@@ -23,7 +23,7 @@ Black-Litterman prior estimator for asset returns.
   - `sets`: Asset sets.
   - `views_conf`: View confidence(s).
   - `rf`: Risk-free rate.
-  - `tau`: Blending parameter.
+  - `tau`: Blending parameter. When computing the prior if `nothing`, defaults to `1/T` where `T` is the number of observations.
 
 # Constructor
 
@@ -45,6 +45,62 @@ Keyword arguments correspond to the fields above.
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+
+# Examples
+
+```jldoctest
+julia> BlackLittermanPrior(; sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"])),
+                           views = LinearConstraintEstimator(;
+                                                             val = ["A == 0.03", "B + C == 0.04"]))
+BlackLittermanPrior
+          pe | EmpiricalPrior
+             |        ce | PortfolioOptimisersCovariance
+             |           |   ce | Covariance
+             |           |      |    me | SimpleExpectedReturns
+             |           |      |       |   w | nothing
+             |           |      |    ce | GeneralWeightedCovariance
+             |           |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |           |      |       |    w | nothing
+             |           |      |   alg | Full()
+             |           |   mp | DefaultMatrixProcessing
+             |           |      |       pdm | Posdef
+             |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |           |      |   denoise | nothing
+             |           |      |    detone | nothing
+             |           |      |       alg | nothing
+             |        me | EquilibriumExpectedReturns
+             |           |   ce | PortfolioOptimisersCovariance
+             |           |      |   ce | Covariance
+             |           |      |      |    me | SimpleExpectedReturns
+             |           |      |      |       |   w | nothing
+             |           |      |      |    ce | GeneralWeightedCovariance
+             |           |      |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |           |      |      |       |    w | nothing
+             |           |      |      |   alg | Full()
+             |           |      |   mp | DefaultMatrixProcessing
+             |           |      |      |       pdm | Posdef
+             |           |      |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |           |      |      |   denoise | nothing
+             |           |      |      |    detone | nothing
+             |           |      |      |       alg | nothing
+             |           |    w | nothing
+             |           |    l | Int64: 1
+             |   horizon | nothing
+          mp | DefaultMatrixProcessing
+             |       pdm | Posdef
+             |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |   denoise | nothing
+             |    detone | nothing
+             |       alg | nothing
+       views | LinearConstraintEstimator
+             |   val | Vector{String}: ["A == 0.03", "B + C == 0.04"]
+        sets | AssetSets
+             |    key | String: "nx"
+             |   dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+  views_conf | nothing
+          rf | Float64: 0.0
+         tau | nothing
+```
 
 # Related
 
@@ -135,7 +191,7 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
 # Related
 
   - [`BlackLittermanPrior`](@ref)
-  - [`calc_omega`](@ref)
+  - [`vanilla_posteriors`](@ref)
 """
 function calc_omega(::Nothing, P::AbstractMatrix, sigma::AbstractMatrix)
     return Diagonal(P * sigma * transpose(P))
@@ -148,6 +204,37 @@ function calc_omega(views_conf::AbstractVector, P::AbstractMatrix, sigma::Abstra
     alphas = inv.(views_conf) .- one(eltype(views_conf))
     return Diagonal(alphas .* P * sigma * transpose(P))
 end
+"""
+```julia
+vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
+                   prior_sigma::AbstractMatrix, omega::AbstractMatrix, P::AbstractMatrix,
+                   Q::AbstractVector)
+```
+
+Compute the Black-Litterman posterior mean and covariance for asset returns.
+
+`vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, risk-free rate `rf`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
+
+# Arguments
+
+  - `tau`: Scalar blending parameter for prior and views.
+  - `rf`: Risk-free rate to add to the posterior mean.
+  - `prior_mu`: Prior mean vector of asset returns.
+  - `prior_sigma`: Prior covariance matrix of asset returns.
+  - `omega`: View uncertainty matrix.
+  - `P`: View matrix (views × assets).
+  - `Q`: Vector of view returns (views).
+
+# Returns
+
+  - `posterior_mu::Vector{<:Real}`: Posterior mean vector of asset returns.
+  - `posterior_sigma::Matrix{<:Real}`: Posterior covariance matrix of asset returns.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`calc_omega`](@ref)
+"""
 function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
                             prior_sigma::AbstractMatrix, omega::AbstractMatrix,
                             P::AbstractMatrix, Q::AbstractVector)
@@ -158,6 +245,53 @@ function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
 end
+"""
+```julia
+prior(pe::BlackLittermanPrior, X::AbstractMatrix;
+      F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+      kwargs...)
+```
+
+Compute the Black-Litterman prior moments for asset returns.
+
+`prior` estimates the mean and covariance of asset returns using the Black-Litterman model, combining a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. The method supports both direct and constraint-based views, flexible confidence specification, and matrix processing.
+
+# Arguments
+
+  - `pe::BlackLittermanPrior`: Black-Litterman prior estimator.
+  - `X::AbstractMatrix`: Asset returns matrix (observations × assets).
+  - `F::Union{Nothing, <:AbstractMatrix}`: Optional factor matrix (default: `nothing`).
+  - `dims::Int`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - `strict::Bool`: If `true`, enforce strict validation of views and sets. Default is `false`.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, and posterior covariance matrix.
+
+# Validation
+
+  - `dims in (1, 2)`.
+  - `length(pe.sets.dict[pe.sets.key]) == size(X, 2)`.
+
+# Details
+
+  - If `dims == 2`, `X` and `F` are transposed to ensure assets are in columns.
+  - The prior model is computed using the embedded prior estimator `pe.pe`.
+  - Views are extracted using `black_litterman_views`, which returns the view matrix `P` and view returns vector `Q`.
+  - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
+  - The view uncertainty matrix `omega` is computed using `calc_omega`.
+  - The posterior mean and covariance are computed using `vanilla_posteriors`.
+  - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`prior`](@ref)
+  - [`calc_omega`](@ref)
+  - [`vanilla_posteriors`](@ref)
+"""
 function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)

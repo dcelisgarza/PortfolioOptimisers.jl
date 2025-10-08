@@ -242,3 +242,5 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::AbstractMatrix)
     @expression(model, Xap1, one(eltype(X)) .+ X)
     return Xap1
 end
+
+export JuMPOptimisationSolution

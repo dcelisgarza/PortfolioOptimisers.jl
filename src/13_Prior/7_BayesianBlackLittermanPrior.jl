@@ -1,3 +1,141 @@
+"""
+```julia
+struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
+       AbstractLowOrderPriorEstimator_F
+    pe::T1
+    mp::T2
+    views::T3
+    sets::T4
+    views_conf::T5
+    rf::T6
+    tau::T7
+end
+```
+
+Bayesian Black-Litterman prior estimator for asset returns.
+
+`BayesianBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using a Bayesian Black-Litterman model. It combines a factor prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates Bayesian updating for posterior inference.
+
+# Fields
+
+  - `pe`: Factor prior estimator.
+  - `mp`: Matrix post-processing estimator.
+  - `views`: Views estimator or views object.
+  - `sets`: Asset sets.
+  - `views_conf`: View confidence(s).
+  - `rf`: Risk-free rate.
+  - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of factor observations.
+
+# Constructor
+
+```julia
+BayesianBlackLittermanPrior(;
+                            pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(;
+                                                                                  pe = EmpiricalPrior(;
+                                                                                                      me = EquilibriumExpectedReturns())),
+                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                            views::Union{<:LinearConstraintEstimator,
+                                         <:BlackLittermanViews},
+                            sets::Union{Nothing, <:AssetSets} = nothing,
+                            views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
+                            rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
+  - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
+  - If `tau` is not `nothing`, `tau > 0`.
+
+# Examples
+
+```jldoctest
+julia> BayesianBlackLittermanPrior(;
+                                   sets = AssetSets(; key = "nx",
+                                                    dict = Dict("nx" => ["A", "B", "C"])),
+                                   views = LinearConstraintEstimator(;
+                                                                     val = ["A == 0.03",
+                                                                            "B + C == 0.04"]))
+BayesianBlackLittermanPrior
+          pe | FactorPrior
+             |    pe | EmpiricalPrior
+             |       |        ce | PortfolioOptimisersCovariance
+             |       |           |   ce | Covariance
+             |       |           |      |    me | SimpleExpectedReturns
+             |       |           |      |       |   w | nothing
+             |       |           |      |    ce | GeneralWeightedCovariance
+             |       |           |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |       |           |      |       |    w | nothing
+             |       |           |      |   alg | Full()
+             |       |           |   mp | DefaultMatrixProcessing
+             |       |           |      |       pdm | Posdef
+             |       |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |       |           |      |   denoise | nothing
+             |       |           |      |    detone | nothing
+             |       |           |      |       alg | nothing
+             |       |        me | EquilibriumExpectedReturns
+             |       |           |   ce | PortfolioOptimisersCovariance
+             |       |           |      |   ce | Covariance
+             |       |           |      |      |    me | SimpleExpectedReturns
+             |       |           |      |      |       |   w | nothing
+             |       |           |      |      |    ce | GeneralWeightedCovariance
+             |       |           |      |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |       |           |      |      |       |    w | nothing
+             |       |           |      |      |   alg | Full()
+             |       |           |      |   mp | DefaultMatrixProcessing
+             |       |           |      |      |       pdm | Posdef
+             |       |           |      |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |       |           |      |      |   denoise | nothing
+             |       |           |      |      |    detone | nothing
+             |       |           |      |      |       alg | nothing
+             |       |           |    w | nothing
+             |       |           |    l | Int64: 1
+             |       |   horizon | nothing
+             |    mp | DefaultMatrixProcessing
+             |       |       pdm | Posdef
+             |       |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |       |   denoise | nothing
+             |       |    detone | nothing
+             |       |       alg | nothing
+             |    re | StepwiseRegression
+             |       |     crit | PValue
+             |       |          |   threshold | Float64: 0.05
+             |       |      alg | Forward()
+             |       |   target | LinearModel
+             |       |          |   kwargs | @NamedTuple{}: NamedTuple()
+             |    ve | SimpleVariance
+             |       |          me | SimpleExpectedReturns
+             |       |             |   w | nothing
+             |       |           w | nothing
+             |       |   corrected | Bool: true
+             |   rsd | Bool: true
+          mp | DefaultMatrixProcessing
+             |       pdm | Posdef
+             |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |   denoise | nothing
+             |    detone | nothing
+             |       alg | nothing
+       views | LinearConstraintEstimator
+             |   val | Vector{String}: ["A == 0.03", "B + C == 0.04"]
+        sets | AssetSets
+             |    key | String: "nx"
+             |   dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+  views_conf | nothing
+          rf | Float64: 0.0
+         tau | nothing
+```
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`BlackLittermanViews`](@ref)
+  - [`AssetSets`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`prior`](@ref)
+"""
 struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_F
     pe::T1
@@ -53,6 +191,52 @@ function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+```julia
+prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+      strict::Bool = false, kwargs...)
+```
+
+Compute Bayesian Black-Litterman prior moments for asset returns.
+
+`prior` estimates the mean and covariance of asset returns using the Bayesian Black-Litterman model, combining a factor prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates Bayesian updating for posterior inference.
+
+# Arguments
+
+  - `pe::BayesianBlackLittermanPrior`: Bayesian Black-Litterman prior estimator.
+  - `X::AbstractMatrix`: Asset returns matrix (observations × assets).
+  - `F::AbstractMatrix`: Factor matrix (observations × factors).
+  - `dims::Int`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - `strict::Bool`: If `true`, enforce strict validation of views and sets. Default is `false`.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, and factor prior details.
+
+# Validation
+
+  - `dims in (1, 2)`.
+  - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
+
+# Details
+
+  - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
+  - The factor prior is computed using the embedded prior estimator `pe.pe`.
+  - Views are extracted using `black_litterman_views`, which returns the view matrix `P` and view returns vector `Q`.
+  - `tau` defaults to `1/T` if not specified, where `T` is the number of factor observations.
+  - The view uncertainty matrix `f_omega` is computed using `calc_omega`.
+  - Bayesian posterior mean and covariance are computed via the model's update equations.
+  - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
+  - The result includes factor prior mean and covariance, and regression details.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`prior`](@ref)
+  - [`calc_omega`](@ref)
+"""
 function prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
