@@ -66,7 +66,7 @@ BayesianBlackLittermanPrior
              |       |           |      |    me | SimpleExpectedReturns
              |       |           |      |       |   w | nothing
              |       |           |      |    ce | GeneralWeightedCovariance
-             |       |           |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |       |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              |       |           |      |       |    w | nothing
              |       |           |      |   alg | Full()
              |       |           |   mp | DefaultMatrixProcessing
@@ -81,7 +81,7 @@ BayesianBlackLittermanPrior
              |       |           |      |      |    me | SimpleExpectedReturns
              |       |           |      |      |       |   w | nothing
              |       |           |      |      |    ce | GeneralWeightedCovariance
-             |       |           |      |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |       |           |      |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              |       |           |      |      |       |    w | nothing
              |       |           |      |      |   alg | Full()
              |       |           |      |   mp | DefaultMatrixProcessing
