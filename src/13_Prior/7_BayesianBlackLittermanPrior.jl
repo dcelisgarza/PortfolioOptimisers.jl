@@ -203,11 +203,11 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
 
 # Arguments
 
-  - `pe::BayesianBlackLittermanPrior`: Bayesian Black-Litterman prior estimator.
-  - `X::AbstractMatrix`: Asset returns matrix (observations × assets).
-  - `F::AbstractMatrix`: Factor matrix (observations × factors).
-  - `dims::Int`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
-  - `strict::Bool`: If `true`, enforce strict validation of views and sets. Default is `false`.
+  - `pe`: Bayesian Black-Litterman prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Factor matrix (observations × factors).
+  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
 # Returns
@@ -223,9 +223,9 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
 
   - If `dims == 2`, `X` and `F` are transposed to ensure assets/factors are in columns.
   - The factor prior is computed using the embedded prior estimator `pe.pe`.
-  - Views are extracted using `black_litterman_views`, which returns the view matrix `P` and view returns vector `Q`.
+  - Views are extracted using [`black_litterman_views`](@ref), which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of factor observations.
-  - The view uncertainty matrix `f_omega` is computed using `calc_omega`.
+  - The view uncertainty matrix `f_omega` is computed using [`calc_omega`](@ref).
   - Bayesian posterior mean and covariance are computed via the model's update equations.
   - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
   - The result includes factor prior mean and covariance, and regression details.

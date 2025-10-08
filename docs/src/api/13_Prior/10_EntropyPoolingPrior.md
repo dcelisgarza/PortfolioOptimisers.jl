@@ -1,5 +1,20 @@
 # Entropy Pooling
 
 ```@docs
+H0_EntropyPooling
+H1_EntropyPooling
+H2_EntropyPooling
+LogEntropyPooling
+ExpEntropyPooling
+CVaREntropyPooling
+OptimEntropyPooling
+JuMPEntropyPooling
+EntropyPoolingPrior
+PortfolioOptimisers.AbstractEntropyPoolingOptimiser
+PortfolioOptimisers.AbstractEntropyPoolingAlgorithm
+PortfolioOptimisers.AbstractEntropyPoolingOptAlgorithm
 PortfolioOptimisers.replace_prior_views
+PortfolioOptimisers.get_epw
+PortfolioOptimisers.add_ep_constraint!
+PortfolioOptimisers.entropy_pooling
 ```

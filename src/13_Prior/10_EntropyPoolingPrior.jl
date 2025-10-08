@@ -1,17 +1,244 @@
+"""
+```julia
 abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
+```
+
+Abstract supertype for entropy pooling optimisers.
+
+`AbstractEntropyPoolingOptimiser` is the base type for all optimisers that compute entropy pooling weights subject to moment and view constraints. All concrete entropy pooling optimisers should subtype this type to ensure a consistent interface for entropy pooling routines and integration with portfolio optimisation workflows.
+
+# Related
+
+  - [`AbstractEntropyPoolingAlgorithm`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
+abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
+"""
+```julia
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
+```
+
+Abstract supertype for entropy pooling algorithms.
+
+`AbstractEntropyPoolingAlgorithm` is the base type for all algorithms used in entropy pooling optimisation routines. All concrete entropy pooling algorithms should subtype this type to ensure a consistent interface for entropy pooling methods and integration with portfolio optimisation workflows.
+
+# Related
+
+  - [`AbstractEntropyPoolingOptimiser`](@ref)
+  - [`LogEntropyPooling`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
+"""
+```julia
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+```
+
+One-shot entropy pooling. It sets and optimises all the constraints simultaneously. This introduces bias in the posterior probabilities, but is faster.
+
+# Related
+
+  - [`AbstractEntropyPoolingAlgorithm`](@ref)
+  - [`H1_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+"""
+struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+"""
+```julia
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+```
+
+Uses the initial probabilities to optimise the posterior probabilities at every step. This reduces bias in the posterior probabilities, but is slower.
+
+# Related
+
+  - [`AbstractEntropyPoolingAlgorithm`](@ref)
+  - [`H0_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+"""
+struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+"""
+```julia
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+```
+
+Uses the previous step's probabilities to optimise the next step's probabilities. This is faster but may introduce bias.
+
+# Related
+
+  - [`AbstractEntropyPoolingAlgorithm`](@ref)
+  - [`H0_EntropyPooling`](@ref)
+  - [`H1_EntropyPooling`](@ref)
+"""
+struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+"""
+```julia
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
+```
+
+Abstract supertype for entropy pooling optimisation algorithms.
+
+`AbstractEntropyPoolingOptAlgorithm` is the base type for all optimisation algorithms used in entropy pooling routines. All concrete entropy pooling optimisation algorithms should subtype this type to ensure a consistent interface for entropy pooling optimisation and integration with portfolio optimisation workflows.
+
+# Related
+
+  - [`AbstractEntropyPoolingAlgorithm`](@ref)
+  - [`LogEntropyPooling`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
+abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
+"""
+```julia
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+```
+
+Logarithmic entropy pooling optimisation algorithm.
+
+`LogEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptAlgorithm`](@ref) representing the logarithmic entropy pooling optimisation algorithm. This algorithm solves for posterior probabilities by minimising the Kullback-Leibler divergence between the prior and posterior weights, subject to moment and view constraints, using a logarithmic objective.
+
+# Examples
+
+```jldoctest
+julia> entropy_pooling(w0, epc, opt)
+w0 = pweights([0.25, 0.25, 0.25, 0.25])
+```
+
+# Related
+
+  - [`AbstractEntropyPoolingOptAlgorithm`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
+struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+"""
+```julia
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+```
+
+Exponential entropy pooling optimisation algorithm.
+
+`ExpEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptAlgorithm`](@ref) representing the exponential entropy pooling optimisation algorithm. This algorithm solves for posterior probabilities by minimising the exponential divergence between the prior and posterior weights, subject to moment and view constraints, using an exponential objective.
+
+# Examples
+
+```jldoctest
+julia> entropy_pooling(w0, epc, opt)
+w0 = pweights([0.25, 0.25, 0.25, 0.25])
+```
+
+# Related
+
+  - [`AbstractEntropyPoolingOptAlgorithm`](@ref)
+  - [`LogEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
+struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+"""
+```julia
+get_epw(alg::Union{<:H0_EntropyPooling, <:H1_EntropyPooling}, w0::AbstractWeights,
+        wi::AbstractWeights)
+```
+
+Select entropy pooling weights according to the specified algorithm.
+
+`get_epw` returns the appropriate weights for entropy pooling based on the chosen algorithm. For `H1_EntropyPooling`, it returns the initial prior weights `w0`. For `H2_EntropyPooling`, it returns the updated weights `wi`. This function is used internally to manage the flow of weights in multi-stage entropy pooling routines.
+
+# Arguments
+
+  - `alg`: Entropy pooling algorithm .
+  - `w0`: Initial prior weights.
+  - `wi`: Updated weights from previous step.
+
+# Returns
+
+  - `w::AbstractWeights`: Selected weights for the current entropy pooling step.
+
+# Examples
+
+```jldoctest
+julia> using StatsBase
+
+julia> w0 = pweights([0.25, 0.25, 0.25, 0.25]);
+
+julia> wi = pweights([0.1, 0.2, 0.3, 0.4]);
+
+julia> PortfolioOptimisers.get_epw(H1_EntropyPooling(), w0, wi)
+4-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
+ 0.25
+ 0.25
+ 0.25
+ 0.25
+
+julia> PortfolioOptimisers.get_epw(H2_EntropyPooling(), w0, wi)
+4-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
+ 0.1
+ 0.2
+ 0.3
+ 0.4
+```
+
+# Related
+
+  - [`H0_EntropyPooling`](@ref)
+  - [`H1_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
 end
 function get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return wi
 end
+"""
+```julia
+struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
+    args::T1
+    kwargs::T2
+end
+```
+
+Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
+
+`CVaREntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses root-finding algorithms from [`Roots.jl`](https://github.com/JuliaMath/Roots.jl) to solve entropy pooling problems with CVaR (Conditional Value-at-Risk) view constraints. This optimiser is designed for scenarios where CVaR views are specified and requires robust numerical methods to find the solution.
+
+# Fields
+
+  - `args`: Tuple of arguments passed to the root-finding algorithm (e.g., `Roots.Brent()`).
+  - `kwargs`: Named tuple of keyword arguments for the root-finding algorithm.
+
+# Constructor
+
+```julia
+CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
+```
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> CVaREntropyPooling()
+CVaREntropyPooling
+    args | Tuple{Roots.Brent}: (Roots.Brent(),)
+  kwargs | @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`AbstractEntropyPoolingOptimiser`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
+"""
 struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
@@ -22,6 +249,66 @@ end
 function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
     return CVaREntropyPooling(args, kwargs)
 end
+"""
+```julia
+struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
+    args::T1
+    kwargs::T2
+    sc1::T3
+    sc2::T4
+    alg::T5
+end
+```
+
+Optim.jl-based entropy pooling optimiser.
+
+`OptimEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) to solve entropy pooling problems. This optimiser supports both logarithmic and exponential entropy pooling objectives, and allows for flexible configuration of solver arguments, scaling parameters, and algorithm selection.
+
+# Fields
+
+  - `args`: Tuple of arguments passed to the [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) solver.
+  - `kwargs`: Named tuple of keyword arguments for the [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) solver.
+  - `sc1`: Scaling parameter for the objective function.
+  - `sc2`: Slack parameter for relaxing fixed equality constraint penalties so that they can be satisfied more easily.
+  - `alg`: Entropy pooling optimisation algorithm.
+
+# Constructor
+
+```julia
+OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Real = 1,
+                    sc2::Real = 1e3,
+                    alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `sc1 >= 0`
+  - `sc2 >= 0`
+
+# Examples
+
+```jldoctest
+julia> OptimEntropyPooling()
+OptimEntropyPooling
+    args | Tuple{}: ()
+  kwargs | @NamedTuple{}: NamedTuple()
+     sc1 | Int64: 1
+     sc2 | Float64: 1000.0
+     alg | ExpEntropyPooling()
+```
+
+# Related
+
+  - [`AbstractEntropyPoolingOptimiser`](@ref)
+  - [`LogEntropyPooling`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+  - [`CVaREntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
+"""
 struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
@@ -43,6 +330,73 @@ function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
+"""
+```julia
+struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
+    slv::T1
+    sc1::T2
+    sc2::T3
+    so::T4
+    alg::T5
+end
+```
+
+JuMP.jl-based entropy pooling optimiser.
+
+`JuMPEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses [JuMP.jl](https://github.com/jump-dev/JuMP.jl) to solve entropy pooling problems. This optimiser supports both logarithmic and exponential entropy pooling objectives, and allows for flexible configuration of solver arguments, scaling parameters, and algorithm selection.
+
+# Fields
+
+  - `slv`: Solver object or vector of solvers for JuMP.jl.
+  - `sc1`: Scaling parameter for the objective function.
+  - `sc2`: Scaling parameter for constraint penalties.
+  - `so`: Scaling parameter for the objective expression.
+  - `alg`: Entropy pooling optimisation algorithm (`LogEntropyPooling` or `ExpEntropyPooling`).
+
+# Constructor
+
+```julia
+JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc1::Real = 1,
+                   sc2::Real = 1e5, so::Real = 1,
+                   alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `slv` is a vector, it must be non-empty.
+  - `sc1 >= 0`
+  - `sc2 >= 0`
+  - `so >= 0`
+
+# Examples
+
+```jldoctest
+julia> JuMPEntropyPooling(; slv = Solver(; name = :fake_solver, solver = :MySolver))
+JuMPEntropyPooling
+  slv | Solver
+      |          name | Symbol: :fake_solver
+      |        solver | Symbol: :MySolver
+      |      settings | nothing
+      |     check_sol | @NamedTuple{}: NamedTuple()
+      |   add_bridges | Bool: true
+  sc1 | Int64: 1
+  sc2 | Float64: 100000.0
+   so | Int64: 1
+  alg | ExpEntropyPooling()
+```
+
+# Related
+
+  - [`AbstractEntropyPoolingOptimiser`](@ref)
+  - [`LogEntropyPooling`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`CVaREntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [JuMP.jl](https://github.com/jump-dev/JuMP.jl)
+"""
 struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     slv::T1
     sc1::T2
@@ -68,6 +422,145 @@ function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
+"""
+```julia
+struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
+                           T16} <: AbstractLowOrderPriorEstimator_AF
+    pe::T1
+    mu_views::T2
+    var_views::T3
+    cvar_views::T4
+    sigma_views::T5
+    sk_views::T6
+    kt_views::T7
+    rho_views::T8
+    var_alpha::T9
+    cvar_alpha::T10
+    sets::T11
+    ds_opt::T12
+    dm_opt::T13
+    opt::T14
+    w::T15
+    alg::T16
+end
+```
+
+Entropy pooling prior estimator for asset returns.
+
+`EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports moment and view constraints (mean, variance, CVaR, covariance, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The estimator integrates asset sets, view constraints, and multiple entropy pooling algorithms (Optim.jl, JuMP.jl, CVaR root-finding), and allows for custom prior weights and solver configuration.
+
+# Fields
+
+  - `pe`: Prior estimator for asset returns.
+  - `mu_views`: Mean view constraints.
+  - `sigma_views`: Variance view constraints.
+  - `cvar_views`: CVaR view constraints.
+  - `sigma_views`: Covariance view constraints.
+  - `sk_views`: Skewness view constraints.
+  - `kt_views`: Kurtosis view constraints.
+  - `rho_views`: Correlation view constraints.
+  - `var_alpha`: Confidence level for VaR (Value at Risk) views.
+  - `cvar_alpha`: Confidence level for CVaR (Conditional Value at Risk) views.
+  - `sets`: Asset sets.
+  - `ds_opt`: CVaR entropy pooling optimiser.
+  - `dm_opt`: Optim.jl-based entropy pooling optimiser.
+  - `opt`: Main entropy pooling optimiser.
+  - `w`: Prior weights.
+  - `alg`: Entropy pooling algorithm.
+
+# Constructor
+
+```julia
+EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+                    mu_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    var_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    cvar_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    sigma_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    sk_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    kt_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    rho_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                    var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
+                    sets::Union{Nothing, <:AssetSets} = nothing,
+                    ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
+                    dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
+                    opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
+                    w::Union{Nothing, AbstractVector} = nothing,
+                    alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If any view constraint is provided, `sets` must not be `nothing`.
+  - `0 < var_alpha < 1`
+  - `0 < cvar_alpha < 1`
+  - If `w` is provided, it must be non-empty and match the number of observations.
+
+# Examples
+
+```jldoctest
+julia> EntropyPoolingPrior(; sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"])),
+                           mu_views = LinearConstraintEstimator(;
+                                                                val = ["A == 0.03",
+                                                                       "B + C == 0.04"]))
+EntropyPoolingPrior
+           pe | EmpiricalPrior
+              |        ce | PortfolioOptimisersCovariance
+              |           |   ce | Covariance
+              |           |      |    me | SimpleExpectedReturns
+              |           |      |       |   w | nothing
+              |           |      |    ce | GeneralWeightedCovariance
+              |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+              |           |      |       |    w | nothing
+              |           |      |   alg | Full()
+              |           |   mp | DefaultMatrixProcessing
+              |           |      |       pdm | Posdef
+              |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+              |           |      |   denoise | nothing
+              |           |      |    detone | nothing
+              |           |      |       alg | nothing
+              |        me | SimpleExpectedReturns
+              |           |   w | nothing
+              |   horizon | nothing
+     mu_views | LinearConstraintEstimator
+              |   val | Vector{String}: ["A == 0.03", "B + C == 0.04"]
+    var_views | nothing
+   cvar_views | nothing
+  sigma_views | nothing
+     sk_views | nothing
+     kt_views | nothing
+    rho_views | nothing
+    var_alpha | Float64: 0.05
+   cvar_alpha | Float64: 0.05
+         sets | AssetSets
+              |    key | String: "nx"
+              |   dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+       ds_opt | nothing
+       dm_opt | nothing
+          opt | OptimEntropyPooling
+              |     args | Tuple{}: ()
+              |   kwargs | @NamedTuple{}: NamedTuple()
+              |      sc1 | Int64: 1
+              |      sc2 | Float64: 1000.0
+              |      alg | ExpEntropyPooling()
+            w | nothing
+          alg | H1_EntropyPooling()
+```
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_AF`](@ref)
+  - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`LinearConstraintEstimator`](@ref)
+  - [`AssetSets`](@ref)
+  - [`CVaREntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+  - [`AbstractEntropyPoolingAlgorithm`](@ref)
+"""
 struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
                            T16} <: AbstractLowOrderPriorEstimator_AF
     pe::T1
@@ -174,7 +667,31 @@ function factory(pe::EntropyPoolingPrior, w::Union{Nothing, <:AbstractWeights} =
                                opt = pe.opt, w = nothing_scalar_array_factory(pe.w, w),
                                alg = pe.alg)
 end
-function get_pr_value end
+"""
+```julia
+add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector, key::Symbol)
+```
+
+Add an entropy pooling view constraint to the constraint dictionary.
+
+`add_ep_constraint!` normalises and adds a constraint to the entropy pooling constraint dictionary `epc`. If a constraint with the same key already exists, it concatenates the new constraint to the existing one. This function is used internally to build the set of linear and nonlinear constraints for entropy pooling optimisation.
+
+# Arguments
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `lhs`: Left-hand side constraint matrix.
+  - `rhs`: Right-hand side constraint vector.
+  - `key`: Constraint type key (`:eq`, `:ineq`, `:feq`, `:cvar_eq`).
+
+# Returns
+
+  - `nothing`: The function mutates `epc` in-place.
+
+# Related
+
+  - [`entropy_pooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector,
                             key::Symbol)
     sc = norm(lhs)
@@ -187,6 +704,44 @@ function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::Abstrac
     end
     return nothing
 end
+"""
+```julia
+replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
+                    key::Symbol; alpha::Union{Nothing, <:Real} = nothing,
+                    strict::Bool = false)
+```
+
+Replace prior references in view parsing results with their corresponding prior values.
+
+`replace_prior_views` scans a parsed view constraint [`ParsingResult`](@ref) for references to prior values (e.g., `prior(A)`), and replaces them with the actual prior value from the provided prior result object. This ensures that prior-based terms in view constraints are treated as constants and not as variables in the optimisation. If an asset referenced in a prior is not found in the asset set, a warning is issued (or an error if `strict=true`). If all variables in the view are prior references, an error is thrown.
+
+# Arguments
+
+  - `res`: Parsed view constraint containing variables and coefficients.
+  - `pr`: Prior result object containing prior values (mean, variance, etc.).
+  - `sets`: Asset set mapping asset names to indices.
+  - `key`: Moment type key (`:mu`, `:var`, `:cvar`, etc.).
+  - `alpha`: Optional confidence level for VaR/CVaR views.
+  - `strict`: If `true`, throw errors for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `res::ParsingResult`: Updated parsing result with prior references replaced by their values.
+
+# Details
+
+  - Prior references are matched using the pattern `prior(<asset>)`.
+  - The right-hand side of the constraint is adjusted by subtracting the prior value times its coefficient.
+  - Variables corresponding to prior references are removed from the constraint.
+  - Throws an error if no non-prior variables remain.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`AssetSets`](@ref)
+  - [`prior`](@ref)
+"""
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
                              key::Symbol, alpha::Union{Nothing, <:Real} = nothing;
                              strict::Bool = false)
@@ -224,6 +779,9 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "))
     return ParsingResult(variables_new, coeffs_new, res.op, rhs, "$(eqn) $(res.op) $(rhs)")
 end
+"""
+broadcasted version of replace_prior_views for vectors of parsing results (multiple views).
+"""
 function replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
     return replace_prior_views.(res, args...; kwargs...)
 end
@@ -307,6 +865,42 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     end
     return nothing
 end
+"""
+```julia
+entropy_pooling(w::AbstractVector, epc::AbstractDict, opt::OptimEntropyPooling)
+```
+
+Solve the dual of the exponential entropy pooling formulation using Optim.jl.
+
+`entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), supporting box constraints and slack variables for relaxed equality constraints. This method is used internally by [`EntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
+
+# Arguments
+
+  - `w`: Prior weights (length = number of observations).
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `opt: Optim.jl-based entropy pooling optimiser with exponential objective.
+
+      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: use the exponential formulation.
+      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: use the logarithmic formulation.
+
+# Returns
+
+  - `pw::ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+
+# Details
+
+  - Constructs the constraint matrix and bounds from `epc`.
+  - Relaxes fixed equality constraints via slack variables to make the problem more tractable.
+  - Throws an error if optimisation fails.
+
+# Related
+
+  - [`OptimEntropyPooling`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                   <:ExpEntropyPooling})
@@ -416,6 +1010,42 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     end
     return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
 end
+"""
+```julia
+entropy_pooling(w::AbstractVector, epc::AbstractDict, opt::JuMPEntropyPooling)
+```
+
+Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
+
+`entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl), supporting relative entropy cones and slack variables for relaxed equality constraints. This method is used internally by [`EntropyPoolingPrior`](@ref) when the optimiser is a [`JuMPEntropyPooling`](@ref).
+
+# Arguments
+
+  - `w`: Prior weights (length = number of observations).
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `opt`: JuMP.jl-based entropy pooling optimiser with exponential objective.
+
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: use the exponential formulation.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: use the logarithmic formulation.
+
+# Returns
+
+  - `pw::ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+
+# Details
+
+  - Constructs the JuMP model with exponential objective and constraints from `epc`.
+  - Relaxes fixed equality constraints by adding norm one cone bounded slack variables to make the problem more tractable.
+  - Throws an error if optimisation fails.
+
+# Related
+
+  - [`JuMPEntropyPooling`](@ref)
+  - [`ExpEntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+"""
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                  <:ExpEntropyPooling})
@@ -464,6 +1094,9 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
         throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     end
 end
+"""
+Solve the primal of the entropy pooling logarithmic formulation using JuMP.jl.
+"""
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                  <:LogEntropyPooling})
@@ -953,4 +1586,5 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
 end
 
 export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior, H0_EntropyPooling,
-       H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling
+       H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling,
+       CVaREntropyPooling

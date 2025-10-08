@@ -59,7 +59,7 @@ BlackLittermanPrior
              |           |      |    me | SimpleExpectedReturns
              |           |      |       |   w | nothing
              |           |      |    ce | GeneralWeightedCovariance
-             |           |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              |           |      |       |    w | nothing
              |           |      |   alg | Full()
              |           |   mp | DefaultMatrixProcessing
@@ -181,8 +181,8 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
       + `::Real`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
       + `::AbstractVector{<:Real}`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
 
-  - `P::AbstractMatrix`: The view matrix (views × assets).
-  - `sigma::AbstractMatrix`: The prior covariance matrix (assets × assets).
+  - `P`: The view matrix (views × assets).
+  - `sigma`: The prior covariance matrix (assets × assets).
 
 # Returns
 
@@ -258,11 +258,11 @@ Compute the Black-Litterman prior moments for asset returns.
 
 # Arguments
 
-  - `pe::BlackLittermanPrior`: Black-Litterman prior estimator.
-  - `X::AbstractMatrix`: Asset returns matrix (observations × assets).
-  - `F::Union{Nothing, <:AbstractMatrix}`: Optional factor matrix (default: `nothing`).
-  - `dims::Int`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
-  - `strict::Bool`: If `true`, enforce strict validation of views and sets. Default is `false`.
+  - `pe`: Black-Litterman prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F{Nothing, <:AbstractMatrix}`: Optional factor matrix (default: `nothing`).
+  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
 # Returns
@@ -278,10 +278,10 @@ Compute the Black-Litterman prior moments for asset returns.
 
   - If `dims == 2`, `X` and `F` are transposed to ensure assets are in columns.
   - The prior model is computed using the embedded prior estimator `pe.pe`.
-  - Views are extracted using `black_litterman_views`, which returns the view matrix `P` and view returns vector `Q`.
+  - Views are extracted using [`black_litterman_views`](@ref), which returns the view matrix `P` and view returns vector `Q`.
   - `tau` defaults to `1/T` if not specified, where `T` is the number of observations.
-  - The view uncertainty matrix `omega` is computed using `calc_omega`.
-  - The posterior mean and covariance are computed using `vanilla_posteriors`.
+  - The view uncertainty matrix `omega` is computed using [`calc_omega`](@ref).
+  - The posterior mean and covariance are computed using [`vanilla_posteriors`](@ref).
   - Matrix processing is applied to the posterior covariance and asset returns using the embedded matrix processing estimator `pe.mp`.
 
 # Related
