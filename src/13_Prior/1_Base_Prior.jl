@@ -452,7 +452,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
   - `sigma`: Covariance matrix.
   - `chol`: Cholesky factorisation of the factor-adjusted covariance matrix. Factor models sparsify the covariance matrix, so using their smaller, sparser Cholesky factor makes for more numerically stable and efficient optimisations.
   - `w`: Asset weights.
-  - `ens`: Entropy.
+  - `ens`: Effective number of scenarios.
   - `kld`: Kullback-Leibler divergence.
   - `ow`: Opinion pooling weights.
   - `rr`: Regression result.

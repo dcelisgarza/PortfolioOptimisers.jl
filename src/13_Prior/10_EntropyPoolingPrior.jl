@@ -470,7 +470,7 @@ EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior
                     ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
                     dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
                     opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
-                    w::Union{Nothing, AbstractVector} = nothing,
+                    w::Union{Nothing, <:ProbabilityWeights} = nothing,
                     alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
 ```
 
@@ -479,9 +479,15 @@ Keyword arguments correspond to the fields above.
 ## Validation
 
   - If any view constraint is provided, `sets` must not be `nothing`.
-  - `0 < var_alpha < 1`
-  - `0 < cvar_alpha < 1`
+  - If not `nothing`, `0 < var_alpha < 1`.
+  - If not `nothing`, `0 < cvar_alpha < 1`.
   - If `w` is provided, it must be non-empty and match the number of observations.
+
+# Details
+
+  - If `w` is provided, it is normalised to sum to 1; otherwise, uniform weights are used when `prior` is called.
+  - If `var_views` is provided without `var_alpha`, defaults to `0.05`.
+  - If `cvar_views` is provided without `cvar_alpha`, defaults to `0.05`.
 
 # Examples
 
@@ -573,15 +579,17 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  sk_views::Union{Nothing, <:LinearConstraintEstimator},
                                  kt_views::Union{Nothing, <:LinearConstraintEstimator},
                                  rho_views::Union{Nothing, <:LinearConstraintEstimator},
-                                 var_alpha::Real, cvar_alpha::Real,
+                                 var_alpha::Union{Nothing, <:Real},
+                                 cvar_alpha::Union{Nothing, <:Real},
                                  sets::Union{Nothing, <:AssetSets},
                                  ds_opt::Union{Nothing, <:CVaREntropyPooling},
                                  dm_opt::Union{Nothing, <:OptimEntropyPooling},
                                  opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
-                                 w::Union{Nothing, AbstractVector},
+                                 w::Union{Nothing, <:ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
-        if isa(w, AbstractWeights)
+        if isa(w, ProbabilityWeights)
             @argcheck(!isempty(w))
+            normalize!(w, 1)
         end
         if !isnothing(mu_views) ||
            !isnothing(var_views) ||
@@ -592,8 +600,20 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
            !isnothing(rho_views)
             @argcheck(!isnothing(sets))
         end
-        @argcheck(zero(var_alpha) < var_alpha < one(var_alpha))
-        @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
+        if !isnothing(var_views)
+            if !isnothing(var_alpha)
+                @argcheck(zero(var_alpha) < var_alpha < one(var_alpha))
+            else
+                var_alpha = 0.05
+            end
+        end
+        if !isnothing(cvar_views)
+            if !isnothing(cvar_alpha)
+                @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
+            else
+                cvar_alpha = 0.05
+            end
+        end
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
                    typeof(sigma_views), typeof(sk_views), typeof(kt_views),
                    typeof(rho_views), typeof(var_alpha), typeof(cvar_alpha), typeof(sets),
@@ -623,12 +643,13 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              sk_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              kt_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              rho_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
-                             var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
+                             var_alpha::Union{Nothing, <:Real} = nothing,
+                             cvar_alpha::Union{Nothing, <:Real} = nothing,
                              sets::Union{Nothing, <:AssetSets} = nothing,
                              ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
                              dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
                              opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
-                             w::Union{Nothing, AbstractVector} = nothing,
+                             w::Union{Nothing, <:ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
@@ -660,7 +681,7 @@ add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector, 
 
 Add an entropy pooling view constraint to the constraint dictionary.
 
-`add_ep_constraint!` normalises and adds a constraint to the entropy pooling constraint dictionary `epc`. If a constraint with the same key already exists, it concatenates the new constraint to the existing one. This function is used internally to build the set of linear and nonlinear constraints for entropy pooling optimisation.
+`add_ep_constraint!` normalises and adds a constraint to the entropy pooling constraint dictionary `epc`. If a constraint with the same key already exists, it concatenates the new constraint to the existing one. This function is used internally to build the set of linear constraints for entropy pooling optimisation.
 
 # Arguments
 
@@ -704,11 +725,12 @@ Replace prior references in view parsing results with their corresponding prior 
 # Arguments
 
   - `res`: Parsed view constraint containing variables and coefficients.
+
   - `pr`: Prior result object containing prior values.
   - `sets`: Asset set mapping asset names to indices.
   - `key`: Moment type key (`:mu`, `:var`, `:cvar`, etc.).
   - `alpha`: Optional confidence level for VaR/CVaR views.
-  - `strict`: If `true`, throw errors for missing assets; otherwise, issue warnings.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
 
@@ -793,12 +815,98 @@ Broadcast prior reference replacement across multiple view constraints.
 function replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
     return replace_prior_views.(res, args...; kwargs...)
 end
+"""
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu}, args...)
+```
+
+Extract the mean (expected return) for asset `i` from a prior result.
+
+`get_pr_value` returns the mean value for the asset indexed by `i` from the prior result object `pr`. This method is used internally to replace prior references in view constraints and for moment extraction in entropy pooling and other prior-based routines.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:mu}`: Dispatch tag for mean extraction.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `mu::Real`: Mean (expected return) for asset `i`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu}, args...)
     return pr.mu[i]
 end
+"""
+```julia
+ep_mu_views!(mu_views::Nothing, args...; kwargs...)
+```
+
+No-op pass-through for mean view constraints when none are specified.
+
+`ep_mu_views!` is an internal API compatibility method that does nothing when mean view constraints (`mu_views`) are not provided (`mu_views = nothing`). This allows higher-level entropy pooling routines to uniformly call `ep_mu_views!` without special-casing the absence of mean views.
+
+# Arguments
+
+  - `mu_views::Nothing`: Indicates that no mean view constraints are specified.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `nothing`: No operation is performed.
+
+# Related
+
+  - [`ep_mu_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
     return nothing
 end
+"""
+```julia
+ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
+             pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+```
+
+Parse and add mean (expected return) view constraints to the entropy pooling constraint dictionary.
+
+`ep_mu_views!` parses mean view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method is used internally by entropy pooling routines to enforce mean views in the optimisation.
+
+# Arguments
+
+  - `mu_views`: Mean view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` in-place.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior values.
+  - Converts parsed views to linear constraints and adds them to `epc`.
+  - Supports both equality and fixed equality constraints.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
     mu_views = parse_equation(mu_views.val; datatype = eltype(pr.X))
@@ -814,6 +922,37 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     end
     return nothing
 end
+"""
+```julia
+fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+        pr::AbstractPriorResult)
+```
+
+Add constraints to fix the mean of specified assets in entropy pooling.
+
+`fix_mu!` identifies assets in `to_fix` that are not yet fixed (i.e., not present in `fixed`), and adds constraints to the entropy pooling constraint dictionary `epc` to fix their mean to the prior value. This ensures that higher moment views (e.g., variance, skewness, kurtosis, correlation) do not inadvertently alter the mean of these assets. The function updates `fixed` in-place to reflect the newly fixed assets.
+
+# Arguments
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `fixed`: Boolean vector indicating which assets have their mean fixed.
+  - `to_fix`: Boolean vector indicating which assets should have their mean fixed.
+  - `pr`: Prior result containing asset return information.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `fixed` in-place.
+
+# Details
+
+  - Adds a fixed equality constraint (`:feq`) for each asset in `to_fix` that is not yet fixed.
+  - Uses the prior mean values from `pr.mu` for the constraint right-hand side.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
                  pr::AbstractPriorResult)
     fix = to_fix .& .!fixed
@@ -823,14 +962,102 @@ function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVecto
     end
     return nothing
 end
+"""
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Real)
+```
+
+Extract the Value-at-Risk (VaR) for asset `i` from a prior result.
+
+`get_pr_value` computes the VaR at confidence level `alpha` for the asset indexed by `i` from the prior result object `pr`. This method uses the asset return samples in `pr` and applies the VaR calculation, typically using the empirical quantile.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:var}`: Dispatch tag for VaR extraction.
+  - `alpha`: Confidence level (e.g., `0.05` for 5% VaR).
+
+# Returns
+
+  - `var::Real`: Value-at-Risk for asset `i` at level `alpha`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Real)
     #! Don't use a view, use a copy, value at risk uses partialsort!
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     return ValueatRisk(; alpha = alpha)(pr.X[:, i])
 end
+"""
+```julia
+ep_var_views!(var_views::Nothing, args...; kwargs...)
+```
+
+No-op pass-through for variance view constraints when none are specified.
+
+`ep_var_views!` is an internal API compatibility method that does nothing when variance view constraints (`var_views`) are not provided (`var_views = nothing`). This allows higher-level entropy pooling routines to uniformly call `ep_var_views!` without special-casing the absence of variance views.
+
+# Arguments
+
+  - `var_views::Nothing`: Indicates that no variance view constraints are specified.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `nothing`: No operation is performed.
+
+# Related
+
+  - [`ep_var_views!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_var_views!(var_views::Nothing, args...; kwargs...)
     return nothing
 end
+"""
+```julia
+ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
+              pr::AbstractPriorResult, sets::AssetSets, alpha::Real; strict::Bool = false)
+```
+
+Parse and add variance (VaR) view constraints to the entropy pooling constraint dictionary.
+
+`ep_var_views!` parses variance (VaR) view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method validates that only single-asset, non-negative, and unit-coefficient views are allowed, and throws informative errors for invalid or extreme views.
+
+# Arguments
+
+  - `var_views`: Variance (VaR) view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `alpha`: Confidence level for VaR.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` in-place.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior values.
+  - Converts parsed views to linear constraints and adds them to `epc`.
+  - Validates that only equality and inequality constraints with unit coefficients are present.
+  - Throws errors for negative or multi-asset views, or if the view is more extreme than the worst realisation.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                        pr::AbstractPriorResult, sets::AssetSets, alpha::Real;
                        strict::Bool = false)
@@ -1155,7 +1382,40 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     end
 end
 """
-Solve entropy pooling views without cvar views, this is for api compatibility.
+```julia
+ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
+                     w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
+                     kwargs...)
+```
+
+Solve entropy pooling views when no CVaR views are specified.
+
+`ep_cvar_views_solve!` is an internal API compatibility method that solves the entropy pooling problem when no Conditional Value-at-Risk (CVaR) view constraints are present (`cvar_views = nothing`). It simply delegates to the main entropy pooling solver using the provided prior weights, constraint dictionary, and optimiser.
+
+# Arguments
+
+  - `cvar_views`: Indicates that no CVaR view constraints are specified.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `w`: Prior probability weights.
+  - `opt`: Entropy pooling optimiser.
+  - `kwargs...`: Additional keyword arguments forwarded to the solver.
+
+# Returns
+
+  - `pw::ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+
+# Details
+
+  - This method is used for API compatibility when CVaR views are not present.
+  - Calls [`entropy_pooling`](@ref) with the provided arguments.
+
+# Related
+
+  - [`entropy_pooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+  - [`CVaREntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
                               w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
@@ -1163,7 +1423,31 @@ function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::A
     return entropy_pooling(w, epc, opt)
 end
 """
-get prior value for cvar views
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
+```
+
+Compute the Conditional Value-at-Risk (CVaR) for asset `i` from a prior result.
+
+`get_pr_value` extracts the CVaR at confidence level `alpha` for the asset indexed by `i` from the prior result object `pr`. This method assumes the prior result contains the necessary asset return information (mean, covariance, or samples) to compute CVaR, typically under a normality assumption.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:cvar}`: Dispatch tag for CVaR computation.
+  - `alpha`: Confidence level.
+
+# Returns
+
+  - `cvar::Real`: Conditional Value-at-Risk for asset `i` at level `alpha`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
     #! Don't use a view, use a copy, value at risk uses partialsort!
@@ -1171,7 +1455,50 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::
     return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
 end
 """
-solve the entropy pooling problem with cvar views
+```julia
+ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
+                     pr::AbstractPriorResult, sets::AssetSets, alpha::Real,
+                     w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
+                     ds_opt::Union{Nothing, <:CVaREntropyPooling},
+                     dm_opt::Union{Nothing, <:OptimEntropyPooling}; strict::Bool = false)
+```
+
+Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view constraints.
+
+`ep_cvar_views_solve!` parses and validates CVaR view constraints, replaces prior references, and constructs the corresponding entropy pooling constraint system. It then solves for posterior probability weights using either root-finding (for single CVaR view) or optimisation (for multiple views), depending on the number of constraints and the provided optimiser. Throws informative errors if views are infeasible or too extreme.
+
+# Arguments
+
+  - `cvar_views`: CVaR view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `alpha`: Confidence level for CVaR.
+  - `w`: Prior probability weights.
+  - `opt`: Main entropy pooling optimiser.
+  - `ds_opt`: CVaR-specific optimiser (for single view).
+  - `dm_opt`: General optimiser (for multiple views).
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `pw::ProbabilityWeights`: Posterior probability weights satisfying CVaR view constraints.
+
+# Details
+
+  - Parses CVaR view equations and replaces prior references.
+  - Validates that only equality constraints are present and that each view targets a single asset.
+  - Checks that views are not too extreme i.e. not greater than the worst realisation.
+  - For a single CVaR view, uses root-finding via [`CVaREntropyPooling`](@ref).
+  - For multiple CVaR views, uses optimisation via [`OptimEntropyPooling`](@ref).
+  - Throws errors if optimisation fails or views are infeasible.
+
+# Related
+
+  - [`CVaREntropyPooling`](@ref)
+  - [`OptimEntropyPooling`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`entropy_pooling`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::AssetSets, alpha::Real,
@@ -1250,9 +1577,71 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         end
     end
 end
+"""
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
+```
+
+Extract the variance for asset `i` from a prior result.
+
+`get_pr_value` returns the variance (diagonal element of the covariance matrix) for the asset indexed by `i` from the prior result object `pr`. This method is used internally to replace prior references in view constraints and for moment extraction in entropy pooling and other prior-based routines.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:sigma}`: Dispatch tag for variance extraction.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `sigma::Real`: Variance for asset `i`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
     return diag(pr.sigma)[i]
 end
+"""
+```julia
+ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
+                pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+```
+
+Parse and add variance (sigma) view constraints to the entropy pooling constraint dictionary.
+
+`ep_sigma_views!` parses variance view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding quadratic constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean to be fixed to the prior value, ensuring that variance views do not inadvertently alter the mean.
+
+# Arguments
+
+  - `sigma_views`: Variance view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean to be fixed.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior values.
+  - Converts parsed views to quadratic constraints and adds them to `epc`.
+  - Returns a boolean vector for assets that need their mean fixed due to variance constraints.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
                          pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
     sigma_views = parse_equation(sigma_views.val; datatype = eltype(pr.X))
@@ -1272,6 +1661,37 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
     end
     return to_fix
 end
+"""
+```julia
+fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+           pr::AbstractPriorResult)
+```
+
+Add constraints to fix the variance of specified assets in entropy pooling.
+
+`fix_sigma!` identifies assets in `to_fix` that are not yet fixed (i.e., not present in `fixed`), and adds constraints to the entropy pooling constraint dictionary `epc` to fix their variance to the prior value. This ensures that higher moment views (e.g., skewness, kurtosis, correlation) do not inadvertently alter the variance of these assets. The function updates `fixed` in-place to reflect the newly fixed assets.
+
+# Arguments
+
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `fixed`: Boolean vector indicating which assets have their variance fixed.
+  - `to_fix`: Boolean vector indicating which assets should have their variance fixed.
+  - `pr`: Prior result containing asset return information.
+
+# Returns
+
+  - `nothing`: The function mutates `epc` and `fixed` in-place.
+
+# Details
+
+  - Adds a fixed equality constraint (`:feq`) for each asset in `to_fix` that is not yet fixed.
+  - Uses the prior variance values from `diag(pr.sigma)` for the constraint right-hand side.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
                     pr::AbstractPriorResult)
     sigma = diag(pr.sigma)
@@ -1298,7 +1718,7 @@ Replace correlation prior references in view parsing results with their correspo
   - `res`: Parsed correlation view constraint containing variables and coefficients.
   - `pr`: Prior result object containing prior correlation values.
   - `sets`: Asset set mapping asset names to indices.
-  - `strict`: If `true`, throw errors for missing assets; otherwise, issue warnings.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
 
@@ -1410,6 +1830,33 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     return RhoParsingResult(variables_new, coeffs_new, res.op, rhs,
                             "$(eqn) $(res.op) $(rhs)", jk_idx)
 end
+"""
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
+```
+
+Extract the prior correlation value between assets `i` and `j` from a prior result.
+
+`get_pr_value` returns the correlation coefficient between the assets indexed by `i` and `j` from the prior result object `pr`. This method is used internally to replace prior references in correlation view constraints and for moment extraction in entropy pooling and other prior-based routines.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the first asset.
+  - `j`: Index of the second asset.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `rho::Real`: Correlation coefficient between assets `i` and `j`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
     return cov2cor(pr.sigma)[i, j]
 end
@@ -1417,6 +1864,41 @@ function get_pr_value(pr::AbstractPriorResult, i::AbstractVector{<:Integer},
                       j::AbstractVector{<:Integer}, args...)
     return norm(cov2cor(pr.sigma)[i, j]) / length(i)
 end
+"""
+```julia
+ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
+              pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+```
+
+Parse and add correlation view constraints to the entropy pooling constraint dictionary.
+
+`ep_rho_views!` parses correlation view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that correlation views do not inadvertently alter lower moments.
+
+# Arguments
+
+  - `rho_views`: Correlation view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior correlation values.
+  - Converts parsed views to linear constraints and adds them to `epc`.
+  - Returns a boolean vector for assets that need their mean and variance fixed due to correlation constraints.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
                        pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
     rho_views = parse_equation(rho_views.val; datatype = eltype(pr.X))
@@ -1446,10 +1928,72 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     end
     return to_fix
 end
+"""
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
+```
+
+Extract the skewness for asset `i` from a prior result.
+
+`get_pr_value` returns the skewness of the asset indexed by `i` from the prior result object `pr`. This method is used internally to replace prior references in view constraints and for higher moment extraction in entropy pooling and other prior-based routines.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:skew}`: Dispatch tag for skewness extraction.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `skew::Real`: Skewness for asset `i`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
     #! Think about how to include pr.w
     return Skewness()([1], reshape(pr.X[:, i], :, 1))
 end
+"""
+```julia
+ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
+             pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+```
+
+Parse and add skewness view constraints to the entropy pooling constraint dictionary.
+
+`ep_sk_views!` parses skewness view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that skewness views do not inadvertently alter lower moments.
+
+# Arguments
+
+  - `skew_views`: Skewness view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior skewness values.
+  - Converts parsed views to linear constraints and adds them to `epc`.
+  - Returns a boolean vector for assets that need their mean and variance fixed due to skewness constraints.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
     skew_views = parse_equation(skew_views.val; datatype = eltype(pr.X))
@@ -1470,6 +2014,33 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
     end
     return to_fix
 end
+"""
+```julia
+get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
+```
+
+Extract the kurtosis for asset `i` from a prior result.
+
+`get_pr_value` returns the kurtosis of the asset indexed by `i` from the prior result object `pr`. This method is used internally to replace prior references in view constraints and for higher moment extraction in entropy pooling and other prior-based routines.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Index of the asset.
+  - `::Val{:kurtosis}`: Dispatch tag for kurtosis extraction.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `kurtosis::Real`: Kurtosis for asset `i`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
     #! Think about how to include pr.w
     return HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))([1],
@@ -1478,6 +2049,41 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, arg
                                                                                               :,
                                                                                               1))
 end
+"""
+```julia
+ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
+             pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+```
+
+Parse and add kurtosis view constraints to the entropy pooling constraint dictionary.
+
+`ep_kt_views!` parses kurtosis view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that kurtosis views do not inadvertently alter lower moments.
+
+# Arguments
+
+  - `kurtosis_views`: Kurtosis view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior kurtosis values.
+  - Converts parsed views to linear constraints and adds them to `epc`.
+  - Returns a boolean vector for assets that need their mean and variance fixed due to kurtosis constraints.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
 function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
     kurtosis_views = parse_equation(kurtosis_views.val; datatype = eltype(pr.X))
@@ -1502,6 +2108,64 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
     end
     return to_fix
 end
+"""
+```julia
+prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                              <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
+      X::AbstractMatrix; F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1,
+      strict::Bool = false, kwargs...)
+```
+
+Compute entropy pooling prior moments for asset returns with iterative constraint enforcement.
+
+`prior` estimates the mean and covariance of asset returns using the entropy pooling framework, supporting iterative constraint enforcement via the `H1_EntropyPooling` and `H2_EntropyPooling` algorithms. It integrates moment and view constraints (mean, variance, CVaR, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The method iteratively applies constraints, updating prior weights and moments at each step, and ensures that higher moment views do not inadvertently alter lower moments.
+
+# Arguments
+
+  - `pe`: Entropy pooling prior estimator with iterative algorithm .
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Optional factor matrix (default: `nothing`).
+  - `dims`: Dimension along which to compute moments.
+  - If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
+
+# Validation
+
+  - `dims in (1, 2)`.
+  - If any view constraint is provided, `!isnothing(sets)`.
+  - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations.
+
+# Details
+
+  - If `isnothing(pe.w)`, prior weights are initialised to `1/T` where `T` is the number of observations; otherwise, provided weights are normalised.
+  - Constraints are enforced iteratively, from lower to higher moments.
+  - Moment and view constraints are parsed and added to the constraint dictionary.
+  - The initial weights for each stage is selected according to `pe.alg`.
+  - At each stage, the prior weights are updated by solving the entropy pooling optimisation with the current set of constraints. If present, the CVaR views are also enforced at every stage.
+  - Lower moments are fixed as needed to prevent distortion by higher moment views. If asset `i` has a view enforced on moment `N` that uses moments `n < N` to compute, then all moments `n` for asset `i` are fixed.
+  - The final result includes the effective number of scenarios and Kullback-Leibler divergence between prior and posterior weights.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`H1_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+  - [`ep_mu_views!`](@ref)
+  - [`ep_var_views!`](@ref)
+  - [`ep_cvar_views_solve!`](@ref)
+  - [`ep_sigma_views!`](@ref)
+  - [`ep_sk_views!`](@ref)
+  - [`ep_kt_views!`](@ref)
+  - [`ep_rho_views!`](@ref)
+  - [`fix_mu!`](@ref)
+  - [`fix_sigma!`](@ref)
+"""
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any,
@@ -1520,7 +2184,6 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pweights(range(; start = inv(T), stop = inv(T), length = T))
     else
         @argcheck(length(pe.w) == T)
-        pweights(pe.w)
     end
     fixed = falses(N, 2)
     epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
@@ -1578,6 +2241,58 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                          kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = !isnothing(rr) ? w1 : nothing)
 end
+"""
+```julia
+prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                              <:H0_EntropyPooling}, X::AbstractMatrix;
+      F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+      kwargs...)
+```
+
+Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
+
+`prior` estimates the mean and covariance of asset returns using the entropy pooling framework, enforcing all moment and view constraints in a single optimisation step via the `H0_EntropyPooling` algorithm. This approach is fast but may distort lower moments when higher moment views are present, as all constraints are applied simultaneously.
+
+# Arguments
+
+  - `pe`: Entropy pooling prior estimator with single-shot algorithm.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Optional factor matrix.
+  - `dims`: Dimension along which to compute moments,
+  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, posterior mean vector, posterior covariance matrix, weights, effective number of scenarios, Kullback-Leibler divergence, and optional factor moments.
+
+# Validation
+
+  - `dims in (1, 2)`.
+  - If any view constraint is provided, `!isnothing(pe.sets)`.
+  - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations
+
+# Details
+
+  - If `isnothing(pe.w)`, prior weights are initialised to `1/T` where `T` is the number of observations; otherwise, provided weights are normalised.
+  - All constraints are parsed and added to the constraint dictionary at once. This means that lower moments may be distorted by higher moment views, since they cannot be fixed at any point.
+  - A single optimisation is performed to solve for the posterior weights, enforcing all constraints at once.
+  - The final result includes the effective number of scenarios and Kullback-Leibler divergence between prior and posterior weights.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`H0_EntropyPooling`](@ref)
+  - [`ep_mu_views!`](@ref)
+  - [`ep_var_views!`](@ref)
+  - [`ep_cvar_views_solve!`](@ref)
+  - [`ep_sigma_views!`](@ref)
+  - [`ep_sk_views!`](@ref)
+  - [`ep_kt_views!`](@ref)
+  - [`ep_rho_views!`](@ref)
+"""
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:H0_EntropyPooling}, X::AbstractMatrix,
