@@ -589,10 +589,10 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  alg::AbstractEntropyPoolingAlgorithm)
         if isa(w, ProbabilityWeights)
             @argcheck(!isempty(w))
-            if ismutable(w)
+            if ismutable(w.values)
                 normalize!(w, 1)
             else
-                w = normalize(w, 1)
+                w = pweights(normalize(w, 1))
             end
         end
         if !isnothing(mu_views) ||
@@ -1421,7 +1421,7 @@ Solve entropy pooling views when no CVaR views are specified.
   - [`CVaREntropyPooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
+function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Any,
                               w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
                               ::Any, ::Any; kwargs...)
     return entropy_pooling(w, epc, opt)
