@@ -128,13 +128,13 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-      pes | Vector{EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralWeightedCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}}: EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralWeightedCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+      pes | Vector{EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}}: EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
            pe | EmpiricalPrior
               |        ce | PortfolioOptimisersCovariance
               |           |   ce | Covariance
               |           |      |    me | SimpleExpectedReturns
               |           |      |       |   w | nothing
-              |           |      |    ce | GeneralWeightedCovariance
+              |           |      |    ce | GeneralCovariance
               |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
               |           |      |       |    w | nothing
               |           |      |   alg | Full()
@@ -176,7 +176,7 @@ OpinionPoolingPrior
               |           |   ce | Covariance
               |           |      |    me | SimpleExpectedReturns
               |           |      |       |   w | nothing
-              |           |      |    ce | GeneralWeightedCovariance
+              |           |      |    ce | GeneralCovariance
               |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
               |           |      |       |    w | nothing
               |           |      |   alg | Full()
@@ -219,7 +219,7 @@ OpinionPoolingPrior
           |           |   ce | Covariance
           |           |      |    me | SimpleExpectedReturns
           |           |      |       |   w | nothing
-          |           |      |    ce | GeneralWeightedCovariance
+          |           |      |    ce | GeneralCovariance
           |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
           |           |      |       |    w | nothing
           |           |      |   alg | Full()

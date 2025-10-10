@@ -28,20 +28,20 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 # Related
 
   - [`BaseGerberCovariance`](@ref)
-  - [`UnNormalisedGerberCovarianceAlgorithm`](@ref)
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
+  - [`StandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 
 """
 ```julia
-abstract type UnNormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+abstract type UnStandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 ```
 
 Abstract supertype for all unnormalised Gerber covariance algorithm types.
 
-Concrete types implementing unnormalised Gerber covariance algorithms should subtype `UnNormalisedGerberCovarianceAlgorithm`.
+Concrete types implementing unnormalised Gerber covariance algorithms should subtype `UnStandardisedGerberCovarianceAlgorithm`.
 
 # Related
 
@@ -51,16 +51,16 @@ Concrete types implementing unnormalised Gerber covariance algorithms should sub
   - [`Gerber2`](@ref)
   - [`GerberCovariance`](@ref)
 """
-abstract type UnNormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+abstract type UnStandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 
 """
 ```julia
-abstract type NormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 ```
 
 Abstract supertype for all normalised Gerber covariance algorithm types. These Z-transform the data before applying the Gerber covariance algorithm.
 
-Concrete types implementing normalised Gerber covariance algorithms should subtype `NormalisedGerberCovarianceAlgorithm`.
+Concrete types implementing normalised Gerber covariance algorithms should subtype `StandardisedGerberCovarianceAlgorithm`.
 
 # Related
 
@@ -70,59 +70,59 @@ Concrete types implementing normalised Gerber covariance algorithms should subty
   - [`NormalisedGerber2`](@ref)
   - [`GerberCovariance`](@ref)
 """
-abstract type NormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 
 """
 ```julia
-struct Gerber0 <: UnNormalisedGerberCovarianceAlgorithm end
+struct Gerber0 <: UnStandardisedGerberCovarianceAlgorithm end
 ```
 
 Implements the original Gerber covariance algorithm.
 
 # Related
 
-  - [`UnNormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
 """
-struct Gerber0 <: UnNormalisedGerberCovarianceAlgorithm end
+struct Gerber0 <: UnStandardisedGerberCovarianceAlgorithm end
 
 """
 ```julia
-struct Gerber1 <: UnNormalisedGerberCovarianceAlgorithm end
+struct Gerber1 <: UnStandardisedGerberCovarianceAlgorithm end
 ```
 
 Implements the first variant of the Gerber covariance algorithm.
 
 # Related
 
-  - [`UnNormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber2`](@ref)
 """
-struct Gerber1 <: UnNormalisedGerberCovarianceAlgorithm end
+struct Gerber1 <: UnStandardisedGerberCovarianceAlgorithm end
 
 """
 ```julia
-struct Gerber2 <: UnNormalisedGerberCovarianceAlgorithm end
+struct Gerber2 <: UnStandardisedGerberCovarianceAlgorithm end
 ```
 
 Implements the second variant of the Gerber covariance algorithm.
 
 # Related
 
-  - [`UnNormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
 """
-struct Gerber2 <: UnNormalisedGerberCovarianceAlgorithm end
+struct Gerber2 <: UnStandardisedGerberCovarianceAlgorithm end
 
 """
 ```julia
-struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
 end
 ```
@@ -152,14 +152,14 @@ NormalisedGerber0
 
 # Related
 
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`StandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
     function NormalisedGerber0(me::AbstractExpectedReturnsEstimator)
         return new{typeof(me)}(me)
@@ -171,7 +171,7 @@ end
 
 """
 ```julia
-struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber1{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
 end
 ```
@@ -201,14 +201,14 @@ NormalisedGerber1
 
 # Related
 
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`StandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`NormalisedGerber0`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber1{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
     function NormalisedGerber1(me::AbstractExpectedReturnsEstimator)
         return new{typeof(me)}(me)
@@ -220,7 +220,7 @@ end
 
 """
 ```julia
-struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber2{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
 end
 ```
@@ -250,14 +250,14 @@ NormalisedGerber2
 
 # Related
 
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
+  - [`StandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`NormalisedGerber0`](@ref)
   - [`NormalisedGerber1`](@ref)
 """
-struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber2{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
     function NormalisedGerber2(me::AbstractExpectedReturnsEstimator)
         return new{typeof(me)}(me)
@@ -697,8 +697,8 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
   - `ce::GerberCovariance`: Gerber covariance estimator.
 
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Compute the unnormalised Gerber correlation matrix.
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Compute the normalised Gerber correlation matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnStandardisedGerberCovarianceAlgorithm}`: Compute the unnormalised Gerber correlation matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the normalised Gerber correlation matrix.
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the correlation.
@@ -724,7 +724,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - [`cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnNormalisedGerberCovarianceAlgorithm},
+                                             <:UnStandardisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -734,7 +734,7 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     return gerber(ce, X, std_vec)
 end
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:NormalisedGerberCovarianceAlgorithm},
+                                             <:StandardisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -761,8 +761,8 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
   - `ce::GerberCovariance`: Gerber covariance estimator.
 
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Compute the unnormalised Gerber covariance matrix.
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Compute the normalised Gerber covariance matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnStandardisedGerberCovarianceAlgorithm}`: Compute the unnormalised Gerber covariance matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the normalised Gerber covariance matrix.
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the covariance.
@@ -788,7 +788,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - [`cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnNormalisedGerberCovarianceAlgorithm},
+                                             <:UnStandardisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -798,7 +798,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
 end
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:NormalisedGerberCovarianceAlgorithm},
+                                             <:StandardisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

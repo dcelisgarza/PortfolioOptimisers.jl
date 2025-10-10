@@ -840,7 +840,7 @@ NetworkEstimator
       |   ce | Covariance
       |      |    me | SimpleExpectedReturns
       |      |       |   w | nothing
-      |      |    ce | GeneralWeightedCovariance
+      |      |    ce | GeneralCovariance
       |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       |      |       |    w | nothing
       |      |   alg | Full()
@@ -938,7 +938,7 @@ CentralityEstimator
        |       |   ce | Covariance
        |       |      |    me | SimpleExpectedReturns
        |       |      |       |   w | nothing
-       |       |      |    ce | GeneralWeightedCovariance
+       |       |      |    ce | GeneralCovariance
        |       |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
        |       |      |       |    w | nothing
        |       |      |   alg | Full()

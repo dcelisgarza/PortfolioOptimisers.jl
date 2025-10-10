@@ -22,7 +22,7 @@
                                                                                               ce = Covariance(;
                                                                                                               me = SimpleExpectedReturns(;
                                                                                                                                          w = ew),
-                                                                                                              ce = GeneralWeightedCovariance(;
+                                                                                                              ce = GeneralCovariance(;
                                                                                                                                              ce = SimpleCovariance(;
                                                                                                                                                                    corrected = false),
                                                                                                                                              w = ew),

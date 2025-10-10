@@ -64,23 +64,19 @@
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
                Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = SimpleCovariance(;
-                                                                               corrected = false),
-                                                         w = ew)),
+                          ce = GeneralCovariance(;
+                                                 ce = SimpleCovariance(; corrected = false),
+                                                 w = ew)),
                Covariance(; alg = Full(),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = AnalyticalNonlinearShrinkage())),
+                          ce = GeneralCovariance(; ce = AnalyticalNonlinearShrinkage())),
                Covariance(; alg = Semi()),
                Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = ew),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = SimpleCovariance(;
-                                                                               corrected = false),
-                                                         w = ew)),
+                          ce = GeneralCovariance(;
+                                                 ce = SimpleCovariance(; corrected = false),
+                                                 w = ew)),
                Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = fw),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = AnalyticalNonlinearShrinkage(),
-                                                         w = fw)), SpearmanCovariance(),
+                          ce = GeneralCovariance(; ce = AnalyticalNonlinearShrinkage(),
+                                                 w = fw)), SpearmanCovariance(),
                KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = Knuth()),
                MutualInfoCovariance(; bins = FreedmanDiaconis()),
