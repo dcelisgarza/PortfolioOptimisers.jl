@@ -523,8 +523,8 @@ EntropyPoolingPrior
      sk_views | nothing
      kt_views | nothing
     rho_views | nothing
-    var_alpha | Float64: 0.05
-   cvar_alpha | Float64: 0.05
+    var_alpha | nothing
+   cvar_alpha | nothing
          sets | AssetSets
               |    key | String: "nx"
               |   dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
