@@ -64,7 +64,7 @@
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns(;
                                                                                                                                                        alg = BodnarOkhrinParolya(;
-                                                                                                                                                                                 target = MeanSquareError())))))),
+                                                                                                                                                                                 target = MeanSquaredError())))))),
                            re = StepwiseRegression(; crit = AICC()), rsd = false),
                FactorPrior(;
                            pe = EmpiricalPrior(;

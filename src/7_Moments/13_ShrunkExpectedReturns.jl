@@ -45,7 +45,7 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
 
   - [`GrandMean`](@ref)
   - [`VolatilityWeighted`](@ref)
-  - [`MeanSquareError`](@ref)
+  - [`MeanSquaredError`](@ref)
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 
@@ -83,19 +83,19 @@ struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 
 """
 ```julia
-struct MeanSquareError <: AbstractShrunkExpectedReturnsTarget end
+struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 ```
 
 Shrinkage target representing the mean squared error of expected returns.
 
-`MeanSquareError` computes the shrinkage target as the trace of the covariance matrix divided by the number of observations, resulting in a vector where each element is the same value. This target is useful for certain shrinkage estimators that minimize mean squared error.
+`MeanSquaredError` computes the shrinkage target as the trace of the covariance matrix divided by the number of observations, resulting in a vector where each element is the same value. This target is useful for certain shrinkage estimators that minimize mean squared error.
 
 # Related
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
-struct MeanSquareError <: AbstractShrunkExpectedReturnsTarget end
+struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 
 """
 ```julia
@@ -335,7 +335,7 @@ Compute the shrinkage target vector for expected returns estimation.
 
       + `target::GrandMean`: Returns a vector filled with the mean of `mu`.
       + `target::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-      + `target::MeanSquareError`: Returns a vector filled with the trace of `sigma` divided by `T`.
+      + `target::MeanSquaredError`: Returns a vector filled with the trace of `sigma` divided by `T`.
 
   - `mu`: 1D array of expected returns.
   - `sigma`: Covariance matrix of asset returns.
@@ -349,7 +349,7 @@ Compute the shrinkage target vector for expected returns estimation.
 
   - [`GrandMean`](@ref)
   - [`VolatilityWeighted`](@ref)
-  - [`MeanSquareError`](@ref)
+  - [`MeanSquaredError`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
 function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
@@ -364,7 +364,7 @@ function target_mean(::VolatilityWeighted, mu::AbstractArray, sigma::AbstractMat
     val = sum(isigma * mu) / sum(isigma)
     return range(; start = val, stop = val, length = length(mu))
 end
-function target_mean(::MeanSquareError, mu::AbstractArray, sigma::AbstractMatrix;
+function target_mean(::MeanSquaredError, mu::AbstractArray, sigma::AbstractMatrix;
                      T::Integer, kwargs...)
     val = tr(sigma) / T
     return range(; start = val, stop = val, length = length(mu))
@@ -469,5 +469,5 @@ function factory(ce::ShrunkExpectedReturns, w::Union{Nothing, <:AbstractWeights}
                                  alg = ce.alg)
 end
 
-export GrandMean, VolatilityWeighted, MeanSquareError, JamesStein, BayesStein,
+export GrandMean, VolatilityWeighted, MeanSquaredError, JamesStein, BayesStein,
        BodnarOkhrinParolya, ShrunkExpectedReturns

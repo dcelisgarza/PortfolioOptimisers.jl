@@ -32,12 +32,12 @@
     @testset "Expected ReturnsResult" begin
         mes = [ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; target = VolatilityWeighted())),
-               ShrunkExpectedReturns(; alg = JamesStein(; target = MeanSquareError())),
+               ShrunkExpectedReturns(; alg = JamesStein(; target = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = JamesStein(),
                                      me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(; alg = BayesStein()),
                ShrunkExpectedReturns(; alg = BayesStein(; target = VolatilityWeighted())),
-               ShrunkExpectedReturns(; alg = BayesStein(; target = MeanSquareError())),
+               ShrunkExpectedReturns(; alg = BayesStein(; target = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = BayesStein(),
                                      me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya()),
@@ -46,7 +46,7 @@
                                                                target = VolatilityWeighted())),
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
-                                                               target = MeanSquareError())),
+                                                               target = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
                                      me = SimpleExpectedReturns(; w = ew)),
                EquilibriumExpectedReturns(), ExcessExpectedReturns(; rf = rf)]
