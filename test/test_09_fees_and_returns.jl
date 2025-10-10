@@ -43,14 +43,14 @@
            Fees(; tn = Turnover(; val = 0.001, w = w), l = 0.002, s = 0.003, fl = 0.005,
                 fs = 0.007)]
     T, N = size(pr.X)
-    res = optimise!(MeanRisk(;
-                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
-                                                 sbgt = 1, bgt = 1, pe = pr, slv = slv)))
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
+                                                sbgt = 1, bgt = 1, pe = pr, slv = slv)))
     @testset "Fees" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
         f1s = [0.02002313426946848, 0.12149580659357644]
         for (i, fe) in pairs(fes)
-            res_mip = optimise!(da, res.w, vec(values(X[end])), 1000, T, fe)
+            res_mip = optimise(da, res.w, vec(values(X[end])), 1000, T, fe)
             f1 = calc_fees(res.w, fe)
             @test isapprox(f1s[i], f1)
             f2 = calc_asset_fees(res.w, fe)

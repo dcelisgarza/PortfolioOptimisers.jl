@@ -18,9 +18,9 @@
                                                                                                                             rd = a.rd,
                                                                                                                             a.kwargs...) isa
                                                                                                    AbstractVector),
-                         optimise! = ("optimise!" => a::Arguments -> optimise!(a.opt, a.rd;
-                                                                               a.kwargs...) isa
-                                                                     OptimisationResult),
+                         optimise = ("optimise" => a::Arguments -> optimise(a.opt, a.rd;
+                                                                            a.kwargs...) isa
+                                                                   OptimisationResult),
                          set_return_constraints! = ("set return constraints!" => a::Arguments -> set_return_constraints!(a.args...;
                                                                                                                          rd = a.rd,
                                                                                                                          a.kwargs...) ===

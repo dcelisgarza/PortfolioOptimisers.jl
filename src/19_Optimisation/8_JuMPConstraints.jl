@@ -428,23 +428,27 @@ end
 function non_zero_real_or_vec(x::AbstractVector{<:Real})
     return any(!iszero, x)
 end
-function set_linear_weight_constraints!(::JuMP.Model, ::Nothing, ::Symbol, ::Symbol)
+function set_linear_weight_constraints!(args...)
     return nothing
 end
-function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraint,
+function set_linear_weight_constraints!(model::JuMP.Model,
+                                        lcms::Union{<:LinearConstraint,
+                                                    <:AbstractVector{<:LinearConstraint}},
                                         key_ineq::Symbol, key_eq::Symbol)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    if !isnothing(lcm.ineq)
-        A = lcm.ineq.A
-        B = lcm.ineq.B
-        model[key_ineq] = @constraint(model, sc * (A * w - k * B) <= 0)
-    end
-    if !isnothing(lcm.eq)
-        A = lcm.eq.A
-        B = lcm.eq.B
-        model[key_eq] = @constraint(model, sc * (A * w - k * B) == 0)
+    for (i, lcm) in enumerate(lcms)
+        if !isnothing(lcm.ineq)
+            A = lcm.ineq.A
+            B = lcm.ineq.B
+            model[Symbol(key_ineq, i)] = @constraint(model, sc * (A * w - k * B) <= 0)
+        end
+        if !isnothing(lcm.eq)
+            A = lcm.eq.A
+            B = lcm.eq.B
+            model[Symbol(key_eq, i)] = @constraint(model, sc * (A * w - k * B) == 0)
+        end
     end
     return nothing
 end

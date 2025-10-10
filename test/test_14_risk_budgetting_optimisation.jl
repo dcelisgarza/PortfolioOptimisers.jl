@@ -82,7 +82,7 @@
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
             rb = RiskBudgeting(; r = r, opt = opt)
-            res = optimise!(rb, rd)
+            res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
             v1 = minimum(rkc)
@@ -143,7 +143,7 @@
                                rba = AssetRiskBudgeting(;
                                                         rkb = RiskBudgetResult(;
                                                                                val = 1:20)))
-            res = optimise!(rb, rd)
+            res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
             v1, m1 = findmin(rkc)
@@ -205,24 +205,24 @@
                                                                                      "MSFT" => 0.25,
                                                                                      "LLY" => 0.125])),
                            opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets))
-        res = optimise!(rb, rd)
+        res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = risk_contribution(r, res.w, pr.X)
         rkc /= sum(rkc)
         rkb = risk_budget_constraints(rb.rba.rkb, sets)
         @test isapprox(rkc, rkb.val, rtol = 5e-5)
 
-        res = optimise!(RiskBudgeting(; wi = w0,
-                                      rba = AssetRiskBudgeting(;
-                                                               rkb = RiskBudgetEstimator(;
-                                                                                         val = ["AAPL" => 0.5])),
-                                      opt = JuMPOptimiser(; pe = pr, sets = sets,
-                                                          slv = Solver(;
-                                                                       solver = Clarabel.Optimizer,
-                                                                       settings = ["verbose" => false,
-                                                                                   "max_iter" => 1])),
-                                      fallback = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
+        res = optimise(RiskBudgeting(; wi = w0,
+                                     rba = AssetRiskBudgeting(;
+                                                              rkb = RiskBudgetEstimator(;
+                                                                                        val = ["AAPL" => 0.5])),
+                                     opt = JuMPOptimiser(; pe = pr, sets = sets,
+                                                         slv = Solver(;
+                                                                      solver = Clarabel.Optimizer,
+                                                                      settings = ["verbose" => false,
+                                                                                  "max_iter" => 1])),
+                                     fallback = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)
@@ -235,7 +235,7 @@
                 continue
             end
             rb = RiskBudgeting(; r = r, opt = opt, rba = FactorRiskBudgeting(; re = rr))
-            res = optimise!(rb, rd)
+            res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)
@@ -299,7 +299,7 @@
                                rba = FactorRiskBudgeting(; flag = true, re = rr,
                                                          rkb = RiskBudgetResult(;
                                                                                 val = 1:5)))
-            res = optimise!(rb, rd)
+            res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)
@@ -365,7 +365,7 @@
                                                wb = WeightBounds(; lb = nothing,
                                                                  ub = nothing),
                                                sets = fsets))
-        res = optimise!(rb, rd)
+        res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = factor_risk_contribution(r, res.w, pr.X; re = res.prb.rr)
         rkc[1:5] /= sum(rkc[1:5])

@@ -35,9 +35,26 @@ end
 function opt_view(opt::AbstractVector{<:AbstractOptimisationEstimator}, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
-function optimise! end
-function optimise!(or::OptimisationResult, args...)
+function optimise end
+function optimise(or::OptimisationResult, args...)
     return or
+end
+function opt_attempt_factory end
+function optimise(opt::OptimisationEstimator, args...; kwargs...)
+    attempts = Tuple{OptimisationEstimator, OptimisationResult}[]
+    current_opt = opt
+    res = nothing
+    while true
+        res = _optimise(current_opt, args...; kwargs...)
+        if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fallback)
+            break
+        else
+            push!(attempts, (current_opt, res))
+            current_opt = current_opt.fallback
+            @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+        end
+    end
+    return isempty(attempts) ? res : opt_attempt_factory(res, attempts)
 end
 function assert_internal_optimiser(::OptimisationResult)
     return nothing
@@ -54,4 +71,4 @@ function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::Returns
     return pr.X * wi, rd.F, rd.ts, iv, ivpa
 end
 
-export optimise!, OptimisationSuccess, OptimisationFailure
+export optimise, OptimisationSuccess, OptimisationFailure

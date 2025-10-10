@@ -1,7 +1,7 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
-struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
+struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        OptimisationResult
     oe::T1
     pa::T2
@@ -12,6 +12,13 @@ struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     retcode::T7
     sol::T8
     model::T9
+    attempts::T10
+end
+function opt_attempt_factory(res::NearOptimalCenteringOptimisation, attempts)
+    return NearOptimalCenteringOptimisation(res.oe, res.pa, res.w_min_retcode,
+                                            res.w_opt_retcode, res.w_max_retcode,
+                                            res.noc_retcode, res.retcode, res.sol,
+                                            res.model, attempts)
 end
 function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
     return if sym == :w
@@ -255,20 +262,20 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
     if w_min_flag
-        res_min = optimise!(MeanRisk(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
-                                     wi = noc.w_min_ini), rd; save = false)
+        res_min = optimise(MeanRisk(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
+                                    wi = noc.w_min_ini), rd; save = false)
         w_min_retcode = res_min.retcode
         w_min = res_min.w
     end
     if w_opt_flag
-        res_opt = optimise!(MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
-                            rd; save = false)
+        res_opt = optimise(MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
+                           rd; save = false)
         w_opt_retcode = res_opt.retcode
         w_opt = res_opt.w
     end
     if w_max_flag
-        res_max = optimise!(MeanRisk(; r = nb_r, obj = MaximumReturn(), opt = nb_opt,
-                                     wi = noc.w_max_ini), rd; save = false)
+        res_max = optimise(MeanRisk(; r = nb_r, obj = MaximumReturn(), opt = nb_opt,
+                                    wi = noc.w_max_ini), rd; save = false)
         w_max_retcode = res_max.retcode
         w_max = res_max.w
     end
@@ -517,7 +524,7 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
         OptimisationFailure(msg)
     end
 end
-function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:UnconstrainedNearOptimalCentering},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -536,30 +543,28 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return if isa(retcode, OptimisationSuccess) || isnothing(noc.fallback)
-        NearOptimalCenteringOptimisation(typeof(noc),
-                                         ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
-                                                                          opt.lt, opt.st,
-                                                                          opt.lcs, opt.cent,
-                                                                          opt.gcard,
-                                                                          opt.sgcard,
-                                                                          opt.smtx,
-                                                                          opt.sgmtx,
-                                                                          opt.slt, opt.sst,
-                                                                          opt.sglt,
-                                                                          opt.sgst, opt.plg,
-                                                                          opt.tn, opt.fees,
-                                                                          opt.ret),
-                                         w_min_retcode, w_opt_retcode, w_max_retcode,
-                                         noc_retcode, retcode, sol,
-                                         ifelse(save, model, nothing))
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(noc.fallback, rd; dims = dims, str_names = str_names, save = save,
-                  kwargs...)
-    end
+    return NearOptimalCenteringOptimisation(typeof(noc),
+                                            ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
+                                                                             opt.lt, opt.st,
+                                                                             opt.lcs,
+                                                                             opt.cent,
+                                                                             opt.gcard,
+                                                                             opt.sgcard,
+                                                                             opt.smtx,
+                                                                             opt.sgmtx,
+                                                                             opt.slt,
+                                                                             opt.sst,
+                                                                             opt.sglt,
+                                                                             opt.sgst,
+                                                                             opt.plg,
+                                                                             opt.tn,
+                                                                             opt.fees,
+                                                                             opt.ret),
+                                            w_min_retcode, w_opt_retcode, w_max_retcode,
+                                            noc_retcode, retcode, sol,
+                                            ifelse(save, model, nothing), nothing)
 end
-function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:ConstrainedNearOptimalCentering},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -573,9 +578,8 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     @expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
-    set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq, :lcs_eq)
-    set_linear_weight_constraints!(model, opt.cent, :cent_ineq, :cent_eq)
-    set_linear_weight_constraints!(model, opt.lcm, :lcm_ineq, :lcm_eq)
+    set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, opt.cent, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.plg, opt.lt, opt.st,
                          opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
@@ -595,28 +599,32 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return if isa(retcode, OptimisationSuccess) || isnothing(noc.fallback)
-        NearOptimalCenteringOptimisation(typeof(noc),
-                                         ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
-                                                                          opt.lt, opt.st,
-                                                                          opt.lcs, opt.cent,
-                                                                          opt.gcard,
-                                                                          opt.sgcard,
-                                                                          opt.smtx,
-                                                                          opt.sgmtx,
-                                                                          opt.slt, opt.sst,
-                                                                          opt.sglt,
-                                                                          opt.sgst, opt.plg,
-                                                                          opt.tn, opt.fees,
-                                                                          opt.ret),
-                                         w_min_retcode, w_opt_retcode, w_max_retcode,
-                                         noc_retcode, retcode, sol,
-                                         ifelse(save, model, nothing))
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(noc.fallback, rd; dims = dims, str_names = str_names, save = save,
-                  kwargs...)
-    end
+    return NearOptimalCenteringOptimisation(typeof(noc),
+                                            ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
+                                                                             opt.lt, opt.st,
+                                                                             opt.lcs,
+                                                                             opt.cent,
+                                                                             opt.gcard,
+                                                                             opt.sgcard,
+                                                                             opt.smtx,
+                                                                             opt.sgmtx,
+                                                                             opt.slt,
+                                                                             opt.sst,
+                                                                             opt.sglt,
+                                                                             opt.sgst,
+                                                                             opt.plg,
+                                                                             opt.tn,
+                                                                             opt.fees,
+                                                                             opt.ret),
+                                            w_min_retcode, w_opt_retcode, w_max_retcode,
+                                            noc_retcode, retcode, sol,
+                                            ifelse(save, model, nothing), nothing)
+end
+function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                            <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  str_names::Bool = false, save::Bool = true, kwargs...)
+    return _optimise(noc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
 export NearOptimalCentering, UnconstrainedNearOptimalCentering,

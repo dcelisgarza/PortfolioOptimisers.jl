@@ -58,6 +58,8 @@ EmpiricalPrior
 # Related
 
   - [`AbstractLowOrderPriorEstimator_A`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`prior`](@ref)

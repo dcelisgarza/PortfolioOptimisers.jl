@@ -1,21 +1,32 @@
-struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     oe::T1
     shares::T2
     cost::T3
     w::T4
     retcode::T5
     cash::T6
+    attempts::T7
 end
-struct GreedyAllocation{T1, T2, T3} <: BaseFiniteAllocationOptimisationEstimator
+function opt_attempt_factory(res::GreedyAllocationOptimisation, attempts)
+    return GreedyAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
+                                        res.cash, attempts)
+end
+struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
     kwargs::T3
-    function GreedyAllocation(unit::Real, args::Tuple, kwargs::NamedTuple)
-        return new{typeof(unit), typeof(args), typeof(kwargs)}(unit, args, kwargs)
+    fallback::T4
+    function GreedyAllocation(unit::Real, args::Tuple, kwargs::NamedTuple,
+                              fallback::Union{Nothing,
+                                              <:FiniteAllocationOptimisationEstimator} = nothing)
+        return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fallback)}(unit, args,
+                                                                                 kwargs,
+                                                                                 fallback)
     end
 end
-function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;))
-    return GreedyAllocation(unit, args, kwargs)
+function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;),
+                          fallback::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = nothing)
+    return GreedyAllocation(unit, args, kwargs, fallback)
 end
 function roundmult(val::Real, prec::Real, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)
@@ -85,7 +96,7 @@ function finite_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
-function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
+function _optimise(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
                    cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
                    fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     @argcheck(!isempty(w) && !isempty(p) && length(w) == length(p))
@@ -108,7 +119,12 @@ function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 3] = -sw
     return GreedyAllocationOptimisation(typeof(ga), view(res, :, 1), view(res, :, 2),
                                         view(res, :, 3), OptimisationSuccess(nothing),
-                                        lcash)
+                                        lcash, nothing)
+end
+function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::AbstractVector,
+                  p::AbstractVector, cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+                  fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+    return _optimise(ga, w, p, cash, T, fees; kwargs...)
 end
 
 export GreedyAllocationOptimisation, GreedyAllocation

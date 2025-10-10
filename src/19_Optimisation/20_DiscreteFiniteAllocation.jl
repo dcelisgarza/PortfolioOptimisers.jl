@@ -1,4 +1,4 @@
-struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
+struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
        OptimisationResult
     oe::T1
     shares::T2
@@ -10,15 +10,22 @@ struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <
     s_model::T8
     l_model::T9
     cash::T10
+    attempts::T11
 end
-struct DiscreteAllocation{T1, T2, T3, T4} <: BaseFiniteAllocationOptimisationEstimator
+function opt_attempt_factory(res::DiscreteAllocationOptimisation, attempts)
+    return DiscreteAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
+                                          res.s_retcode, res.l_retcode, res.s_model,
+                                          res.l_model, res.cash, attempts)
+end
+struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
     so::T3
     fallback::T4
     function DiscreteAllocation(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
                                 so::Real,
-                                fallback::BaseFiniteAllocationOptimisationEstimator)
+                                fallback::Union{Nothing,
+                                                <:FiniteAllocationOptimisationEstimator})
         if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
@@ -30,7 +37,8 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: BaseFiniteAllocationOptimisationEst
 end
 function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             sc::Real = 1, so::Real = 1,
-                            fallback::BaseFiniteAllocationOptimisationEstimator = GreedyAllocation())
+                            fallback::Union{Nothing,
+                                            <:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, fallback)
 end
 function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
@@ -63,25 +71,17 @@ function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real,
                  end)
     @objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)
-    return if res.success
-        shares = round.(Int, value.(x))
-        cost = shares .* p
-        aw = if any(!iszero, cost)
-            cost / sum(cost) * bgt
-        else
-            range(; start = 0, stop = 0, length = N)
-        end
-        acash = value(r)
-        shares, cost, aw, acash, OptimisationSuccess(; res = res.trials), model
+    shares = round.(Int, value.(x))
+    cost = shares .* p
+    aw = if any(!iszero, cost)
+        cost / sum(cost) * bgt
     else
-        res = finite_sub_allocation!(w, p, cash, bgt, da.fallback, str_names)
-        if length(res) == 4
-            res = (res..., OptimisationFailure(nothing), nothing)
-        end
-        res
+        range(; start = 0, stop = 0, length = N)
     end
+    acash = value(r)
+    return shares, cost, aw, acash, res, model
 end
-function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
+function _optimise(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
                    cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
                    fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -116,7 +116,13 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
     return DiscreteAllocationOptimisation(typeof(da), view(res, :, 1), view(res, :, 2),
                                           view(res, :, 3), retcode, sretcode, lretcode,
                                           ifelse(save, smodel, nothing),
-                                          ifelse(save, lmodel, nothing), lcash)
+                                          ifelse(save, lmodel, nothing), lcash, nothing)
+end
+function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::AbstractVector,
+                  p::AbstractVector, cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+                  fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
+                  save::Bool = true, kwargs...)
+    return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)
 end
 
 export DiscreteAllocationOptimisation, DiscreteAllocation

@@ -1,5 +1,5 @@
 abstract type BaseStackingOptimisationEstimator <: OptimisationEstimator end
-struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
+struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -8,6 +8,11 @@ struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResul
     cv::T6
     retcode::T7
     w::T8
+    attempts::T9
+end
+function opt_attempt_factory(res::StackingOptimisation, attempts)
+    return StackingOptimisation(res.oe, res.pr, res.wb, res.resi, res.reso, res.cv,
+                                res.retcode, res.w, attempts)
 end
 struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        BaseStackingOptimisationEstimator
@@ -80,7 +85,7 @@ function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
                     sets = sets, strict = st.strict, threads = st.threads,
                     fallback = st.fallback)
 end
-function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
     pr = prior(st.pe, rd; dims = dims)
@@ -89,8 +94,8 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
     @floop st.threads for (i, opt) in pairs(opti)
-        res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
-                        str_names = str_names, save = save, kwargs...)
+        res = optimise(opt, rd; dims = dims, branchorder = branchorder,
+                       str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
         @argcheck(!isa(res.retcode, AbstractVector))
         wi[:, i] = res.w
@@ -99,17 +104,18 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     X, F, ts, iv, ivpa = predict_outer_estimator_returns(st, rd, pr, wi, resi)
     rdo = ReturnsResult(; nx = ["_$i" for i in 1:Ni], X = X, nf = rd.nf, F = F, ts = ts,
                         iv = iv, ivpa = ivpa)
-    reso = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,
-                     str_names = str_names, save = save, kwargs...)
+    reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
+                    str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
                                                  reso, wi * reso.w; datatype = eltype(pr.X))
-    return if isa(retcode, OptimisationSuccess) || isnothing(st.fallback)
-        StackingOptimisation(typeof(st), pr, wb, resi, reso, st.cv, retcode, w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(st.fallback, rd; dims = dims, branchorder = branchorder,
-                  str_names = str_names, save = save, kwargs...)
-    end
+    return StackingOptimisation(typeof(st), pr, wb, resi, reso, st.cv, retcode, w, nothing)
+end
+function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                               <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
+                  dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
+    return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,
+                     save = save, kwargs...)
 end
 
 export StackingOptimisation, Stacking

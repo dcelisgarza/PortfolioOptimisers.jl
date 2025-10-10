@@ -90,11 +90,11 @@ mr4 = MeanRisk(; r = r, obj = MaximumReturn(), opt = opt)
 Lets perform the optimisations, but since we've precomputed the prior statistics, we do not need to provide the returns data. We will also produce a benchmark using the `InverseVolatility` estimator.
 
 ````@example 2_Mean_Risk_Objectives
-res1 = optimise!(mr1)
-res2 = optimise!(mr2)
-res3 = optimise!(mr3)
-res4 = optimise!(mr4)
-res0 = optimise!(InverseVolatility(; pe = pr))
+res1 = optimise(mr1)
+res2 = optimise(mr2)
+res3 = optimise(mr3)
+res4 = optimise(mr4)
+res0 = optimise(InverseVolatility(; pe = pr))
 ````
 
 Lets view the results as pretty tables.

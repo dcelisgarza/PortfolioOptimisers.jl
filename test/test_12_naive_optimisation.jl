@@ -25,17 +25,17 @@
     pr = prior(EmpiricalPrior(), rd)
     N = size(pr.X, 2)
 
-    res = optimise!(InverseVolatility(; pe = pr), rd)
+    res = optimise(InverseVolatility(; pe = pr), rd)
     w = inv.(sqrt.(diag(pr.sigma)))
     w /= sum(w)
     @test isapprox(res.w, w)
 
-    res = optimise!(EqualWeighted(), rd)
+    res = optimise(EqualWeighted(), rd)
     @test isapprox(res.w, range(; start = inv(N), stop = inv(N), length = N))
 
-    res = optimise!(RandomWeights(; rng = StableRNG(123456789)), rd)
+    res = optimise(RandomWeights(; rng = StableRNG(123456789)), rd)
     @test isapprox(sum(res.w), 1)
 
-    res = optimise!(RandomWeights(;), rd)
+    res = optimise(RandomWeights(;), rd)
     @test isapprox(sum(res.w), 1)
 end

@@ -216,7 +216,7 @@ Propagate or pass through prior result objects.
 
 # Returns
 
-  - `res::AbstractPriorResult`: The input prior result object, unchanged.
+  - `pr::AbstractPriorResult`: The input prior result object, unchanged.
 
 # Related
 
@@ -246,7 +246,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 
 # Returns
 
-  - `res::AbstractClusteringResult`: Result object containing clustering information.
+  - `clr::AbstractClusteringResult`: Result object containing clustering information.
 
 # Related
 
@@ -276,7 +276,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 
 # Returns
 
-  - `res::PhylogenyResult`: Result object containing the phylogeny matrix.
+  - `plr::PhylogenyResult`: Result object containing the phylogeny matrix.
 
 # Related
 
@@ -308,7 +308,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 
 # Returns
 
-  - `res::PhylogenyResult`: Result object containing the centrality vector.
+  - `plr::PhylogenyResult`: Result object containing the centrality vector.
 
 # Related
 
@@ -339,7 +339,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 
 # Returns
 
-  - `res::PhylogenyResult`: Result object containing the centrality vector.
+  - `plr::PhylogenyResult`: Result object containing the centrality vector.
 
 # Related
 
@@ -452,7 +452,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
   - `sigma`: Covariance matrix.
   - `chol`: Cholesky factorisation of the factor-adjusted covariance matrix. Factor models sparsify the covariance matrix, so using their smaller, sparser Cholesky factor makes for more numerically stable and efficient optimisations.
   - `w`: Asset weights.
-  - `ens`: Entropy.
+  - `ens`: Effective number of scenarios.
   - `kld`: Kullback-Leibler divergence.
   - `ow`: Opinion pooling weights.
   - `rr`: Regression result.
@@ -463,7 +463,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 # Constructor
 
 ```julia
-LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix;
+LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
               chol::Union{Nothing, <:AbstractMatrix} = nothing,
               w::Union{Nothing, <:AbstractWeights} = nothing,
               ens::Union{Nothing, <:Real} = nothing,
@@ -480,13 +480,15 @@ Keyword arguments correspond to the fields above.
 ## Validation
 
   - `X`, `mu`, and `sigma` must be non-empty.
-  - `size(X, 2) == length(mu)`.
   - `sigma` must be square.
+  - `size(X, 2) == length(mu) == size(sigma, 1)`.
   - If `w` is provided, it must be non-empty and `length(w) == size(X, 1)`.
   - If `kld` is a vector, it must be non-empty.
   - If `ow` is provided, it must be non-empty.
-  - If regression or factor moments are provided, all must be present and non-empty, and dimensions must match.
-  - If `chol` or `f_w` are provided, they must be non-empty and have correct dimensions.
+  - If any of `rr`, `f_mu`, or `f_sigma` are provided, all must be provided and non-empty, `size(rr.M, 2) == length(f_mu) == size(f_sigma, 1)`, and `size(rr.M, 1) == length(mu)`.
+  - If `f_sigma` is provided, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
+  - If `chol` is provided, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
+  - If `f_w` is provided, it must be non-empty and `length(f_w) == size(X, 1)`.
 
 # Examples
 
@@ -539,8 +541,8 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                            f_sigma::Union{Nothing, <:AbstractMatrix},
                            f_w::Union{Nothing, <:AbstractVector})
         @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
-        @argcheck(size(X, 2) == length(mu))
         assert_matrix_issquare(sigma)
+        @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
         if !isnothing(w)
             @argcheck(!isempty(w))
             @argcheck(length(w) == size(X, 1))
@@ -560,14 +562,14 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
             assert_matrix_issquare(f_sigma)
             @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
             @argcheck(size(rr.M, 1) == length(mu))
-            if !isnothing(chol)
-                @argcheck(!isempty(chol))
-                @argcheck(length(mu) == size(chol, 2))
-            end
-            if !isnothing(f_w)
-                @argcheck(!isempty(f_w))
-                @argcheck(length(f_w) == size(X, 1))
-            end
+        end
+        if !isnothing(chol)
+            @argcheck(!isempty(chol))
+            @argcheck(length(mu) == size(chol, 2))
+        end
+        if !isnothing(f_w)
+            @argcheck(!isempty(f_w))
+            @argcheck(length(f_w) == size(X, 1))
         end
         return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
                    typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(f_mu),
@@ -613,21 +615,17 @@ Container type for high order prior results in PortfolioOptimisers.jl.
 
 # Fields
 
-  - `pr`: Prior result for low order moments (`AbstractPriorResult`).
-  - `kt`: Cokurtosis tensor (`N^2 × N^2` matrix).
-  - `L2`: Elimination matrix (`div(N * (N + 1), 2) × N^2`).
-  - `S2`: Summation matrix (`div(N * (N + 1), 2) × N^2`).
-  - `sk`: Coskewness tensor (`N × N^2` matrix).
-  - `V`: Negative quadratic skewness matrix (`N × N`).
+  - `pr`: Prior result for low order moments.
+  - `kt`: Cokurtosis tensor.
+  - `L2`: Elimination matrix.
+  - `S2`: Summation matrix.
+  - `sk`: Coskewness tensor.
+  - `V`: Negative quadratic skewness matrix.
   - `skmp`: Matrix processing estimator for post-processing quadratic skewness.
 
 # Constructor
 
 ```julia
-HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
-               L2::Union{Nothing, <:AbstractMatrix}, S2::Union{Nothing, <:AbstractMatrix},
-               sk::Union{Nothing, <:AbstractMatrix}, V::Union{Nothing, <:AbstractMatrix},
-               skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
 HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix} = nothing,
                L2::Union{Nothing, <:AbstractMatrix} = nothing,
                S2::Union{Nothing, <:AbstractMatrix} = nothing,
@@ -640,11 +638,44 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If any of `kt`, `L2`, or `S2` are provided, all must be provided, non-empty and have compatible dimensions.
-  - If `sk` or `V` are provided, both must be non-empty and have compatible dimensions.
-  - If only one of `sk` or `V` is provided, both must be provided.
+Defining `N = length(pr.mu)`.
+
+  - If any of `kt`, `L2`, or `S2` are provided, all must be provided, non-empty, and `size(kt) == (N^2, N^2)`, `size(L2) == size(S2) == (div(N * (N + 1), 2), N^2)`.
+  - If `sk` or `V` are provided, both must be provided, non-empty, and `size(sk) == (N, N^2)`, `size(V) == (N, N)`.
 
 # Examples
+
+```jldoctest
+julia> HighOrderPrior(;
+                      pr = LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
+                                         sigma = [0.0001 0.0002; 0.0002 0.0003]), kt = rand(4, 4),
+                      L2 = PortfolioOptimisers.elimination_matrix(2),
+                      S2 = PortfolioOptimisers.summation_matrix(2), sk = rand(2, 4),
+                      V = rand(2, 2), skmp = NonPositiveDefiniteMatrixProcessing())
+HighOrderPrior
+    pr | LowOrderPrior
+       |         X | 2×2 Matrix{Float64}
+       |        mu | Vector{Float64}: [0.02, 0.03]
+       |     sigma | 2×2 Matrix{Float64}
+       |      chol | nothing
+       |         w | nothing
+       |       ens | nothing
+       |       kld | nothing
+       |        ow | nothing
+       |        rr | nothing
+       |      f_mu | nothing
+       |   f_sigma | nothing
+       |       f_w | nothing
+    kt | 4×4 Matrix{Float64}
+    L2 | 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    S2 | 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    sk | 2×4 Matrix{Float64}
+     V | 2×2 Matrix{Float64}
+  skmp | NonPositiveDefiniteMatrixProcessing
+       |   denoise | nothing
+       |    detone | nothing
+       |       alg | nothing
+```
 
 # Related
 
@@ -667,30 +698,23 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
                             sk::Union{Nothing, <:AbstractMatrix},
                             V::Union{Nothing, <:AbstractMatrix},
                             skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+        N = length(pr.mu)
         kt_flag = isa(kt, AbstractMatrix)
         L2_flag = isa(L2, AbstractMatrix)
         S2_flag = isa(S2, AbstractMatrix)
         if kt_flag || L2_flag || S2_flag
             @argcheck(kt_flag && L2_flag && S2_flag)
             @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
-            assert_matrix_issquare(kt)
-            N = length(pr.mu)
-            @argcheck(length(pr.mu)^2 == size(kt, 1))
+            @argcheck(size(kt) == (N^2, N^2))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
         end
         sk_flag = isa(sk, AbstractMatrix)
         V_flag = isa(V, AbstractMatrix)
-        if sk_flag
-            @argcheck(!isempty(sk))
-            @argcheck(length(pr.mu)^2 == size(sk, 2))
-        end
-        if V_flag
-            @argcheck(!isempty(V))
-            assert_matrix_issquare(V)
-        end
         if sk_flag || V_flag
-            @argcheck(sk_flag && V_flag,
-                      "If either sk or V, is nothing, both must be nothing.")
+            @argcheck(sk_flag && V_flag)
+            @argcheck(!isempty(sk) && !isempty(V))
+            @argcheck(size(V) == (N, N))
+            @argcheck(size(sk) == (N, N^2))
         end
         return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
                    typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)

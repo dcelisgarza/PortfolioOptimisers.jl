@@ -149,7 +149,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w], pr.sigma)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
-function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
+function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
                                                                                                                                               rd;
@@ -159,9 +159,8 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
     @expression(model, k, 1)
     prb = set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, rd)
-    set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
-    set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
-    set_linear_weight_constraints!(model, rrb.opt.lcm, :lcm_ineq, :lcm_eq)
+    set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, wb, rrb.opt.card, gcard, plg, lt, st, fees, rrb.opt.ss)
     set_smip_constraints!(model, wb, rrb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rrb.opt.ss)
@@ -177,19 +176,20 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
-    return if isa(retcode, OptimisationSuccess) || isnothing(rrb.fallback)
-        JuMPOptimisationRiskBudgeting(typeof(rrb),
-                                      ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
-                                                                       cent, gcard, sgcard,
-                                                                       smtx, sgmtx, slt,
-                                                                       sst, sglt, sgst, plg,
-                                                                       tn, fees, ret), prb,
-                                      retcode, sol, ifelse(save, model, nothing))
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(rrb.fallback, rd; dims = dims, str_names = str_names, save = save,
-                  kwargs...)
-    end
+    return JuMPOptimisationRiskBudgeting(typeof(rrb),
+                                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
+                                                                          lcs, cent, gcard,
+                                                                          sgcard, smtx,
+                                                                          sgmtx, slt, sst,
+                                                                          sglt, sgst, plg,
+                                                                          tn, fees, ret),
+                                         prb, retcode, sol, ifelse(save, model, nothing),
+                                         nothing)
+end
+function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  str_names::Bool = false, save::Bool = true, kwargs...)
+    return _optimise(rrb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
 export BasicRelaxedRiskBudgeting, RegularisedRelaxedRiskBudgeting,

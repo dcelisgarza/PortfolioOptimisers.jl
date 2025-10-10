@@ -82,12 +82,11 @@ abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
-    name = string(typeof(ear))
     fields = propertynames(ear)
     if isempty(fields)
         return println(io, string(typeof(ear), "()"))
     end
-    name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
+    name = Base.typename(typeof(ear)).wrapper
     println(io, name)
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
@@ -119,10 +118,7 @@ function Base.show(io::IO,
             end
         elseif isa(val, DataType)
             tval = typeof(val)
-            val = repr(val)
-            if !isnothing(match(r"[\(\{]", val))
-                val = val[1:(findfirst(x -> (x == '{' || x == '('), val) - 1)]
-            end
+            val = Base.typename(tval).wrapper
             println(io, "| $(tval): ", val)
         else
             println(io, "| $(typeof(val)): ", repr(val))

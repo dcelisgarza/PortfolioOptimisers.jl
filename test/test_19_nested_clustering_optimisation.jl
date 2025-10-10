@@ -247,7 +247,7 @@
                                  opto = FactorRiskContribution(; opt = jopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustering.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
-            res = optimise!(opt, rd)
+            res = optimise(opt, rd)
             rtol = if i == 2
                 1e-4
             elseif i == 3
@@ -288,7 +288,7 @@
                                                                                                opt = jopto),
                                                                                opto = MeanRisk(;
                                                                                                opt = jopto))))
-        res = optimise!(opt, rd)
+        res = optimise(opt, rd)
         =#
     end
     @testset "Fees" begin
@@ -301,10 +301,10 @@
                              wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
         opto = JuMPOptimiser(; slv = slv, sbgt = 1, bgt = 1,
                              wb = WeightBounds(; lb = -1, ub = 1))
-        res = optimise!(NestedClustering(; cle = clr,
-                                         opti = MeanRisk(; r = ConditionalDrawdownatRisk(),
-                                                         opt = opti),
-                                         opto = MeanRisk(; opt = opto)), rd)
+        res = optimise(NestedClustering(; cle = clr,
+                                        opti = MeanRisk(; r = ConditionalDrawdownatRisk(),
+                                                        opt = opti),
+                                        opto = MeanRisk(; opt = opto)), rd)
 
         clusters = cutree(clr.clustering; k = clr.k)
         idx = findfirst(x -> x == "PG", rd.nx)
@@ -321,10 +321,10 @@
                              wb = WeightBounds(; lb = -1, ub = 1),
                              fees = fees_constraints(fees, sets), sets = sets)
         @test isapprox(res.w,
-                       optimise!(NestedClustering(; cle = clr,
-                                                  opti = MeanRisk(;
-                                                                  r = ConditionalDrawdownatRisk(),
-                                                                  opt = opti),
-                                                  opto = MeanRisk(; opt = opto)), rd).w)
+                       optimise(NestedClustering(; cle = clr,
+                                                 opti = MeanRisk(;
+                                                                 r = ConditionalDrawdownatRisk(),
+                                                                 opt = opti),
+                                                 opto = MeanRisk(; opt = opto)), rd).w)
     end
 end

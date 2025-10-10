@@ -447,7 +447,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     end
     return w, rkcl, fees
 end
-function optimise!(hec::HierarchicalEqualRiskContribution,
+function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
     pr = prior(hec.opt.pe, rd; dims = dims)
@@ -491,12 +491,13 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(pr.X))
     retcode, w = clustering_optimisation_result(hec.opt.cwf, wb, w / sum(w))
-    return if isa(retcode, OptimisationSuccess) || isnothing(hec.fallback)
-        HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(hec.fallback, rd; dims = dims, kwargs...)
-    end
+    return HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w, nothing)
+end
+function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  branchorder::Symbol = :optimal, kwargs...)
+    return _optimise(hec, rd; dims = dims, branchorder = branchorder, kwargs...)
 end
 
 export HierarchicalEqualRiskContribution
