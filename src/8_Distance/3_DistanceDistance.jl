@@ -51,7 +51,7 @@ DistanceDistance
     dist | Distances.Euclidean: Distances.Euclidean(0.0)
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
-   power | Int64: 1
+   power | nothing
      alg | SimpleDistance()
 ```
 

@@ -83,7 +83,8 @@ SemiDefinitePhylogenyEstimator
      |       |      |    detone | nothing
      |       |      |       alg | nothing
      |    de | Distance
-     |       |   alg | CanonicalDistance()
+     |       |   power | nothing
+     |       |     alg | CanonicalDistance()
      |   alg | KruskalTree
      |       |     args | Tuple{}: ()
      |       |   kwargs | @NamedTuple{}: NamedTuple()
@@ -251,7 +252,8 @@ IntegerPhylogenyEstimator
         |       |      |    detone | nothing
         |       |      |       alg | nothing
         |    de | Distance
-        |       |   alg | CanonicalDistance()
+        |       |   power | nothing
+        |       |     alg | CanonicalDistance()
         |   alg | KruskalTree
         |       |     args | Tuple{}: ()
         |       |   kwargs | @NamedTuple{}: NamedTuple()
@@ -633,7 +635,6 @@ CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
 # Examples
 
 ```jldoctest
-julia> CentralityConstraint()
 CentralityConstraint
      A | CentralityEstimator
        |     ne | NetworkEstimator
@@ -652,7 +653,8 @@ CentralityConstraint
        |        |       |      |    detone | nothing
        |        |       |      |       alg | nothing
        |        |    de | Distance
-       |        |       |   alg | CanonicalDistance()
+       |        |       |   power | nothing
+       |        |       |     alg | CanonicalDistance()
        |        |   alg | KruskalTree
        |        |       |     args | Tuple{}: ()
        |        |       |   kwargs | @NamedTuple{}: NamedTuple()

@@ -834,7 +834,6 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> NetworkEstimator()
 NetworkEstimator
    ce | PortfolioOptimisersCovariance
       |   ce | Covariance
@@ -851,7 +850,8 @@ NetworkEstimator
       |      |    detone | nothing
       |      |       alg | nothing
    de | Distance
-      |   alg | CanonicalDistance()
+      |   power | nothing
+      |     alg | CanonicalDistance()
   alg | KruskalTree
       |     args | Tuple{}: ()
       |   kwargs | @NamedTuple{}: NamedTuple()
@@ -949,7 +949,8 @@ CentralityEstimator
        |       |      |    detone | nothing
        |       |      |       alg | nothing
        |    de | Distance
-       |       |   alg | CanonicalDistance()
+       |       |   power | nothing
+       |       |     alg | CanonicalDistance()
        |   alg | KruskalTree
        |       |     args | Tuple{}: ()
        |       |   kwargs | @NamedTuple{}: NamedTuple()

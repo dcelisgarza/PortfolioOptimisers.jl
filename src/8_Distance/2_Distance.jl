@@ -43,7 +43,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Distance()
 Distance
-  power | Nothing: nothing
+  power | nothing
     alg | SimpleDistance()
 ```
 

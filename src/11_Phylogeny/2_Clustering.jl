@@ -392,7 +392,8 @@ ClusteringEstimator
       |      |    detone | nothing
       |      |       alg | nothing
    de | Distance
-      |   alg | CanonicalDistance()
+      |   power | nothing
+      |     alg | CanonicalDistance()
   alg | HClustAlgorithm
       |   linkage | Symbol: :ward
   onc | OptimalNumberClusters
