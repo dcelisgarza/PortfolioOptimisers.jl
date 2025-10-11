@@ -834,7 +834,9 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> NetworkEstimator
+julia> NetworkEstimator()
+
+NetworkEstimator
    ce | PortfolioOptimisersCovariance
       |   ce | Covariance
       |      |    me | SimpleExpectedReturns
