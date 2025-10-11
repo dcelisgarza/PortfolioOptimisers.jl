@@ -42,6 +42,10 @@ CurrentModule = PortfolioOptimisers
     
     Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
+Portfolio optimisation is the science of reducing investment risk by being clever about how you distribute your money. Ironically, some of the most robust ways to ensure risk is minimised is to distribute your money equally among a portfolio of proven assets. There exist however, a rather large number of methods, risk measures, constraints, prior statistics estimators, etc. Which give a huge number of combinations.
+
+`PortfolioOptimisers.jl` is an attempt at providing as many as possible, and to make it possible to add more by leveraging Julia's type system.
+
 The feature list is quite large and under active development. New features will be added over time. Check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) documentation for details.
 
 Please feel free to file issues and/or start discussions if you have any issues using the library, or if I haven't got to writing docs/examples for something you need. That way I know what to prioritise.
@@ -169,3 +173,91 @@ plot_histogram(mip_res.w, rd.X, slv)
 # Plot compounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ````
+
+## Caveats
+
+### Documentation
+
+  - Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
+  - Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
+  - Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
+
+### API
+
+  - Unstable: there will likely be breaking changes as I figure out better, more general way to do things, or better naming conventions.
+
+### Internals
+
+  - Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
+
+## Features
+
+The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There's also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
+
+### Price data
+
+Everything but the finite allocation optimisations work off of returns data. Some optimisations may use price data in the future.
+
+  - Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
+  - Computing them, validating and cleaning up data.
+
+### Co-moment matrix processing
+
+  - Positive definite projection.
+
+  - Matrix denoising.
+    
+      + Spectral, shrunk, fixed.
+  - Matrix detoning.
+
+### Moment estimation
+
+Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
+
+  - Expected returns:
+    
+      + Arithmetic expected returns.
+    
+      + Shrunk expected returns.
+        
+          * James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
+      + Equilibrium expected returns.
+      + Excess expected returns.
+
+  - Variance.
+  - Covariance/Correlation matrix:
+    
+      + Custom: estimator + processing pipeline.
+    
+      + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
+        
+          * Full, and Semi covariance algorithms.
+      + Gerber.
+        
+          * Gerber 0, 1, 2. Standardised and unstandardised.
+      + Smyth-Broby.
+        
+          * Smyth-Broby 0, 1, 2. Standardised and unstandardised.
+          * Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
+      + Distance covariance.
+      + Lower tail dependence.
+      + Kendall.
+      + Spearman.
+      + Mutual information.
+      + Coskewness.
+        
+          * Full and Semi algorithms.
+      + Implied volatility.
+
+### Regression
+
+Factor models and implied volatility work off of regression.
+
+  - Stepwise.
+    
+      + Forward and Backward. Both of them with P-value, Corrected and vanilla Akaike info, Bayesian info, R-square, and Adjusted R-squared criteria.
+
+  - Dimensional reduction.
+    
+      + Principal Component.
+      + Probabilistic Principal Component.

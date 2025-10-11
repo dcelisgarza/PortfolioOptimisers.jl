@@ -32,12 +32,12 @@
     @testset "Expected ReturnsResult" begin
         mes = [ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; target = VolatilityWeighted())),
-               ShrunkExpectedReturns(; alg = JamesStein(; target = MeanSquareError())),
+               ShrunkExpectedReturns(; alg = JamesStein(; target = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = JamesStein(),
                                      me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(; alg = BayesStein()),
                ShrunkExpectedReturns(; alg = BayesStein(; target = VolatilityWeighted())),
-               ShrunkExpectedReturns(; alg = BayesStein(; target = MeanSquareError())),
+               ShrunkExpectedReturns(; alg = BayesStein(; target = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = BayesStein(),
                                      me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya()),
@@ -46,7 +46,7 @@
                                                                target = VolatilityWeighted())),
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
-                                                               target = MeanSquareError())),
+                                                               target = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
                                      me = SimpleExpectedReturns(; w = ew)),
                EquilibriumExpectedReturns(), ExcessExpectedReturns(; rf = rf)]
@@ -64,23 +64,19 @@
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
                Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = SimpleCovariance(;
-                                                                               corrected = false),
-                                                         w = ew)),
+                          ce = GeneralCovariance(;
+                                                 ce = SimpleCovariance(; corrected = false),
+                                                 w = ew)),
                Covariance(; alg = Full(),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = AnalyticalNonlinearShrinkage())),
+                          ce = GeneralCovariance(; ce = AnalyticalNonlinearShrinkage())),
                Covariance(; alg = Semi()),
                Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = ew),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = SimpleCovariance(;
-                                                                               corrected = false),
-                                                         w = ew)),
+                          ce = GeneralCovariance(;
+                                                 ce = SimpleCovariance(; corrected = false),
+                                                 w = ew)),
                Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = fw),
-                          ce = GeneralWeightedCovariance(;
-                                                         ce = AnalyticalNonlinearShrinkage(),
-                                                         w = fw)), SpearmanCovariance(),
+                          ce = GeneralCovariance(; ce = AnalyticalNonlinearShrinkage(),
+                                                 w = fw)), SpearmanCovariance(),
                KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = Knuth()),
                MutualInfoCovariance(; bins = FreedmanDiaconis()),
@@ -209,10 +205,10 @@
         des = [Distance(; alg = SimpleAbsoluteDistance()),
                DistanceDistance(; alg = SimpleAbsoluteDistance()),
                Distance(; alg = LogDistance()), DistanceDistance(; alg = LogDistance())]
-        desg = [GeneralDistance(; alg = SimpleAbsoluteDistance()),
-                GeneralDistanceDistance(; alg = SimpleAbsoluteDistance()),
-                GeneralDistance(; alg = LogDistance()),
-                GeneralDistanceDistance(; alg = LogDistance())]
+        desg = [Distance(; power = 1, alg = SimpleAbsoluteDistance()),
+                DistanceDistance(; power = 1, alg = SimpleAbsoluteDistance()),
+                Distance(; power = 1, alg = LogDistance()),
+                DistanceDistance(; power = 1, alg = LogDistance())]
         df = CSV.read(joinpath(@__DIR__, "./assets/distance1.csv.gz"), DataFrame)
         ce = PortfolioOptimisersCovariance()
         for (i, (de, deg)) in enumerate(zip(des, desg))
@@ -229,10 +225,8 @@
             @test isapprox(d1, dg1)
             @test isapprox(d2, dg2)
             @test isapprox(d1, d2)
-            if isa(de, Distance{<:SimpleAbsoluteDistance}) ||
-               isa(de, Distance{<:LogDistance}) ||
-               isa(de, GeneralDistance{<:Any, <:SimpleAbsoluteDistance}) ||
-               isa(de, GeneralDistance{<:Any, <:LogDistance})
+            if isa(de, Distance{<:Any, <:SimpleAbsoluteDistance}) ||
+               isa(de, Distance{<:Any, <:LogDistance})
                 r, d = cor_and_dist(de, ce, rd.X)
                 rg, dg = cor_and_dist(deg, ce, rd.X)
                 @test isapprox(r, rg)
@@ -246,7 +240,7 @@
                GerberCovariance(), SmythBrobyCovariance()]
         df = CSV.read(joinpath(@__DIR__, "./assets/CanonicalDistance.csv.gz"), DataFrame)
         de = Distance(; alg = CanonicalDistance())
-        deg = GeneralDistance(; alg = CanonicalDistance())
+        deg = Distance(; power = 1, alg = CanonicalDistance())
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
             r1, d1 = cor_and_dist(de, cei, rd.X)
@@ -274,15 +268,15 @@
                 @test all(isapprox.((r1, d1), cor_and_dist(deg, ce, rd.X)))
                 @test isapprox(d1, distance(deg, ce, rd.X))
                 @test isapprox(d1, distance(deg, cei, rd.X))
-                distance(GeneralDistance(;
-                                         alg = VariationInfoDistance(; bins = ce.bins,
-                                                                     normalise = ce.normalise)),
+                distance(Distance(; power = 1,
+                                  alg = VariationInfoDistance(; bins = ce.bins,
+                                                              normalise = ce.normalise)),
                          cov(ce, rd.X), rd.X)
             elseif isa(ce, DistanceCovariance)
-                distance(GeneralDistance(; alg = CorrelationDistance(;)), cov(ce, rd.X),
+                distance(Distance(; power = 1, alg = CorrelationDistance(;)), cov(ce, rd.X),
                          rd.X)
             elseif isa(ce, LTDCovariance)
-                distance(GeneralDistance(; alg = LogDistance()), cov(ce, rd.X), rd.X)
+                distance(Distance(; power = 1, alg = LogDistance()), cov(ce, rd.X), rd.X)
             else
                 distance(deg, cov(ce, rd.X), rd.X)
             end
@@ -302,7 +296,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/CanonicalDistanceDistance.csv.gz"),
                       DataFrame)
         de = DistanceDistance(; alg = CanonicalDistance())
-        deg = GeneralDistanceDistance(; alg = CanonicalDistance())
+        deg = DistanceDistance(; power = 1, alg = CanonicalDistance())
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
             r1, d1 = cor_and_dist(de, cei, rd.X)
@@ -326,16 +320,15 @@
             end
             d5 = distance(deg, ce, rd.X)
             d6 = if isa(ce, MutualInfoCovariance)
-                distance(GeneralDistanceDistance(;
-                                                 alg = VariationInfoDistance(;
-                                                                             bins = ce.bins,
-                                                                             normalise = ce.normalise)),
+                distance(DistanceDistance(; power = 1,
+                                          alg = VariationInfoDistance(; bins = ce.bins,
+                                                                      normalise = ce.normalise)),
                          cov(ce, rd.X), rd.X)
             elseif isa(ce, DistanceCovariance)
-                distance(GeneralDistanceDistance(; alg = CorrelationDistance(;)),
+                distance(DistanceDistance(; power = 1, alg = CorrelationDistance(;)),
                          cov(ce, rd.X), rd.X)
             elseif isa(ce, LTDCovariance)
-                distance(GeneralDistanceDistance(; alg = LogDistance()), cov(ce, rd.X),
+                distance(DistanceDistance(; power = 1, alg = LogDistance()), cov(ce, rd.X),
                          rd.X)
             else
                 distance(deg, cov(ce, rd.X), rd.X)
