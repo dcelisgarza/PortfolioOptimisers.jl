@@ -2,17 +2,19 @@
 
 ```@docs
 Distance
-distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
+distance(::Distance{Nothing, <:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(::Distance{<:LogDistance},
+distance(::Distance{Nothing, <:LogDistance},
                   ce::Union{<:LTDCovariance,
                             <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(::Distance{<:CanonicalDistance}, ce::MutualInfoCovariance,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatrix;
+distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
                   dims::Int = 1, kwargs...)
-distance(::Distance{<:SimpleDistance}, rho::AbstractMatrix, args...; kwargs...)
-cor_and_dist(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+distance(::Distance{Nothing, <:SimpleDistance}, rho::AbstractMatrix, args...;
+                  kwargs...)
+cor_and_dist(::Distance{Nothing, <:SimpleDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+distance(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```

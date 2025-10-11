@@ -45,8 +45,8 @@ include("./7_Moments/21_ImpliedVolatility.jl")
 include("./8_Distance/1_Base_Distance.jl")
 include("./8_Distance/2_Distance.jl")
 include("./8_Distance/3_DistanceDistance.jl")
-include("./8_Distance/4_GeneralDistance.jl")
-include("./8_Distance/5_GeneralDistanceDistance.jl")
+# include("./8_Distance/4_GeneralDistance.jl")
+# include("./8_Distance/5_GeneralDistanceDistance.jl")
 
 include("./9_JuMPModelOptimisation.jl")
 

@@ -1,57 +1,81 @@
 """
 ```julia
-struct Distance{T1} <: AbstractDistanceEstimator
-    alg::T1
+struct Distance{T1, T2} <: AbstractDistanceEstimator
+    power::T1
+    alg::T2
 end
 ```
 
-Distance estimator for portfolio optimization.
+If power is not `nothing`, computes the generalised distance estimator.
+
+```math
+\\begin{align}
+_{g}d_{i,\\,j} &= s \\cdot \\left(d_{i,\\,j}\\right)^{p}\\\\
+    s &= \\begin{cases}
+        1/2 & \\text{if } p \\mod 2 \\neq 0\\\\
+        1 & \\text{otherwise}
+        \\end{cases}\\,,
+\\end{align}
+```
+
+where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed using the specified distance algorithm, ``p`` is the integer power, ``s`` is a scaling factor, and each subscript denotes an asset.
 
 # Fields
 
-  - `alg`: The distance algorithm.
+  - `power`: Optional integer power to which the base correlation or distance matrix is raised.
+  - `alg`: The base distance algorithm.
 
 # Constructor
 
 ```julia
-Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
+Distance(; power::Union{Nothing, <:Integer} = nothing,
+         alg::AbstractDistanceAlgorithm = SimpleDistance())
 ```
 
 Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `power` is not `nothing`, then `power >= 1`.
 
 # Examples
 
 ```jldoctest
 julia> Distance()
 Distance
-  alg | SimpleDistance()
+  power | Nothing: nothing
+    alg | SimpleDistance()
 ```
 
 # Related
 
-  - [`AbstractDistanceEstimator`](@ref)
-  - [`AbstractDistanceAlgorithm`](@ref)
+  - [`distance`](@ref)
+  - [`cor_and_dist`](@ref)
   - [`SimpleDistance`](@ref)
   - [`SimpleAbsoluteDistance`](@ref)
   - [`LogDistance`](@ref)
   - [`CorrelationDistance`](@ref)
   - [`CanonicalDistance`](@ref)
   - [`VariationInfoDistance`](@ref)
-  - [`distance`](@ref)
 """
-struct Distance{T1} <: AbstractDistanceEstimator
-    alg::T1
-    function Distance(alg::AbstractDistanceAlgorithm)
-        return new{typeof(alg)}(alg)
+struct Distance{T1, T2} <: AbstractDistanceEstimator
+    power::T1
+    alg::T2
+    function Distance(power::Union{Nothing, <:Integer}, alg::AbstractDistanceAlgorithm)
+        if !isnothing(power)
+            @argcheck(power >= one(power))
+        end
+        return new{typeof(power), typeof(alg)}(power, alg)
     end
 end
-function Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
-    return Distance(alg)
+function Distance(; power::Union{Nothing, <:Integer} = nothing,
+                  alg::AbstractDistanceAlgorithm = SimpleDistance())
+    return Distance(power, alg)
 end
-
 """
 ```julia
-distance(de::Distance{<:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
+distance(de::Distance{<:Any,
+                      <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
                               <:CorrelationDistance, <:CanonicalDistance}},
          ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
@@ -62,11 +86,11 @@ This method computes the correlation matrix using the provided covariance estima
 
   - `de`: Distance estimator.
 
-      + `de::Distance{<:SimpleDistance}`: Use the [`SimpleDistance`](@ref) algorithm.
-      + `de::Distance{<:SimpleAbsoluteDistance}`: Use the [`SimpleAbsoluteDistance`](@ref) algorithm.
-      + `de::Distance{<:LogDistance}`: Use the [`LogDistance`](@ref) algorithm.
-      + `de::Distance{<:CorrelationDistance}`: Use the [`CorrelationDistance`](@ref) algorithm.
-      + `de::Distance{<:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:SimpleDistance}`: Use the [`SimpleDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:SimpleAbsoluteDistance}`: Use the [`SimpleAbsoluteDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:LogDistance}`: Use the [`LogDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:CorrelationDistance}`: Use the [`CorrelationDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
 
   - `ce`: Covariance estimator.
   - `X`: Data matrix (observations × features).
@@ -87,35 +111,64 @@ This method computes the correlation matrix using the provided covariance estima
   - [`CanonicalDistance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
+function distance(::Distance{Nothing, <:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!((one(eltype(X)) .- rho) * 0.5, zero(eltype(X)), one(eltype(X))))
 end
-function distance(::Distance{<:SimpleAbsoluteDistance}, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+function distance(de::Distance{<:Integer, <:SimpleDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
+    scale = isodd(de.power) ? 0.5 : 1.0
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    return sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
+end
+function distance(::Distance{Nothing, <:SimpleAbsoluteDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!((one(eltype(X)) .- (all(x -> x >= zero(x), rho) ? rho : abs.(rho))),
                         zero(eltype(X)), one(eltype(X))))
 end
-function distance(::Distance{<:LogDistance}, ce::StatsBase.CovarianceEstimator,
+function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
+end
+function distance(::Distance{Nothing, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(all(x -> x >= zero(x), rho) ? rho : abs.(rho))
 end
-function distance(::Distance{<:CorrelationDistance}, ce::StatsBase.CovarianceEstimator,
+function distance(de::Distance{<:Integer, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    return -log.(rho)
+end
+function distance(::Distance{Nothing, <:CorrelationDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
-function distance(::Distance{<:CanonicalDistance}, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return distance(Distance(; alg = SimpleDistance()), ce, X; dims = dims, kwargs...)
+function distance(de::Distance{<:Integer, <:CorrelationDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
-
+function distance(de::Distance{<:Any, <:CanonicalDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
+    return distance(Distance(; power = de.power, alg = SimpleDistance()), ce, X;
+                    dims = dims, kwargs...)
+end
 """
 ```julia
-distance(de::Distance{<:LogDistance},
+distance(de::Distance{<:Any, <:LogDistance},
          ce::Union{<:LTDCovariance,
                    <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
          X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -125,7 +178,7 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 
 # Arguments
 
-  - `::Distance{<:LogDistance}`: Distance estimator with [`LogDistance`](@ref) algorithm.
+  - `de::Distance{<:Any, <:LogDistance}`: Distance estimator with [`LogDistance`](@ref) algorithm.
   - `ce`: LTD covariance estimator or a PortfolioOptimisersCovariance wrapping an LTD estimator.
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the correlation.
@@ -141,86 +194,31 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
   - [`LogDistance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function distance(::Distance{<:LogDistance},
+function distance(::Distance{Nothing, <:LogDistance},
                   ce::Union{<:LTDCovariance,
                             <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
-
-"""
-```julia
-distance(::Distance{<:CanonicalDistance},
-         ce::Union{<:MutualInfoCovariance,
-                   <:PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
-                   <:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any},
-                   <:DistanceCovariance,
-                   <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
-         X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
-
-Compute the canonical distance matrix using the covariance estimator and data matrix. The method selects the appropriate distance algorithm based on the type of covariance estimator provided (see [`CanonicalDistance`](@ref)).
-
-# Arguments
-
-  - `::Distance{<:CanonicalDistance}`: Distance estimator using the [`CanonicalDistance`](@ref) algorithm.
-  - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
-  - `X`: Data matrix (observations × features).
-  - `dims`: Dimension along which to compute the distance.
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
-
-# Related
-
-  - [`Distance`](@ref)
-  - [`CanonicalDistance`](@ref)
-  - [`MutualInfoCovariance`](@ref)
-  - [`LTDCovariance`](@ref)
-  - [`DistanceCovariance`](@ref)
-"""
-function distance(::Distance{<:CanonicalDistance}, ce::MutualInfoCovariance,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return distance(Distance(;
-                             alg = VariationInfoDistance(; bins = ce.bins,
-                                                         normalise = ce.normalise)), ce, X;
-                    dims = dims, kwargs...)
-end
-function distance(::Distance{<:CanonicalDistance},
-                  ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return distance(Distance(;
-                             alg = VariationInfoDistance(; bins = ce.ce.bins,
-                                                         normalise = ce.ce.normalise)), ce,
-                    X; dims = dims, kwargs...)
-end
-function distance(::Distance{<:CanonicalDistance},
+function distance(de::Distance{<:Integer, <:LogDistance},
                   ce::Union{<:LTDCovariance,
                             <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return distance(Distance(; alg = LogDistance()), ce, X; dims = dims, kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    return -log.(rho)
 end
-function distance(::Distance{<:CanonicalDistance},
-                  ce::Union{<:DistanceCovariance,
-                            <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return distance(Distance(; alg = CorrelationDistance()), ce, X; dims = dims, kwargs...)
-end
-
 """
 ```julia
-distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatrix; dims::Int = 1,
-         kwargs...)
+distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
+         dims::Int = 1, kwargs...)
 ```
 
 Compute the variation of information (VI) distance matrix from a data matrix.
 
 # Arguments
 
-  - `de::Distance{<:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
+  - `de::Distance{<:Any, <:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
   - `::Any`: Covariance estimator placeholder for API compatibility (ignored).
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the distance. If `2`, the data is transposed.
@@ -244,7 +242,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
   - [`Distance`](@ref)
   - [`VariationInfoDistance`](@ref)
 """
-function distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatrix;
+function distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
                   dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -252,10 +250,18 @@ function distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatri
     end
     return variation_info(X, de.alg.bins, de.alg.normalise)
 end
-
+function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    @argcheck(dims in (1, 2))
+    if dims == 2
+        X = transpose(X)
+    end
+    return variation_info(X, de.alg.bins, de.alg.normalise) .^ de.power
+end
 """
 ```julia
-distance(::Distance{<:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
+distance(::Distance{<:Any,
+                    <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
                             <:CorrelationDistance, <:CanonicalDistance}},
          rho::AbstractMatrix, args...; kwargs...)
 ```
@@ -268,11 +274,11 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
 
   - `de`: Distance estimator.
 
-      + `de::Distance{<:SimpleDistance}`: Use the [`SimpleDistance`](@ref) algorithm.
-      + `de::Distance{<:SimpleAbsoluteDistance}`: Use the [`SimpleAbsoluteDistance`](@ref) algorithm.
-      + `de::Distance{<:LogDistance}`: Use the [`LogDistance`](@ref) algorithm.
-      + `de::Distance{<:CorrelationDistance}`: Use the [`CorrelationDistance`](@ref) algorithm.
-      + `de::Distance{<:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:SimpleDistance}`: Use the [`SimpleDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:SimpleAbsoluteDistance}`: Use the [`SimpleAbsoluteDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:LogDistance}`: Use the [`LogDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:CorrelationDistance}`: Use the [`CorrelationDistance`](@ref) algorithm.
+      + `de::Distance{<:Any, <:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
 
   - `rho`: Correlation or covariance matrix.
   - `args...`: Additional arguments (ignored).
@@ -296,7 +302,8 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
   - [`CanonicalDistance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function distance(::Distance{<:SimpleDistance}, rho::AbstractMatrix, args...; kwargs...)
+function distance(::Distance{Nothing, <:SimpleDistance}, rho::AbstractMatrix, args...;
+                  kwargs...)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov
@@ -306,8 +313,20 @@ function distance(::Distance{<:SimpleDistance}, rho::AbstractMatrix, args...; kw
     return sqrt.(clamp!((one(eltype(rho)) .- rho) * 0.5, zero(eltype(rho)),
                         one(eltype(rho))))
 end
-function distance(::Distance{<:SimpleAbsoluteDistance}, rho::AbstractMatrix, args...;
+function distance(de::Distance{<:Integer, <:SimpleDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
+    s = diag(rho)
+    iscov = any(!isone, s)
+    if iscov
+        s .= sqrt.(s)
+        rho = StatsBase.cov2cor(rho, s)
+    end
+    scale = isodd(de.power) ? 0.5 : 1.0
+    return sqrt.(clamp!((one(eltype(rho)) .- rho .^ de.power) * scale, zero(eltype(rho)),
+                        one(eltype(rho))))
+end
+function distance(::Distance{Nothing, <:SimpleAbsoluteDistance}, rho::AbstractMatrix,
+                  args...; kwargs...)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov
@@ -317,7 +336,20 @@ function distance(::Distance{<:SimpleAbsoluteDistance}, rho::AbstractMatrix, arg
     return sqrt.(clamp!(one(eltype(rho)) .- (all(x -> x >= zero(x), rho) ? rho : abs.(rho)),
                         zero(eltype(rho)), one(eltype(rho))))
 end
-function distance(::Distance{<:LogDistance}, rho::AbstractMatrix, args...; kwargs...)
+function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::AbstractMatrix,
+                  args...; kwargs...)
+    s = diag(rho)
+    iscov = any(!isone, s)
+    if iscov
+        s .= sqrt.(s)
+        rho = StatsBase.cov2cor(rho, s)
+    end
+    return sqrt.(clamp!(one(eltype(rho)) .-
+                        (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power,
+                        zero(eltype(rho)), one(eltype(rho))))
+end
+function distance(::Distance{Nothing, <:LogDistance}, rho::AbstractMatrix, args...;
+                  kwargs...)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov
@@ -326,7 +358,17 @@ function distance(::Distance{<:LogDistance}, rho::AbstractMatrix, args...; kwarg
     end
     return -log.(all(x -> x >= zero(x), rho) ? rho : abs.(rho))
 end
-function distance(::Distance{<:CorrelationDistance}, rho::AbstractMatrix, args...;
+function distance(de::Distance{<:Integer, <:LogDistance}, rho::AbstractMatrix, args...;
+                  kwargs...)
+    s = diag(rho)
+    iscov = any(!isone, s)
+    if iscov
+        s .= sqrt.(s)
+        rho = StatsBase.cov2cor(rho, s)
+    end
+    return -log.((all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power)
+end
+function distance(::Distance{Nothing, <:CorrelationDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
     assert_matrix_issquare(rho)
     s = diag(rho)
@@ -337,14 +379,29 @@ function distance(::Distance{<:CorrelationDistance}, rho::AbstractMatrix, args..
     end
     return sqrt.(clamp!(one(eltype(rho)) .- rho, zero(eltype(rho)), one(eltype(rho))))
 end
-function distance(::Distance{<:CanonicalDistance}, rho::AbstractMatrix, args...; kwargs...)
-    return distance(Distance(; alg = SimpleDistance()), rho; kwargs...)
+function distance(de::Distance{<:Integer, <:CorrelationDistance}, rho::AbstractMatrix,
+                  args...; kwargs...)
+    assert_matrix_issquare(rho)
+    s = diag(rho)
+    iscov = any(!isone, s)
+    if iscov
+        s .= sqrt.(s)
+        rho = StatsBase.cov2cor(rho, s)
+    end
+    return sqrt.(clamp!(one(eltype(rho)) .- rho .^ de.power, zero(eltype(rho)),
+                        one(eltype(rho))))
 end
-
+function distance(de::Distance{<:Any, <:CanonicalDistance}, rho::AbstractMatrix, args...;
+                  kwargs...)
+    return distance(Distance(; power = de.power, alg = SimpleDistance()), rho; kwargs...)
+end
 """
 ```julia
-cor_and_dist(de::Distance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
-             dims::Int = 1, kwargs...)
+cor_and_dist(de::Distance{<:Any,
+                          <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
+                                  <:LogDistance, <:VariationInfoDistance,
+                                  <:CorrelationDistance}}, Nothing,
+             ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
 Compute and return the correlation and distance matrices. The distance matrix depends on the combination of distance and covariance estimators (see [`distance`](@ref)).
@@ -359,7 +416,7 @@ Compute and return the correlation and distance matrices. The distance matrix de
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - `dims in (1, 2)`.
 
 # Returns
 
@@ -370,13 +427,22 @@ Compute and return the correlation and distance matrices. The distance matrix de
   - [`Distance`](@ref)
   - [`distance`](@ref)
 """
-function cor_and_dist(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+function cor_and_dist(::Distance{Nothing, <:SimpleDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho,
            sqrt.(clamp!((one(eltype(X)) .- rho) * 0.5, zero(eltype(X)), one(eltype(X))))
 end
-function cor_and_dist(::Distance{<:SimpleAbsoluteDistance},
+function cor_and_dist(de::Distance{<:Integer, <:SimpleDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+    scale = isodd(de.power) ? 0.5 : 1.0
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    return rho,
+           sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
+end
+function cor_and_dist(::Distance{Nothing, <:SimpleAbsoluteDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
@@ -384,19 +450,40 @@ function cor_and_dist(::Distance{<:SimpleAbsoluteDistance},
            sqrt.(clamp!((one(eltype(X)) .- (all(x -> x >= zero(x), rho) ? rho : abs.(rho))),
                         zero(eltype(X)), one(eltype(X))))
 end
-function cor_and_dist(::Distance{<:LogDistance}, ce::StatsBase.CovarianceEstimator,
+function cor_and_dist(de::Distance{<:Integer, <:SimpleAbsoluteDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    return rho, sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
+end
+function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(all(x -> x >= zero(x), rho) ? rho : abs.(rho))
 end
-function cor_and_dist(::Distance{<:LogDistance},
+function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    return rho, -log.(rho)
+end
+function cor_and_dist(::Distance{Nothing, <:LogDistance},
                       ce::Union{<:LTDCovariance,
                                 <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(rho)
 end
-function cor_and_dist(de::Distance{<:VariationInfoDistance},
+function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
+                      ce::Union{<:LTDCovariance,
+                                <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    return rho, -log.(rho)
+end
+function cor_and_dist(de::Distance{Nothing, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
     @argcheck(dims in (1, 2))
@@ -406,43 +493,125 @@ function cor_and_dist(de::Distance{<:VariationInfoDistance},
     end
     return rho, variation_info(X, de.alg.bins, de.alg.normalise)
 end
-function cor_and_dist(::Distance{<:CorrelationDistance}, ce::StatsBase.CovarianceEstimator,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+function cor_and_dist(de::Distance{<:Integer, <:VariationInfoDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+    @argcheck(dims in (1, 2))
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    if dims == 2
+        X = transpose(X)
+    end
+    return rho, variation_info(X, de.alg.bins, de.alg.normalise) .^ de.power
+end
+function cor_and_dist(::Distance{Nothing, <:CorrelationDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
-function cor_and_dist(::Distance{<:CanonicalDistance}, ce::MutualInfoCovariance,
+function cor_and_dist(de::Distance{<:Integer, <:CorrelationDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    return rho, sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
+end
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return cor_and_dist(Distance(;
+    return cor_and_dist(Distance(; power = de.power,
                                  alg = VariationInfoDistance(; bins = ce.bins,
                                                              normalise = ce.normalise)), ce,
                         X; dims = dims, kwargs...)
 end
-function cor_and_dist(::Distance{<:CanonicalDistance},
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                       ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return cor_and_dist(Distance(;
+    return cor_and_dist(Distance(; power = de.power,
                                  alg = VariationInfoDistance(; bins = ce.ce.bins,
                                                              normalise = ce.ce.normalise)),
                         ce, X; dims = dims, kwargs...)
 end
-function cor_and_dist(::Distance{<:CanonicalDistance},
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                       ce::Union{<:LTDCovariance,
                                 <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return cor_and_dist(Distance(; alg = LogDistance()), ce, X; dims = dims, kwargs...)
+    return cor_and_dist(Distance(; power = de.power, alg = LogDistance()), ce, X;
+                        dims = dims, kwargs...)
 end
-function cor_and_dist(::Distance{<:CanonicalDistance},
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                       ce::Union{<:DistanceCovariance,
                                 <:PortfolioOptimisersCovariance{<:DistanceCovariance,
                                                                 <:Any}}, X::AbstractMatrix;
                       dims::Int = 1, kwargs...)
-    return cor_and_dist(Distance(; alg = CorrelationDistance()), ce, X; dims = dims,
-                        kwargs...)
+    return cor_and_dist(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
+                        dims = dims, kwargs...)
 end
-function cor_and_dist(::Distance{<:CanonicalDistance}, ce::StatsBase.CovarianceEstimator,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return cor_and_dist(Distance(; alg = SimpleDistance()), ce, X; dims = dims, kwargs...)
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
+    return cor_and_dist(Distance(; power = de.power, alg = SimpleDistance()), ce, X;
+                        dims = dims, kwargs...)
+end
+"""
+```julia
+distance(de::Distance{<:Any, <:CanonicalDistance},
+         ce::Union{<:MutualInfoCovariance,
+                   <:PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
+                   <:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any},
+                   <:DistanceCovariance,
+                   <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
+         X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
+
+Compute the canonical distance matrix using the covariance estimator and data matrix. The method selects the appropriate distance algorithm based on the type of covariance estimator provided (see [`CanonicalDistance`](@ref)).
+
+# Arguments
+
+  - `de::Distance{<:Any, <:CanonicalDistance}`: Distance estimator using the [`CanonicalDistance`](@ref) algorithm.
+  - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
+
+# Related
+
+  - [`Distance`](@ref)
+  - [`CanonicalDistance`](@ref)
+  - [`MutualInfoCovariance`](@ref)
+  - [`LTDCovariance`](@ref)
+  - [`DistanceCovariance`](@ref)
+"""
+function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return distance(Distance(; power = de.power,
+                             alg = VariationInfoDistance(; bins = ce.bins,
+                                                         normalise = ce.normalise)), ce, X;
+                    dims = dims, kwargs...)
+end
+function distance(de::Distance{<:Any, <:CanonicalDistance},
+                  ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return distance(Distance(; power = de.power,
+                             alg = VariationInfoDistance(; bins = ce.ce.bins,
+                                                         normalise = ce.ce.normalise)), ce,
+                    X; dims = dims, kwargs...)
+end
+function distance(de::Distance{<:Any, <:CanonicalDistance},
+                  ce::Union{<:LTDCovariance,
+                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return distance(Distance(; power = de.power, alg = LogDistance()), ce, X; dims = dims,
+                    kwargs...)
+end
+function distance(de::Distance{<:Any, <:CanonicalDistance},
+                  ce::Union{<:DistanceCovariance,
+                            <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return distance(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
+                    dims = dims, kwargs...)
 end
 
 export Distance

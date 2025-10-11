@@ -221,7 +221,8 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
             A = phylogeny_matrix(NetworkEstimator(; n = i,
-                                                  alg = MaximumDistanceSimilarity()), pr.X).X
+                                                  alg = MaximumDistanceSimilarity()),
+                                 pr.X).X
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on MaximumDistanceSimilarity.")
@@ -592,18 +593,18 @@
                DistanceDistance(; alg = LogDistance()),
                Distance(; alg = VariationInfoDistance()),
                DistanceDistance(; alg = VariationInfoDistance())]
-        desg = [GeneralDistance(; alg = CanonicalDistance()),
-                GeneralDistanceDistance(; alg = CanonicalDistance()),
-                GeneralDistance(; alg = SimpleDistance()),
-                GeneralDistanceDistance(; alg = SimpleDistance()),
-                GeneralDistance(; alg = SimpleAbsoluteDistance()),
-                GeneralDistanceDistance(; alg = SimpleAbsoluteDistance()),
-                GeneralDistance(; alg = CorrelationDistance()),
-                GeneralDistanceDistance(; alg = CorrelationDistance()),
-                GeneralDistance(; alg = LogDistance()),
-                GeneralDistanceDistance(; alg = LogDistance()),
-                GeneralDistance(; alg = VariationInfoDistance()),
-                GeneralDistanceDistance(; alg = VariationInfoDistance())]
+        desg = [Distance(;power=1, alg = CanonicalDistance()),
+                DistanceDistance(;power=1, alg = CanonicalDistance()),
+                Distance(;power=1, alg = SimpleDistance()),
+                DistanceDistance(;power=1, alg = SimpleDistance()),
+                Distance(;power=1, alg = SimpleAbsoluteDistance()),
+                DistanceDistance(;power=1, alg = SimpleAbsoluteDistance()),
+                Distance(;power=1, alg = CorrelationDistance()),
+                DistanceDistance(;power=1, alg = CorrelationDistance()),
+                Distance(;power=1, alg = LogDistance()),
+                DistanceDistance(;power=1, alg = LogDistance()),
+                Distance(;power=1, alg = VariationInfoDistance()),
+                DistanceDistance(;power=1, alg = VariationInfoDistance())]
         for i in eachindex(des)
             sigma1 = copy(sigma)
             sigma2 = copy(sigma)
@@ -642,18 +643,18 @@
                DistanceDistance(; alg = LogDistance()),
                Distance(; alg = VariationInfoDistance()),
                DistanceDistance(; alg = VariationInfoDistance())]
-        desg = [GeneralDistance(; alg = CanonicalDistance()),
-                GeneralDistanceDistance(; alg = CanonicalDistance()),
-                GeneralDistance(; alg = SimpleDistance()),
-                GeneralDistanceDistance(; alg = SimpleDistance()),
-                GeneralDistance(; alg = SimpleAbsoluteDistance()),
-                GeneralDistanceDistance(; alg = SimpleAbsoluteDistance()),
-                GeneralDistance(; alg = CorrelationDistance()),
-                GeneralDistanceDistance(; alg = CorrelationDistance()),
-                GeneralDistance(; alg = LogDistance()),
-                GeneralDistanceDistance(; alg = LogDistance()),
-                GeneralDistance(; alg = VariationInfoDistance()),
-                GeneralDistanceDistance(; alg = VariationInfoDistance())]
+        desg = [Distance(;power=1, alg = CanonicalDistance()),
+                DistanceDistance(;power=1, alg = CanonicalDistance()),
+                Distance(;power=1, alg = SimpleDistance()),
+                DistanceDistance(;power=1, alg = SimpleDistance()),
+                Distance(;power=1, alg = SimpleAbsoluteDistance()),
+                DistanceDistance(;power=1, alg = SimpleAbsoluteDistance()),
+                Distance(;power=1, alg = CorrelationDistance()),
+                DistanceDistance(;power=1, alg = CorrelationDistance()),
+                Distance(;power=1, alg = LogDistance()),
+                DistanceDistance(;power=1, alg = LogDistance()),
+                Distance(;power=1, alg = VariationInfoDistance()),
+                DistanceDistance(;power=1, alg = VariationInfoDistance())]
         for i in eachindex(des)
             sigma1 = copy(sigma)
             sigma2 = copy(sigma)

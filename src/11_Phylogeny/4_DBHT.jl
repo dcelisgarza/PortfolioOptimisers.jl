@@ -2019,13 +2019,10 @@ Validate compatibility of the distance estimator and covariance matrix for LoGo 
   - [`LoGo`](@ref)
   - [`logo!`](@ref)
 """
-function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
-                                  GeneralDistance{<:VariationInfoDistance, <:Any},
-                                  DistanceDistance{<:VariationInfoDistance, <:Any, <:Any,
-                                                   <:Any},
-                                  GeneralDistanceDistance{<:VariationInfoDistance, <:Any,
-                                                          <:Any, <:Any, <:Any}},
-                          sigma::AbstractMatrix, X::AbstractMatrix)
+function LoGo_dist_assert(::Union{<:Distance{<:Any, <:VariationInfoDistance},
+                                  <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
+                                                     <:Any, <:Any}}, sigma::AbstractMatrix,
+                          X::AbstractMatrix)
     @argcheck(size(sigma, 1) == size(X, 2),
               DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
     return nothing
