@@ -299,14 +299,14 @@ Individual entries can be raised to an integer power and scaled according to whe
       + Direct Bubble Hierarchy Trees.
         
           * Local Global sparsification of the inverse covariance/correlation matrix.
-      + Phylogeny matrices.
+  - Phylogeny matrices.
         
-          * Network (MST) adjacency.
-          * Clustering adjacency.
-      + Centrality vectors and average centrality.
+      + Network (MST) adjacency.
+      + Clustering adjacency.
+  - Centrality vectors and average centrality.
         
-          * Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
-      + Asset phylogeny score.
+      + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
+  - Asset phylogeny score.
 
 ### Constraint generation
 
