@@ -14,7 +14,6 @@ All concrete types implementing rank-based covariance estimation algorithms (suc
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
-
 """
 ```julia
 struct KendallCovariance{T1} <: RankCovarianceEstimator
@@ -66,7 +65,6 @@ end
 function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return KendallCovariance(ve)
 end
-
 """
 ```julia
 cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -103,7 +101,6 @@ function Statistics.cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, k
     end
     return corkendall(X)
 end
-
 """
 ```julia
 cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -144,7 +141,6 @@ end
 function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return KendallCovariance(; ve = factory(ce.ve, w))
 end
-
 """
 ```julia
 struct SpearmanCovariance{T1} <: RankCovarianceEstimator
@@ -196,7 +192,6 @@ end
 function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return SpearmanCovariance(ve)
 end
-
 """
 ```julia
 cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -233,7 +228,6 @@ function Statistics.cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, 
     end
     return corspearman(X)
 end
-
 """
 ```julia
 cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

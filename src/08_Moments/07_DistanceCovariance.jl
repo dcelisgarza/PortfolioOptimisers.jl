@@ -76,7 +76,6 @@ function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = 
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, threads = ce.threads)
 end
-
 """
 ```julia
 cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
@@ -133,7 +132,6 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     dcov2_yy = dot(B, B) / N2
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
-
 """
 ```julia
 cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
@@ -173,7 +171,6 @@ function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
     end
     return rho
 end
-
 """
 ```julia
 Statistics.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -228,7 +225,6 @@ function Statistics.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1
     end
     return cor_distance(ce, X)
 end
-
 """
 ```julia
 cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
@@ -283,7 +279,6 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     dcov2_xy = dot(A, B) / N2
     return sqrt(dcov2_xy)
 end
-
 """
 ```julia
 cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
@@ -323,7 +318,6 @@ function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
     end
     return rho
 end
-
 """
 ```julia
 Statistics.cov(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

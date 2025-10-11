@@ -13,7 +13,6 @@ All concrete types implementing cokurtosis estimation algorithms should subtype 
   - [`AbstractEstimator`](@ref)
 """
 abstract type CokurtosisEstimator <: AbstractEstimator end
-
 """
 ```julia
 struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
@@ -83,7 +82,6 @@ end
 function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
-
 """
 ```julia
 _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
@@ -116,7 +114,6 @@ function _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
     matrix_processing!(mp, ckurt, X)
     return ckurt
 end
-
 """
 ```julia
 cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1,

@@ -14,7 +14,6 @@ This enables a consistent interface for estimation routines throughout the packa
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractAlgorithm end
@@ -31,7 +30,6 @@ This allows for flexible extension and dispatch of routines.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractAlgorithm end
-
 """
 ```julia
 abstract type AbstractResult end
@@ -48,7 +46,6 @@ This ensures a unified interface for accessing results across different estimato
   - [`AbstractAlgorithm`](@ref)
 """
 abstract type AbstractResult end
-
 """
 ```julia
 abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
@@ -64,7 +61,6 @@ All concrete types that implement covariance estimation (e.g., sample covariance
   - [`AbstractMomentAlgorithm`](@ref)
 """
 abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
-
 """
 ```julia
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end

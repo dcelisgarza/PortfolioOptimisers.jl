@@ -16,7 +16,6 @@ Abstract supertype for all histogram binning algorithms.
   - [`HacineGharbiRavier`](@ref)
 """
 abstract type AbstractBins <: AbstractAlgorithm end
-
 """
 ```julia
 abstract type AstroPyBins <: AbstractBins end
@@ -34,7 +33,6 @@ Abstract supertype for all histogram binning algorithms implemented using AstroP
   - [`AbstractBins`](@ref)
 """
 abstract type AstroPyBins <: AbstractBins end
-
 """
 ```julia
 struct Knuth <: AstroPyBins end
@@ -53,7 +51,6 @@ Histogram binning algorithm using Knuth's rule.
   - [`get_bin_width_func`](@ref)
 """
 struct Knuth <: AstroPyBins end
-
 """
 ```julia
 struct FreedmanDiaconis <: AstroPyBins end
@@ -72,7 +69,6 @@ Histogram binning algorithm using the Freedman-Diaconis rule.
   - [`get_bin_width_func`](@ref)
 """
 struct FreedmanDiaconis <: AstroPyBins end
-
 """
 ```julia
 struct Scott <: AstroPyBins end
@@ -91,7 +87,6 @@ Histogram binning algorithm using Scott's rule.
   - [`get_bin_width_func`](@ref)
 """
 struct Scott <: AstroPyBins end
-
 """
 ```julia
 struct HacineGharbiRavier <: AbstractBins end
@@ -111,7 +106,6 @@ Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
   - [`get_bin_width_func`](@ref)
 """
 struct HacineGharbiRavier <: AbstractBins end
-
 """
 ```julia
 get_bin_width_func(bins::Union{<:AbstractBins, <:Integer})
@@ -169,7 +163,6 @@ end
 function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
 end
-
 """
 ```julia
 calc_num_bins(bins::Union{<:AbstractBins, <:Integer}, xj::AbstractVector,
@@ -233,7 +226,6 @@ end
 function calc_num_bins(bins::Integer, args...)
     return bins
 end
-
 """
 ```julia
 calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
@@ -290,7 +282,6 @@ function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
 
     return ex, ey, hxy
 end
-
 """
 ```julia
 intrinsic_mutual_info(X::AbstractMatrix)
@@ -343,7 +334,6 @@ function intrinsic_mutual_info(X::AbstractMatrix)
 
     return sum(mi)
 end
-
 """
 ```julia
 variation_info(X::AbstractMatrix;

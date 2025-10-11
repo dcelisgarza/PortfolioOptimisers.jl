@@ -214,7 +214,7 @@ Everything but the finite allocation optimisations work off of returns data. Som
 
 Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
 
-  - Expected returns:
+  - Expected returns.
     
       + Arithmetic expected returns.
     
@@ -225,13 +225,13 @@ Many of these can be used in conjunction. For example, some covariance estimator
       + Excess expected returns.
 
   - Variance.
-  - Covariance/Correlation matrix:
+  - Covariance/Correlation matrix.
     
       + Custom: estimator + processing pipeline.
     
       + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
         
-          * Full, and Semi covariance algorithms.
+          * Full and Semi covariance algorithms.
       + Gerber.
         
           * Gerber 0, 1, 2. Standardised and unstandardised.
@@ -255,9 +255,52 @@ Factor models and implied volatility work off of regression.
 
   - Stepwise.
     
-      + Forward and Backward. Both of them with P-value, Corrected and vanilla Akaike info, Bayesian info, R-square, and Adjusted R-squared criteria.
+      + Forward and Backward. Both of them with P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-square, and Adjusted R-squared criteria.
 
   - Dimensional reduction.
     
       + Principal Component.
       + Probabilistic Principal Component.
+
+### Distance
+
+Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
+
+  - Distance: these compare pairwise relationships.
+  - Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
+
+Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
+
+  - Simple.
+  - Absolute.
+  - Logarithmic.
+  - Correlation.
+  - Canonical: depends on the covariance/correlation estimator used.
+
+### Phylogeny
+
+  - Clustering.
+    
+      + Optimal number of clusters:
+        
+          * Predefined, Second order difference, Standardised silhouette scores.
+    
+      + Hierarchical clustering.
+      + Direct Bubble Hierarchy Trees.
+        
+          * Local Global sparsification of the inverse covariance/correlation matrix.
+      + Phylogeny matrices.
+        
+          * Network (MST) adjacency.
+          * Clustering adjacency.
+      + Centrality vectors and average centrality.
+        
+          * Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
+      + Asset phylogeny score.
+
+### Constraint generation
+
+  - Equation parsing: lets users define linear constraints by directly writing the equations.
+  - Linear weight constraint generation.
+  - Risk budget constraint generation.
+  - Asset set matrix generation.

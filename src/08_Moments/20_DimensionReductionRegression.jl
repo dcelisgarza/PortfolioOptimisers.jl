@@ -17,7 +17,6 @@ These types are used to specify the dimension reduction method when constructing
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
-
 """
 ```julia
 struct PCA{T1} <: DimensionReductionTarget
@@ -64,7 +63,6 @@ end
 function PCA(; kwargs::NamedTuple = (;))
     return PCA(kwargs)
 end
-
 """
 ```julia
 StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
@@ -92,7 +90,6 @@ This method applies PCA as a dimension reduction technique for regression-based 
 function StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
-
 """
 ```julia
 struct PPCA{T1} <: DimensionReductionTarget
@@ -139,7 +136,6 @@ end
 function PPCA(; kwargs::NamedTuple = (;))
     return PPCA(kwargs)
 end
-
 """
 ```julia
 StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
@@ -167,7 +163,6 @@ This method applies PPCA as a dimension reduction technique for regression-based
 function StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
-
 """
 ```julia
 struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
@@ -247,7 +242,6 @@ function DimensionReductionRegression(;
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
-
 """
 ```julia
 prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
@@ -289,7 +283,6 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     x1 = [ones(eltype(X), N) Xp]
     return x1, Vp
 end
-
 """
 ```julia
 regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
@@ -335,7 +328,6 @@ function regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::Abst
     pushfirst!(beta, beta0)
     return beta
 end
-
 """
 ```julia
 regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)

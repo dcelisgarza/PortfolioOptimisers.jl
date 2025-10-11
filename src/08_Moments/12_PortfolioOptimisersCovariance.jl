@@ -65,7 +65,6 @@ function factory(ce::PortfolioOptimisersCovariance,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
-
 """
 ```julia
 cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
@@ -109,7 +108,6 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; di
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
-
 """
 ```julia
 cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)

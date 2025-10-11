@@ -13,7 +13,6 @@ All concrete types implementing Smyth-Broby covariance estimation algorithms sho
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
 """
 abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
-
 """
 ```julia
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
@@ -33,7 +32,6 @@ These types are used to specify the algorithm when constructing a [`SmythBrobyCo
   - [`SmythBrobyCovariance`](@ref)
 """
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
-
 """
 ```julia
 abstract type UnNormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
@@ -55,7 +53,6 @@ Concrete types implementing unnormalised Smyth-Broby covariance algorithms shoul
   - [`SmythBrobyCovariance`](@ref)
 """
 abstract type UnNormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 abstract type NormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
@@ -77,7 +74,6 @@ Concrete types implementing normalised Smyth-Broby covariance algorithms should 
   - [`SmythBrobyCovariance`](@ref)
 """
 abstract type NormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBroby0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
@@ -93,7 +89,6 @@ Implements the original Smyth-Broby covariance algorithm (unnormalised variant).
   - [`SmythBroby2`](@ref)
 """
 struct SmythBroby0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBroby1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
@@ -109,7 +104,6 @@ Implements the first variant of the Smyth-Broby covariance algorithm (unnormalis
   - [`SmythBroby2`](@ref)
 """
 struct SmythBroby1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBroby2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
@@ -125,7 +119,6 @@ Implements the second variant of the Smyth-Broby covariance algorithm (unnormali
   - [`SmythBroby1`](@ref)
 """
 struct SmythBroby2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBrobyGerber0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
@@ -141,7 +134,6 @@ Implements the original Gerber-style variant of the Smyth-Broby covariance algor
   - [`SmythBrobyGerber2`](@ref)
 """
 struct SmythBrobyGerber0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBrobyGerber1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
@@ -157,7 +149,6 @@ Implements the first Gerber-style variant of the Smyth-Broby covariance algorith
   - [`SmythBrobyGerber2`](@ref)
 """
 struct SmythBrobyGerber1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBrobyGerber2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
@@ -173,7 +164,6 @@ Implements the second Gerber-style variant of the Smyth-Broby covariance algorit
   - [`SmythBrobyGerber1`](@ref)
 """
 struct SmythBrobyGerber2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedSmythBroby0 <: NormalisedSmythBrobyCovarianceAlgorithm end
@@ -189,7 +179,6 @@ Implements the original Smyth-Broby covariance algorithm on Z-transformed data (
   - [`NormalisedSmythBroby2`](@ref)
 """
 struct NormalisedSmythBroby0 <: NormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedSmythBroby1 <: NormalisedSmythBrobyCovarianceAlgorithm end
@@ -205,7 +194,6 @@ Implements the first variant of the Smyth-Broby covariance algorithm on Z-transf
   - [`NormalisedSmythBroby2`](@ref)
 """
 struct NormalisedSmythBroby1 <: NormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedSmythBroby2 <: NormalisedSmythBrobyCovarianceAlgorithm end
@@ -221,7 +209,6 @@ Implements the second variant of the Smyth-Broby covariance algorithm on Z-trans
   - [`NormalisedSmythBroby1`](@ref)
 """
 struct NormalisedSmythBroby2 <: NormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedSmythBrobyGerber0 <: NormalisedSmythBrobyCovarianceAlgorithm end
@@ -237,7 +224,6 @@ Implements the original Gerber-style variant of the Smyth-Broby covariance algor
   - [`NormalisedSmythBrobyGerber2`](@ref)
 """
 struct NormalisedSmythBrobyGerber0 <: NormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedSmythBrobyGerber1 <: NormalisedSmythBrobyCovarianceAlgorithm end
@@ -253,7 +239,6 @@ Implements the first Gerber-style variant of the Smyth-Broby covariance algorith
   - [`NormalisedSmythBrobyGerber2`](@ref)
 """
 struct NormalisedSmythBrobyGerber1 <: NormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm end
@@ -269,7 +254,6 @@ Implements the second Gerber-style variant of the Smyth-Broby covariance algorit
   - [`NormalisedSmythBrobyGerber1`](@ref)
 """
 struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm end
-
 """
 ```julia
 struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
@@ -424,7 +408,6 @@ function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} 
                                 c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg,
                                 threads = ce.threads)
 end
-
 """
 ```julia
 sb_delta(xi::Real, xj::Real, mui::Real, muj::Real, sigmai::Real, sigmaj::Real, c1::Real,
@@ -486,7 +469,6 @@ function sb_delta(xi::Real, xj::Real, mui::Real, muj::Real, sigmai::Real, sigmaj
 
     return kappa / (one(gamma) + gamma^n)
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -567,7 +549,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -643,7 +624,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -724,7 +704,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -804,7 +783,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -883,7 +861,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -957,7 +934,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1044,7 +1020,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1127,7 +1102,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1220,7 +1194,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1310,7 +1283,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1393,7 +1365,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1472,7 +1443,6 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 cor(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -1552,7 +1522,6 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     X = (X .- mean_vec) ⊘ std_vec
     return smythbroby(ce, X)
 end
-
 """
 ```julia
 cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)

@@ -13,7 +13,6 @@ All concrete types implementing Gerber covariance estimation algorithms should s
   - [`GerberCovarianceAlgorithm`](@ref)
 """
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
-
 """
 ```julia
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
@@ -33,7 +32,6 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
   - [`GerberCovariance`](@ref)
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
-
 """
 ```julia
 abstract type UnStandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
@@ -52,7 +50,6 @@ Concrete types implementing unnormalised Gerber covariance algorithms should sub
   - [`GerberCovariance`](@ref)
 """
 abstract type UnStandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
-
 """
 ```julia
 abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
@@ -71,7 +68,6 @@ Concrete types implementing normalised Gerber covariance algorithms should subty
   - [`GerberCovariance`](@ref)
 """
 abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
-
 """
 ```julia
 struct Gerber0 <: UnStandardisedGerberCovarianceAlgorithm end
@@ -87,7 +83,6 @@ Implements the original Gerber covariance algorithm.
   - [`Gerber2`](@ref)
 """
 struct Gerber0 <: UnStandardisedGerberCovarianceAlgorithm end
-
 """
 ```julia
 struct Gerber1 <: UnStandardisedGerberCovarianceAlgorithm end
@@ -103,7 +98,6 @@ Implements the first variant of the Gerber covariance algorithm.
   - [`Gerber2`](@ref)
 """
 struct Gerber1 <: UnStandardisedGerberCovarianceAlgorithm end
-
 """
 ```julia
 struct Gerber2 <: UnStandardisedGerberCovarianceAlgorithm end
@@ -119,7 +113,6 @@ Implements the second variant of the Gerber covariance algorithm.
   - [`Gerber1`](@ref)
 """
 struct Gerber2 <: UnStandardisedGerberCovarianceAlgorithm end
-
 """
 ```julia
 struct NormalisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
@@ -168,7 +161,6 @@ end
 function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber0(me)
 end
-
 """
 ```julia
 struct NormalisedGerber1{T1} <: StandardisedGerberCovarianceAlgorithm
@@ -217,7 +209,6 @@ end
 function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber1(me)
 end
-
 """
 ```julia
 struct NormalisedGerber2{T1} <: StandardisedGerberCovarianceAlgorithm
@@ -280,7 +271,6 @@ for alg in (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
              end
          end)
 end
-
 """
 ```julia
 struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
@@ -348,7 +338,6 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
                           alg::GerberCovarianceAlgorithm = Gerber1())
     return GerberCovariance(ve, pdm, threshold, alg)
 end
-
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix,
@@ -405,7 +394,6 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)
@@ -459,7 +447,6 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0},
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
@@ -512,7 +499,6 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)
@@ -568,7 +554,6 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1},
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
@@ -627,7 +612,6 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)
@@ -683,7 +667,6 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2},
     posdef!(ce.pdm, rho)
     return rho
 end
-
 """
 ```julia
 cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -747,7 +730,6 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X)
 end
-
 """
 ```julia
 cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

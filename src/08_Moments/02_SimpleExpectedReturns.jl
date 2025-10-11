@@ -43,7 +43,6 @@ end
 function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleExpectedReturns(w)
 end
-
 """
 ```julia
 mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)

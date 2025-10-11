@@ -13,7 +13,6 @@ All concrete types implementing clustering-based estimation algorithms should su
   - [`AbstractClusteringResult`](@ref)
 """
 abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
-
 """
 ```julia
 abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
@@ -29,7 +28,6 @@ All concrete types implementing specific clustering algorithms should subtype `A
   - [`AbstractClusteringResult`](@ref)
 """
 abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
-
 """
 ```julia
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
@@ -44,7 +42,6 @@ All concrete types implementing algorithms to estimate the optimal number of clu
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
@@ -59,7 +56,6 @@ All concrete types implementing specific algorithms for determining the optimal 
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
@@ -75,7 +71,6 @@ All concrete types representing the result of a clustering estimation should sub
   - [`AbstractClusteringAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
-
 """
 ```julia
 struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
@@ -134,7 +129,6 @@ function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatr
                                 D::AbstractMatrix, k::Integer)
     return HierarchicalClustering(clustering, S, D, k)
 end
-
 """
 ```julia
 clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -161,7 +155,6 @@ This function provides a generic interface for extracting or processing clusteri
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
-
 """
 ```julia
 struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
@@ -177,7 +170,6 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
   - [`OptimalNumberClusters`](@ref)
 """
 struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
-
 """
 ```julia
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
@@ -225,7 +217,6 @@ function StandardisedSilhouetteScore(;
                                      metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
     return StandardisedSilhouetteScore(metric)
 end
-
 """
 ```julia
 struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
@@ -293,7 +284,6 @@ function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                           <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)
 end
-
 """
 ```julia
 struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
@@ -339,7 +329,6 @@ end
 function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
 end
-
 """
 ```julia
 struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator

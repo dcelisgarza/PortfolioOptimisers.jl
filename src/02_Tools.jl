@@ -47,7 +47,6 @@ end
 function assert_nonneg_finite_val(::Nothing)
     return nothing
 end
-
 """
 ```julia
 assert_matrix_issquare(A::AbstractMatrix)
@@ -114,7 +113,6 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
 
     return df
 end
-
 """
 ```julia
 ⊗(A::AbstractArray, B::AbstractArray)
@@ -313,7 +311,6 @@ end
 function dot_scalar(a::AbstractVector, b::AbstractVector)
     return dot(a, b)
 end
-
 """
 ```julia
 nothing_scalar_array_view(x, i)
@@ -370,7 +367,6 @@ end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
 end
-
 """
 ```julia
 nothing_scalar_array_view_odd_order(x, i, j)
@@ -406,7 +402,6 @@ end
 function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
     return view(x, i, j)
 end
-
 """
 ```julia
 nothing_scalar_array_getindex(x, i)
@@ -465,7 +460,6 @@ end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
-
 """
 ```julia
 fourth_moment_index_factory(N::Integer, i::AbstractVector)
@@ -500,7 +494,6 @@ function fourth_moment_index_factory(N::Integer, i)
     end
     return idx
 end
-
 """
 ```julia
 traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:AbstractVector} = nothing)
@@ -546,7 +539,6 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} =
     end
     return ctarr
 end
-
 """
 ```julia
 concrete_typed_array(A::AbstractArray)

@@ -13,7 +13,6 @@ All concrete types representing the result of constraint generation or evaluatio
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractConstraintResult <: AbstractResult end
-
 """
 ```julia
 abstract type AbstractConstraintEstimator <: AbstractEstimator end
@@ -29,7 +28,6 @@ All concrete types implementing constraint generation or estimation algorithms s
   - [`AbstractEstimator`](@ref)
 """
 abstract type AbstractConstraintEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type ComparisonOperator end
@@ -45,7 +43,6 @@ Concrete subtypes represent specific comparison semantics (e.g., equality, inequ
   - [`InequalityComparisonOperator`](@ref)
 """
 abstract type ComparisonOperator end
-
 """
 ```julia
 abstract type EqualityComparisonOperator <: ComparisonOperator end
@@ -61,7 +58,6 @@ Concrete subtypes represent equality-based comparison semantics (e.g., `EQ`) for
   - [`EQ`](@ref)
 """
 abstract type EqualityComparisonOperator <: ComparisonOperator end
-
 """
 ```julia
 abstract type InequalityComparisonOperator <: ComparisonOperator end
@@ -78,7 +74,6 @@ Concrete subtypes represent inequality-based comparison semantics (e.g., `LEQ`, 
   - [`GEQ`](@ref)
 """
 abstract type InequalityComparisonOperator <: ComparisonOperator end
-
 """
 ```julia
 struct EQ <: EqualityComparisonOperator end
@@ -93,7 +88,6 @@ Equality comparison operator for constraint generation.
   - [`GEQ`](@ref)
 """
 struct EQ <: EqualityComparisonOperator end
-
 """
 ```julia
 struct LEQ <: InequalityComparisonOperator end
@@ -108,7 +102,6 @@ Less-than-or-equal-to comparison operator for constraint generation.
   - [`GEQ`](@ref)
 """
 struct LEQ <: InequalityComparisonOperator end
-
 """
 ```julia
 struct GEQ <: InequalityComparisonOperator end
@@ -123,7 +116,6 @@ Greater-than-or-equal-to comparison operator for constraint generation.
   - [`LEQ`](@ref)
 """
 struct GEQ <: InequalityComparisonOperator end
-
 """
 ```julia
 comparison_sign_ineq_flag(op::ComparisonOperator)

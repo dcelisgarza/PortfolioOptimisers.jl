@@ -72,7 +72,6 @@ function GeneralCovariance(;
                            w::Union{Nothing, <:AbstractWeights} = nothing)
     return GeneralCovariance(ce, w)
 end
-
 """
 ```julia
 cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -107,7 +106,6 @@ function Statistics.cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1,
         robust_cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
-
 """
 ```julia
 cor(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -145,7 +143,6 @@ end
 function factory(ce::GeneralCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return GeneralCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
-
 """
 ```julia
 struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
@@ -213,7 +210,6 @@ end
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
-
 """
 ```julia
 cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -257,7 +253,6 @@ function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
     X = min.(X .- mu, zero(eltype(X)))
     return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
-
 """
 ```julia
 cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)

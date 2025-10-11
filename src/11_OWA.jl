@@ -14,7 +14,6 @@ All concrete types implementing OWA estimation algorithms should subtype `Abstra
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
 """
 abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
@@ -31,7 +30,6 @@ All concrete types implementing specific OWA algorithms should subtype `Abstract
   - [`MinimumSumSquares`](@ref)
 """
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
@@ -47,7 +45,6 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
   - [`OWAJuMP`](@ref)
 """
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
-
 """
 ```julia
 struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
@@ -63,7 +60,6 @@ The Minimum Square Distance algorithm finds OWA weights that minimize the square
   - [`OWAJuMP`](@ref)
 """
 struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
-
 """
 ```julia
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
@@ -79,7 +75,6 @@ The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, p
   - [`OWAJuMP`](@ref)
 """
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
-
 """
 ```julia
 struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
@@ -131,7 +126,6 @@ end
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
     return NormalisedConstantRelativeRiskAversion(g)
 end
-
 """
 ```julia
 struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
@@ -231,7 +225,6 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
-
 """
 ```julia
 ncrra_weights(weights::AbstractMatrix{<:Real}; g::Real = 0.5)
@@ -305,7 +298,6 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
     end
     return w
 end
-
 """
 ```julia
 owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
@@ -355,7 +347,6 @@ function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
                  end)
     return model
 end
-
 """
 ```julia
 owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
@@ -398,7 +389,6 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMa
         w = ncrra_weights(weights, 0.5)
     end
 end
-
 """
 ```julia
 owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator,
@@ -478,7 +468,6 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumS
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
-
 """
 ```julia
 owa_gmd(T::Integer)
@@ -497,7 +486,6 @@ Compute the Ordered Weights Array (OWA) of the Gini Mean Difference (GMD) risk m
 function owa_gmd(T::Integer)
     return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
-
 """
 ```julia
 owa_cvar(T::Integer; alpha::Real = 0.05)
@@ -534,7 +522,6 @@ function owa_cvar(T::Integer, alpha::Real = 0.05)
     w[k + 1] = -one(alpha) - sum(w[1:k])
     return w
 end
-
 """
 ```julia
 owa_wcvar(T::Integer, alphas::AbstractVector{<:Real}, weights::AbstractVector{<:Real})
@@ -565,7 +552,6 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
     end
     return w
 end
-
 """
 ```julia
 owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
@@ -609,7 +595,6 @@ function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Int
     w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
     return owa_wcvar(T, alphas, w)
 end
-
 """
 ```julia
 owa_wr(T::Integer)
@@ -636,7 +621,6 @@ function owa_wr(T::Integer)
     w[1] = -1
     return w
 end
-
 """
 ```julia
 owa_rg(T::Integer)
@@ -664,7 +648,6 @@ function owa_rg(T::Integer)
     w[T] = 1
     return w
 end
-
 """
 ```julia
 owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
@@ -692,7 +675,6 @@ This function returns a vector of OWA weights corresponding to the difference be
 function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
-
 """
 ```julia
 owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real}, weights_a::AbstractVector{<:Real};
@@ -728,7 +710,6 @@ function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
     w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
     return w
 end
-
 """
 ```julia
 owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05, a_sim::Integer = 100,
@@ -766,7 +747,6 @@ function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
 
     return w
 end
-
 """
 ```julia
 owa_l_moment(T::Integer; k::Integer = 2)
@@ -805,7 +785,6 @@ function owa_l_moment(T::Integer, k::Integer = 2)
     end
     return w
 end
-
 """
 ```julia
 owa_l_moment_crm(T::Integer; k::Integer = 2,

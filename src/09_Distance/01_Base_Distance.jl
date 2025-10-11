@@ -15,7 +15,6 @@ All concrete types implementing distance-based estimation algorithms should subt
   - [`cor_and_dist`](@ref)
 """
 abstract type AbstractDistanceEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
@@ -38,7 +37,6 @@ All concrete types implementing specific distance-based algorithms (such as corr
   - [`cor_and_dist`](@ref)
 """
 abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 struct SimpleDistance <: AbstractDistanceAlgorithm end
@@ -62,7 +60,6 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
   - [`cor_and_dist`](@ref)
 """
 struct SimpleDistance <: AbstractDistanceAlgorithm end
-
 """
 ```julia
 struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
@@ -86,7 +83,6 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
   - [`cor_and_dist`](@ref)
 """
 struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
-
 """
 ```julia
 struct LogDistance <: AbstractDistanceAlgorithm end
@@ -110,7 +106,6 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
   - [`cor_and_dist`](@ref)
 """
 struct LogDistance <: AbstractDistanceAlgorithm end
-
 """
 ```julia
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
@@ -134,7 +129,6 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
   - [`cor_and_dist`](@ref)
 """
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
-
 """
 ```julia
 struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
@@ -195,7 +189,6 @@ function VariationInfoDistance(;
                                normalise::Bool = true)
     return VariationInfoDistance(bins, normalise)
 end
-
 """
 ```julia
 struct CanonicalDistance <: AbstractDistanceAlgorithm end

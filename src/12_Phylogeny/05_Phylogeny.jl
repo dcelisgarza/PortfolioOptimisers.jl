@@ -62,7 +62,6 @@ end
 function PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
     return PhylogenyResult(X)
 end
-
 """
 ```julia
 phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
@@ -100,7 +99,6 @@ PhylogenyResult
 function phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
     return ph
 end
-
 """
 ```julia
 centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
@@ -138,7 +136,6 @@ PhylogenyResult
 function centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
     return ph
 end
-
 """
 ```julia
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
@@ -166,7 +163,6 @@ function centrality_vector(ph::PhylogenyResult{<:AbstractMatrix},
     G = SimpleGraph(ph.X)
     return PhylogenyResult(; X = calc_centrality(cent, G))
 end
-
 """
 ```julia
 struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -216,7 +212,6 @@ end
 function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality(args, kwargs)
 end
-
 """
 ```julia
 struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -266,7 +261,6 @@ end
 function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality(args, kwargs)
 end
-
 """
 ```julia
 struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -321,7 +315,6 @@ end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
     return DegreeCentrality(kind, kwargs)
 end
-
 """
 ```julia
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
@@ -337,7 +330,6 @@ Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/G
   - [`Graphs.eigenvector_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D)
 """
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
-
 """
 ```julia
 struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
@@ -383,7 +375,6 @@ end
 function KatzCentrality(; alpha::Real = 0.3)
     return KatzCentrality(alpha)
 end
-
 """
 ```julia
 struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
@@ -445,7 +436,6 @@ end
 function Pagerank(; n::Integer = 100, alpha::Real = 0.85, epsilon::Real = 1e-6)
     return Pagerank(n, alpha, epsilon)
 end
-
 """
 ```julia
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
@@ -461,7 +451,6 @@ Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Gra
   - [`Graphs.radiality_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D)
 """
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
-
 """
 ```julia
 struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -511,7 +500,6 @@ end
 function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality(args, kwargs)
 end
-
 """
 ```julia
 calc_centrality(cent::AbstractCentralityAlgorithm, g::AbstractGraph)
@@ -576,7 +564,6 @@ end
 function calc_centrality(cent::StressCentrality, g::AbstractGraph)
     return Graphs.stress_centrality(g, cent.args...; cent.kwargs...)
 end
-
 """
 ```julia
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
@@ -593,7 +580,6 @@ All concrete types implementing specific MST algorithms (e.g., Kruskal, Boruvka,
   - [`PrimTree`](@ref)
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
-
 """
 ```julia
 struct KruskalTree{T1, T2} <: AbstractTreeType
@@ -643,7 +629,6 @@ end
 function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree(args, kwargs)
 end
-
 """
 ```julia
 struct BoruvkaTree{T1, T2} <: AbstractTreeType
@@ -693,7 +678,6 @@ end
 function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree(args, kwargs)
 end
-
 """
 ```julia
 struct PrimTree{T1, T2} <: AbstractTreeType
@@ -743,7 +727,6 @@ end
 function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return PrimTree(args, kwargs)
 end
-
 """
 ```julia
 calc_mst(alg::AbstractTreeType, g::AbstractGraph)
@@ -782,7 +765,6 @@ end
 function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
-
 """
 ```julia
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
@@ -798,7 +780,6 @@ All concrete types implementing network-based estimation algorithms should subty
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
-
 """
 ```julia
 struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
@@ -885,7 +866,6 @@ function NetworkEstimator(;
                                      <:AbstractTreeType} = KruskalTree(), n::Integer = 1)
     return NetworkEstimator(ce, de, alg, n)
 end
-
 """
 ```julia
 abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
@@ -901,7 +881,6 @@ All concrete types implementing centrality-based estimation algorithms should su
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
-
 """
 ```julia
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
@@ -981,7 +960,6 @@ function CentralityEstimator(;
                              cent::AbstractCentralityAlgorithm = DegreeCentrality())
     return CentralityEstimator(ne, cent)
 end
-
 """
 ```julia
 calc_adjacency(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -1025,7 +1003,6 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
-
 """
 ```julia
 phylogeny_matrix(ne::AbstractNetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -1061,7 +1038,6 @@ function phylogeny_matrix(ne::AbstractNetworkEstimator, X::AbstractMatrix; dims:
     P .= clamp!(P, 0, 1) - I
     return PhylogenyResult(; X = P)
 end
-
 """
 ```julia
 phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult},
@@ -1103,7 +1079,6 @@ function phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator,
     end
     return PhylogenyResult(; X = P * transpose(P) - I)
 end
-
 """
 ```julia
 centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
@@ -1142,7 +1117,6 @@ function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
     G = SimpleGraph(P)
     return PhylogenyResult(; X = calc_centrality(cent, G))
 end
-
 """
 ```julia
 centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -1172,7 +1146,6 @@ function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::In
                            kwargs...)
     return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
 end
-
 """
 ```julia
 average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
@@ -1209,7 +1182,6 @@ function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
                             X::AbstractMatrix; dims::Int = 1, kwargs...)
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
-
 """
 ```julia
 average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
@@ -1241,7 +1213,6 @@ function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::Abst
                             dims::Int = 1, kwargs...)
     return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
 end
-
 """
 ```julia
 asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
@@ -1271,7 +1242,6 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
-
 """
 ```julia
 asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
@@ -1282,7 +1252,6 @@ Calls `asset_phylogeny` with the phylogeny matrix `X` from a `PhylogenyResult`.
 function asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
     return asset_phylogeny(w, ph.X)
 end
-
 """
 ```julia
 asset_phylogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator}, w::AbstractVector,
@@ -1315,7 +1284,6 @@ function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
                          X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
 end
-
 """
 ```julia
 asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;

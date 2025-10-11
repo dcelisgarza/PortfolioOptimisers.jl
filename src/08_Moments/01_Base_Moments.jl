@@ -13,7 +13,6 @@ All concrete types that implement expected returns estimation (e.g., sample mean
   - [`AbstractExpectedReturnsAlgorithm`](@ref)
 """
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
@@ -29,7 +28,6 @@ All concrete types that implement a specific algorithm for expected returns esti
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
@@ -45,7 +43,6 @@ All concrete types that implement a specific algorithm for moment estimation (e.
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 struct Full <: AbstractMomentAlgorithm end
@@ -59,7 +56,6 @@ struct Full <: AbstractMomentAlgorithm end
   - [`Semi`](@ref)
 """
 struct Full <: AbstractMomentAlgorithm end
-
 """
 ```julia
 struct Semi <: AbstractMomentAlgorithm end
@@ -73,7 +69,6 @@ struct Semi <: AbstractMomentAlgorithm end
   - [`Full`](@ref)
 """
 struct Semi <: AbstractMomentAlgorithm end
-
 """
 ```julia
 robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights];
@@ -118,7 +113,6 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
         cov(ce, X, w; dims = dims, mean = mean)
     end
 end
-
 """
 ```julia
 robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights];

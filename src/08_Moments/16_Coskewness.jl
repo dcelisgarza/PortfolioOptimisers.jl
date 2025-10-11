@@ -13,7 +13,6 @@ All concrete types implementing coskewness estimation algorithms should subtype 
   - [`AbstractEstimator`](@ref)
 """
 abstract type CoskewnessEstimator <: AbstractEstimator end
-
 """
 ```julia
 struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
@@ -81,7 +80,6 @@ end
 function factory(ce::Coskewness, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
-
 """
 ```julia
 __coskewness(cskew::AbstractMatrix, X::AbstractMatrix,
@@ -125,7 +123,6 @@ function __coskewness(cskew::AbstractMatrix, X::AbstractMatrix,
     end
     return V
 end
-
 """
 ```julia
 _coskewness(y::AbstractMatrix, X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
@@ -161,7 +158,6 @@ function _coskewness(y::AbstractMatrix, X::AbstractMatrix,
     V = __coskewness(cskew, X, mp)
     return cskew, V
 end
-
 """
 ```julia
 coskewness(ske::Union{Nothing, <:Coskewness}, X::AbstractMatrix; dims::Int = 1,

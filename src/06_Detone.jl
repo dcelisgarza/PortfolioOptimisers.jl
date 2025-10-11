@@ -14,7 +14,6 @@ All concrete types representing detoning estimators (such as [`Detone`](@ref)) s
   - [`detone`](@ref)
 """
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
-
 """
 ```julia
 struct Detone{T1} <: AbstractDetoneEstimator
@@ -63,7 +62,6 @@ end
 function Detone(; n::Integer = 1)
     return Detone(n)
 end
-
 """
 ```julia
 detone!(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
@@ -150,7 +148,6 @@ function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = 
     end
     return nothing
 end
-
 """
 ```julia
 detone(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())

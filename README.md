@@ -184,6 +184,137 @@ plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 
 ![Fig. 4](./docs/src/assets/readme_4.svg)
 
+## Caveats
+
+### Documentation
+
+  - Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
+  - Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
+  - Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
+
+### API
+
+  - Unstable: there will likely be breaking changes as I figure out better, more general way to do things, or better naming conventions.
+
+### Internals
+
+  - Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
+
+## Features
+
+The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There's also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
+
+### Price data
+
+Everything but the finite allocation optimisations work off of returns data. Some optimisations may use price data in the future.
+
+  - Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
+  - Computing them, validating and cleaning up data.
+
+### Co-moment matrix processing
+
+  - Positive definite projection.
+
+  - Matrix denoising.
+    
+      + Spectral, shrunk, fixed.
+  - Matrix detoning.
+
+### Moment estimation
+
+Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
+
+  - Expected returns.
+    
+      + Arithmetic expected returns.
+    
+      + Shrunk expected returns.
+        
+          * James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
+      + Equilibrium expected returns.
+      + Excess expected returns.
+
+  - Variance.
+  - Covariance/Correlation matrix.
+    
+      + Custom: estimator + processing pipeline.
+    
+      + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
+        
+          * Full and Semi covariance algorithms.
+      + Gerber.
+        
+          * Gerber 0, 1, 2. Standardised and unstandardised.
+      + Smyth-Broby.
+        
+          * Smyth-Broby 0, 1, 2. Standardised and unstandardised.
+          * Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
+      + Distance covariance.
+      + Lower tail dependence.
+      + Kendall.
+      + Spearman.
+      + Mutual information.
+      + Coskewness.
+        
+          * Full and Semi algorithms.
+      + Implied volatility.
+
+### Regression
+
+Factor models and implied volatility work off of regression.
+
+  - Stepwise.
+    
+      + Forward and Backward. Both of them with P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-square, and Adjusted R-squared criteria.
+
+  - Dimensional reduction.
+    
+      + Principal Component.
+      + Probabilistic Principal Component.
+
+### Distance
+
+Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
+
+  - Distance: these compare pairwise relationships.
+  - Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
+
+Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
+
+  - Simple.
+  - Absolute.
+  - Logarithmic.
+  - Correlation.
+  - Canonical: depends on the covariance/correlation estimator used.
+
+### Phylogeny
+
+  - Clustering.
+    
+      + Optimal number of clusters:
+        
+          * Predefined, Second order difference, Standardised silhouette scores.
+    
+      + Hierarchical clustering.
+      + Direct Bubble Hierarchy Trees.
+        
+          * Local Global sparsification of the inverse covariance/correlation matrix.
+      + Phylogeny matrices.
+        
+          * Network (MST) adjacency.
+          * Clustering adjacency.
+      + Centrality vectors and average centrality.
+        
+          * Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
+      + Asset phylogeny score.
+
+### Constraint generation
+
+  - Equation parsing: lets users define linear constraints by directly writing the equations.
+  - Linear weight constraint generation.
+  - Risk budget constraint generation.
+  - Asset set matrix generation.
+
 ## How to Cite
 
 If you use PortfolioOptimisers.jl in your work, please cite using the reference given in [CITATION.cff](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/CITATION.cff).

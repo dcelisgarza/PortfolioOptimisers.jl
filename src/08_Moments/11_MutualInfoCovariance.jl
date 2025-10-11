@@ -71,7 +71,6 @@ function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} 
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end
-
 """
 ```julia
 cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -110,7 +109,6 @@ function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int =
     end
     return mutual_info(X, ce.bins, ce.normalise)
 end
-
 """
 ```julia
 cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

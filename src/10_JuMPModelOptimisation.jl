@@ -12,7 +12,6 @@ All concrete types representing the result of a JuMP model optimisation should s
   - [`JuMPResult`](@ref)
 """
 abstract type AbstractJuMPResult <: AbstractResult end
-
 """
 ```julia
 struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
@@ -88,7 +87,6 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
-
 """
 ```julia
 struct JuMPResult{T1, T2} <: AbstractJuMPResult
@@ -140,7 +138,6 @@ end
 function JuMPResult(; trials::AbstractDict, success::Bool)
     return JuMPResult(trials, success)
 end
-
 """
 ```julia
 set_solver_attributes(args...)
@@ -161,7 +158,6 @@ This is a generic fallback that does nothing if no model or settings are provide
 function set_solver_attributes(args...)
     return nothing
 end
-
 """
 ```julia
 set_solver_attributes(model::JuMP.Model,
@@ -188,7 +184,6 @@ function set_solver_attributes(model::JuMP.Model,
     end
     return nothing
 end
-
 """
 ```julia
 set_solver_attributes(model::JuMP.Model, settings::Pair)
@@ -209,7 +204,6 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)
     set_attribute(model, settings...)
     return nothing
 end
-
 """
 ```julia
 optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:AbstractVector{<:Solver}})

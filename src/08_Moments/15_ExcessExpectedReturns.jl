@@ -54,7 +54,6 @@ end
 function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
-
 """
 ```julia
 mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)

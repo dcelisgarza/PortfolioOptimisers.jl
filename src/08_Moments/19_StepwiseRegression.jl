@@ -48,7 +48,6 @@ end
 function PValue(; threshold::Real = 0.05)
     return PValue(threshold)
 end
-
 """
 ```julia
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
@@ -65,7 +64,6 @@ Stepwise regression algorithm: forward selection.
   - [`StepwiseRegression`](@ref)
 """
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
-
 """
 ```julia
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
@@ -82,7 +80,6 @@ Stepwise regression algorithm: backward elimination.
   - [`StepwiseRegression`](@ref)
 """
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
-
 """
 ```julia
 struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
@@ -145,7 +142,6 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             target::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, target)
 end
-
 """
 ```julia
 add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
@@ -205,7 +201,6 @@ function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
     push!(included, new_feature)
     return nothing
 end
-
 """
 ```julia
 regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
@@ -272,7 +267,6 @@ function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVect
     add_best_feature_after_pval_failure!(re.target, included, F, x)
     return included
 end
-
 """
 ```julia
 get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
@@ -319,7 +313,6 @@ function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
     end
     return threshold
 end
-
 """
 ```julia
 get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
@@ -366,7 +359,6 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
     end
     return threshold
 end
-
 """
 ```julia
 regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
@@ -434,7 +426,6 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
     end
     return included
 end
-
 """
 ```julia
 regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
@@ -492,7 +483,6 @@ function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVec
     add_best_feature_after_pval_failure!(re.target, included, F, x)
     return included
 end
-
 """
 ```julia
 get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::AbstractVector,
@@ -536,7 +526,6 @@ function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion,
     end
     return threshold
 end
-
 """
 ```julia
 get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::AbstractVector,
@@ -580,7 +569,6 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria,
     end
     return threshold
 end
-
 """
 ```julia
 regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
@@ -652,7 +640,6 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
     end
     return included
 end
-
 """
 ```julia
 regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix)

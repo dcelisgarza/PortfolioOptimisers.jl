@@ -15,7 +15,6 @@ All concrete types that implement positive definite matrix projection or estimat
   - [`posdef`](@ref)
 """
 abstract type AbstractPosdefEstimator <: AbstractEstimator end
-
 """
 ```julia
 struct Posdef{T1} <: AbstractPosdefEstimator
@@ -59,7 +58,6 @@ end
 function Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
     return Posdef(alg)
 end
-
 """
 ```julia
 posdef!(pdm::Posdef, X::AbstractMatrix)
@@ -139,7 +137,6 @@ function posdef!(pdm::Posdef, X::AbstractMatrix)
     end
     return nothing
 end
-
 """
 ```julia
 posdef(pdm::Posdef, X::AbstractMatrix)

@@ -15,7 +15,6 @@ All concrete types that implement denoising of covariance or correlation matrice
   - [`denoise`](@ref)
 """
 abstract type AbstractDenoiseEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
@@ -33,7 +32,6 @@ All concrete types that implement a specific denoising algorithm (e.g., spectral
   - [`ShrunkDenoise`](@ref)
 """
 abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
@@ -55,7 +53,6 @@ SpectralDenoise()
   - [`Denoise`](@ref)
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
-
 """
 ```julia
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
@@ -77,7 +74,6 @@ FixedDenoise()
   - [`Denoise`](@ref)
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
-
 """
 ```julia
 struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
@@ -130,7 +126,6 @@ end
 function ShrunkDenoise(; alpha::Real = 0.0)
     return ShrunkDenoise(alpha)
 end
-
 """
 ```julia
 struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
@@ -219,7 +214,6 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
                  n::Integer = 1000)
     return Denoise(alg, args, kwargs, kernel, m, n)
 end
-
 """
 ```julia
 _denoise!(alg::AbstractDenoiseAlgorithm, X::AbstractMatrix, vals::AbstractVector,
@@ -285,7 +279,6 @@ function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
     X .= corr0 + de.alpha * corr1 + (one(de.alpha) - de.alpha) * Diagonal(corr1)
     return nothing
 end
-
 """
 ```julia
 errPDF(x::Real, vals::AbstractVector, q::Real;
@@ -329,7 +322,6 @@ function errPDF(x::Real, vals::AbstractVector, q::Real;
     sse = sum((pdf2 - pdf1) .^ 2)
     return sse
 end
-
 """
 ```julia
 find_max_eval(vals::AbstractVector, q::Real;
@@ -370,7 +362,6 @@ function find_max_eval(vals::AbstractVector, q::Real;
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
 end
-
 """
 ```julia
 denoise!(de::Denoise, X::AbstractMatrix, q::Real; pdm::Union{Nothing, <:Posdef} = Posdef())
@@ -456,7 +447,6 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
     end
     return nothing
 end
-
 """
 ```julia
 denoise(de::Denoise, X::AbstractMatrix, q::Real; pdm::Union{Nothing, <:Posdef} = Posdef())

@@ -14,7 +14,6 @@ All concrete types implementing regression estimation algorithms should subtype 
   - [`AbstractRegressionResult`](@ref)
 """
 abstract type AbstractRegressionEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractRegressionResult <: AbstractResult end
@@ -31,7 +30,6 @@ All concrete types representing the output of regression-based moment estimation
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
-
 """
 ```julia
 abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
@@ -52,7 +50,6 @@ These types are used to specify the algorithm when constructing a regression est
   - [`AbstractRegressionTarget`](@ref)
 """
 abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
@@ -69,7 +66,6 @@ All concrete types implementing stepwise regression algorithms should subtype `A
   - [`AbstractRegressionTarget`](@ref)
 """
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
-
 """
 ```julia
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
@@ -85,7 +81,6 @@ All concrete types representing criteria for stepwise regression algorithms shou
   - [`AbstractRegressionTarget`](@ref)
 """
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
-
 """
 ```julia
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
@@ -100,7 +95,6 @@ All concrete types representing regression targets (such as linear or generalise
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
-
 """
 ```julia
 struct LinearModel{T1} <: AbstractRegressionTarget
@@ -147,7 +141,6 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-
 """
 ```julia
 StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
@@ -175,7 +168,6 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 function StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
     return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
 end
-
 """
 ```julia
 struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
@@ -226,7 +218,6 @@ end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-
 """
 ```julia
 StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
@@ -254,7 +245,6 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
 function StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
     return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
 end
-
 """
 ```julia
 abstract type AbstractMinValStepwiseRegressionCriterion <:
@@ -274,7 +264,6 @@ All concrete types implementing minimisation-based stepwise regression criteria 
 """
 abstract type AbstractMinValStepwiseRegressionCriterion <:
               AbstractStepwiseRegressionCriterion end
-
 """
 ```julia
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
@@ -293,7 +282,6 @@ All concrete types implementing maximisation-based stepwise regression criteria 
 """
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
               AbstractStepwiseRegressionCriterion end
-
 """
 ```julia
 struct AIC <: AbstractMinValStepwiseRegressionCriterion end
@@ -311,7 +299,6 @@ Akaike Information Criterion (AIC) for stepwise regression in PortfolioOptimiser
   - [`regression_criterion_func(::AIC)`](@ref)
 """
 struct AIC <: AbstractMinValStepwiseRegressionCriterion end
-
 """
 ```julia
 struct AICC <: AbstractMinValStepwiseRegressionCriterion end
@@ -329,7 +316,6 @@ Corrected Akaike Information Criterion (AICC) for stepwise regression in Portfol
   - [`regression_criterion_func(::AICC)`](@ref)
 """
 struct AICC <: AbstractMinValStepwiseRegressionCriterion end
-
 """
 ```julia
 struct BIC <: AbstractMinValStepwiseRegressionCriterion end
@@ -347,7 +333,6 @@ Bayesian Information Criterion (BIC) for stepwise regression in PortfolioOptimis
   - [`regression_criterion_func(::BIC)`](@ref)
 """
 struct BIC <: AbstractMinValStepwiseRegressionCriterion end
-
 """
 ```julia
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
@@ -364,7 +349,6 @@ Coefficient of determination (R²) for stepwise regression in PortfolioOptimiser
   - [`regression_criterion_func(::RSquared)`](@ref)
 """
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
-
 """
 ```julia
 struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
@@ -381,7 +365,6 @@ Adjusted coefficient of determination (Adjusted R²) for stepwise regression in 
   - [`regression_criterion_func(::AdjustedRSquared)`](@ref)
 """
 struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
-
 """
 ```julia
 regression_criterion_func(::AbstractStepwiseRegressionCriterion)
@@ -428,7 +411,6 @@ end
 function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
     return -Inf
 end
-
 """
 ```julia
 struct Regression{T1, T2, T3} <: AbstractRegressionResult
@@ -512,7 +494,6 @@ function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::S
         getfield(re, sym)
     end
 end
-
 """
 ```julia
 regression_view(re::Regression, i::AbstractVector)
@@ -555,7 +536,6 @@ function regression_view(re::Regression, i::AbstractVector)
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
-
 """
 ```julia
 regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
@@ -581,7 +561,6 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
     return re
 end
-
 """
 ```julia
 regression(re::Regression, args...)
@@ -607,7 +586,6 @@ This method is a pass-through for [`Regression`](@ref) result objects, allowing 
 function regression(re::Regression, args...)
     return re
 end
-
 """
 ```julia
 regression(re::AbstractRegressionEstimator, rd::ReturnsResult)

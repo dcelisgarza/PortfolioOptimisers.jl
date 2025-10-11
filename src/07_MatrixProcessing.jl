@@ -14,7 +14,6 @@ All concrete types that implement matrix processing routines—such as covarianc
   - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
@@ -31,7 +30,6 @@ All concrete types that implement a specific matrix processing algorithm (e.g., 
   - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 matrix_processing_algorithm!(::Nothing, args...; kwargs...)
@@ -60,7 +58,6 @@ These methods are called internally when no matrix processing algorithm is speci
 function matrix_processing_algorithm!(::Nothing, args...; kwargs...)
     return nothing
 end
-
 """
 ```julia
 matrix_processing_algorithm(::Nothing, args...; kwargs...)
@@ -77,7 +74,6 @@ Same as [`matrix_processing_algorithm!`](@ref), but meant for returning a new ma
 function matrix_processing_algorithm(::Nothing, args...; kwargs...)
     return nothing
 end
-
 """
 ```julia
 struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
@@ -165,7 +161,6 @@ function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                                  alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
-
 """
 ```julia
 struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
@@ -244,7 +239,6 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
                                                         <:AbstractMatrixProcessingAlgorithm} = nothing)
     return NonPositiveDefiniteMatrixProcessing(denoise, detone, alg)
 end
-
 """
 ```julia
 matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
@@ -354,7 +348,6 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
     matrix_processing_algorithm!(mp.alg, nothing, sigma, X; kwargs...)
     return nothing
 end
-
 """
 ```julia
 matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,

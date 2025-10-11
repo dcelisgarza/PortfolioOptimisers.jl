@@ -12,7 +12,6 @@ Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection me
   - [`DBHT`](@ref)
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
-
 """
 ```julia
 struct UniqueRoot <: DBHTRootMethod end
@@ -27,7 +26,6 @@ A DBHT root selection method that enforces a unique root in the hierarchy.
   - [`DBHT`](@ref)
 """
 struct UniqueRoot <: DBHTRootMethod end
-
 """
 ```julia
 struct EqualRoot <: DBHTRootMethod end
@@ -42,7 +40,6 @@ A DBHT root selection method that creates a root from the adjacency tree of all 
   - [`DBHT`](@ref)
 """
 struct EqualRoot <: DBHTRootMethod end
-
 """
 ```julia
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
@@ -59,7 +56,6 @@ Abstract supertype for all similarity matrix algorithms used in the creation of 
   - [`LoGo`](@ref)
 """
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
@@ -83,7 +79,6 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
   - [`dbht_similarity`](@ref)
 """
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
-
 """
 ```julia
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
@@ -107,7 +102,6 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
   - [`dbht_similarity`](@ref)
 """
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
-
 """
 ```julia
 struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
@@ -172,7 +166,6 @@ end
 function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
     return GeneralExponentialSimilarity(coef, power)
 end
-
 """
 ```julia
 dbht_similarity(se::AbstractSimilarityMatrixAlgorithm; D::AbstractMatrix, kwargs...)
@@ -215,7 +208,6 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::AbstractMatrix, kw
     coef = se.coef
     return exp.(-coef * D .^ power)
 end
-
 """
 ```julia
 struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
@@ -273,7 +265,6 @@ function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilari
               root::DBHTRootMethod = UniqueRoot())
     return DBHT(sim, root)
 end
-
 """
 ```julia
 PMFG_T2s(W::AbstractMatrix{<:Real}; nargout::Integer = 3)
@@ -414,7 +405,6 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
 
     return A, tri, clique3, cliques, cliqueTree
 end
-
 """
 ```julia
 distance_wei(L::AbstractMatrix{<:Real})
@@ -495,7 +485,6 @@ function distance_wei(L::AbstractMatrix{<:Real})
 
     return D, B
 end
-
 """
 ```julia
 clique3(A::AbstractMatrix{<:Real})
@@ -573,7 +562,6 @@ function clique3(A::AbstractMatrix{<:Real})
 
     return K3, E, clique
 end
-
 """
 ```julia
 breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
@@ -649,7 +637,6 @@ function breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
 
     return distance, branch
 end
-
 """
 ```julia
 FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
@@ -707,7 +694,6 @@ function FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
     T[Cliq] .= 0
     return T, IndxNot
 end
-
 """
 ```julia
 BuildHierarchy(M::AbstractMatrix{<:Real})
@@ -757,7 +743,6 @@ function BuildHierarchy(M::AbstractMatrix{<:Real})
     end
     return Pred
 end
-
 """
 ```julia
 AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
@@ -808,7 +793,6 @@ function AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
 
     return Adj
 end
-
 """
 ```julia
 BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real})
@@ -886,7 +870,6 @@ function BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real
     H = H - Diagonal(H)
     return H, Mb
 end
-
 """
 ```julia
 CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer, args...)
@@ -936,7 +919,6 @@ function CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc
     end
     return H = H + transpose(H)
 end
-
 """
 ```julia
 CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer,
@@ -993,7 +975,6 @@ function CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc:
         H = spzeros(Int, 0, 0)
     end
 end
-
 """
 ```julia
 CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real}; root::DBHTRootMethod = UniqueRoot())
@@ -1072,7 +1053,6 @@ function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
 
     return H, H2, Mb, CliqList, Sb
 end
-
 """
 ```julia
 DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
@@ -1158,7 +1138,6 @@ function DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
 
     return Hc, Sep
 end
-
 """
 ```julia
 BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
@@ -1253,7 +1232,6 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
 
     return Adjv, Tc
 end
-
 """
 ```julia
 BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
@@ -1306,7 +1284,6 @@ function BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
 
     return Mvv
 end
-
 """
 ```julia
 DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
@@ -1347,7 +1324,6 @@ function DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<
     Z = vcat(Zi, hcat(transpose(sort!(unique(LabelVec1[indx]))), LinkageDist))
     return Z
 end
-
 """
 ```julia
 LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:Real})
@@ -1400,7 +1376,6 @@ function LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:R
     PairLink = Links[imn, 1:2]
     return PairLink, dvu
 end
-
 """
 ```
 build_link_and_dendro(rg::AbstractRange, dpm::AbstractMatrix{<:Real},
@@ -1458,7 +1433,6 @@ function build_link_and_dendro(rg::AbstractRange, dpm::AbstractMatrix{<:Real},
     end
     return Z, nc, LabelVec1
 end
-
 """
 ```
 HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
@@ -1548,7 +1522,6 @@ function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<
 
     return Z
 end
-
 """
 ```julia
 turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
@@ -1616,7 +1589,6 @@ function turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
     end
     return Z
 end
-
 """
 ```julia
 DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
@@ -1713,7 +1685,6 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
 
     return T8, Rpm, Adjv, Dpm, Mv, Z, Z_hclust
 end
-
 """
 ```julia
 jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMatrix, sign::Integer)
@@ -1776,7 +1747,6 @@ function jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMa
     end
     return nothing
 end
-
 """
 ```julia
 J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::AbstractMatrix)
@@ -1814,7 +1784,6 @@ function J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::Abst
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
-
 """
 ```julia
 struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
@@ -1874,7 +1843,6 @@ function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                         D::AbstractMatrix, k::Integer)
     return DBHTClustering(clustering, S, D, k)
 end
-
 """
 ```julia
 clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::AbstractMatrix{<:Real};
@@ -1925,7 +1893,6 @@ end
 function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
-
 """
 ```julia
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
@@ -1939,7 +1906,6 @@ Abstract supertype for all inverse matrix sparsification algorithms in Portfolio
   - [`LoGo`](@ref)
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
-
 """
 ```julia
 struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
@@ -1996,7 +1962,6 @@ function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDist
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
     return LoGo(dist, sim)
 end
-
 """
 ```julia
 LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::AbstractMatrix, X::AbstractMatrix)
@@ -2027,7 +1992,6 @@ function LoGo_dist_assert(::Union{<:Distance{<:Any, <:VariationInfoDistance},
               DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
     return nothing
 end
-
 """
 ```julia
 LoGo_dist_assert(args...)
@@ -2042,7 +2006,6 @@ No-op fallback for other distance estimators.
 function LoGo_dist_assert(args...)
     return nothing
 end
-
 """
 ```julia
 logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix, X::AbstractMatrix;
@@ -2109,7 +2072,6 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
     posdef!(pdm, sigma)
     return nothing
 end
-
 """
 ```julia
 matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,

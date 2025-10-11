@@ -54,7 +54,6 @@ end
 function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
     return PartialLinearConstraint(A, B)
 end
-
 """
 ```julia
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
@@ -134,7 +133,6 @@ function Base.getproperty(obj::LinearConstraint, sym::Symbol)
         getfield(obj, sym)
     end
 end
-
 """
 ```julia
 abstract type AbstractParsingResult <: AbstractConstraintResult end
@@ -150,7 +148,6 @@ All concrete types representing parsing results should subtype `AbstractParsingR
   - [`RhoParsingResult`](@ref)
 """
 abstract type AbstractParsingResult <: AbstractConstraintResult end
-
 """
 ```julia
 struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
@@ -198,7 +195,6 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
                                                                                      eqn)
     end
 end
-
 """
 ```julia
 struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
@@ -340,7 +336,6 @@ function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
     end
     return AssetSets(; key = key, dict = dict)
 end
-
 """
 ```julia
 nothing_asset_sets_view(::Nothing, ::Any)
@@ -355,7 +350,6 @@ No-op fallback for indexing `nothing` asset sets.
 function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
-
 """
 ```julia
 group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
@@ -409,7 +403,6 @@ function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::R
     end
     return nothing
 end
-
 """
 ```julia
 estimator_to_val(dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
@@ -478,7 +471,6 @@ function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real 
     end
     return arr
 end
-
 """
 ```julia
 estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...; kwargs...)
@@ -508,7 +500,6 @@ function estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                           kwargs...)
     return val
 end
-
 """
 ```julia
 _eval_numeric_functions(expr)
@@ -558,7 +549,6 @@ function _eval_numeric_functions(expr)
         expr
     end
 end
-
 """
 ```julia
 _collect_terms(expr::Union{Symbol, Expr, <:Number})
@@ -593,7 +583,6 @@ function _collect_terms(expr)
     _collect_terms!(expr, 1.0, terms)
     return terms
 end
-
 """
 ```julia
 _collect_terms!(expr, coeff, terms)
@@ -673,7 +662,6 @@ function _collect_terms!(expr, coeff, terms)
         end
     end
 end
-
 """
 ```julia
 _format_term(coeff, var)
@@ -712,7 +700,6 @@ function _format_term(coeff, var)
         "$(coeff)*$var"
     end
 end
-
 """
 ```julia
 _rethrow_parse_error(expr; side = :lhs)
@@ -759,7 +746,6 @@ function _rethrow_parse_error(expr::Expr, side = :lhs)
     end
     return nothing
 end
-
 """
 ```julia
 _parse_equation(lhs, opstr::AbstractString, rhs; datatype::DataType = Float64)
@@ -771,10 +757,10 @@ Parse and canonicalise a linear constraint equation from Julia expressions.
 
 # Arguments
 
-  - `lhs::Expr`: Left-hand side of the equation as a Julia expression.
-  - `opstr::AbstractString`: Comparison operator as a string.
-  - `rhs::Expr`: Right-hand side of the equation as a Julia expression.
-  - `datatype::DataType`: Numeric type for coefficients and right-hand side.
+  - `lhs`: Left-hand side of the equation as a Julia expression.
+  - `opstr`: Comparison operator as a string.
+  - `rhs`: Right-hand side of the equation as a Julia expression.
+  - `datatype`: Numeric type for coefficients and right-hand side.
 
 # Details
 
@@ -831,7 +817,6 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     formatted = strip("$lhs_str $opstr $rhs_str")
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
-
 """
 ```julia
 parse_equation(eqn::Union{<:AbstractString, Expr,
@@ -946,7 +931,6 @@ function parse_equation(eqn::AbstractVector{<:Union{<:AbstractString, Expr}};
                         datatype::DataType = Float64)
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
-
 """
 ```julia
 replace_group_by_assets(res::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
@@ -1119,7 +1103,6 @@ function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::Ass
                                  args...)
     return replace_group_by_assets.(res, sets, args...)
 end
-
 """
 ```julia
 get_linear_constraints(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
@@ -1212,7 +1195,6 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
         LinearConstraint(; ineq = ineq, eq = eq)
     end
 end
-
 """
 ```julia
 struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
@@ -1281,7 +1263,6 @@ function LinearConstraintEstimator(;
                                                                        Expr}}})
     return LinearConstraintEstimator(val)
 end
-
 """
 ```julia
 linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
@@ -1310,7 +1291,6 @@ This method is used to pass through an already constructed [`LinearConstraint`](
 function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
     return lcs
 end
-
 """
 ```julia
 linear_constraints(eqn::Union{<:AbstractString, Expr,
@@ -1379,7 +1359,6 @@ function linear_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
-
 """
 ```julia
 linear_constraints(lcs::Union{<:LinearConstraintEstimator,
@@ -1410,7 +1389,6 @@ function linear_constraints(lcs::AbstractVector{<:LinearConstraintEstimator},
     return linear_constraints.(lcs, Ref(sets); datatype = datatype, strict = strict,
                                bl_flag = bl_flag)
 end
-
 """
 ```julia
 struct RiskBudgetResult{T1} <: AbstractConstraintResult
@@ -1471,7 +1449,6 @@ function risk_budget_view(rb::RiskBudgetResult, i::AbstractVector)
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudgetResult(; val = val)
 end
-
 """
 ```julia
 struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
@@ -1551,7 +1528,6 @@ end
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
 end
-
 """
 ```julia
 risk_budget_constraints(::Nothing, args...; N::Real, datatype::DataType = Float64,
@@ -1591,7 +1567,6 @@ function risk_budget_constraints(::Nothing, args...; N::Real, kwargs...)
     iN = inv(N)
     return RiskBudgetResult(; val = range(; start = iN, stop = iN, length = N))
 end
-
 """
 ```julia
 risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
@@ -1627,7 +1602,6 @@ RiskBudgetResult
 function risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
     return rb
 end
-
 """
 ```julia
 risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Real},
@@ -1685,7 +1659,6 @@ function risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Re
     val = estimator_to_val(rb, sets, inv(N); strict = strict)
     return RiskBudgetResult(; val = val / sum(val))
 end
-
 """
 ```julia
 risk_budget_constraints(rb::Union{<:RiskBudgetEstimator,
@@ -1711,7 +1684,6 @@ function risk_budget_constraints(rb::AbstractVector{<:RiskBudgetEstimator}, sets
                                  strict::Bool = false, kwargs...)
     return risk_budget_constraints.(rb, Ref(sets); strict = strict)
 end
-
 """
 ```julia
 struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
@@ -1772,7 +1744,6 @@ end
 function AssetSetsMatrixEstimator(; val::AbstractString)
     return AssetSetsMatrixEstimator(val)
 end
-
 """
 ```julia
 asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
@@ -1833,7 +1804,6 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     end
     return transpose(A)
 end
-
 """
 ```julia
 asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
@@ -1861,7 +1831,6 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
     return smtx
 end
-
 """
 ```julia
 asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
@@ -1878,7 +1847,6 @@ It is used for type stability and to provide a uniform interface for processing 
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
-
 """
 ```julia
 asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,

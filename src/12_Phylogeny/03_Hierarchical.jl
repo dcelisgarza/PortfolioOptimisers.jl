@@ -63,7 +63,6 @@ struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
                                                                                            ilevel)
     end
 end
-
 """
 ```julia
 is_leaf(a::ClusterNode)
@@ -95,7 +94,6 @@ true
 function is_leaf(a::ClusterNode)
     return isnothing(a.left)
 end
-
 """
 ```julia
 abstract type AbstractPreorderBy <: AbstractAlgorithm end
@@ -111,7 +109,6 @@ Concrete types implementing specific preorder traversal logic should subtype `Ab
   - [`pre_order`](@ref)
 """
 abstract type AbstractPreorderBy <: AbstractAlgorithm end
-
 """
 ```julia
 struct PreorderTreeByID <: AbstractPreorderBy end
@@ -128,7 +125,6 @@ Preorder traversal strategy that visits nodes by their ID.
   - [`pre_order`](@ref)
 """
 struct PreorderTreeByID <: AbstractPreorderBy end
-
 """
 ```julia
 get_node_property(preorder_by::PreorderTreeByID, a::ClusterNode)
@@ -210,7 +206,6 @@ function pre_order(a::ClusterNode, preorder_by::AbstractPreorderBy = PreorderTre
     end
     return preorder
 end
-
 """
 ```julia
 to_tree(a::Hclust)
@@ -253,7 +248,6 @@ function to_tree(a::Hclust)
     end
     return nd, d
 end
-
 """
 ```julia
 clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
@@ -290,7 +284,6 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:
     k = optimal_number_clusters(cle.onc, clustering, D)
     return HierarchicalClustering(; clustering = clustering, S = S, D = D, k = k)
 end
-
 """
 ```julia
 validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNode}, k::Integer)
@@ -340,7 +333,6 @@ function validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNod
     end
     return true
 end
-
 """
 ```julia
 valid_k_clusters(clustering::Hclust, arr::AbstractVector)
@@ -378,7 +370,6 @@ function valid_k_clusters(clustering::Hclust, arr::AbstractVector)
         arr[k] = typemin(eltype(arr))
     end
 end
-
 """
 ```julia
 optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer}, clustering::Hclust,

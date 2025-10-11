@@ -13,7 +13,6 @@ All concrete types implementing shrinkage-based expected returns estimation algo
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
-
 """
 ```julia
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
@@ -31,7 +30,6 @@ All concrete types implementing specific shrinkage algorithms (e.g., James-Stein
   - [`AbstractExpectedReturnsAlgorithm`](@ref)
 """
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
-
 """
 ```julia
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
@@ -48,7 +46,6 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
   - [`MeanSquaredError`](@ref)
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
-
 """
 ```julia
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
@@ -64,7 +61,6 @@ Shrinkage target representing the grand mean of expected returns.
   - [`ShrunkExpectedReturns`](@ref)
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
-
 """
 ```julia
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
@@ -80,7 +76,6 @@ Shrinkage target representing the volatility-weighted mean of expected returns.
   - [`ShrunkExpectedReturns`](@ref)
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
-
 """
 ```julia
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
@@ -96,7 +91,6 @@ Shrinkage target representing the mean squared error of expected returns.
   - [`ShrunkExpectedReturns`](@ref)
 """
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
-
 """
 ```julia
 struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
@@ -144,7 +138,6 @@ end
 function JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return JamesStein(target)
 end
-
 """
 ```julia
 struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
@@ -192,7 +185,6 @@ end
 function BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BayesStein(target)
 end
-
 """
 ```julia
 struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
@@ -240,7 +232,6 @@ end
 function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BodnarOkhrinParolya(target)
 end
-
 """
 ```julia
 struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
@@ -318,7 +309,6 @@ function ShrunkExpectedReturns(;
                                alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
     return ShrunkExpectedReturns(me, ce, alg)
 end
-
 """
 ```julia
 target_mean(::AbstractShrunkExpectedReturnsTarget, mu::AbstractArray, sigma::AbstractMatrix;
@@ -369,7 +359,6 @@ function target_mean(::MeanSquaredError, mu::AbstractArray, sigma::AbstractMatri
     val = tr(sigma) / T
     return range(; start = val, stop = val, length = length(mu))
 end
-
 """
 ```julia
 mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)

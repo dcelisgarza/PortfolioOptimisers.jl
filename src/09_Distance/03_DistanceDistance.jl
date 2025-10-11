@@ -86,7 +86,6 @@ function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                           alg::AbstractDistanceAlgorithm = SimpleDistance())
     return DistanceDistance(dist, args, kwargs, power, alg)
 end
-
 """
 ```julia
 distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
@@ -121,7 +120,6 @@ function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
-
 """
 ```julia
 distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
@@ -152,7 +150,6 @@ function distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
     dist = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
-
 """
 ```julia
 cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;

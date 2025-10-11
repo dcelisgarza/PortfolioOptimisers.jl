@@ -69,7 +69,6 @@ end
 function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
 end
-
 """
 ```julia
 lower_tail_dependence(X::AbstractMatrix; alpha::Real = 0.05,
@@ -123,7 +122,6 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
     end
     return rho
 end
-
 """
 ```julia
 cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -160,7 +158,6 @@ function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     end
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
-
 """
 ```julia
 cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

@@ -13,7 +13,6 @@ All concrete types implementing phylogeny-based estimation algorithms should sub
   - [`AbstractPhylogenyResult`](@ref)
 """
 abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
-
 """
 ```julia
 abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
@@ -29,7 +28,6 @@ All concrete types implementing specific phylogeny algorithms should subtype `Ab
   - [`AbstractPhylogenyResult`](@ref)
 """
 abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
-
 """
 ```julia
 abstract type AbstractPhylogenyResult <: AbstractResult end

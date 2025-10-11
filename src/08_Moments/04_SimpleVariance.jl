@@ -82,7 +82,6 @@ function SimpleVariance(;
                         corrected::Bool = true)
     return SimpleVariance(me, w, corrected)
 end
-
 """
 ```julia
 std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -139,7 +138,6 @@ function Statistics.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
         std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
-
 """
 ```julia
 std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
@@ -204,7 +202,6 @@ function Statistics.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
         std(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-
 """
 ```julia
 var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -260,7 +257,6 @@ function Statistics.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
         var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
-
 """
 ```julia
 var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
