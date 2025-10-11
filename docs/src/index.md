@@ -256,7 +256,7 @@ Factor models and implied volatility work off of regression.
   - Stepwise.
     
       + Forward and Backward.
-          * P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-square, and Adjusted R-squared criteria.
+          * P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
 
   - Dimensional reduction.
     
