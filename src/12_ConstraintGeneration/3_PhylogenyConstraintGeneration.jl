@@ -635,6 +635,7 @@ CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
 # Examples
 
 ```jldoctest
+julia> CentralityConstraint()
 CentralityConstraint
      A | CentralityEstimator
        |     ne | NetworkEstimator

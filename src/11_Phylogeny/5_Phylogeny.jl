@@ -835,7 +835,6 @@ Keyword arguments correspond to the fields above.
 
 ```jldoctest
 julia> NetworkEstimator()
-
 NetworkEstimator
    ce | PortfolioOptimisersCovariance
       |   ce | Covariance
