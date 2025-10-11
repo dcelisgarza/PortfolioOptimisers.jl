@@ -89,7 +89,7 @@ Opinion pooling prior estimator for asset returns.
   - `pes`: Vector of prior estimators to be pooled.
   - `pe1`: Optional pre-processing prior estimator.
   - `pe2`: Post-processing prior estimator.
-  - `p`: Penalty parameter for penalising opinions which diviate from the consensus.
+  - `p`: Penalty parameter for penalising opinions which deviate from the consensus.
   - `w`: Vector of opinion probabilities.
   - `alg`: Opinion pooling algorithm.
   - `threads`: Parallel execution strategy.

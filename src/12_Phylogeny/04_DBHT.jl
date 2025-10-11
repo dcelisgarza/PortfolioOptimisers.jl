@@ -1237,7 +1237,7 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
             Mdjv[uv[v], imx] = 1    # Pick the most strongly associated converging bubble
         end
 
-        # Assign discrete cluster memebership of vertices in the converging bubbles
+        # Assign discrete cluster membership of vertices in the converging bubbles
         v, ci, _ = findnz(Mdjv)
         Tc[v] .= ci
 

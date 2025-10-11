@@ -1569,7 +1569,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
             res = find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)
             func([res])[1]
         catch e
-            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
+            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end
     else
         res = Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
@@ -1577,7 +1577,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         if Optim.converged(res)
             func(Optim.minimizer(res))[1]
         else
-            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
+            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
         end
     end
 end

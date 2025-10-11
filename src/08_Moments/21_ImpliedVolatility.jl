@@ -65,7 +65,7 @@ function implied_vol(X::AbstractMatrix, ws::Integer,
 end
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::AbstractMatrix, ::Any,
                                ivpa::Nothing)
-    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa`to be a `<:Real` or `<:AbstractVector{<:Real}`"))
+    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Real` or `<:AbstractVector{<:Real}`"))
 end
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::AbstractMatrix, ::Any,
                                ivpa::Union{<:Real, <:AbstractVector{<:Real}})

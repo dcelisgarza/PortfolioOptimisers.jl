@@ -120,7 +120,7 @@ end
 ⊗(A::AbstractArray, B::AbstractArray)
 ```
 
-Tensor product of two arrays. ReturnsResult a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
+Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
 # Examples
 

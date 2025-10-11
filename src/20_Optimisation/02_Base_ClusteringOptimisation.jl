@@ -11,18 +11,18 @@ end
 function IterativeWeightFinaliser(; iter::Integer = 100)
     return IterativeWeightFinaliser(iter)
 end
-abstract type JuMPWeightFiniliserFormulation <: AbstractAlgorithm end
-struct RelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
-struct SquareRelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
-struct AbsoluteErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
-struct SquareAbsoluteErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
-struct JuMPWeightFiniliser{T1, T2, T3, T4} <: WeightFinaliser
+abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
+struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct SquareRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct SquareAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct JuMPWeightFinaliser{T1, T2, T3, T4} <: WeightFinaliser
     slv::T1
     sc::T2
     so::T3
     alg::T4
-    function JuMPWeightFiniliser(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
-                                 so::Real, alg::JuMPWeightFiniliserFormulation)
+    function JuMPWeightFinaliser(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
+                                 so::Real, alg::JuMPWeightFinaliserFormulation)
         if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
@@ -31,13 +31,13 @@ struct JuMPWeightFiniliser{T1, T2, T3, T4} <: WeightFinaliser
         return new{typeof(slv), typeof(sc), typeof(so), typeof(alg)}(slv, sc, so, alg)
     end
 end
-function JuMPWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+function JuMPWeightFinaliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                              sc::Real = 1.0, so::Real = 1.0,
-                             alg::JuMPWeightFiniliserFormulation = RelativeErrorWeightFiniliser())
-    return JuMPWeightFiniliser(slv, sc, so, alg)
+                             alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())
+    return JuMPWeightFinaliser(slv, sc, so, alg)
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::RelativeErrorWeightFiniliser,
+                                              ::RelativeErrorWeightFinaliser,
                                               wi::AbstractVector)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
@@ -51,7 +51,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquareRelativeErrorWeightFiniliser,
+                                              ::SquareRelativeErrorWeightFinaliser,
                                               wi::AbstractVector)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
@@ -63,7 +63,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::AbsoluteErrorWeightFiniliser,
+                                              ::AbsoluteErrorWeightFinaliser,
                                               wi::AbstractVector)
     w = model[:w]
     sc = model[:sc]
@@ -74,7 +74,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquareAbsoluteErrorWeightFiniliser,
+                                              ::SquareAbsoluteErrorWeightFinaliser,
                                               wi::AbstractVector)
     w = model[:w]
     sc = model[:sc]
@@ -84,7 +84,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function opt_weight_bounds(cwf::JuMPWeightFiniliser, wb::WeightBounds, wi::AbstractVector)
+function opt_weight_bounds(cwf::JuMPWeightFinaliser, wb::WeightBounds, wi::AbstractVector)
     lb = wb.lb
     ub = wb.ub
     if !(any(map((x, y) -> x < y, ub, wi)) || any(map((x, y) -> x > y, lb, wi)))
@@ -146,6 +146,6 @@ function clustering_optimisation_result(cwf::WeightFinaliser, wb::WeightBounds,
     return retcode, w
 end
 
-export IterativeWeightFinaliser, RelativeErrorWeightFiniliser,
-       SquareRelativeErrorWeightFiniliser, AbsoluteErrorWeightFiniliser,
-       SquareAbsoluteErrorWeightFiniliser, JuMPWeightFiniliser
+export IterativeWeightFinaliser, RelativeErrorWeightFinaliser,
+       SquareRelativeErrorWeightFinaliser, AbsoluteErrorWeightFinaliser,
+       SquareAbsoluteErrorWeightFinaliser, JuMPWeightFinaliser

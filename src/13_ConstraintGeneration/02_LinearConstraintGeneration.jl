@@ -1396,7 +1396,7 @@ This method is a wrapper calling:
 linear_constraints(lcs.val, sets; datatype = datatype, strict = strict, bl_flag = bl_flag)
 ```
 
-It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
+It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
 """
 function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
                             datatype::DataType = Float64, strict::Bool = false,

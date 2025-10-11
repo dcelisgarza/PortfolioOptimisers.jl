@@ -271,7 +271,7 @@ threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimat
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
-Provides a uniform interface for processing multiple constraint estimators simulatneously.
+Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
 function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
                                                          <:BuyInThreshold}},

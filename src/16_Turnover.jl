@@ -237,7 +237,7 @@ turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
-Provides a uniform interface for processing multiple constraint estimators simulatneously.
+Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
 function turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
                                         <:AbstractVector{<:Turnover},
