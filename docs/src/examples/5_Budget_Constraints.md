@@ -8,7 +8,7 @@ EditURL = "../../../examples/5_Budget_Constraints.jl"
 
 This example shows how to use basic budget constraints.
 
-Before starting it is worth mentioning that portfolio budget constraints are implemented on the actual weights, while the short budget constraints are implemented on a relaxation variable stand-in for the short weights. This means that in some cases, it may appear the short budget constraints are not satisfied when they actually are. This is because the relaxation variables that stand in for the short weights can take on a range of values as long as they are greater than or equal to the absolute value of the actual negative weights, and still satify the budget constraint placed on them.
+Before starting it is worth mentioning that portfolio budget constraints are implemented on the actual weights, while the short budget constraints are implemented on a relaxation variable stand-in for the short weights. This means that in some cases, it may appear the short budget constraints are not satisfied when they actually are. This is because the relaxation variables that stand in for the short weights can take on a range of values as long as they are greater than or equal to the absolute value of the actual negative weights, and still satisfy the budget constraint placed on them.
 
 ````@example 5_Budget_Constraints
 using PortfolioOptimisers, PrettyTables
@@ -53,9 +53,9 @@ rd = prices_to_returns(X)
 
 ## 2. Preparatory steps
 
-We'll provide a vector of continuous solvers beacause the optimisation type we'll be using is more complex, and will contain various constraints. We will also use a more exotic risk measure.
+We'll provide a vector of continuous solvers because the optimisation type we'll be using is more complex, and will contain various constraints. We will also use a more exotic risk measure.
 
-For the mixed interger solvers, we can use a single one.
+For the mixed integer solvers, we can use a single one.
 
 ````@example 5_Budget_Constraints
 using Clarabel, HiGHS
@@ -169,7 +169,7 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip
 
 #### 3.1.3 Short-only portfolio
 
-We will now create and discretely allocate a short-only portfolio. This is in general an anti-pattern but oen can use various combinations of budget, weight bounds and short budget constraints to create hedging portfolios.
+We will now create and discretely allocate a short-only portfolio. This is in general an anti-pattern but one can use various combinations of budget, weight bounds and short budget constraints to create hedging portfolios.
 
 ````@example 5_Budget_Constraints
 opt3 = JuMPOptimiser(; pe = pr, slv = slv,
@@ -231,7 +231,7 @@ We will now optimise an underleveraged long-short portfolio.
 
 Note that the short budget is not satisfied, this is because it is implemented as an equality constraint on a relaxation variable stand-in for the short weights. However, the portfolio budget constraint is satisfied because it is an equality constraint on the actual weights.
 
-It is also possible to set budget bounds for the short and portfolio bugets. They are implemented in the same way as the equality constraints. We will explore them in the next section.
+It is also possible to set budget bounds for the short and portfolio budgets. They are implemented in the same way as the equality constraints. We will explore them in the next section.
 
 ````@example 5_Budget_Constraints
 opt5 = JuMPOptimiser(; pe = pr, slv = slv,
@@ -263,7 +263,7 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res5.cost)) + mip
 
 # 4. Budget range
 
-The other type of buget constraint we will explore in this example is the budget range constraint, `BudgetRange`. It allows the user to define upper and lower bounds on the budget and short budget. When using a `BudgetRange`, it is necessary to provide both the upper and lower bounds.
+The other type of budget constraint we will explore in this example is the budget range constraint, `BudgetRange`. It allows the user to define upper and lower bounds on the budget and short budget. When using a `BudgetRange`, it is necessary to provide both the upper and lower bounds.
 
 We mentioned at the start of this example that the interaction between budget and short budget constraints might be unintuitive due to how the constraints are implemented. The following example will illustrate this.
 

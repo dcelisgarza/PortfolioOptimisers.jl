@@ -33,9 +33,9 @@
     res = optimise(EqualWeighted(), rd)
     @test isapprox(res.w, range(; start = inv(N), stop = inv(N), length = N))
 
-    res = optimise(RandomWeights(; rng = StableRNG(123456789)), rd)
+    res = optimise(RandomWeighted(; rng = StableRNG(123456789)), rd)
     @test isapprox(sum(res.w), 1)
 
-    res = optimise(RandomWeights(;), rd)
+    res = optimise(RandomWeighted(;), rd)
     @test isapprox(sum(res.w), 1)
 end

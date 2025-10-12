@@ -59,16 +59,16 @@ function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...
                              range(; start = inv(N), stop = inv(N), length = N),
                              OptimisationSuccess(nothing), nothing)
 end
-struct RandomWeights{T1} <: NaiveOptimisationEstimator
+struct RandomWeighted{T1} <: NaiveOptimisationEstimator
     rng::T1
-    function RandomWeights(rng::Union{Nothing, <:AbstractRNG})
+    function RandomWeighted(rng::Union{Nothing, <:AbstractRNG})
         return new{typeof(rng)}(rng)
     end
 end
-function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
-    return RandomWeights(rng)
+function RandomWeighted(; rng::Union{Nothing, <:AbstractRNG} = nothing)
+    return RandomWeighted(rng)
 end
-function optimise(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
+function optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X))
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
@@ -77,4 +77,4 @@ function optimise(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...
     return NaiveOptimisation(typeof(rw), nothing, w, OptimisationSuccess(nothing), nothing)
 end
 
-export NaiveOptimisation, InverseVolatility, EqualWeighted, RandomWeights
+export NaiveOptimisation, InverseVolatility, EqualWeighted, RandomWeighted

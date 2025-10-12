@@ -46,7 +46,7 @@ rd = prices_to_returns(X)
 
 The pareto surface is a generalisation of the efficient frontier, in fact, we can even think of hypersurfaces if we provide more parameters, but that would be difficult to visualise, so we will stick to a 2D surface in 3D space.
 
-We'll provide a vector of solvers beacause the optimisation type we'll be using is more complex, and will contain various constraints.
+We'll provide a vector of solvers because the optimisation type we'll be using is more complex, and will contain various constraints.
 
 ````@example 4_Pareto_Surface
 using Clarabel
@@ -96,7 +96,7 @@ pe = HighOrderPriorEstimator(;
                              ske = Coskewness())
 ````
 
-Lets compute the prior statistics.
+Let's compute the prior statistics.
 
 ````@example 4_Pareto_Surface
 pr = prior(pe, rd)
@@ -182,7 +182,7 @@ r2 = factory(SquareRootKurtosis(;
 nothing #hide
 ````
 
-Now we only need to maximise the return given both risk measures. Internally, the optimisation will generate the mesh as a product of the ranges in the order in which the risk measures were provided. This also works with the `MeanRisk` estimatro, in fact, `NearOptimalCentering` uses it internally.
+Now we only need to maximise the return given both risk measures. Internally, the optimisation will generate the mesh as a product of the ranges in the order in which the risk measures were provided. This also works with the `MeanRisk` estimator, in fact, `NearOptimalCentering` uses it internally.
 
 Since we are using an unconstrained `NearOptimalCentering`, the risk bound constraints will not be satisfied by the solution. If we wish to satisfy them, we can provide `alg = ConstrainedNearOptimalCentering()`, but would also make the optimisations harder, which may cause them to fail.
 
@@ -190,7 +190,7 @@ Since we are using an unconstrained `NearOptimalCentering`, the risk bound const
 opt3 = NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(), opt = opt)
 ````
 
-See how `r` is a vector of risk measures with populated properties. We can now optimise the porftolios.
+See how `r` is a vector of risk measures with populated properties. We can now optimise the portfolios.
 
 ````@example 4_Pareto_Surface
 res3 = optimise(opt3)
@@ -213,7 +213,7 @@ using StatsPlots, GraphRecipes
 plot_stacked_area_composition(res3.w, rd.nx)
 ````
 
-Now we can view the parteo surface. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
+Now we can view the pareto surface. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
 
 ````@example 4_Pareto_Surface
 plot_measures(res3.w, pr; x = r1, y = r2,
@@ -221,7 +221,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
                                    rt = ArithmeticReturn(), rf = rf),
               c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),
-              title = "Pareto Surface", xlabel = "Sqrt NSke", ylabel = "Sqrt Kt",
+              title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               zlabel = "CDaR/Return")
 ````
 
@@ -232,7 +232,7 @@ gr()
 plot_measures(res3.w, pr; x = r1, y = r2,
               c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),
-              title = "Pareto Front", xlabel = "Sqrt NSke", ylabel = "Sqrt Kt",
+              title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
 ````
 

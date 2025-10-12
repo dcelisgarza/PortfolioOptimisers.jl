@@ -2,7 +2,7 @@
 
 ```@docs
 MaximumEntropy
-MinimumSquareDistance
+MinimumSquaredDistance
 MinimumSumSquares
 NormalisedConstantRelativeRiskAversion
 OWAJuMP

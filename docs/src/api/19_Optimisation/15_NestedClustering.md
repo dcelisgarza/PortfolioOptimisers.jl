@@ -1,5 +1,5 @@
 # Nested Clustering
 
 ```@docs
-NestedClustering
+NestedClustered
 ```

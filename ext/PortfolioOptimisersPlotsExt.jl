@@ -11,7 +11,7 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray,
                                                          kwargs::NamedTuple = (;
                                                                                title = "Portfolio",
                                                                                xlabel = "Date",
-                                                                               ylabel = "$(compound ? "Compound" : "Simple") Portfolio Cummulative Returns",
+                                                                               ylabel = "$(compound ? "Compound" : "Simple") Portfolio Cumulative Returns",
                                                                                legend = false),
                                                          ekwargs...)
     ret = cumulative_returns(calc_net_returns(w, X, fees); compound = compound)
@@ -33,13 +33,15 @@ end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
                                                            X::AbstractMatrix,
                                                            fees::Union{Nothing, <:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Union{Nothing, <:Real} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
                                                                                    xlabel = "Date",
-                                                                                   ylabel = "$(compound ? "Compound" : "Simple") Asset Cummulative Returns"),
+                                                                                   ylabel = "$(compound ? "Compound" : "Simple") Asset Cumulative Returns"),
                                                            asset_kwargs::NamedTuple = (;),
                                                            summary_kwargs::NamedTuple = (;
                                                                                          label = "Others"),
@@ -129,7 +131,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVec
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:AbstractVector{<:Real},
                                                                     <:AbstractVector{<:AbstractVector}},
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",

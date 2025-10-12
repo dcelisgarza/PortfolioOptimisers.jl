@@ -26,7 +26,7 @@ All concrete types implementing specific OWA algorithms should subtype `Abstract
 # Related
 
   - [`MaximumEntropy`](@ref)
-  - [`MinimumSquareDistance`](@ref)
+  - [`MinimumSquaredDistance`](@ref)
   - [`MinimumSumSquares`](@ref)
 """
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
@@ -47,19 +47,19 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
 """
 ```julia
-struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
 ```
 
-Represents the Minimum Square Distance algorithm for Ordered Weights Array (OWA) estimation.
+Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
 
-The Minimum Square Distance algorithm finds OWA weights that minimize the squared distance from a target or reference vector, subject to the OWA constraints. This approach is useful for regularizing OWA weights towards a desired profile.
+The Minimum Squared Distance algorithm finds OWA weights that minimize the squared distance from a target or reference vector, subject to the OWA constraints. This approach is useful for regularizing OWA weights towards a desired profile.
 
 # Related
 
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
 """
-struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
 """
 ```julia
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
@@ -403,7 +403,7 @@ This function dispatches on the estimator `method` to compute OWA weights from a
 
   - `method::NormalisedConstantRelativeRiskAversion`: Computes OWA weights using the normalised CRRA scheme, parameterised by the risk aversion parameter `g` in `method`. The resulting weights interpolate between risk-neutral and risk-averse profiles and are normalised to sum to one.
   - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy}`: Computes OWA weights by solving a maximum entropy optimization problem using JuMP. This yields the most "uninformative" or uniform OWA weights subject to the imposed constraints.
-  - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSquareDistance}`: Computes OWA weights by minimizing the squared distance from a target or reference vector, regularizing the OWA weights towards a desired profile.
+  - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSquaredDistance}`: Computes OWA weights by minimizing the squared distance from a target or reference vector, regularizing the OWA weights towards a desired profile.
   - `method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares}`: Computes OWA weights by minimizing the sum of squared OWA weights, promoting sparsity or concentration in the resulting weights.
   - `weights`: Matrix of weights (e.g., order statistics or moment weights).
 
@@ -416,7 +416,7 @@ This function dispatches on the estimator `method` to compute OWA weights from a
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
   - [`OWAJuMP`](@ref)
   - [`MaximumEntropy`](@ref)
-  - [`MinimumSquareDistance`](@ref)
+  - [`MinimumSquaredDistance`](@ref)
   - [`MinimumSumSquares`](@ref)
   - [`ncrra_weights`](@ref)
 """
@@ -445,7 +445,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumE
     return owa_model_solve(model, method, weights)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
-                                          <:MinimumSquareDistance},
+                                          <:MinimumSquaredDistance},
                           weights::AbstractMatrix{<:Real})
     sc = method.sc
     so = method.so
@@ -832,7 +832,7 @@ function owa_l_moment_crm(T::Integer; k::Integer = 2,
     return owa_l_moment_crm(method, weights)
 end
 
-export MaximumEntropy, MinimumSquareDistance, MinimumSumSquares,
+export MaximumEntropy, MinimumSquaredDistance, MinimumSumSquares,
        NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd, owa_cvar, owa_wcvar,
        owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg, owa_l_moment,
        owa_l_moment_crm
