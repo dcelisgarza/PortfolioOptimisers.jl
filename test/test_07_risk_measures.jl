@@ -119,7 +119,6 @@
             end
             success = isapprox(r1, r2; rtol = rtol)
             if !success
-                println(rtol)
                 println("Iteration $i fails")
                 find_tol(r1, r2)
             end
