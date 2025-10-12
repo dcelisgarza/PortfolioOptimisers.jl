@@ -1,5 +1,4 @@
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
-abstract type ImpliedVolatilityRegressionEstimator <: ImpliedVolatilityAlgorithm end
 struct ImpliedVolatilityRegression{T1, T2,
                                    #    T3 <: AbstractStepwiseRegressionCriterion,
                                    T3} <: ImpliedVolatilityAlgorithm

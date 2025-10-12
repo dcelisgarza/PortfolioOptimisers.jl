@@ -192,7 +192,7 @@ plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 
 ## Features
 
-The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There's also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
+The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There are also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
 
 ### Price data
 
@@ -202,6 +202,8 @@ Everything but the finite allocation optimisations work off of returns data. Som
   - Computing them, validating and cleaning up data.
 
 ### Co-moment matrix processing
+
+Price data is often noisy and follows general macroeconomic trends. Every optimisation model is at risk of overfitting the data. In particular, those which rely on summary statistics (moments) can be overly sensitive to the input data, for example a covariance matrix. It is therefore important to have methods that increase the robustness of their estimation.
 
   - Positive definite projection.
 
@@ -251,11 +253,12 @@ Many of these can be used in conjunction. For example, some covariance estimator
 
 ### Regression
 
-Factor models and implied volatility work off of regression.
+Factor models and implied volatility use regression in their estimation.
 
   - Stepwise.
     
       + Forward and Backward.
+        
           * P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
 
   - Dimensional reduction.
@@ -280,6 +283,8 @@ Individual entries can be raised to an integer power and scaled according to whe
 
 ### Phylogeny
 
+These define asset relationships. They can be used to set constraints on and/or compute the relatedness of assets in a portfolio.
+
   - Clustering.
     
       + Optimal number of clusters:
@@ -290,18 +295,47 @@ Individual entries can be raised to an integer power and scaled according to whe
       + Direct Bubble Hierarchy Trees.
         
           * Local Global sparsification of the inverse covariance/correlation matrix.
-  - Phylogeny matrices.
 
+  - Phylogeny matrices.
+    
       + Network (MST) adjacency.
       + Clustering adjacency.
   - Centrality vectors and average centrality.
-        
+    
       + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
   - Asset phylogeny score.
 
 ### Constraint generation
 
+These let users easily manually or programatically define optimisation constraints.
+
   - Equation parsing: lets users define linear constraints by directly writing the equations.
-  - Linear weight constraint generation.
-  - Risk budget constraint generation.
-  - Asset set matrix generation.
+
+  - Linear weights.
+  - Risk budget.
+  - Asset set matrices.
+  - Phylogeny.
+    
+      + Phylogeny matrix.
+        
+          * Semi definite.
+          * Mixed integer programming.
+    
+      + Centralilty.
+  - Weight bounds.
+  - Buy-in threshold.
+
+### Prior statistics
+
+  - Empirical.
+
+  - Factor model.
+  - High order moments (coskewness and cokurtosis).
+  - Black-Litterman.
+    
+      + Vanilla.
+      + Bayesian.
+      + Factor model.
+      + Augmented.
+  - Entropy pooling.
+  - Opinion poolong.
