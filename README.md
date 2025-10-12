@@ -264,8 +264,9 @@ Many of these can be used in conjunction. For example, some covariance estimator
           * Full.
           * Semi.
       + Cokurtosis.
-        + Full.
-        + Semi.
+        
+          * Full.
+          * Semi.
       + Implied volatility.
 
 ### Regression
