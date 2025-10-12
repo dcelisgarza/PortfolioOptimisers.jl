@@ -46,7 +46,7 @@ Portfolio optimisation is the science of reducing investment risk by being cleve
 
 `PortfolioOptimisers.jl` is an attempt at providing as many as possible, and to make it possible to add more by leveraging Julia's type system.
 
-The feature list is quite large and under active development. New features will be added over time. Check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) documentation for details.
+The feature list is *quite large* and under *active development*. New features will be added over time. Check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) documentation for details.
 
 Please feel free to file issues and/or start discussions if you have any issues using the library, or if I haven't got to writing docs/examples for something you need. That way I know what to prioritise.
 
