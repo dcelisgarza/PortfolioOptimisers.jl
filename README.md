@@ -245,7 +245,8 @@ Many of these can be used in conjunction. For example, some covariance estimator
     
       + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
         
-          * Full and Semi covariance algorithms.
+          * Full.
+          * Semi.
       + Gerber.
         
           * Gerber 0, 1, 2. Standardised and unstandardised.
@@ -260,7 +261,12 @@ Many of these can be used in conjunction. For example, some covariance estimator
       + Mutual information.
       + Coskewness.
         
-          * Full and Semi algorithms.
+          * Full.
+          * Semi.
+      + Cokurtosis.
+        
+          * Full.
+          * Semi.
       + Implied volatility.
 
 ### Regression
