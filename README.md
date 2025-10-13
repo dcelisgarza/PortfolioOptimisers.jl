@@ -194,7 +194,7 @@ plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 
 ### API
 
-  - Unstable: there will likely be breaking changes as I figure out better, more general way to do things, or better naming conventions.
+  - Unstable: there will likely be breaking changes as I figure out better, more general ways to do things, or better naming conventions.
 
 ### Internals
 
@@ -259,6 +259,8 @@ Many of these can be used in conjunction. For example, some covariance estimator
       + Kendall.
       + Spearman.
       + Mutual information.
+        
+          * Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
       + Coskewness.
         
           * Full.
@@ -314,9 +316,13 @@ Distance matrices are used for clustering. They are related to correlation dista
 Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
 
   - Simple.
+
   - Absolute.
   - Logarithmic.
   - Correlation.
+  - Variation of Information.
+    
+      + Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
   - Canonical: depends on the covariance/correlation estimator used.
 
 ### Phylogeny
