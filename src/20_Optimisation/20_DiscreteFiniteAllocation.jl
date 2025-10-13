@@ -71,6 +71,11 @@ function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real,
                  end)
     @objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)
+    res = if res.success
+        OptimisationSuccess(; res = res.trials)
+    else
+        OptimisationFailure(; res = res.trials)
+    end
     shares = round.(Int, value.(x))
     cost = shares .* p
     aw = if any(!iszero, cost)
@@ -109,6 +114,12 @@ function _optimise(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
     retcode = if isa(sretcode, OptimisationFailure) || isa(lretcode, OptimisationFailure)
+        if isa(sretcode, OptimisationFailure)
+            @warn("Failed to solve sub optimisation problem. Check `s_retcode.res` for details.")
+        end
+        if isa(lretcode, OptimisationFailure)
+            @warn("Failed to solve sub optimisation problem. Check `l_retcode.res` for details.")
+        end
         OptimisationFailure(nothing)
     else
         OptimisationSuccess(nothing)
