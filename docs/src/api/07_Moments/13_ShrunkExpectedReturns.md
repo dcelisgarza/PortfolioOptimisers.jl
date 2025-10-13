@@ -3,7 +3,7 @@
 ```@docs
 GrandMean
 VolatilityWeighted
-MeanSquareError
+MeanSquaredError
 JamesStein
 BayesStein
 BodnarOkhrinParolya

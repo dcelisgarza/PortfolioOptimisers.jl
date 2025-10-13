@@ -1,4 +1,4 @@
-@safetestset "NestedClustering" begin
+@safetestset "NestedClustered" begin
     using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames, StableRNGs,
           Pajarito, HiGHS, JuMP, Clustering
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
@@ -157,95 +157,95 @@
         jopto = JuMPOptimiser(; slv = slv)
         hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
         hopto = HierarchicalOptimiser(; slv = slv)
-        opts = [NestedClustering(; cle = clr, opti = MeanRisk(; opt = jopti),
-                                 opto = MeanRisk(; opt = jopto)),
-                NestedClustering(; cle = clr, opti = NearOptimalCentering(; opt = jopti),
-                                 opto = NearOptimalCentering(; opt = jopto)),
-                NestedClustering(; cle = clr, opti = RiskBudgeting(; opt = jopti),
-                                 opto = RiskBudgeting(; opt = jopto)),
-                NestedClustering(; cle = clr, opti = RelaxedRiskBudgeting(; opt = jopti),
-                                 opto = RelaxedRiskBudgeting(; opt = jopto)),
-                NestedClustering(; cle = clr, opti = HierarchicalRiskParity(; opt = hopti),
-                                 opto = HierarchicalRiskParity(; opt = hopto)),
-                NestedClustering(; cle = clr,
-                                 opti = HierarchicalEqualRiskContribution(; opt = hopti),
-                                 opto = HierarchicalEqualRiskContribution(; opt = hopto)),
-                NestedClustering(; pe = pr, cle = clr,
-                                 opti = NestedClustering(; pe = pr,
-                                                         opti = MeanRisk(; opt = jopti),
-                                                         opto = MeanRisk(; opt = jopto)),
-                                 opto = NestedClustering(; opti = MeanRisk(; opt = jopto),
-                                                         opto = MeanRisk(; opt = jopto))),
-                NestedClustering(; cle = clr, opti = InverseVolatility(; pe = pr),
-                                 opto = InverseVolatility()),
-                NestedClustering(; cle = clr, opti = EqualWeighted(),
-                                 opto = EqualWeighted()),
-                NestedClustering(; cle = clr,
-                                 opti = RandomWeights(; rng = StableRNG(1234567890)),
-                                 opto = RandomWeights(; rng = StableRNG(0987654321))),
-                NestedClustering(; cle = clr,
-                                 opti = SchurHierarchicalRiskParity(;
-                                                                    params = SchurParams(;
-                                                                                         gamma = 0),
-                                                                    opt = hopti),
-                                 opto = SchurHierarchicalRiskParity(;
-                                                                    params = SchurParams(;
-                                                                                         gamma = 0.5),
-                                                                    opt = hopto)),
-                NestedClustering(; pe = pr, cle = clr,
-                                 opti = Stacking(;
-                                                 opti = [MeanRisk(; opt = jopti),
-                                                         HierarchicalRiskParity(;
-                                                                                opt = hopti),
-                                                         InverseVolatility(; pe = pr),
-                                                         EqualWeighted(),
-                                                         NestedClustering(; pe = pr,
-                                                                          opti = NearOptimalCentering(;
-                                                                                                      opt = jopti),
-                                                                          opto = NearOptimalCentering(;
-                                                                                                      opt = jopto))],
-                                                 opto = Stacking(;
-                                                                 opti = [MeanRisk(;
-                                                                                  opt = jopto),
-                                                                         HierarchicalRiskParity(;
-                                                                                                opt = hopto),
-                                                                         InverseVolatility(),
-                                                                         EqualWeighted(),
-                                                                         NestedClustering(;
-                                                                                          opti = NearOptimalCentering(;
-                                                                                                                      opt = jopto),
-                                                                                          opto = NearOptimalCentering(;
-                                                                                                                      opt = jopto))],
-                                                                 opto = HierarchicalRiskParity(;
-                                                                                               opt = hopto))),
-                                 opto = Stacking(;
-                                                 opti = [MeanRisk(; opt = jopto),
-                                                         HierarchicalRiskParity(;
-                                                                                opt = hopto),
-                                                         InverseVolatility(),
-                                                         EqualWeighted(),
-                                                         NestedClustering(;
-                                                                          opti = NearOptimalCentering(;
-                                                                                                      opt = jopto),
-                                                                          opto = NearOptimalCentering(;
-                                                                                                      opt = jopto))],
-                                                 opto = Stacking(;
-                                                                 opti = [MeanRisk(;
-                                                                                  opt = jopto),
-                                                                         HierarchicalRiskParity(;
-                                                                                                opt = hopto),
-                                                                         InverseVolatility(),
-                                                                         EqualWeighted(),
-                                                                         NestedClustering(;
-                                                                                          opti = NearOptimalCentering(;
-                                                                                                                      opt = jopto),
-                                                                                          opto = NearOptimalCentering(;
-                                                                                                                      opt = jopto))],
-                                                                 opto = HierarchicalRiskParity(;
-                                                                                               opt = hopto)))),
-                NestedClustering(; cle = clr, opti = FactorRiskContribution(; opt = jopti),
-                                 opto = FactorRiskContribution(; opt = jopto))]
-        df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustering.csv.gz"), DataFrame)
+        opts = [NestedClustered(; cle = clr, opti = MeanRisk(; opt = jopti),
+                                opto = MeanRisk(; opt = jopto)),
+                NestedClustered(; cle = clr, opti = NearOptimalCentering(; opt = jopti),
+                                opto = NearOptimalCentering(; opt = jopto)),
+                NestedClustered(; cle = clr, opti = RiskBudgeting(; opt = jopti),
+                                opto = RiskBudgeting(; opt = jopto)),
+                NestedClustered(; cle = clr, opti = RelaxedRiskBudgeting(; opt = jopti),
+                                opto = RelaxedRiskBudgeting(; opt = jopto)),
+                NestedClustered(; cle = clr, opti = HierarchicalRiskParity(; opt = hopti),
+                                opto = HierarchicalRiskParity(; opt = hopto)),
+                NestedClustered(; cle = clr,
+                                opti = HierarchicalEqualRiskContribution(; opt = hopti),
+                                opto = HierarchicalEqualRiskContribution(; opt = hopto)),
+                NestedClustered(; pe = pr, cle = clr,
+                                opti = NestedClustered(; pe = pr,
+                                                       opti = MeanRisk(; opt = jopti),
+                                                       opto = MeanRisk(; opt = jopto)),
+                                opto = NestedClustered(; opti = MeanRisk(; opt = jopto),
+                                                       opto = MeanRisk(; opt = jopto))),
+                NestedClustered(; cle = clr, opti = InverseVolatility(; pe = pr),
+                                opto = InverseVolatility()),
+                NestedClustered(; cle = clr, opti = EqualWeighted(),
+                                opto = EqualWeighted()),
+                NestedClustered(; cle = clr,
+                                opti = RandomWeighted(; rng = StableRNG(1234567890)),
+                                opto = RandomWeighted(; rng = StableRNG(0987654321))),
+                NestedClustered(; cle = clr,
+                                opti = SchurComplementHierarchicalRiskParity(;
+                                                                             params = SchurComplementParams(;
+                                                                                                            gamma = 0),
+                                                                             opt = hopti),
+                                opto = SchurComplementHierarchicalRiskParity(;
+                                                                             params = SchurComplementParams(;
+                                                                                                            gamma = 0.5),
+                                                                             opt = hopto)),
+                NestedClustered(; pe = pr, cle = clr,
+                                opti = Stacking(;
+                                                opti = [MeanRisk(; opt = jopti),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopti),
+                                                        InverseVolatility(; pe = pr),
+                                                        EqualWeighted(),
+                                                        NestedClustered(; pe = pr,
+                                                                        opti = NearOptimalCentering(;
+                                                                                                    opt = jopti),
+                                                                        opto = NearOptimalCentering(;
+                                                                                                    opt = jopto))],
+                                                opto = Stacking(;
+                                                                opti = [MeanRisk(;
+                                                                                 opt = jopto),
+                                                                        HierarchicalRiskParity(;
+                                                                                               opt = hopto),
+                                                                        InverseVolatility(),
+                                                                        EqualWeighted(),
+                                                                        NestedClustered(;
+                                                                                        opti = NearOptimalCentering(;
+                                                                                                                    opt = jopto),
+                                                                                        opto = NearOptimalCentering(;
+                                                                                                                    opt = jopto))],
+                                                                opto = HierarchicalRiskParity(;
+                                                                                              opt = hopto))),
+                                opto = Stacking(;
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        InverseVolatility(),
+                                                        EqualWeighted(),
+                                                        NestedClustered(;
+                                                                        opti = NearOptimalCentering(;
+                                                                                                    opt = jopto),
+                                                                        opto = NearOptimalCentering(;
+                                                                                                    opt = jopto))],
+                                                opto = Stacking(;
+                                                                opti = [MeanRisk(;
+                                                                                 opt = jopto),
+                                                                        HierarchicalRiskParity(;
+                                                                                               opt = hopto),
+                                                                        InverseVolatility(),
+                                                                        EqualWeighted(),
+                                                                        NestedClustered(;
+                                                                                        opti = NearOptimalCentering(;
+                                                                                                                    opt = jopto),
+                                                                                        opto = NearOptimalCentering(;
+                                                                                                                    opt = jopto))],
+                                                                opto = HierarchicalRiskParity(;
+                                                                                              opt = hopto)))),
+                NestedClustered(; cle = clr, opti = FactorRiskContribution(; opt = jopti),
+                                opto = FactorRiskContribution(; opt = jopto))]
+        df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
             rtol = if i == 2
@@ -265,25 +265,25 @@
             @test success
         end
         #=
-        opt = NestedClustering(; pe = pr, cle = clr,
-                               opti = NestedClustering(; pe = pr,
-                                                       opti = NestedClustering(; pe = pr,
+        opt = NestedClustered(; pe = pr, cle = clr,
+                               opti = NestedClustered(; pe = pr,
+                                                       opti = NestedClustered(; pe = pr,
                                                                                opti = MeanRisk(;
                                                                                                opt = jopti),
                                                                                opto = MeanRisk(;
                                                                                                opt = jopto)),
-                                                       opto = NestedClustering(;
+                                                       opto = NestedClustered(;
                                                                                opti = MeanRisk(;
                                                                                                opt = jopto),
                                                                                opto = MeanRisk(;
                                                                                                opt = jopto))),
-                               opto = NestedClustering(;
-                                                       opti = NestedClustering(;
+                               opto = NestedClustered(;
+                                                       opti = NestedClustered(;
                                                                                opti = MeanRisk(;
                                                                                                opt = jopto),
                                                                                opto = MeanRisk(;
                                                                                                opt = jopto)),
-                                                       opto = NestedClustering(;
+                                                       opto = NestedClustered(;
                                                                                opti = MeanRisk(;
                                                                                                opt = jopto),
                                                                                opto = MeanRisk(;
@@ -301,10 +301,10 @@
                              wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
         opto = JuMPOptimiser(; slv = slv, sbgt = 1, bgt = 1,
                              wb = WeightBounds(; lb = -1, ub = 1))
-        res = optimise(NestedClustering(; cle = clr,
-                                        opti = MeanRisk(; r = ConditionalDrawdownatRisk(),
-                                                        opt = opti),
-                                        opto = MeanRisk(; opt = opto)), rd)
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = ConditionalDrawdownatRisk(),
+                                                       opt = opti),
+                                       opto = MeanRisk(; opt = opto)), rd)
 
         clusters = cutree(clr.clustering; k = clr.k)
         idx = findfirst(x -> x == "PG", rd.nx)
@@ -321,10 +321,10 @@
                              wb = WeightBounds(; lb = -1, ub = 1),
                              fees = fees_constraints(fees, sets), sets = sets)
         @test isapprox(res.w,
-                       optimise(NestedClustering(; cle = clr,
-                                                 opti = MeanRisk(;
-                                                                 r = ConditionalDrawdownatRisk(),
-                                                                 opt = opti),
-                                                 opto = MeanRisk(; opt = opto)), rd).w)
+                       optimise(NestedClustered(; cle = clr,
+                                                opti = MeanRisk(;
+                                                                r = ConditionalDrawdownatRisk(),
+                                                                opt = opti),
+                                                opto = MeanRisk(; opt = opto)), rd).w)
     end
 end

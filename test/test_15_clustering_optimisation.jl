@@ -232,8 +232,8 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMPWeightFiniliser(;
-                                                              alg = RelativeErrorWeightFiniliser(),
+                                    cwf = JuMPWeightFinaliser(;
+                                                              alg = RelativeErrorWeightFinaliser(),
                                                               slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -243,8 +243,8 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMPWeightFiniliser(;
-                                                              alg = SquareRelativeErrorWeightFiniliser(),
+                                    cwf = JuMPWeightFinaliser(;
+                                                              alg = SquareRelativeErrorWeightFinaliser(),
                                                               slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -254,8 +254,8 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMPWeightFiniliser(;
-                                                              alg = AbsoluteErrorWeightFiniliser(),
+                                    cwf = JuMPWeightFinaliser(;
+                                                              alg = AbsoluteErrorWeightFinaliser(),
                                                               slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -265,8 +265,8 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMPWeightFiniliser(;
-                                                              alg = SquareAbsoluteErrorWeightFiniliser(),
+                                    cwf = JuMPWeightFinaliser(;
+                                                              alg = SquareAbsoluteErrorWeightFinaliser(),
                                                               slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -275,71 +275,78 @@
                          for i in sets.dict["group1"]]] .>= 0.02)
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
     end
-    @testset "SchurHierarchicalRiskParity" begin
+    @testset "SchurComplementHierarchicalRiskParity" begin
         r = factory(Variance(), pr)
         hrp = HierarchicalRiskParity(; r = r, opt = opt)
         res0 = optimise(hrp)
         rk0 = expected_risk(r, res0.w, pr)
 
-        sch = SchurHierarchicalRiskParity(;
-                                          params = SchurParams(; gamma = 0,
-                                                               alg = NonMonotonicSchur()),
-                                          opt = opt)
+        sch = SchurComplementHierarchicalRiskParity(;
+                                                    params = SchurComplementParams(;
+                                                                                   gamma = 0,
+                                                                                   alg = NonMonotonicSchurComplement()),
+                                                    opt = opt)
         res = optimise(sch)
         rk = expected_risk(r, res.w, pr)
         @test isapprox(res0.w, res.w)
         @test isapprox(rk0, rk)
 
-        sch = SchurHierarchicalRiskParity(;
-                                          params = SchurParams(; gamma = 1,
-                                                               alg = MonotonicSchur()),
-                                          opt = opt)
+        sch = SchurComplementHierarchicalRiskParity(;
+                                                    params = SchurComplementParams(;
+                                                                                   gamma = 1,
+                                                                                   alg = MonotonicSchurComplement()),
+                                                    opt = opt)
         res = optimise(sch)
         rk = expected_risk(r, res.w, pr)
         @test rk <= rk0
 
-        sch = SchurHierarchicalRiskParity(;
-                                          params = SchurParams(; gamma = 0.675,
-                                                               alg = NonMonotonicSchur()),
-                                          opt = opt)
+        sch = SchurComplementHierarchicalRiskParity(;
+                                                    params = SchurComplementParams(;
+                                                                                   gamma = 0.675,
+                                                                                   alg = NonMonotonicSchurComplement()),
+                                                    opt = opt)
         res = optimise(sch)
         rk = expected_risk(r, res.w, pr)
         @test rk >= rk0
 
         rk0 = -Inf
         for gamma in range(; start = 0.0, stop = 0.20, length = 10)
-            sch = SchurHierarchicalRiskParity(;
-                                              params = SchurParams(; gamma = 0.675,
-                                                                   alg = NonMonotonicSchur()),
-                                              opt = opt)
+            sch = SchurComplementHierarchicalRiskParity(;
+                                                        params = SchurComplementParams(;
+                                                                                       gamma = 0.675,
+                                                                                       alg = NonMonotonicSchurComplement()),
+                                                        opt = opt)
             res = optimise(sch)
             rk = expected_risk(r, res.w, pr)
             @test rk >= rk0
             rk0 = rk
         end
 
-        sch = SchurHierarchicalRiskParity(;
-                                          params = SchurParams(; gamma = 0.05,
-                                                               alg = NonMonotonicSchur()),
-                                          opt = opt)
+        sch = SchurComplementHierarchicalRiskParity(;
+                                                    params = SchurComplementParams(;
+                                                                                   gamma = 0.05,
+                                                                                   alg = NonMonotonicSchurComplement()),
+                                                    opt = opt)
         res0 = optimise(sch)
-        sch = SchurHierarchicalRiskParity(;
-                                          params = SchurParams(; r = StandardDeviation(),
-                                                               gamma = 0.1,
-                                                               alg = NonMonotonicSchur()),
-                                          opt = opt)
+        sch = SchurComplementHierarchicalRiskParity(;
+                                                    params = SchurComplementParams(;
+                                                                                   r = StandardDeviation(),
+                                                                                   gamma = 0.1,
+                                                                                   alg = NonMonotonicSchurComplement()),
+                                                    opt = opt)
         res1 = optimise(sch)
 
-        sch = SchurHierarchicalRiskParity(;
-                                          params = [SchurParams(; gamma = 0.05,
-                                                                alg = NonMonotonicSchur()),
-                                                    SchurParams(;
-                                                                r = StandardDeviation(;
-                                                                                      settings = RiskMeasureSettings(;
-                                                                                                                     scale = 2)),
-                                                                gamma = 0.1,
-                                                                alg = NonMonotonicSchur())],
-                                          opt = opt)
+        sch = SchurComplementHierarchicalRiskParity(;
+                                                    params = [SchurComplementParams(;
+                                                                                    gamma = 0.05,
+                                                                                    alg = NonMonotonicSchurComplement()),
+                                                              SchurComplementParams(;
+                                                                                    r = StandardDeviation(;
+                                                                                                          settings = RiskMeasureSettings(;
+                                                                                                                                         scale = 2)),
+                                                                                    gamma = 0.1,
+                                                                                    alg = NonMonotonicSchurComplement())],
+                                                    opt = opt)
         res2 = optimise(sch)
 
         w2 = res0.w + 2 * res1.w

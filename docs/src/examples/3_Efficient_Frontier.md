@@ -46,7 +46,7 @@ rd = prices_to_returns(X)
 
 We have two mutually exclusive ways to compute the efficient frontier. We can do so from the perspective of minimising the risk with a return lower bound, or maximising the return with a risk upper bound. It is possible to provide explicit bounds, or a `Frontier` object which automatically computes the bounds based on the problem and constraints. All four combinations have their use cases. In this example we will only show the use of `Frontier` as a lower bound on the portfolio return.
 
-Since we will be performing various optimistions, we will provide a vector of solver settings because we don't know if a single set of settings will work in all cases.
+Since we will be performing various optimisations, we will provide a vector of solver settings because we don't know if a single set of settings will work in all cases.
 
 ````@example 3_Efficient_Frontier
 using Clarabel

@@ -11,7 +11,7 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray,
                                                          kwargs::NamedTuple = (;
                                                                                title = "Portfolio",
                                                                                xlabel = "Date",
-                                                                               ylabel = "$(compound ? "Compound" : "Simple") Portfolio Cummulative Returns",
+                                                                               ylabel = "$(compound ? "Compound" : "Simple") Portfolio Cumulative Returns",
                                                                                legend = false),
                                                          ekwargs...)
     ret = cumulative_returns(calc_net_returns(w, X, fees); compound = compound)
@@ -39,7 +39,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
                                                                                    xlabel = "Date",
-                                                                                   ylabel = "$(compound ? "Compound" : "Simple") Asset Cummulative Returns"),
+                                                                                   ylabel = "$(compound ? "Compound" : "Simple") Asset Cumulative Returns"),
                                                            asset_kwargs::NamedTuple = (;),
                                                            summary_kwargs::NamedTuple = (;
                                                                                          label = "Others"),

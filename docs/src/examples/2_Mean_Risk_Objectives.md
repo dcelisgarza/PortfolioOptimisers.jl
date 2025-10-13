@@ -128,7 +128,7 @@ pretty_table(DataFrame(;
                        :rr => [rr1, rr2, rr3, rr4, rr0]); formatters = resfmt)
 ````
 
-We can seee that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
+We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
 
 * * *
 

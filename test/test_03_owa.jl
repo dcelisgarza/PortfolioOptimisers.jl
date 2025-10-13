@@ -35,9 +35,9 @@
                 OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.75, slv = slv),
                 OWAJuMP(; alg = MinimumSumSquares(), slv = slv),
                 OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.25, slv = slv),
-                OWAJuMP(; alg = MinimumSquareDistance(), max_phi = 0.75, slv = slv),
-                OWAJuMP(; alg = MinimumSquareDistance(), slv = slv),
-                OWAJuMP(; alg = MinimumSquareDistance(), max_phi = 0.25, slv = slv)]
+                OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.75, slv = slv),
+                OWAJuMP(; alg = MinimumSquaredDistance(), slv = slv),
+                OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.25, slv = slv)]
         for i in eachindex(owas)
             owa = owa_l_moment_crm(200; k = 5, method = owas[i])
             rtol = if i == 4
