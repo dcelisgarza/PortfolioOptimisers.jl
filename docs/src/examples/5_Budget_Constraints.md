@@ -113,7 +113,7 @@ println("short budget: $(sum(res1.w[res1.w .< zero(eltype(res1.w))]))")
 println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res1.w))")
 ````
 
-Now lets allocate a finite amount of capital, `4206.9`, to this portfolio.
+Now let's allocate a finite amount of capital, `4206.9`, to this portfolio.
 
 ````@example 5_Budget_Constraints
 da = DiscreteAllocation(; slv = mip_slv)
@@ -151,7 +151,7 @@ println("short budget: $(sum(res2.w[res2.w .< zero(eltype(res2.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res2.w))")
 ````
 
-Lets allocate a finite amount of capital. Since we set the long and short budgets equal to 1, the cost of the long and short positions will be approximately equal to the allocated value of `4206.9`, and the sum of the costs will be close to zero. The discrepancies are due to the fact that we are allocating a finite amount of capital.
+Let's allocate a finite amount of capital. Since we set the long and short budgets equal to 1, the cost of the long and short positions will be approximately equal to the allocated value of `4206.9`, and the sum of the costs will be close to zero. The discrepancies are due to the fact that we are allocating a finite amount of capital.
 
 The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations.
 
@@ -201,7 +201,7 @@ println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.
 
 #### 3.1.4 Leveraged portfolios
 
-Lets try a leveraged long-only portfolio.
+Let's try a leveraged long-only portfolio.
 
 ````@example 5_Budget_Constraints
 opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
@@ -263,19 +263,19 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res5.cost)) + mip
 
 # 4. Budget range
 
-The other type of budget constraint we will explore in this example is the budget range constraint, `BudgetRange`. It allows the user to define upper and lower bounds on the budget and short budget. When using a `BudgetRange`, it is necessary to provide both the upper and lower bounds.
+The other type of budget constraint we will explore in this example is the budget range constraint, `BudgetRange`. It allows the user to define upper and lower bounds on the budget and short budget. When using a `BudgetRange`, it is necessary to provide at least one of the upper or lower bounds. If only one is provided, the other is assumed to be unbounded. If no budget bounds are desired, simply set `bgt` or `sbgt` to `nothing`.
 
 We mentioned at the start of this example that the interaction between budget and short budget constraints might be unintuitive due to how the constraints are implemented. The following example will illustrate this.
 
 ````@example 5_Budget_Constraints
 opt6 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget range.
-                     bgt = BudgetRange(; lb = -0.6, ub = 0.6),
+                     bgt = BudgetRange(; lb = 0.3, ub = 0.8),
                      # Exact short budget
                      sbgt = 0.5,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
-mr6 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt6)
+mr6 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt6)
 res6 = optimise(mr6)
 println("budget: $(sum(res6.w))")
 println("long budget: $(sum(res6.w[res6.w .>= zero(eltype(res6.w))]))")
@@ -283,25 +283,27 @@ println("short budget: $(sum(res6.w[res6.w .< zero(eltype(res6.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res6.w))")
 ````
 
-As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them room to without violating the constraints and without directly constraining the short weights.
+As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them a unbounded wiggle room without violating the constraints, and without directly constraining the short weights.
 
-In order to remedy this, we can provide a `BudgetRange` to the short budget which eliminates the slack on the relaxation variables. It is worth noting that when providing a `BudgetRange` to the short budget, the bounds cannot be negative.
+In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value greater than or equal to the short budget constraint.
 
 ````@example 5_Budget_Constraints
 opt7 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget range.
-                     bgt = BudgetRange(; lb = -0.6, ub = 0.6),
+                     bgt = BudgetRange(; lb = 0.3, ub = 0.8),
                      # Remove the slack from the short budget.
-                     sbgt = BudgetRange(; lb = 0.5, ub = 0.5),
+                     sbgt = 0.3,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
-mr7 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt7)
+mr7 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt7)
 res7 = optimise(mr7)
 println("budget: $(sum(res7.w))")
 println("long budget: $(sum(res7.w[res7.w .>= zero(eltype(res7.w))]))")
 println("short budget: $(sum(res7.w[res7.w .< zero(eltype(res7.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res7.w))")
 ````
+
+The previous example has an essentially unbounded short budget. If we constrain the absolute value of the short budget to be less than the unconstrained value, then the constraint has an effect on the portfolio weights.
 
 * * *
 

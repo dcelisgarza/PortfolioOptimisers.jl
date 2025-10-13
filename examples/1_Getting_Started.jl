@@ -80,7 +80,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 
 `PortfolioOptimisers` is designed to heavily leverage composition. The first hint of this design ethos in the examples comes in the form of `JuMPOptimiser`, which is the structure defining the optimiser parameters used in all `JuMPOptimisationEstimator`s.
 
-Lets create a `MeanRisk` estimator. As you can see from the output, `JuMPOptimiser` and `MeanRisk` contain myriad properties that we will not showcase in this example.
+Let's create a `MeanRisk` estimator. As you can see from the output, `JuMPOptimiser` and `MeanRisk` contain myriad properties that we will not showcase in this example.
 =#
 
 mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
@@ -96,7 +96,7 @@ The field `retcode` informs us that our optimisation was successful because it c
 res = optimise(mr, rd)
 
 #=
-Lets view the solution results as a pretty table. For convenience, we have ensured all `AbstractResult` have a property called `w`, which directly accesses `sol.w`. The optimisations don't shuffle the asset order, so we can simply view the asset names and weights side by side.
+Let's view the solution results as a pretty table. For convenience, we have ensured all `AbstractResult` have a property called `w`, which directly accesses `sol.w`. The optimisations don't shuffle the asset order, so we can simply view the asset names and weights side by side.
 =#
 
 pretty_table(DataFrame(:assets => rd.nx, :weights => res.w); formatters = resfmt)
@@ -117,7 +117,7 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 da = DiscreteAllocation(; slv = mip_slv)
 
 #=
-Luckily, we have the optimal weights, the latest prices are the last entry of our original time array `X`, and lets say we have `4206.9` USD to invest.
+Luckily, we have the optimal weights, the latest prices are the last entry of our original time array `X`, and let's say we have `4206.9` USD to invest.
 
 The function can optionally take extra positional arguments to account for a variety of fees, but we will not use them here.
 =#
@@ -127,7 +127,7 @@ mip_res = optimise(da, res.w, vec(values(X[end])), 4206.9)
 #=
 The result of this optimisation contains different pieces of information to the previous one. The reason various fields are prefixed by `l_`or `s_` is because the discrete allocation method splits the assets into long and short positions, which are recombined in the final result.
 
-Lets see the results in another pretty table.
+Let's see the results in another pretty table.
 =#
 
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,

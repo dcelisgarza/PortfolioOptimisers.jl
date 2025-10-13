@@ -151,7 +151,7 @@ df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cos
 pretty_table(df; formatters = fmt2)
 ````
 
-Finally, lets plot some results.
+Finally, let's plot some results.
 
 ````@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.

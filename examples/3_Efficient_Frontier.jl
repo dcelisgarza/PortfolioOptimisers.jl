@@ -59,7 +59,7 @@ r = ConditionalValueatRisk()
 pr = prior(EmpiricalPrior(), rd)
 
 #=
-Lets create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
+Let's create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
 =#
 
 opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
@@ -72,7 +72,7 @@ mr = MeanRisk(; opt = opt, r = r)
 res1 = optimise(mr)
 
 #=
-Note that `retcode` and `sol` are now vectors. This is because there is one per point in the frontier. Since we didn't get any warnings that any optimisations failed we can proceed without checking the return codes. Regardless, lets check that all optimisations succeeded.
+Note that `retcode` and `sol` are now vectors. This is because there is one per point in the frontier. Since we didn't get any warnings that any optimisations failed we can proceed without checking the return codes. Regardless, let's check that all optimisations succeeded.
 =#
 
 all(x -> isa(x, OptimisationSuccess), res1.retcode)
