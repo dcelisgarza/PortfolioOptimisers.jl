@@ -1,7 +1,5 @@
 """
-```julia
-abstract type DBHTRootMethod <: AbstractAlgorithm end
-```
+    abstract type DBHTRootMethod <: AbstractAlgorithm end
 
 Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in PortfolioOptimisers.jl.
 
@@ -13,9 +11,7 @@ Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection me
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
-```julia
-struct UniqueRoot <: DBHTRootMethod end
-```
+    struct UniqueRoot <: DBHTRootMethod end
 
 A DBHT root selection method that enforces a unique root in the hierarchy.
 
@@ -27,9 +23,7 @@ A DBHT root selection method that enforces a unique root in the hierarchy.
 """
 struct UniqueRoot <: DBHTRootMethod end
 """
-```julia
-struct EqualRoot <: DBHTRootMethod end
-```
+    struct EqualRoot <: DBHTRootMethod end
 
 A DBHT root selection method that creates a root from the adjacency tree of all root candidates. This can be used to represent multiple equally plausible roots in the DBHT hierarchy.
 
@@ -41,9 +35,7 @@ A DBHT root selection method that creates a root from the adjacency tree of all 
 """
 struct EqualRoot <: DBHTRootMethod end
 """
-```julia
-abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all similarity matrix algorithms used in the creation of Planar Maximally Filtered Graph (PMFG) used in [`DBHT`](@ref) and [`LoGo`](@ref) methods.
 
@@ -57,9 +49,7 @@ Abstract supertype for all similarity matrix algorithms used in the creation of 
 """
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 """
-```julia
-struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
-```
+    struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
 
 Similarity matrix algorithm using the maximum distance transformation.
 
@@ -80,9 +70,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
 """
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
-```julia
-struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
-```
+    struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
 
 Similarity matrix algorithm using the exponential transformation.
 
@@ -103,12 +91,10 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
 """
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
-```julia
-struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
-    coef::T1
-    power::T2
-end
-```
+    struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
+        coef::T1
+        power::T2
+    end
 
 Similarity matrix algorithm using a generalised exponential transformation.
 
@@ -127,9 +113,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale fa
 
 # Constructor
 
-```julia
-GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
-```
+    GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
 
 Keyword arguments correspond to the fields above.
 
@@ -167,9 +151,7 @@ function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
     return GeneralExponentialSimilarity(coef, power)
 end
 """
-```julia
-dbht_similarity(se::AbstractSimilarityMatrixAlgorithm; D::AbstractMatrix, kwargs...)
-```
+    dbht_similarity(se::AbstractSimilarityMatrixAlgorithm; D::AbstractMatrix, kwargs...)
 
 Compute a similarity matrix from a distance matrix using the specified similarity algorithm.
 
@@ -209,12 +191,10 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::AbstractMatrix, kw
     return exp.(-coef * D .^ power)
 end
 """
-```julia
-struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
-    sim::T1
-    root::T2
-end
-```
+    struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
+        sim::T1
+        root::T2
+    end
 
 Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
@@ -227,10 +207,8 @@ Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
 # Constructor
 
-```julia
-DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-     root::DBHTRootMethod = UniqueRoot())
-```
+    DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+         root::DBHTRootMethod = UniqueRoot())
 
 Keyword arguments correspond to the fields above.
 
@@ -266,9 +244,7 @@ function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilari
     return DBHT(sim, root)
 end
 """
-```julia
-PMFG_T2s(W::AbstractMatrix{<:Real}; nargout::Integer = 3)
-```
+    PMFG_T2s(W::AbstractMatrix{<:Real}; nargout::Integer = 3)
 
 Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate a Maximal Planar Graph with the largest total weight, also known as the Planar Maximally Filtered Graph (PMFG). All weights must be non-negative.
 
@@ -406,9 +382,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     return A, tri, clique3, cliques, cliqueTree
 end
 """
-```julia
-distance_wei(L::AbstractMatrix{<:Real})
-```
+    distance_wei(L::AbstractMatrix{<:Real})
 
 Compute the shortest weighted path lengths between all node pairs in a network.
 
@@ -486,9 +460,7 @@ function distance_wei(L::AbstractMatrix{<:Real})
     return D, B
 end
 """
-```julia
-clique3(A::AbstractMatrix{<:Real})
-```
+    clique3(A::AbstractMatrix{<:Real})
 
 Computes the list of 3-cliques in a Maximal Planar Graph (MPG).
 
@@ -563,9 +535,7 @@ function clique3(A::AbstractMatrix{<:Real})
     return K3, E, clique
 end
 """
-```julia
-breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
-```
+    breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
 
 Breadth-first search.
 
@@ -638,9 +608,7 @@ function breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
     return distance, branch
 end
 """
-```julia
-FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
-```
+    FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
 
 Finds disjointed cliques in an adjacency matrix.
 
@@ -695,9 +663,7 @@ function FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
     return T, IndxNot
 end
 """
-```julia
-BuildHierarchy(M::AbstractMatrix{<:Real})
-```
+    BuildHierarchy(M::AbstractMatrix{<:Real})
 
 Builds the predicted parent hierarchy for 3-cliques in a Maximal Planar Graph (MPG).
 
@@ -744,10 +710,8 @@ function BuildHierarchy(M::AbstractMatrix{<:Real})
     return Pred
 end
 """
-```julia
-AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
-        CliqRoot::AbstractVector{<:Real})
-```
+    AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
+            CliqRoot::AbstractVector{<:Real})
 
 Find adjacent cliques to the root candidates in a Maximal Planar Graph (MPG).
 
@@ -794,9 +758,7 @@ function AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
     return Adj
 end
 """
-```julia
-BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real})
-```
+    BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real})
 
 Build the bubble hierarchy from the clique hierarchy and separating set information.
 
@@ -871,9 +833,7 @@ function BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real
     return H, Mb
 end
 """
-```julia
-CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer, args...)
-```
+    CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer, args...)
 
 Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Graph (MPG) using the unique root selection method.
 
@@ -920,10 +880,8 @@ function CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc
     return H = H + transpose(H)
 end
 """
-```julia
-CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer,
-           A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
-```
+    CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer,
+               A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
 
 Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Graph (MPG) using the equal root selection method.
 
@@ -976,9 +934,7 @@ function CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc:
     end
 end
 """
-```julia
-CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real}; root::DBHTRootMethod = UniqueRoot())
-```
+    CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real}; root::DBHTRootMethod = UniqueRoot())
 
 Construct the clique and bubble hierarchy trees for a Maximal Planar Graph (MPG) using the DBHT (Direct Bubble Hierarchical Tree) approach.
 
@@ -1054,11 +1010,9 @@ function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
     return H, H2, Mb, CliqList, Sb
 end
 """
-```julia
-DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
-         Mb::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
-         CliqList::AbstractMatrix{<:Real})
-```
+    DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
+             Mb::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
+             CliqList::AbstractMatrix{<:Real})
 
 Compute the directed bubble hierarchy tree (DBHT) for a Maximal Planar Graph (MPG).
 
@@ -1139,11 +1093,9 @@ function DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
     return Hc, Sep
 end
 """
-```julia
-BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
-                Hb::AbstractMatrix{<:Real}, Mb::AbstractMatrix{<:Real},
-                Mv::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
-```
+    BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
+                    Hb::AbstractMatrix{<:Real}, Mb::AbstractMatrix{<:Real},
+                    Mv::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
 
 Obtain non-discrete and discrete clusterings from the bubble topology of the Planar Maximally Filtered Graph (PMFG).
 
@@ -1233,10 +1185,8 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
     return Adjv, Tc
 end
 """
-```julia
-BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
-             Mc::AbstractMatrix{<:Real})
-```
+    BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
+                 Mc::AbstractMatrix{<:Real})
 
 Assign each vertex to a specific bubble in the bubble hierarchy.
 
@@ -1285,11 +1235,9 @@ function BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
     return Mvv
 end
 """
-```julia
-DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
-                LabelVec2::AbstractVector{<:Real},
-                LinkageDist::Union{<:Real, <:AbstractVector{<:Real}})
-```
+    DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
+                    LabelVec2::AbstractVector{<:Real},
+                    LinkageDist::Union{<:Real, <:AbstractVector{<:Real}})
 
 Construct the linkage matrix by continually adding rows to the matrix.
 
@@ -1325,9 +1273,7 @@ function DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<
     return Z
 end
 """
-```julia
-LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:Real})
-```
+    LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:Real})
 
 Find the pair of clusters with the best linkage in a bubble.
 
@@ -1523,9 +1469,7 @@ function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<
     return Z
 end
 """
-```julia
-turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
-```
+    turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
 
 Convert a Matlab-style linkage matrix to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
 
@@ -1590,10 +1534,8 @@ function turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
     return Z
 end
 """
-```julia
-DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
-      root::DBHTRootMethod = UniqueRoot())
-```
+    DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
+          root::DBHTRootMethod = UniqueRoot())
 
 Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering algorithm [DBHTs](@cite). This version uses a graph-theoretic filtering technique called Triangulated Maximally Filtered Graph (TMFG).
 
@@ -1686,9 +1628,7 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
     return T8, Rpm, Adjv, Dpm, Mv, Z, Z_hclust
 end
 """
-```julia
-jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMatrix, sign::Integer)
-```
+    jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMatrix, sign::Integer)
 
 Efficiently accumulate contributions to the sparse inverse covariance matrix for LoGo/DBHT.
 
@@ -1748,9 +1688,7 @@ function jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMa
     return nothing
 end
 """
-```julia
-J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::AbstractMatrix)
-```
+    J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::AbstractMatrix)
 
 Compute the sparse inverse covariance matrix using the LoGo (Local-Global) algorithm [J_LoGo](@cite).
 
@@ -1785,14 +1723,12 @@ function J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::Abst
     return jlogo
 end
 """
-```julia
-struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
-    clustering::T1
-    S::T2
-    D::T3
-    k::T4
-end
-```
+    struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+        clustering::T1
+        S::T2
+        D::T3
+        k::T4
+    end
 
 Result type for Direct Bubble Hierarchical Tree (DBHT) clustering.
 
@@ -1807,10 +1743,8 @@ Result type for Direct Bubble Hierarchical Tree (DBHT) clustering.
 
 # Constructor
 
-```julia
-DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix, D::AbstractMatrix,
-               k::Integer)
-```
+    DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix, D::AbstractMatrix,
+                   k::Integer)
 
 Keyword arguments correspond to the fields above.
 
@@ -1844,10 +1778,8 @@ function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
     return DBHTClustering(clustering, S, D, k)
 end
 """
-```julia
-clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::AbstractMatrix{<:Real};
-           branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
-```
+    clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::AbstractMatrix{<:Real};
+               branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
 
 Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `ClusteringEstimator` configured with a `DBHT` algorithm.
 
@@ -1894,9 +1826,7 @@ function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
 """
-```julia
-abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
-```
+    abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 
 Abstract supertype for all inverse matrix sparsification algorithms in PortfolioOptimisers.jl.
 
@@ -1907,12 +1837,10 @@ Abstract supertype for all inverse matrix sparsification algorithms in Portfolio
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 """
-```julia
-struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
-    dist::T1
-    sim::T2
-end
-```
+    struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
+        dist::T1
+        sim::T2
+    end
 
 LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
@@ -1925,16 +1853,14 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
 # Constructor
 
-```julia
-LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-     sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
-```
+    LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+         sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
 
 Keyword arguments correspond to the fields above.
 
 # Examples
 
-```julia
+```jldoctest
 julia> LoGo()
 LoGo
   dist | Distance
@@ -1963,9 +1889,7 @@ function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDist
     return LoGo(dist, sim)
 end
 """
-```julia
-LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::AbstractMatrix, X::AbstractMatrix)
-```
+    LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::AbstractMatrix, X::AbstractMatrix)
 
 Validate compatibility of the distance estimator and covariance matrix for LoGo sparse inverse covariance estimation by checking `size(sigma, 1) == size(X, 2)`.
 
@@ -1993,9 +1917,7 @@ function LoGo_dist_assert(::Union{<:Distance{<:Any, <:VariationInfoDistance},
     return nothing
 end
 """
-```julia
-LoGo_dist_assert(args...)
-```
+    LoGo_dist_assert(args...)
 
 No-op fallback for other distance estimators.
 
@@ -2007,10 +1929,8 @@ function LoGo_dist_assert(args...)
     return nothing
 end
 """
-```julia
-logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix, X::AbstractMatrix;
-      dims::Int = 1, kwargs...)
-```
+    logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix, X::AbstractMatrix;
+          dims::Int = 1, kwargs...)
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
 
@@ -2073,10 +1993,8 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
     return nothing
 end
 """
-```julia
-matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
-                             X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
+                                 X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
 

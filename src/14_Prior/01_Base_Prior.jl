@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractPriorEstimator <: AbstractEstimator end
-```
+    abstract type AbstractPriorEstimator <: AbstractEstimator end
 
 Abstract supertype for all prior estimators.
 
@@ -15,9 +13,7 @@ Abstract supertype for all prior estimators.
 """
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 """
-```julia
-abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
-```
+    abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
 
 Abstract supertype for low order prior estimators.
 
@@ -32,9 +28,7 @@ Abstract supertype for low order prior estimators.
 """
 abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
 """
-```julia
-abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
-```
+    abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
 
 Low order prior estimator using only asset returns.
 
@@ -48,9 +42,7 @@ Low order prior estimator using only asset returns.
 """
 abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
 """
-```julia
-abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
-```
+    abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
 
 Low order prior estimator using factor returns.
 
@@ -64,9 +56,7 @@ Low order prior estimator using factor returns.
 """
 abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
 """
-```julia
-abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
-```
+    abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
 
 Low order prior estimator using both asset and factor returns.
 
@@ -80,10 +70,8 @@ Low order prior estimator using both asset and factor returns.
 """
 abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
 """
-```julia
-const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                  AbstractLowOrderPriorEstimator_AF}
-```
+    const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                      AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only and asset-and-factor low order prior estimators.
 
@@ -99,10 +87,9 @@ Union type for asset-only and asset-and-factor low order prior estimators.
 const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
                                                   AbstractLowOrderPriorEstimator_AF}
 """
-```julia
-const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
+    const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
+
                                                   AbstractLowOrderPriorEstimator_AF}
-```
 
 Union type for factor-only and asset-and-factor low order prior estimators.
 
@@ -118,11 +105,9 @@ Union type for factor-only and asset-and-factor low order prior estimators.
 const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
                                                   AbstractLowOrderPriorEstimator_AF}
 """
-```julia
-const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                    AbstractLowOrderPriorEstimator_F,
-                                                    AbstractLowOrderPriorEstimator_AF}
-```
+    const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                        AbstractLowOrderPriorEstimator_F,
+                                                        AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only, factor-only, and asset-and-factor low order prior estimators.
 
@@ -140,9 +125,7 @@ const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimat
                                                     AbstractLowOrderPriorEstimator_F,
                                                     AbstractLowOrderPriorEstimator_AF}
 """
-```julia
-abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
-```
+    abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 
 Abstract supertype for high order prior estimators.
 
@@ -156,9 +139,7 @@ Abstract supertype for high order prior estimators.
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 """
-```julia
-abstract type AbstractPriorResult <: AbstractResult end
-```
+    abstract type AbstractPriorResult <: AbstractResult end
 
 Abstract supertype for all prior result types.
 
@@ -172,9 +153,7 @@ Abstract supertype for all prior result types.
 """
 abstract type AbstractPriorResult <: AbstractResult end
 """
-```julia
-prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
-```
+    prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 
 Compute prior information from asset and/or factor returns using a prior estimator.
 
@@ -200,9 +179,7 @@ function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     return prior(pr, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
-```julia
-prior(pr::AbstractPriorResult, args...; kwargs...)
-```
+    prior(pr::AbstractPriorResult, args...; kwargs...)
 
 Propagate or pass through prior result objects.
 
@@ -230,9 +207,7 @@ function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end
 """
-```julia
-clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
-```
+    clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
 
@@ -258,11 +233,9 @@ function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-```julia
-phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
-                              <:AbstractClusteringResult}, pr::AbstractPriorResult;
-                 kwargs...)
-```
+    phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
+                                  <:AbstractClusteringResult}, pr::AbstractPriorResult;
+                     kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
 
@@ -292,9 +265,7 @@ function phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator,
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """
-```julia
-centrality_vector(necte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
-```
+    centrality_vector(necte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a centrality estimator and prior result.
 
@@ -320,11 +291,9 @@ function centrality_vector(necte::CentralityEstimator, pr::AbstractPriorResult; 
     return centrality_vector(necte, pr.X; kwargs...)
 end
 """
-```julia
-centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
-                            <:AbstractClusteringResult}, cent::AbstractCentralityAlgorithm,
-                  pr::AbstractPriorResult; kwargs...)
-```
+    centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
+                                <:AbstractClusteringResult}, cent::AbstractCentralityAlgorithm,
+                      pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
 
@@ -356,11 +325,9 @@ function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end
 """
-```julia
-average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
-                   cent::AbstractCentralityAlgorithm, w::AbstractVector,
-                   pr::AbstractPriorResult; kwargs...)
-```
+    average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
+                       cent::AbstractCentralityAlgorithm, w::AbstractVector,
+                       pr::AbstractPriorResult; kwargs...)
 
 Compute the weighted average centrality for a network or phylogeny result.
 
@@ -392,10 +359,8 @@ function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
     return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
 """
-```julia
-average_centrality(cte::CentralityEstimator, w::AbstractVector, pr::AbstractPriorResult;
-                   kwargs...)
-```
+    average_centrality(cte::CentralityEstimator, w::AbstractVector, pr::AbstractPriorResult;
+                       kwargs...)
 
 Compute the weighted average centrality for a centrality estimator.
 
@@ -423,23 +388,21 @@ function average_centrality(cte::CentralityEstimator, w::AbstractVector,
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
 end
 """
-```julia
-struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
-       AbstractPriorResult
-    X::T1
-    mu::T2
-    sigma::T3
-    chol::T4
-    w::T5
-    ens::T6
-    kld::T7
-    ow::T8
-    rr::T9
-    f_mu::T10
-    f_sigma::T11
-    f_w::T12
-end
-```
+    struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
+           AbstractPriorResult
+        X::T1
+        mu::T2
+        sigma::T3
+        chol::T4
+        w::T5
+        ens::T6
+        kld::T7
+        ow::T8
+        rr::T9
+        f_mu::T10
+        f_sigma::T11
+        f_w::T12
+    end
 
 Container type for low order prior results in PortfolioOptimisers.jl.
 
@@ -462,18 +425,16 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-```julia
-LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-              chol::Union{Nothing, <:AbstractMatrix} = nothing,
-              w::Union{Nothing, <:AbstractWeights} = nothing,
-              ens::Union{Nothing, <:Real} = nothing,
-              kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-              ow::Union{Nothing, <:AbstractVector} = nothing,
-              rr::Union{Nothing, <:Regression} = nothing,
-              f_mu::Union{Nothing, <:AbstractVector} = nothing,
-              f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-              f_w::Union{Nothing, <:AbstractVector} = nothing)
-```
+    LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
+                  chol::Union{Nothing, <:AbstractMatrix} = nothing,
+                  w::Union{Nothing, <:AbstractWeights} = nothing,
+                  ens::Union{Nothing, <:Real} = nothing,
+                  kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                  ow::Union{Nothing, <:AbstractVector} = nothing,
+                  rr::Union{Nothing, <:Regression} = nothing,
+                  f_mu::Union{Nothing, <:AbstractVector} = nothing,
+                  f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+                  f_w::Union{Nothing, <:AbstractVector} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -597,17 +558,15 @@ function prior_view(pr::LowOrderPrior, i::AbstractVector)
                          f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
 """
-```julia
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
-    pr::T1
-    kt::T2
-    L2::T3
-    S2::T4
-    sk::T5
-    V::T6
-    skmp::T7
-end
-```
+    struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
+        pr::T1
+        kt::T2
+        L2::T3
+        S2::T4
+        sk::T5
+        V::T6
+        skmp::T7
+    end
 
 Container type for high order prior results in PortfolioOptimisers.jl.
 
@@ -625,14 +584,12 @@ Container type for high order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-```julia
-HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix} = nothing,
-               L2::Union{Nothing, <:AbstractMatrix} = nothing,
-               S2::Union{Nothing, <:AbstractMatrix} = nothing,
-               sk::Union{Nothing, <:AbstractMatrix} = nothing,
-               V::Union{Nothing, <:AbstractMatrix} = nothing,
-               skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
-```
+    HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix} = nothing,
+                   L2::Union{Nothing, <:AbstractMatrix} = nothing,
+                   S2::Union{Nothing, <:AbstractMatrix} = nothing,
+                   sk::Union{Nothing, <:AbstractMatrix} = nothing,
+                   V::Union{Nothing, <:AbstractMatrix} = nothing,
+                   skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
 
 Keyword arguments correspond to the fields above.
 

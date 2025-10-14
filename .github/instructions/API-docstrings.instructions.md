@@ -15,7 +15,7 @@ applyTo: '**'
   - Use present tense verbs (is, open) instead of past tense (was, opened).
   - Write factual statements and direct commands. Avoid hypotheticals like "could" or "would".
   - Use active voice where the subject performs the action.
-  - Write in second person (you) to speak directly to readers.
+  - Write in third person (one, the user) to keep statements consistent.
 
 ## Markdown Guidelines
 

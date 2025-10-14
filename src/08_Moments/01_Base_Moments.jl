@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
-```
+    abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 
 Abstract supertype for all expected returns estimator types in PortfolioOptimisers.jl.
 
@@ -14,9 +12,7 @@ All concrete types that implement expected returns estimation (e.g., sample mean
 """
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
-```julia
-abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all expected returns algorithm types in PortfolioOptimisers.jl.
 
@@ -29,9 +25,7 @@ All concrete types that implement a specific algorithm for expected returns esti
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """
-```julia
-abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all moment algorithm types in PortfolioOptimisers.jl.
 
@@ -44,9 +38,7 @@ All concrete types that implement a specific algorithm for moment estimation (e.
 """
 abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
-```julia
-struct Full <: AbstractMomentAlgorithm end
-```
+    struct Full <: AbstractMomentAlgorithm end
 
 `Full` is used to indicate that all available data points are included in the moment estimation process.
 
@@ -57,9 +49,7 @@ struct Full <: AbstractMomentAlgorithm end
 """
 struct Full <: AbstractMomentAlgorithm end
 """
-```julia
-struct Semi <: AbstractMomentAlgorithm end
-```
+    struct Semi <: AbstractMomentAlgorithm end
 
 `Semi` is used for semi-moment estimators, where only observations below the mean (i.e., negative deviations) are considered.
 
@@ -70,10 +60,8 @@ struct Semi <: AbstractMomentAlgorithm end
 """
 struct Semi <: AbstractMomentAlgorithm end
 """
-```julia
-robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights];
-           dims::Int = 1, mean = nothing, kwargs...)
-```
+    robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights];
+               dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
@@ -114,10 +102,8 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
     end
 end
 """
-```julia
-robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights];
-           dims::Int = 1, mean = nothing, kwargs...)
-```
+    robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights];
+               dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 

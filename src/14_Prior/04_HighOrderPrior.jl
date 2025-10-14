@@ -1,7 +1,5 @@
 """
-```julia
-block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
-```
+    block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
 
 Block vectorisation operator.
 
@@ -191,9 +189,7 @@ function summation_matrix(n::Int, diag::Bool = true)
 end
 # COV_EXCL_STOP
 """
-```julia
-dup_elim_sum_matrices(n::Int)
-```
+    dup_elim_sum_matrices(n::Int)
 
 Construct duplication, elimination, and summation matrices for symmetric matrix vectorisation.
 
@@ -330,13 +326,11 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     end
 end
 """
-```julia
-struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
-    pe::T1
-    kte::T2
-    ske::T3
-end
-```
+    struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
+        pe::T1
+        kte::T2
+        ske::T3
+    end
 
 High order prior estimator for asset returns.
 
@@ -350,13 +344,11 @@ High order prior estimator for asset returns.
 
 # Constructor
 
-```julia
-HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                        kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
-                                                                                alg = Full()),
-                        ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
-                                                                                alg = Full()))
-```
+    HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+                            kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
+                                                                                    alg = Full()),
+                            ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
+                                                                                    alg = Full()))
 
 Keyword arguments correspond to the fields above.
 

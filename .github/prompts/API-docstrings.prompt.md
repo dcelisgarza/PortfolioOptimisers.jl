@@ -23,10 +23,10 @@ Create Julia docstrings for the selected code.
 
   - If applicable, add a heading "# Constructors".
     
-      + List the keyword constructors.
+      + List the keyword constructors in codeblocks.
       + Include their types and default arguments.
       + Write how the arguments correspond to the fields.
-  - If applicable, add a heading "## Validation".
+  - If applicable, add a subheading "## Validation".
     
       + List the validation rules.
   - If applicable, add a heading "# Examples".
@@ -45,14 +45,14 @@ Create Julia docstrings for the selected code.
 
   - Add a heading "# Returns".
     
-      + Describe what the function or macro returns.
-      + In the return variable include its type.
+      + Describe what it returns.
+      + Include type information.
   - If applicable, add a heading "# Validation".
     
       + List the validation rules.
   - Add a heading "# Details".
     
-      + Provide a bullet point summary of the function or macro's behavior.
+      + Provide a bullet point summary of the behavior.
   - Add a heading "# Related" at the end of the docstring.
     
       + List related types, functions, macros, and packages.

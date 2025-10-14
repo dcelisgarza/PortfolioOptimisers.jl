@@ -1,7 +1,5 @@
 """
-```julia
-AbstractUncertaintySetEstimator
-```
+    abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 
 Abstract supertype for all uncertainty set estimators.
 
@@ -14,9 +12,7 @@ Uncertainty set estimators are used to construct sets that describe the plausibl
 """
 abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 """
-```julia
-AbstractUncertaintySetAlgorithm
-```
+    abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all uncertainty set algorithms.
 
@@ -29,9 +25,7 @@ Uncertainty set algorithms define the procedures for constructing uncertainty se
 """
 abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 """
-```julia
-AbstractUncertaintySetResult
-```
+    abstract type AbstractUncertaintySetResult <: AbstractResult end
 
 Abstract supertype for all uncertainty set results.
 
@@ -46,9 +40,7 @@ Uncertainty set results represent concrete, validated sets describing plausible 
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
 """
-```julia
-AbstractUncertaintyKAlgorithm
-```
+    abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all uncertainty set radius algorithms.
 
@@ -62,12 +54,10 @@ Uncertainty set radius algorithms define how the scaling parameter k is computed
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """
-```julia
-ucs(uc::Union{Nothing,
-              <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult},
-                      <:Union{Nothing, <:AbstractUncertaintySetResult}}}, args...;
-    kwargs...)
-```
+    ucs(uc::Union{Nothing,
+                  <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult},
+                          <:Union{Nothing, <:AbstractUncertaintySetResult}}}, args...;
+        kwargs...)
 
 No-op utility for uncertainty set arguments.
 
@@ -104,9 +94,7 @@ function ucs(uc::Union{Nothing,
     return uc
 end
 """
-```julia
-mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
-```
+    mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
 
 No-op utility for expected returns uncertainty set arguments.
 
@@ -138,9 +126,7 @@ function mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwa
     return uc
 end
 """
-```julia
-sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
-```
+    sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
 
 No-op utility for covariance uncertainty set arguments.
 
@@ -187,9 +173,7 @@ function ucs_view(risk_ucs::Union{Nothing, <:AbstractUncertaintySetEstimator}, :
     return risk_ucs
 end
 """
-```julia
-ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-```
+    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 
 Wrapper for expected returns and covariance uncertainty set estimators to work with [`ReturnsResult`](@ref).
 
@@ -271,9 +255,7 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwarg
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
-```julia
-struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
-```
+    struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 
 Concrete algorithm type for box uncertainty sets.
 
@@ -287,12 +269,10 @@ Concrete algorithm type for box uncertainty sets.
 """
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 """
-```julia
-struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
-    lb::T1
-    ub::T2
-end
-```
+    struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
+        lb::T1
+        ub::T2
+    end
 
 Concrete result type for box uncertainty sets.
 
@@ -305,9 +285,7 @@ Concrete result type for box uncertainty sets.
 
 # Constructor
 
-```julia
-BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
-```
+    BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
 
 Keyword arguments correspond to the fields above.
 
@@ -356,9 +334,9 @@ function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractMatrix, <:AbstractMatrix
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 """
-```julia
-NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
-```
+    struct NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
+        kwargs::T1
+    end
 
 Concrete algorithm type for normal uncertainty set radius.
 
@@ -370,9 +348,7 @@ Concrete algorithm type for normal uncertainty set radius.
 
 # Constructors
 
-```julia
-NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
-```
+    NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
 
 Keyword arguments correspond to the fields above.
 
@@ -400,9 +376,7 @@ function NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
     return NormalKUncertaintyAlgorithm(kwargs)
 end
 """
-```julia
-GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
-```
+    struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 
 Concrete algorithm type for general uncertainty set radius.
 
@@ -417,9 +391,7 @@ Concrete algorithm type for general uncertainty set radius.
 """
 struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
-```julia
-ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
-```
+    struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 
 Concrete algorithm type for chi-squared uncertainty set radius.
 
@@ -441,28 +413,146 @@ ChiSqKUncertaintyAlgorithm()
 """
 struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
+    k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix, sigma_X::AbstractMatrix)
+
+Compute the scaling parameter `k` for ellipse-type uncertainty sets using the normal distribution.
+
+This method calculates the scaling parameter based on the quantile of the distribution of the Mahalanobis distances of the data matrix `X` with respect to the covariance matrix `sigma_X`. Additional keyword arguments for quantile calculation are passed via the algorithm's `kwargs` field.
+
+# Arguments
+
+  - `km`: NormalKUncertaintyAlgorithm. Algorithm instance containing quantile calculation keyword arguments.
+  - `q`: Confidence level for the uncertainty set.
+  - `X`: Data matrix of portfolio statistics.
+  - `sigma_X`: Covariance matrix of the data.
+
+# Returns
+
+  - `k::Real`: Scaling parameter for the ellipse uncertainty set.
+
+# Details
+
+  - Computes Mahalanobis distances for each row of `X`.
+  - Calculates the quantile at `1 - q` using the provided keyword arguments.
+  - Returns the square root of the quantile value.
+
+# Related
+
+  - [`NormalKUncertaintyAlgorithm`](@ref)
+  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipseUncertaintySet`](@ref)
+  - [`k_ucs`](@ref)
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix,
                sigma_X::AbstractMatrix)
     k_mus = diag(X * (sigma_X \ transpose(X)))
     return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
+"""
+    k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
+
+Compute the scaling parameter `k` for ellipse-type uncertainty sets using a general formula.
+
+This method calculates the scaling parameter using the formula `sqrt((1 - q) / q)`, where `q` is the confidence level. It is intended for cases where a general, non-distribution-specific approach is required.
+
+# Arguments
+
+  - `q`: Confidence level for the uncertainty set.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `k::Real`: Scaling parameter for the ellipse uncertainty set.
+
+# Details
+
+  - Computes the scaling parameter using a simple formula.
+  - Does not depend on the data or distribution.
+  - Useful for general-purpose uncertainty set construction.
+
+# Related
+
+  - [`GeneralKUncertaintyAlgorithm`](@ref)
+  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipseUncertaintySet`](@ref)
+  - [`k_ucs`](@ref)
+"""
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
     return sqrt((one(q) - q) / q)
 end
+"""
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
+
+Compute the scaling parameter `k` for ellipse-type uncertainty sets using the chi-squared distribution.
+
+This method calculates the scaling parameter based on the quantile of a chi-squared distribution, where the degrees of freedom are set to the number of assets (rows of `X`). Use this when you want the plausible region for portfolio statistics to be determined by the chi-squared quantile.
+
+# Arguments
+
+  - `q`: Confidence level for the uncertainty set.
+  - `X`: Data array of portfolio statistics.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `k::Real`: Scaling parameter for the ellipse uncertainty set.
+
+# Details
+
+  - Uses the chi-squared distribution with degrees of freedom equal to the number of assets.
+  - Computes the quantile at confidence level `q`.
+  - Returns the square root of the quantile value.
+
+# Related
+
+  - [`ChiSqKUncertaintyAlgorithm`](@ref)
+  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipseUncertaintySet`](@ref)
+  - [`k_ucs`](@ref)
+"""
 function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
+"""
+    k_ucs(type::Real, args...)
+
+Return a fixed scaling parameter `k` for ellipse-type uncertainty sets.
+
+This method allows the user to specify a constant value for the scaling parameter, bypassing any distribution-based or data-driven calculation.
+
+# Arguments
+
+  - `type`: The fixed scaling parameter value to use.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - The input `type`, unchanged.
+
+# Validation
+
+  - No validation is performed; the value is returned as-is.
+
+# Details
+
+  - Returns the provided value for `k` unchanged.
+  - Ignores any additional arguments.
+  - Useful for manual or custom uncertainty set construction.
+
+# Related
+
+  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipseUncertaintySet`](@ref)
+  - [`k_ucs`](@ref)
+"""
 function k_ucs(type::Real, args...)
     return type
 end
 """
-```julia
-struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
-    method::T1
-    diagonal::T2
-end
-```
+    struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
+        method::T1
+        diagonal::T2
+    end
 
 Concrete algorithm type for ellipse uncertainty sets.
 
@@ -475,9 +565,7 @@ Concrete algorithm type for ellipse uncertainty sets.
 
 # Constructor
 
-```julia
-EllipseUncertaintySetAlgorithm(; method = ChiSqKUncertaintyAlgorithm(), diagonal = true)
-```
+    EllipseUncertaintySetAlgorithm(; method = ChiSqKUncertaintyAlgorithm(), diagonal = true)
 
 Keyword arguments correspond to the fields above.
 

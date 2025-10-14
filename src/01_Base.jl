@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractEstimator end
-```
+    abstract type AbstractEstimator end
 
 Abstract supertype for all estimator types in PortfolioOptimisers.jl.
 
@@ -15,9 +13,7 @@ This enables a consistent interface for estimation routines throughout the packa
 """
 abstract type AbstractEstimator end
 """
-```julia
-abstract type AbstractAlgorithm end
-```
+    abstract type AbstractAlgorithm end
 
 Abstract supertype for all algorithm types in PortfolioOptimisers.jl.
 
@@ -31,9 +27,7 @@ This allows for flexible extension and dispatch of routines.
 """
 abstract type AbstractAlgorithm end
 """
-```julia
-abstract type AbstractResult end
-```
+    abstract type AbstractResult end
 
 Abstract supertype for all result types returned by optimizers in PortfolioOptimisers.jl.
 
@@ -47,9 +41,7 @@ This ensures a unified interface for accessing results across different estimato
 """
 abstract type AbstractResult end
 """
-```julia
-abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
-```
+    abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 
 Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
 
@@ -62,9 +54,7 @@ All concrete types that implement covariance estimation (e.g., sample covariance
 """
 abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 """
-```julia
-abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-```
+    abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 
 Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
 

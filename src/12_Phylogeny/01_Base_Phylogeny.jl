@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
-```
+    abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
 
 Abstract supertype for all phylogeny estimator types in PortfolioOptimisers.jl.
 
@@ -14,9 +12,7 @@ All concrete types implementing phylogeny-based estimation algorithms should sub
 """
 abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
 """
-```julia
-abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all phylogeny algorithm types in PortfolioOptimisers.jl.
 
@@ -29,9 +25,7 @@ All concrete types implementing specific phylogeny algorithms should subtype `Ab
 """
 abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
 """
-```julia
-abstract type AbstractPhylogenyResult <: AbstractResult end
-```
+    abstract type AbstractPhylogenyResult <: AbstractResult end
 
 Abstract supertype for all phylogeny result types in PortfolioOptimisers.jl.
 

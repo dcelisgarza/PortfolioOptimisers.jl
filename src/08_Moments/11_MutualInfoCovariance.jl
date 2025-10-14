@@ -1,11 +1,9 @@
 """
-```julia
-struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ve::T1
-    bins::T2
-    normalise::T3
-end
-```
+    struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+        ve::T1
+        bins::T2
+        normalise::T3
+    end
 
 Covariance estimator based on mutual information.
 
@@ -19,11 +17,9 @@ Covariance estimator based on mutual information.
 
 # Constructor
 
-```julia
-MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                     bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                     normalise::Bool = true)
-```
+    MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                         bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                         normalise::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -72,9 +68,7 @@ function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} 
                                 normalise = ce.normalise)
 end
 """
-```julia
-cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -110,9 +104,7 @@ function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int =
     return mutual_info(X, ce.bins, ce.normalise)
 end
 """
-```julia
-cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 

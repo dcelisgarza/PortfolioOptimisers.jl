@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractReturnsResult <: AbstractResult end
-```
+    abstract type AbstractReturnsResult <: AbstractResult end
 
 Abstract supertype for all returns result types in PortfolioOptimisers.jl.
 
@@ -48,9 +46,7 @@ function assert_nonneg_finite_val(::Nothing)
     return nothing
 end
 """
-```julia
-assert_matrix_issquare(A::AbstractMatrix)
-```
+    assert_matrix_issquare(A::AbstractMatrix)
 
 Assert that `A` is a square matrix.
 """
@@ -59,10 +55,8 @@ function assert_matrix_issquare(A::AbstractMatrix)
               DimensionMismatch("matrix is not square: dimensions are $(size(A))"))
 end
 """
-```julia
-brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
-                    asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
-```
+    brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
+                        asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
 """
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
@@ -114,9 +108,7 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
     return df
 end
 """
-```julia
-⊗(A::AbstractArray, B::AbstractArray)
-```
+    ⊗(A::AbstractArray, B::AbstractArray)
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
@@ -132,9 +124,7 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 
 """
-```julia
-⊙(A, B)
-```
+    ⊙(A, B)
 
 Elementwise multiplication.
 
@@ -166,9 +156,7 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 ⊙(A, B) = A * B
 
 """
-```julia
-⊘(A, B)
-```
+    ⊘(A, B)
 
 Elementwise division.
 
@@ -200,9 +188,7 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 ⊘(A, B) = A / B
 
 """
-```julia
-⊕(A, B)
-```
+    ⊕(A, B)
 
 Elementwise addition.
 
@@ -234,9 +220,7 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 ⊕(A, B) = A + B
 
 """
-```julia
-⊖(A, B)
-```
+    ⊖(A, B)
 
 Elementwise subtraction.
 
@@ -268,11 +252,9 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B) = A - B
 
 """
-```julia
-dot_scalar(a::Real, b::AbstractVector)
-dot_scalar(a::AbstractVector, b::Real)
-dot_scalar(a::AbstractVector, b::AbstractVector)
-```
+    dot_scalar(a::Real, b::AbstractVector)
+    dot_scalar(a::AbstractVector, b::Real)
+    dot_scalar(a::AbstractVector, b::AbstractVector)
 
 Efficient scalar and vector dot product utility.
 
@@ -312,9 +294,7 @@ function dot_scalar(a::AbstractVector, b::AbstractVector)
     return dot(a, b)
 end
 """
-```julia
-nothing_scalar_array_view(x, i)
-```
+    nothing_scalar_array_view(x, i)
 
 Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
 
@@ -368,9 +348,7 @@ function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
 end
 """
-```julia
-nothing_scalar_array_view_odd_order(x, i, j)
-```
+    nothing_scalar_array_view_odd_order(x, i, j)
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
 
@@ -403,10 +381,8 @@ function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
     return view(x, i, j)
 end
 """
-```julia
-nothing_scalar_array_getindex(x, i)
-nothing_scalar_array_getindex(x, i, j)
-```
+    nothing_scalar_array_getindex(x, i)
+    nothing_scalar_array_getindex(x, i, j)
 
 Utility for safely indexing into possibly `nothing`, scalar, vector, or array values.
 
@@ -461,9 +437,7 @@ function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
 """
-```julia
-fourth_moment_index_factory(N::Integer, i::AbstractVector)
-```
+    fourth_moment_index_factory(N::Integer, i::AbstractVector)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
@@ -495,9 +469,7 @@ function fourth_moment_index_factory(N::Integer, i)
     return idx
 end
 """
-```julia
-traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:AbstractVector} = nothing)
-```
+    traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:AbstractVector} = nothing)
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -512,7 +484,7 @@ An array containing all concrete struct types that are subtypes (direct or indir
 
 # Examples
 
-```julia
+```jldoctest
 julia> abstract type MyAbstract end
 
 julia> struct MyConcrete1 <: MyAbstract end
@@ -540,9 +512,7 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} =
     return ctarr
 end
 """
-```julia
-concrete_typed_array(A::AbstractArray)
-```
+    concrete_typed_array(A::AbstractArray)
 
 Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 

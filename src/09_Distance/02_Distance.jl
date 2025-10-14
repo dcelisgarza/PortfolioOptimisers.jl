@@ -1,10 +1,8 @@
 """
-```julia
-struct Distance{T1, T2} <: AbstractDistanceEstimator
-    power::T1
-    alg::T2
-end
-```
+    struct Distance{T1, T2} <: AbstractDistanceEstimator
+        power::T1
+        alg::T2
+    end
 
 If power is not `nothing`, computes the generalised distance estimator.
 
@@ -27,10 +25,8 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
 
 # Constructor
 
-```julia
-Distance(; power::Union{Nothing, <:Integer} = nothing,
-         alg::AbstractDistanceAlgorithm = SimpleDistance())
-```
+    Distance(; power::Union{Nothing, <:Integer} = nothing,
+             alg::AbstractDistanceAlgorithm = SimpleDistance())
 
 Keyword arguments correspond to the fields above.
 
@@ -73,12 +69,10 @@ function Distance(; power::Union{Nothing, <:Integer} = nothing,
     return Distance(power, alg)
 end
 """
-```julia
-distance(de::Distance{<:Any,
-                      <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
-                              <:CorrelationDistance, <:CanonicalDistance}},
-         ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    distance(de::Distance{<:Any,
+                          <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
+                                  <:CorrelationDistance, <:CanonicalDistance}},
+             ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 This method computes the correlation matrix using the provided covariance estimator `ce` and data matrix `X`, which is used to compute the distance matrix based on the specified distance algorithm in `de`.
 
@@ -167,12 +161,10 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
                     dims = dims, kwargs...)
 end
 """
-```julia
-distance(de::Distance{<:Any, <:LogDistance},
-         ce::Union{<:LTDCovariance,
-                   <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-         X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    distance(de::Distance{<:Any, <:LogDistance},
+             ce::Union{<:LTDCovariance,
+                       <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+             X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance estimator and data matrix.
 
@@ -209,10 +201,8 @@ function distance(de::Distance{<:Integer, <:LogDistance},
     return -log.(rho)
 end
 """
-```julia
-distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
-         dims::Int = 1, kwargs...)
-```
+    distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
+             dims::Int = 1, kwargs...)
 
 Compute the variation of information (VI) distance matrix from a data matrix.
 
@@ -259,12 +249,10 @@ function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any,
     return variation_info(X, de.alg.bins, de.alg.normalise) .^ de.power
 end
 """
-```julia
-distance(::Distance{<:Any,
-                    <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
-                            <:CorrelationDistance, <:CanonicalDistance}},
-         rho::AbstractMatrix, args...; kwargs...)
-```
+    distance(::Distance{<:Any,
+                        <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
+                                <:CorrelationDistance, <:CanonicalDistance}},
+             rho::AbstractMatrix, args...; kwargs...)
 
 Compute the distance matrix from a correlation or covariance matrix.
 
@@ -396,13 +384,11 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, rho::AbstractMatrix,
     return distance(Distance(; power = de.power, alg = SimpleDistance()), rho; kwargs...)
 end
 """
-```julia
-cor_and_dist(de::Distance{<:Any,
-                          <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
-                                  <:LogDistance, <:VariationInfoDistance,
-                                  <:CorrelationDistance}}, Nothing,
-             ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cor_and_dist(de::Distance{<:Any,
+                              <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
+                                      <:LogDistance, <:VariationInfoDistance,
+                                      <:CorrelationDistance}}, Nothing,
+                 ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute and return the correlation and distance matrices. The distance matrix depends on the combination of distance and covariance estimators (see [`distance`](@ref)).
 
@@ -552,15 +538,13 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                         dims = dims, kwargs...)
 end
 """
-```julia
-distance(de::Distance{<:Any, <:CanonicalDistance},
-         ce::Union{<:MutualInfoCovariance,
-                   <:PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
-                   <:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any},
-                   <:DistanceCovariance,
-                   <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
-         X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    distance(de::Distance{<:Any, <:CanonicalDistance},
+             ce::Union{<:MutualInfoCovariance,
+                       <:PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
+                       <:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any},
+                       <:DistanceCovariance,
+                       <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
+             X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the canonical distance matrix using the covariance estimator and data matrix. The method selects the appropriate distance algorithm based on the type of covariance estimator provided (see [`CanonicalDistance`](@ref)).
 
