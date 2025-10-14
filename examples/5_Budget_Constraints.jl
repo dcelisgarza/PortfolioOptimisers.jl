@@ -278,7 +278,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res6.w))")
 #=
 As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them a unbounded wiggle room without violating the constraints, and without directly constraining the short weights.
 
-In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value greater than or equal to the short budget constraint. 
+In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value is greater than or equal to the short budget constraint. 
 =#
 
 opt7 = JuMPOptimiser(; pe = pr, slv = slv,
