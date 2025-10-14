@@ -1,8 +1,13 @@
 # Base Uncertainty Sets
 
 ```@docs
+BoxUncertaintySetAlgorithm
 BoxUncertaintySet
 EllipseUncertaintySetAlgorithm
+EllipseUncertaintySet
+NormalKUncertaintyAlgorithm
+GeneralKUncertaintyAlgorithm
+ChiSqKUncertaintyAlgorithm
 ucs(uc::Union{Nothing,
                        <:Tuple{<:Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult},
                                <:Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult}}}, args...;
@@ -16,4 +21,5 @@ PortfolioOptimisers.AbstractUncertaintySetEstimator
 PortfolioOptimisers.AbstractUncertaintySetAlgorithm
 PortfolioOptimisers.AbstractUncertaintySetResult
 PortfolioOptimisers.AbstractUncertaintyKAlgorithm
+PortfolioOptimisers.k_ucs
 ```
