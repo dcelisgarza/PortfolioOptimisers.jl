@@ -484,13 +484,14 @@ An array containing all concrete struct types that are subtypes (direct or indir
 
 # Examples
 
-```jldoctest
-julia> let
-           abstract type MyAbstract end
-           struct MyConcrete1 <: MyAbstract end
-           struct MyConcrete2 <: MyAbstract end
-           display(traverse_concrete_subtypes(MyAbstract))
-       end
+```julia
+julia> abstract type MyAbstract end
+
+julia> struct MyConcrete1 <: MyAbstract end
+
+julia> struct MyConcrete2 <: MyAbstract end
+
+julia> display(traverse_concrete_subtypes(MyAbstract))
 2-element Vector{Any}:
  MyConcrete1
  MyConcrete2

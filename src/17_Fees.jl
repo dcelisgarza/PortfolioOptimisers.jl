@@ -121,12 +121,22 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 # Examples
 
 ```jldoctest
+julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+
 julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
                             l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                             fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
 
 julia> fees_constraints(fees, sets)
-
+Fees
+      tn | Turnover
+         |     w | Vector{Float64}: [0.2, 0.3, 0.5]
+         |   val | Vector{Float64}: [0.1, 0.0, 0.0]
+       l | Vector{Float64}: [0.001, 0.002, 0.0]
+       s | Vector{Float64}: [0.001, 0.002, 0.0]
+      fl | Vector{Float64}: [5.0, 0.0, 0.0]
+      fs | Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs | @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
 
 # Related
