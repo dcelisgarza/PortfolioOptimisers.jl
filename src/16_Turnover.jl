@@ -230,7 +230,7 @@ function turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
                                         <:AbstractVector{<:Union{<:TurnoverEstimator,
                                                                  <:Turnover}}},
                               sets::AssetSets; strict::Bool = false)
-    return turnover_constraints.(tn, Ref(sets); strict = strict)
+    return [turnover_constraints(_tn, sets; strict = strict) for _tn in tn]
 end
 function turnover_view(::Nothing, ::Any)
     return nothing
@@ -245,7 +245,7 @@ function turnover_view(tn::Turnover, i::AbstractVector)
     return Turnover(; w = w, val = val)
 end
 function turnover_view(tn::AbstractVector{<:Turnover}, i::AbstractVector)
-    return turnover_view.(tn, Ref(i))
+    return [turnover_view(_tn, i) for _tn in tn]
 end
 function factory(tn::Turnover, w::AbstractVector)
     return Turnover(; w = w, val = tn.val)

@@ -396,10 +396,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res1.w...), hcat(res2.w...))
         end
-        rks = expected_risk.(Ref(r), res1.w, Ref(pr))
+        rks = expected_risk.(r, res1.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res1.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res1.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -424,10 +424,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
-        rks = expected_risk.(Ref(r), res3.w, Ref(pr))
+        rks = expected_risk.(r, res3.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res3.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res3.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -440,10 +440,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
         end
-        rks = expected_risk.(Ref(r), res5.w, Ref(pr))
+        rks = expected_risk.(r, res5.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res5.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res5.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -458,10 +458,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
         end
-        rks = expected_risk.(Ref(r), res7.w, Ref(pr))
+        rks = expected_risk.(r, res7.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res7.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res7.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -500,10 +500,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res1.w...), hcat(res2.w...))
         end
-        rks = expected_risk.(Ref(r), res1.w, Ref(pr))
+        rks = expected_risk.(r, res1.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res1.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res1.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -534,10 +534,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
-        rks = expected_risk.(Ref(r), res3.w, Ref(pr))
+        rks = expected_risk.(r, res3.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res3.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res3.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -560,10 +560,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
         end
-        rks = expected_risk.(Ref(r), res5.w, Ref(pr))
+        rks = expected_risk.(r, res5.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res5.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res5.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -588,10 +588,10 @@
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
         end
-        rks = expected_risk.(Ref(r), res7.w, Ref(pr))
+        rks = expected_risk.(r, res7.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res7.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res7.w, pr)
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 

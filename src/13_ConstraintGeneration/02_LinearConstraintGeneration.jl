@@ -1330,8 +1330,8 @@ end
 function linear_constraints(lcs::AbstractVector{<:LinearConstraintEstimator},
                             sets::AssetSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false)
-    return linear_constraints.(lcs, Ref(sets); datatype = datatype, strict = strict,
-                               bl_flag = bl_flag)
+    return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
+                               bl_flag = bl_flag) for lc in lcs]
 end
 """
     struct RiskBudgetResult{T1} <: AbstractConstraintResult
@@ -1608,7 +1608,7 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
 end
 function risk_budget_constraints(rb::AbstractVector{<:RiskBudgetEstimator}, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
-    return risk_budget_constraints.(rb, Ref(sets); strict = strict)
+    return [risk_budget_constraints(_rb, sets; strict = strict) for _rb in rb]
 end
 """
     struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
@@ -1773,7 +1773,7 @@ Provides a uniform interface for processing multiple constraint estimators simul
 function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                                                         <:AssetSetsMatrixEstimator}},
                            sets::AssetSets)
-    return asset_sets_matrix.(smtx, Ref(sets))
+    return [asset_sets_matrix(_smtx, sets) for _smtx in smtx]
 end
 """
 """
@@ -1787,7 +1787,7 @@ end
 function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                                                              <:AssetSetsMatrixEstimator}},
                                 i::AbstractVector; kwargs...)
-    return asset_sets_matrix_view.(smtx, Ref(i); kwargs...)
+    return [asset_sets_matrix_view(_smtx, i; kwargs...) for _smtx in smtx]
 end
 
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,

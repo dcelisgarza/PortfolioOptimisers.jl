@@ -299,9 +299,10 @@ end
 Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
 
   - If `x` is `nothing`, returns `nothing`.
+
   - If `x` is a scalar, returns `x`.
   - If `x` is a vector, returns `view(x, i)`.
-  - If `x` is a vector of vectors, returns `view.(x, Ref(i))`.
+  - If `x` is a vector of vectors, returns `[view(_x, i) for _x in x]`.
   - If `x` is a matrix or higher array, returns `view(x, i, i)`.
 
 # Arguments
@@ -342,7 +343,7 @@ function nothing_scalar_array_view(x::AbstractVector, i)
     return view(x, i)
 end
 function nothing_scalar_array_view(x::AbstractVector{<:AbstractVector}, i)
-    return view.(x, Ref(i))
+    return [view(_x, i) for _x in x]
 end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)

@@ -121,7 +121,7 @@ end
 function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                   <:BuyInThresholdEstimator}},
                         i::AbstractVector)
-    return threshold_view.(t, Ref(i))
+    return [threshold_view(_t, i) for _t in t]
 end
 """
     threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
@@ -260,7 +260,7 @@ Provides a uniform interface for processing multiple constraint estimators simul
 function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
                                                          <:BuyInThreshold}},
                                sets::AssetSets; kwargs...)
-    return threshold_constraints.(t, Ref(sets); kwargs...)
+    return [threshold_constraints(_t, sets; kwargs...) for _t in t]
 end
 
 export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints
