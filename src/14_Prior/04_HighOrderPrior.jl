@@ -478,10 +478,9 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
         end
     end
     pr = prior(pe.pe, X, F; kwargs...)
-    (; X, mu) = pr
-    kt = cokurtosis(pe.kte, X; mean = transpose(mu), kwargs...)
+    kt = cokurtosis(pe.kte, pr.X; kwargs...)
     L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(length(mu))[2:3] : (nothing, nothing)
-    sk, V = coskewness(pe.ske, X; mean = transpose(mu), kwargs...)
+    sk, V = coskewness(pe.ske, pr.X; kwargs...)
     return HighOrderPrior(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
                           skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end
