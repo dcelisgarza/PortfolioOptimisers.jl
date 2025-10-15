@@ -392,7 +392,7 @@ struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
     k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix, sigma_X::AbstractMatrix)
     k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
-    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractMatrix, args...)
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
     k_ucs(type::Real, args...)
 
 Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio optimisation.
@@ -436,7 +436,7 @@ end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractMatrix, args...)
+function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
 function k_ucs(type::Real, args...)
