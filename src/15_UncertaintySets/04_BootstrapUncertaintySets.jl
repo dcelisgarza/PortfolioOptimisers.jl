@@ -1,8 +1,94 @@
+"""
+    abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
+
+Abstract type for estimators that construct uncertainty sets using bootstrap methods in portfolio optimisation.
+
+Subtypes implement specific bootstrap algorithms (e.g., stationary, circular, moving block) to estimate uncertainty sets for risk or prior statistics.
+
+# Related Types
+
+  - [`ARCHUncertaintySet`](@ref)
+"""
 abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
+"""
+    abstract type ARCHBootstrapSet <: AbstractAlgorithm end
+
+Abstract type for bootstrap algorithms used in constructing uncertainty sets for time series data in portfolio optimisation.
+
+Subtypes implement specific bootstrap methods using [`archpy`](https://pypi.org/project/arch/).
+
+# Related Types
+
+  - [`StationaryBootstrap`](@ref)
+  - [`CircularBootstrap`](@ref)
+  - [`MovingBootstrap`](@ref)
+"""
 abstract type ARCHBootstrapSet <: AbstractAlgorithm end
+"""
+    struct StationaryBootstrap <: ARCHBootstrapSet end
+
+Bootstrap algorithm for constructing uncertainty sets using a [stationary bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.StationaryBootstrap.html#arch.bootstrap.StationaryBootstrap) in time series data.
+
+# Related Types
+
+  - [`ARCHBootstrapSet`](@ref)
+  - [`CircularBootstrap`](@ref)
+  - [`MovingBootstrap`](@ref)
+"""
 struct StationaryBootstrap <: ARCHBootstrapSet end
+"""
+    struct CircularBootstrap <: ARCHBootstrapSet end
+
+Bootstrap algorithm for constructing uncertainty sets using a [circular bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.CircularBlockBootstrap.html#arch.bootstrap.CircularBlockBootstrap) in time series data.
+
+# Related Types
+
+  - [`ARCHBootstrapSet`](@ref)
+  - [`StationaryBootstrap`](@ref)
+  - [`MovingBootstrap`](@ref)
+"""
 struct CircularBootstrap <: ARCHBootstrapSet end
+"""
+    struct MovingBootstrap <: ARCHBootstrapSet end
+
+Bootstrap algorithm for constructing uncertainty sets using a [moving bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.MovingBlockBootstrap.html#arch.bootstrap.MovingBlockBootstrap) in time series data.
+
+# Related Types
+
+  - [`ARCHBootstrapSet`](@ref)
+  - [`StationaryBootstrap`](@ref)
+  - [`CircularBootstrap`](@ref)
+"""
 struct MovingBootstrap <: ARCHBootstrapSet end
+"""
+    bootstrap_func(alg::ARCHBootstrapSet, block_size, X, seed)
+
+Creates a bootstrap generator for time series data using the specified bootstrap algorithm.
+
+# Arguments
+
+  - `alg`: Bootstrap algorithm type.
+  - `block_size`: Size of blocks for resampling.
+  - `X`: Data matrix to be resampled.
+  - `seed`: Random seed for reproducibility.
+
+# Returns
+
+  - Returns a Python bootstrap generator object from the `arch.bootstrap` package.
+
+# Details
+
+  - Dispatches to the appropriate bootstrap algorithm based on `alg`.
+  - Uses Python's `arch.bootstrap` via `pyimport` for stationary, circular, or moving block bootstraps.
+  - The generator can be used to produce resampled datasets for uncertainty set estimation.
+
+# Related
+
+  - [`StationaryBootstrap`](@ref)
+  - [`CircularBootstrap`](@ref)
+  - [`MovingBootstrap`](@ref)
+  - [`ARCHBootstrapSet`](@ref)
+"""
 function bootstrap_func(::StationaryBootstrap, block_size, X, seed)
     return pyimport("arch.bootstrap").StationaryBootstrap(block_size, X; seed = seed)
 end
@@ -12,6 +98,86 @@ end
 function bootstrap_func(::MovingBootstrap, block_size, X, seed)
     return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
 end
+"""
+    struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
+        pe::T1
+        alg::T2
+        n_sim::T3
+        block_size::T4
+        q::T5
+        seed::T6
+        bootstrap::T7
+    end
+
+Estimator for box or ellipse uncertainty sets using bootstrap methods for time series data in portfolio optimisation.
+
+# Fields
+
+  - `pe`: Prior estimator used to compute mean and covariance statistics.
+  - `alg`: Uncertainty set algorithm (box or ellipse).
+  - `n_sim`: Number of bootstrap simulations for uncertainty set estimation.
+  - `block_size`: Size of blocks for bootstrap resampling.
+  - `q`: Quantile or confidence level for uncertainty set bounds.
+  - `seed`: Optional random seed for reproducibility.
+  - `bootstrap`: Bootstrap algorithm type (stationary, circular, moving).
+
+# Constructors
+
+    ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+                       alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
+                       n_sim::Integer = 3_000, block_size::Integer = 3, q::Real = 0.05,
+                       seed::Union{Nothing, <:Integer} = nothing,
+                       bootstrap::ARCHBootstrapSet = StationaryBootstrap())
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `n_sim > 0`.
+  - `block_size > 0`.
+  - `0 < q < 1`.
+
+# Examples
+
+```jldoctest
+julia> ARCHUncertaintySet()
+ARCHUncertaintySet
+          pe | EmpiricalPrior
+             |        ce | PortfolioOptimisersCovariance
+             |           |   ce | Covariance
+             |           |      |    me | SimpleExpectedReturns
+             |           |      |       |   w | nothing
+             |           |      |    ce | GeneralCovariance
+             |           |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+             |           |      |       |    w | nothing
+             |           |      |   alg | Full()
+             |           |   mp | DefaultMatrixProcessing
+             |           |      |       pdm | Posdef
+             |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+             |           |      |   denoise | nothing
+             |           |      |    detone | nothing
+             |           |      |       alg | nothing
+             |        me | SimpleExpectedReturns
+             |           |   w | nothing
+             |   horizon | nothing
+         alg | BoxUncertaintySetAlgorithm()
+       n_sim | Int64: 3000
+  block_size | Int64: 3
+           q | Float64: 0.05
+        seed | nothing
+   bootstrap | StationaryBootstrap()
+```
+
+# Related
+
+  - [`BootstrapUncertaintySetEstimator`](@ref)
+  - [`ARCHBootstrapSet`](@ref)
+  - [`StationaryBootstrap`](@ref)
+  - [`CircularBootstrap`](@ref)
+  - [`MovingBootstrap`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+  - [`EllipseUncertaintySet`](@ref)
+"""
 struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
     pe::T1
     alg::T2
