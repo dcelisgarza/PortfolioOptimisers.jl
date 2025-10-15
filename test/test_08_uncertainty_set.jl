@@ -82,15 +82,15 @@
                NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng, seed = 987654321,
                                     alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
                                                                          method = 10)),
-               ARCHUncertaintySet(; pe = EmpiricalPrior(),
+               ARCHUncertaintySet(;
                                   alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
                                                                        method = NormalKUncertaintyAlgorithm()),
                                   seed = 987654321, bootstrap = StationaryBootstrap()),
-               ARCHUncertaintySet(; pe = EmpiricalPrior(),
+               ARCHUncertaintySet(;
                                   alg = EllipseUncertaintySetAlgorithm(; diagonal = false,
                                                                        method = GeneralKUncertaintyAlgorithm()),
                                   seed = 987654321, bootstrap = MovingBootstrap()),
-               ARCHUncertaintySet(; pe = EmpiricalPrior(),
+               ARCHUncertaintySet(;
                                   alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
                                                                        method = ChiSqKUncertaintyAlgorithm()),
                                   seed = 987654321, bootstrap = CircularBootstrap())]
