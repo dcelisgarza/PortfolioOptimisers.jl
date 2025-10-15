@@ -33,8 +33,8 @@ Create Julia docstrings for the selected code.
     
       + Provide a short example as a jldoctest.
   - Add a heading "# Related" at the end of the docstring.
-    
-      + List related types, functions, macros, and packages.
+
+      + List related types, functions, macros, and packages with links.
 
 ## Functions and Macros
 
@@ -54,5 +54,5 @@ Create Julia docstrings for the selected code.
     
       + Provide a bullet point summary of the behavior.
   - Add a heading "# Related" at the end of the docstring.
-    
-      + List related types, functions, macros, and packages.
+
+      + List related types, functions, macros, and packages with links.

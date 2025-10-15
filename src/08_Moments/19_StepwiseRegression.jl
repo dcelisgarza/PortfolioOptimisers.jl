@@ -24,7 +24,9 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-    PValue
+julia> PValue()
+PValue
+  threshold | Float64: 0.05
 ```
 
 # Related
@@ -98,7 +100,9 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-    StepwiseRegression
+julia> StepwiseRegression()
+StepwiseRegression
+    crit | PValue
          |   threshold | Float64: 0.05
      alg | Forward()
   target | LinearModel

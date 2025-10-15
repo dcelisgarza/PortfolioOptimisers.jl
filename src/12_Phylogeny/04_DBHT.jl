@@ -1864,7 +1864,8 @@ Keyword arguments correspond to the fields above.
 julia> LoGo()
 LoGo
   dist | Distance
-       |   alg | CanonicalDistance()
+       |   power | nothing
+       |     alg | CanonicalDistance()
    sim | MaximumDistanceSimilarity()
 ```
 
