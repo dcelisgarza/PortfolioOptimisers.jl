@@ -777,7 +777,7 @@ function owa_l_moment_crm(T::Integer; k::Integer = 2,
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
     for i in rg
         wi = (-1)^i * owa_l_moment(T, i)
-        weights[:, i - 1] .= wi
+        weights[:, i - 1] = wi
     end
     return owa_l_moment_crm(method, weights)
 end

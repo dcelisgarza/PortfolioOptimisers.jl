@@ -809,7 +809,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
         end
     end
     h = sqrt.(diag(rho))
-    rho .= rho ⊘ (h * transpose(h))
+    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -1301,7 +1301,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
         end
     end
     h = sqrt.(diag(rho))
-    rho .= rho ⊘ (h * transpose(h))
+    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end

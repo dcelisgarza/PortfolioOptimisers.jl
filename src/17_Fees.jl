@@ -748,14 +748,14 @@ end
 function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] .= fees * w[idx] ⊙ p[idx]
+    fees_w[idx] = fees * w[idx] ⊙ p[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real},
                          op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] .= fees[idx] ⊙ w[idx] ⊙ p[idx]
+    fees_w[idx] = fees[idx] ⊙ w[idx] ⊙ p[idx]
     return fees_w
 end
 """
@@ -894,13 +894,13 @@ end
 function calc_asset_fees(w::AbstractVector, fees::Real, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    fees_w[idx] .= fees * w[idx]
+    fees_w[idx] = fees * w[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    fees_w[idx] .= fees[idx] ⊙ w[idx]
+    fees_w[idx] = fees[idx] ⊙ w[idx]
     return fees_w
 end
 """
@@ -998,7 +998,7 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::Real, kwargs::NamedTuple
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
-    fees_w[idx1] .= fees * idx2
+    fees_w[idx1] = fees * idx2
     return fees_w
 end
 function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
@@ -1006,7 +1006,7 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
-    fees_w[idx1] .= fees[idx1][idx2]
+    fees_w[idx1] = fees[idx1][idx2]
     return fees_w
 end
 """

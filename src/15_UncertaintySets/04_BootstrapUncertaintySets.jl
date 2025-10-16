@@ -278,7 +278,7 @@ function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwarg
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1, kwargs...)
-        mus[:, i] .= vec(mu)
+        mus[:, i] = vec(mu)
     end
     return mus
 end
@@ -314,7 +314,7 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kw
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = pyconvert(Array, data)[1][1]
-        sigmas[:, :, i] .= cov(ue.pe.ce, X; dims = 1, kwargs...)
+        sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
     end
     return sigmas
 end

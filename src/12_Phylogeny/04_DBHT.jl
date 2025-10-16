@@ -294,7 +294,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     s = sum(W ⊙ (W .> mean(W)); dims = 2)
     j = sortperm(vec(s); rev = true)
 
-    in_v[1:4] .= j[1:4]
+    in_v[1:4] = j[1:4]
     ou_v = sort!(setdiff(1:N, in_v))  # List of vertices not inserted yet
 
     # Build the tetrahedron with largest strength
@@ -311,10 +311,10 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
 
     # Build initial gain table
     gain = zeros(eltype(W), N, 2 * N - 4)
-    gain[ou_v, 1] .= sum(W[ou_v, tri[1, :]]; dims = 2)
-    gain[ou_v, 2] .= sum(W[ou_v, tri[2, :]]; dims = 2)
-    gain[ou_v, 3] .= sum(W[ou_v, tri[3, :]]; dims = 2)
-    gain[ou_v, 4] .= sum(W[ou_v, tri[4, :]]; dims = 2)
+    gain[ou_v, 1] = sum(W[ou_v, tri[1, :]]; dims = 2)
+    gain[ou_v, 2] = sum(W[ou_v, tri[2, :]]; dims = 2)
+    gain[ou_v, 3] = sum(W[ou_v, tri[3, :]]; dims = 2)
+    gain[ou_v, 4] = sum(W[ou_v, tri[4, :]]; dims = 2)
 
     kk = 4  # Number of triangles
     for k in 5:N
@@ -340,18 +340,18 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
         A[ve, tri[agm, :]] .= 1
 
         # Update 3-clique list
-        clique3[k - 4, :] .= tri[agm, :]
+        clique3[k - 4, :] = tri[agm, :]
 
         # Update triangle list replacing 1 and adding 2 triangles
-        tri[kk + 1, :] .= vcat(tri[agm, [1, 3]], ve) # add
-        tri[kk + 2, :] .= vcat(tri[agm, [2, 3]], ve) # add
-        tri[agm, :] .= vcat(tri[agm, [1, 2]], ve)     # replace
+        tri[kk + 1, :] = vcat(tri[agm, [1, 3]], ve) # add
+        tri[kk + 2, :] = vcat(tri[agm, [2, 3]], ve) # add
+        tri[agm, :] = vcat(tri[agm, [1, 2]], ve)     # replace
 
         # # Update gain table
         gain[ve, :] .= 0
-        gain[ou_v, agm] .= sum(W[ou_v, tri[agm, :]]; dims = 2)
-        gain[ou_v, kk + 1] .= sum(W[ou_v, tri[kk + 1, :]]; dims = 2)
-        gain[ou_v, kk + 2] .= sum(W[ou_v, tri[kk + 2, :]]; dims = 2)
+        gain[ou_v, agm] = sum(W[ou_v, tri[agm, :]]; dims = 2)
+        gain[ou_v, kk + 1] = sum(W[ou_v, tri[kk + 1, :]]; dims = 2)
+        gain[ou_v, kk + 2] = sum(W[ou_v, tri[kk + 2, :]]; dims = 2)
 
         # # Update number of triangles
         kk += 2
@@ -439,7 +439,7 @@ function distance_wei(L::AbstractMatrix{<:Real})
                 d, wi = findmin(vcat(vcat(transpose(D[u, T]),
                                           transpose(D[u, v] .+ L1[v, T]))); dims = 1)
                 wi = vec(getindex.(wi, 2))
-                D[u, T] .= vec(d)   # Smallest of old/new path lengths
+                D[u, T] = vec(d)   # Smallest of old/new path lengths
                 ind = T[wi .== 3]   # Indices of lengthened paths
                 B[u, ind] .= B[u, v] + 1    # Increment number of edges in lengthened paths
             end
@@ -1589,7 +1589,7 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
               DimensionMismatch("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))"))
     Rpm = PMFG_T2s(S)[1]
     Apm = copy(Rpm)
-    Apm[Apm .!= 0] .= D[Apm .!= 0]
+    Apm[Apm .!= 0] = D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]
 
     H1, Hb, Mb, CliqList, Sb = CliqHierarchyTree2s(Rpm, root)

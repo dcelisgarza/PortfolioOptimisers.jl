@@ -476,7 +476,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     end
     gaps = fill(typemin(eltype(dist)), c1)
     if c1 > 2
-        gaps[1:(end - 2)] .= W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+        gaps[1:(end - 2)] = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
     end
     return valid_k_clusters(clustering, gaps)
 end

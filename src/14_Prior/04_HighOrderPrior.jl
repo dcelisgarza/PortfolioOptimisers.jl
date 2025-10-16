@@ -52,9 +52,9 @@ function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
         Aj = Matrix{eltype(A)}(undef, m, p * q)
         for i in 0:(m - 1)
             Aij = vec(A[(1 + (i * p)):((i + 1) * p), (1 + (j * q)):((j + 1) * q)])
-            Aj[i + 1, :] .= Aij
+            Aj[i + 1, :] = Aij
         end
-        A_vec[(1 + (j * m)):((j + 1) * m), :] .= Aj
+        A_vec[(1 + (j * m)):((j + 1) * m), :] = Aj
     end
 
     return A_vec

@@ -348,7 +348,7 @@ function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::Abst
     sigma = vec(std(re.ve, F; mean = mu, dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)
-        rr[i, :] .= regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
+        rr[i, :] = regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
     end
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)

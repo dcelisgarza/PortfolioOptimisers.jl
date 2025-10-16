@@ -658,7 +658,7 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
             continue
         end
         idx = [findfirst(x -> x == i, features) + 1 for i in included]
-        rr[i, idx] .= params[2:end]
+        rr[i, idx] = params[2:end]
     end
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))
 end
