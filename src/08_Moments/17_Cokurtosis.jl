@@ -1,7 +1,5 @@
 """
-```julia
-abstract type CokurtosisEstimator <: AbstractEstimator end
-```
+    abstract type CokurtosisEstimator <: AbstractEstimator end
 
 Abstract supertype for all cokurtosis estimators in PortfolioOptimisers.jl.
 
@@ -14,13 +12,11 @@ All concrete types implementing cokurtosis estimation algorithms should subtype 
 """
 abstract type CokurtosisEstimator <: AbstractEstimator end
 """
-```julia
-struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
-    me::T1
-    mp::T2
-    alg::T3
-end
-```
+    struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
+        me::T1
+        mp::T2
+        alg::T3
+    end
 
 Container type for cokurtosis estimators.
 
@@ -34,11 +30,9 @@ Container type for cokurtosis estimators.
 
 # Constructor
 
-```julia
-Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-           mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-           alg::AbstractMomentAlgorithm = Full())
-```
+    Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+               alg::AbstractMomentAlgorithm = Full())
 
 Keyword arguments correspond to the fields above.
 
@@ -83,9 +77,7 @@ function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """
-```julia
-_cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
-```
+    _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
 
 Internal helper for cokurtosis computation.
 
@@ -115,10 +107,8 @@ function _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
     return ckurt
 end
 """
-```julia
-cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1,
-           mean = nothing, kwargs...)
-```
+    cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1,
+               mean = nothing, kwargs...)
 
 Compute the cokurtosis tensor for a dataset.
 

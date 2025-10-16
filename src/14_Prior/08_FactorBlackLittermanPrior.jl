@@ -1,22 +1,20 @@
 """
-```julia
-struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
-       AbstractLowOrderPriorEstimator_F
-    pe::T1
-    f_mp::T2
-    mp::T3
-    re::T4
-    ve::T5
-    views::T6
-    sets::T7
-    views_conf::T8
-    w::T9
-    rf::T10
-    l::T11
-    tau::T12
-    rsd::T13
-end
-```
+    struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
+           AbstractLowOrderPriorEstimator_F
+        pe::T1
+        f_mp::T2
+        mp::T3
+        re::T4
+        ve::T5
+        views::T6
+        sets::T7
+        views_conf::T8
+        w::T9
+        rf::T10
+        l::T11
+        tau::T12
+        rsd::T13
+    end
 
 Factor Black-Litterman prior estimator for asset returns.
 
@@ -40,19 +38,17 @@ Factor Black-Litterman prior estimator for asset returns.
 
 # Constructor
 
-```julia
-FactorBlackLittermanPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                          f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                          mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                          re::AbstractRegressionEstimator = StepwiseRegression(),
-                          ve::AbstractVarianceEstimator = SimpleVariance(),
-                          views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
-                          sets::Union{Nothing, <:AssetSets} = nothing,
-                          views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                          w::Union{Nothing, <:AbstractWeights} = nothing, rf::Real = 0.0,
-                          l::Union{Nothing, <:Real} = nothing,
-                          tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
-```
+    FactorBlackLittermanPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+                              f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                              re::AbstractRegressionEstimator = StepwiseRegression(),
+                              ve::AbstractVarianceEstimator = SimpleVariance(),
+                              views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
+                              sets::Union{Nothing, <:AssetSets} = nothing,
+                              views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
+                              w::Union{Nothing, <:AbstractWeights} = nothing, rf::Real = 0.0,
+                              l::Union{Nothing, <:Real} = nothing,
+                              tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -209,10 +205,8 @@ function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-```julia
-prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
-      strict::Bool = false, kwargs...)
-```
+    prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+          strict::Bool = false, kwargs...)
 
 Compute factor Black-Litterman prior moments for asset returns.
 

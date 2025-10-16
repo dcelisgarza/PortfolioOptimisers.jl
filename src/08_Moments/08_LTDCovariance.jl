@@ -1,11 +1,9 @@
 """
-```julia
-struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ve::T1
-    alpha::T2
-    threads::T3
-end
-```
+    struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+        ve::T1
+        alpha::T2
+        threads::T3
+    end
 
 Lower tail dependence covariance estimator.
 
@@ -19,10 +17,8 @@ Lower tail dependence covariance estimator.
 
 # Constructor
 
-```julia
-LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Real = 0.05,
-              threads::FLoops.Transducers.Executor = ThreadedEx())
-```
+    LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Real = 0.05,
+                  threads::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
 
@@ -70,10 +66,8 @@ function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothi
     return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
 end
 """
-```julia
-lower_tail_dependence(X::AbstractMatrix; alpha::Real = 0.05,
-                      threads::FLoops.Transducers.Executor = SequentialEx())
-```
+    lower_tail_dependence(X::AbstractMatrix; alpha::Real = 0.05,
+                          threads::FLoops.Transducers.Executor = SequentialEx())
 
 Compute the lower tail dependence matrix for a set of asset returns.
 
@@ -123,9 +117,7 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
     return rho
 end
 """
-```julia
-cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence correlation matrix using a [`LTDCovariance`](@ref) estimator.
 
@@ -159,9 +151,7 @@ function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
 """
-```julia
-cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence covariance matrix using a [`LTDCovariance`](@ref) estimator.
 

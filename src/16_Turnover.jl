@@ -1,11 +1,9 @@
 """
-```julia
-struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
-    w::T1
-    val::T2
-    default::T3
-end
-```
+    struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
+        w::T1
+        val::T2
+        default::T3
+    end
 
 Estimator for turnover portfolio constraints.
 
@@ -19,12 +17,10 @@ Estimator for turnover portfolio constraints.
 
 # Constructor
 
-```julia
-TurnoverEstimator(; w::AbstractVector{<:Real},
-                  val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                             <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                  default::Real = 0.0)
-```
+    TurnoverEstimator(; w::AbstractVector{<:Real},
+                      val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                 <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                      default::Real = 0.0)
 
 ## Validation
 
@@ -69,9 +65,7 @@ function TurnoverEstimator(; w::AbstractVector{<:Real},
     return TurnoverEstimator(w, val, default)
 end
 """
-```julia
-turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
-```
+    turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
 
 Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set.
 
@@ -117,12 +111,10 @@ function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bo
                     val = estimator_to_val(tn.val, sets, tn.default; strict = strict))
 end
 """
-```julia
-struct Turnover{T1, T2} <: AbstractResult
-    w::T1
-    val::T2
-end
-```
+    struct Turnover{T1, T2} <: AbstractResult
+        w::T1
+        val::T2
+    end
 
 Container for turnover portfolio constraints.
 
@@ -135,9 +127,7 @@ Container for turnover portfolio constraints.
 
 # Constructor
 
-```julia
-Turnover(; w::AbstractVector{<:Real}, val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
-```
+    Turnover(; w::AbstractVector{<:Real}, val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
 
 ## Validation
 
@@ -189,9 +179,7 @@ function Turnover(; w::AbstractVector{<:Real},
     return Turnover(w, val)
 end
 """
-```julia
-turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...)
-```
+    turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...)
 
 Propagate or pass through turnover portfolio constraints.
 
@@ -228,12 +216,10 @@ function turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...
     return tn
 end
 """
-```julia
-turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
-                               <:AbstractVector{<:Turnover},
-                               <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}},
-                     sets::AssetSets; strict::Bool = false)
-```
+    turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
+                                   <:AbstractVector{<:Turnover},
+                                   <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}},
+                         sets::AssetSets; strict::Bool = false)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
@@ -244,7 +230,7 @@ function turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
                                         <:AbstractVector{<:Union{<:TurnoverEstimator,
                                                                  <:Turnover}}},
                               sets::AssetSets; strict::Bool = false)
-    return turnover_constraints.(tn, Ref(sets); strict = strict)
+    return [turnover_constraints(_tn, sets; strict = strict) for _tn in tn]
 end
 function turnover_view(::Nothing, ::Any)
     return nothing
@@ -259,7 +245,7 @@ function turnover_view(tn::Turnover, i::AbstractVector)
     return Turnover(; w = w, val = val)
 end
 function turnover_view(tn::AbstractVector{<:Turnover}, i::AbstractVector)
-    return turnover_view.(tn, Ref(i))
+    return [turnover_view(_tn, i) for _tn in tn]
 end
 function factory(tn::Turnover, w::AbstractVector)
     return Turnover(; w = w, val = tn.val)

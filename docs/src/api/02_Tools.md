@@ -1,8 +1,6 @@
 # Tools
 
 ```@docs
-ReturnsResult
-prices_to_returns
 brinson_attribution
 traverse_concrete_subtypes
 PortfolioOptimisers.AbstractReturnsResult

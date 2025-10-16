@@ -1,7 +1,5 @@
 """
-```julia
-abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
-```
+    abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 
 Abstract supertype for all rank-based covariance estimators in PortfolioOptimisers.jl.
 
@@ -15,11 +13,9 @@ All concrete types implementing rank-based covariance estimation algorithms (suc
 """
 abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 """
-```julia
-struct KendallCovariance{T1} <: RankCovarianceEstimator
-    ve::T1
-end
-```
+    struct KendallCovariance{T1} <: RankCovarianceEstimator
+        ve::T1
+    end
 
 Robust covariance estimator based on Kendall's tau rank correlation.
 
@@ -31,9 +27,7 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
 # Constructor
 
-```julia
-KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
-```
+    KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
 
 Keyword arguments correspond to the fields above.
 
@@ -66,9 +60,7 @@ function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return KendallCovariance(ve)
 end
 """
-```julia
-cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the Kendall's tau rank correlation matrix using a [`KendallCovariance`](@ref) estimator.
 
@@ -102,9 +94,7 @@ function Statistics.cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, k
     return corkendall(X)
 end
 """
-```julia
-cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the Kendall's tau rank covariance matrix using a [`KendallCovariance`](@ref) estimator.
 
@@ -142,11 +132,9 @@ function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = n
     return KendallCovariance(; ve = factory(ce.ve, w))
 end
 """
-```julia
-struct SpearmanCovariance{T1} <: RankCovarianceEstimator
-    ve::T1
-end
-```
+    struct SpearmanCovariance{T1} <: RankCovarianceEstimator
+        ve::T1
+    end
 
 Robust covariance estimator based on Spearman's rho rank correlation.
 
@@ -158,9 +146,7 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
 # Constructor
 
-```julia
-SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
-```
+    SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
 
 Keyword arguments correspond to the fields above.
 
@@ -193,9 +179,7 @@ function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return SpearmanCovariance(ve)
 end
 """
-```julia
-cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the Spearman's rho rank correlation matrix using a [`SpearmanCovariance`](@ref) estimator.
 
@@ -229,9 +213,7 @@ function Statistics.cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, 
     return corspearman(X)
 end
 """
-```julia
-cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the Spearman's rho rank covariance matrix using a [`SpearmanCovariance`](@ref) estimator.
 

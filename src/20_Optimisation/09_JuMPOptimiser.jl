@@ -547,7 +547,7 @@ end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
     return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret, args...),
-                         NamedTuple{pnames}(getproperty.(Ref(opt), pnames))...)
+                         NamedTuple{pnames}(getproperty.(opt, pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
     (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, sgmtx, slt, sst, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,

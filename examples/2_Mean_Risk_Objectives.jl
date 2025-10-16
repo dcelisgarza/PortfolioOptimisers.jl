@@ -54,7 +54,7 @@ r = LowOrderMoment(;
                                            alg = SecondLowerMoment(; alg = SqrtRiskExpr())))
 
 #=
-Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPrior` to avoid recomputing them every time we call the optimisation.
+Since we will perform various optimisations on the same data, there's no need to redo work. Let's precompute the prior statistics using the `EmpiricalPrior` to avoid recomputing them every time we call the optimisation.
 =#
 
 pr = prior(EmpiricalPrior(), rd)
@@ -80,7 +80,7 @@ mr3 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
 mr4 = MeanRisk(; r = r, obj = MaximumReturn(), opt = opt)
 
 #=
-Lets perform the optimisations, but since we've precomputed the prior statistics, we do not need to provide the returns data. We will also produce a benchmark using the `InverseVolatility` estimator.
+Let's perform the optimisations, but since we've precomputed the prior statistics, we do not need to provide the returns data. We will also produce a benchmark using the `InverseVolatility` estimator.
 =#
 res1 = optimise(mr1)
 res2 = optimise(mr2)
@@ -89,7 +89,7 @@ res4 = optimise(mr4)
 res0 = optimise(InverseVolatility(; pe = pr))
 
 #=
-Lets view the results as pretty tables.
+Let's view the results as pretty tables.
 =#
 
 pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk => res1.w,
@@ -109,7 +109,7 @@ rk4, rt4, rr4 = expected_risk_ret_ratio(r, res4.ret, res4.w, res4.pr; rf = rf);
 rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf);
 
 #=
-Lets make sure the results are what we expect.
+Let's make sure the results are what we expect.
 =#
 
 pretty_table(DataFrame(;

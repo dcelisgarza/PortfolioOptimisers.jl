@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractConstraintResult <: AbstractResult end
-```
+    abstract type AbstractConstraintResult <: AbstractResult end
 
 Abstract supertype for all constraint result types in PortfolioOptimisers.jl.
 
@@ -14,9 +12,7 @@ All concrete types representing the result of constraint generation or evaluatio
 """
 abstract type AbstractConstraintResult <: AbstractResult end
 """
-```julia
-abstract type AbstractConstraintEstimator <: AbstractEstimator end
-```
+    abstract type AbstractConstraintEstimator <: AbstractEstimator end
 
 Abstract supertype for all constraint estimator types in PortfolioOptimisers.jl.
 
@@ -29,9 +25,7 @@ All concrete types implementing constraint generation or estimation algorithms s
 """
 abstract type AbstractConstraintEstimator <: AbstractEstimator end
 """
-```julia
-abstract type ComparisonOperator end
-```
+    abstract type ComparisonOperator end
 
 Abstract supertype for all comparison operator types used in constraint generation.
 
@@ -44,9 +38,7 @@ Concrete subtypes represent specific comparison semantics (e.g., equality, inequ
 """
 abstract type ComparisonOperator end
 """
-```julia
-abstract type EqualityComparisonOperator <: ComparisonOperator end
-```
+    abstract type EqualityComparisonOperator <: ComparisonOperator end
 
 Abstract supertype for all equality comparison operator types.
 
@@ -59,9 +51,7 @@ Concrete subtypes represent equality-based comparison semantics (e.g., `EQ`) for
 """
 abstract type EqualityComparisonOperator <: ComparisonOperator end
 """
-```julia
-abstract type InequalityComparisonOperator <: ComparisonOperator end
-```
+    abstract type InequalityComparisonOperator <: ComparisonOperator end
 
 Abstract supertype for all inequality comparison operator types.
 
@@ -75,9 +65,7 @@ Concrete subtypes represent inequality-based comparison semantics (e.g., `LEQ`, 
 """
 abstract type InequalityComparisonOperator <: ComparisonOperator end
 """
-```julia
-struct EQ <: EqualityComparisonOperator end
-```
+    struct EQ <: EqualityComparisonOperator end
 
 Equality comparison operator for constraint generation.
 
@@ -89,9 +77,7 @@ Equality comparison operator for constraint generation.
 """
 struct EQ <: EqualityComparisonOperator end
 """
-```julia
-struct LEQ <: InequalityComparisonOperator end
-```
+    struct LEQ <: InequalityComparisonOperator end
 
 Less-than-or-equal-to comparison operator for constraint generation.
 
@@ -103,9 +89,7 @@ Less-than-or-equal-to comparison operator for constraint generation.
 """
 struct LEQ <: InequalityComparisonOperator end
 """
-```julia
-struct GEQ <: InequalityComparisonOperator end
-```
+    struct GEQ <: InequalityComparisonOperator end
 
 Greater-than-or-equal-to comparison operator for constraint generation.
 
@@ -117,9 +101,7 @@ Greater-than-or-equal-to comparison operator for constraint generation.
 """
 struct GEQ <: InequalityComparisonOperator end
 """
-```julia
-comparison_sign_ineq_flag(op::ComparisonOperator)
-```
+    comparison_sign_ineq_flag(op::ComparisonOperator)
 
 Return the multiplicative sign and inequality flag for a given comparison operator.
 

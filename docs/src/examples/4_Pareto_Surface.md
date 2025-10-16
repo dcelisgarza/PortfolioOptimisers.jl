@@ -133,7 +133,7 @@ opt2 = NearOptimalCentering(; r = r2, obj = obj, opt = opt)
 
 Note the number of options in the estimator. In particular the `alg` property. Which in this case means the `NearOptimalCentering` alg will not have any external constraints applied to it.
 
-Lets optimise the portfolios.
+Let's optimise the portfolios.
 
 ````@example 4_Pareto_Surface
 res1 = optimise(opt1)
@@ -147,7 +147,7 @@ r1 = factory(r1, pr)
 r2 = factory(r2, pr)
 ````
 
-Lets compute the risk bounds for the pareto surface. We need to compute four risks because we have two risk measures and two optimisations. This will let us pick the lower and upper bounds for each risk measure, as we explore the pareto surface from one optimisation to the other.
+Let's compute the risk bounds for the pareto surface. We need to compute four risks because we have two risk measures and two optimisations. This will let us pick the lower and upper bounds for each risk measure, as we explore the pareto surface from one optimisation to the other.
 
 ````@example 4_Pareto_Surface
 sk_rk1 = expected_risk(r1, res1.w, pr.X);
@@ -206,7 +206,7 @@ isa(res3.retcode, OptimisationSuccess)
 
 ## 5. Visualising the pareto surface
 
-Lets view how the weights evolve along the pareto surface.
+Let's view how the weights evolve along the pareto surface.
 
 ````@example 4_Pareto_Surface
 using StatsPlots, GraphRecipes

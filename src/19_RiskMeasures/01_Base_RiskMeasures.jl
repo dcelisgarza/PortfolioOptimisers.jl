@@ -85,7 +85,7 @@ function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
 end
 function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::AbstractVector,
                            X::AbstractMatrix)
-    return risk_measure_view.(rs, Ref(i), Ref(X))
+    return [risk_measure_view(r, i, X) for r in rs]
 end
 abstract type Scalariser end
 struct SumScalariser <: Scalariser end

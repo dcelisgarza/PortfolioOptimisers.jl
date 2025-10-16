@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractTracking <: AbstractResult end
-```
+    abstract type AbstractTracking <: AbstractResult end
 
 Abstract supertype for all tracking result types in `PortfolioOptimisers.jl`.
 
@@ -16,9 +14,7 @@ All concrete types representing tracking error or tracking constraint results sh
 """
 abstract type AbstractTracking <: AbstractResult end
 """
-```julia
-abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all tracking algorithm types in PortfolioOptimisers.jl.
 
@@ -33,9 +29,7 @@ All concrete types representing tracking algorithms (such as weights or returns 
 """
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 """
-```julia
-abstract type TrackingFormulation <: AbstractAlgorithm end
-```
+    abstract type TrackingFormulation <: AbstractAlgorithm end
 
 Abstract supertype for all tracking formulation algorithm types in PortfolioOptimisers.jl.
 
@@ -51,9 +45,7 @@ All concrete types representing tracking formulation algorithms (such as norm-ba
 """
 abstract type TrackingFormulation <: AbstractAlgorithm end
 """
-```julia
-abstract type NormTracking <: TrackingFormulation end
-```
+    abstract type NormTracking <: TrackingFormulation end
 
 Abstract supertype for all norm-based tracking formulation algorithms in PortfolioOptimisers.jl.
 
@@ -67,9 +59,7 @@ All concrete types representing norm-based tracking algorithms (such as second-o
 """
 abstract type NormTracking <: TrackingFormulation end
 """
-```julia
-abstract type VariableTracking <: TrackingFormulation end
-```
+    abstract type VariableTracking <: TrackingFormulation end
 
 Abstract supertype for all variable-based tracking formulation algorithms in PortfolioOptimisers.jl.
 
@@ -83,11 +73,9 @@ All concrete types representing variable-based tracking algorithms (such as inde
 """
 abstract type VariableTracking <: TrackingFormulation end
 """
-```julia
-struct SOCTracking{T1} <: NormTracking
-    ddof::T1
-end
-```
+    struct SOCTracking{T1} <: NormTracking
+        ddof::T1
+    end
 
 Second-order cone (SOC) norm-based tracking formulation.
 
@@ -99,9 +87,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 # Constructor
 
-```julia
-SOCTracking(; ddof::Integer = 1)
-```
+    SOCTracking(; ddof::Integer = 1)
 
 ## Validation
 
@@ -132,9 +118,7 @@ function SOCTracking(; ddof::Integer = 1)
     return SOCTracking(ddof)
 end
 """
-```julia
-struct NOCTracking <: NormTracking end
-```
+    struct NOCTracking <: NormTracking end
 
 Norm-one (NOC) tracking formulation.
 
@@ -155,10 +139,8 @@ NOCTracking()
 """
 struct NOCTracking <: NormTracking end
 """
-```julia
-norm_tracking(f::SOCTracking, a, b; N::Union{Nothing, <:Real} = nothing)
-norm_tracking(::NOCTracking, a, b; N::Union{Nothing, <:Real} = nothing)
-```
+    norm_tracking(f::SOCTracking, a, b; N::Union{Nothing, <:Real} = nothing)
+    norm_tracking(::NOCTracking, a, b; N::Union{Nothing, <:Real} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
@@ -166,10 +148,10 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Arguments
 
-  - `f`: Tracking formulation algorithm (`SOCTracking` or `NOCTracking`).
-  - `a`: Portfolio weights (vector).
-  - `b`: Benchmark weights (vector).
-  - `N`: Optional number of assets (integer).
+  - `f`: Tracking formulation algorithm.
+  - `a`: Portfolio weights.
+  - `b`: Benchmark weights.
+  - `N`: Optional number of assets.
 
 # Returns
 
@@ -177,7 +159,7 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Details
 
-  - For `SOCTracking`, computes `norm(a - b, 2) / sqrt(N - ddof)` if `N` is provided, else unscaled.
+  - For `SOCTracking`, computes `norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is provided, else unscaled.
   - For `NOCTracking`, computes `norm(a - b, 1) / N` if `N` is provided, else unscaled.
 
 # Examples
@@ -205,9 +187,7 @@ function norm_tracking(::NOCTracking, a, b, N::Union{Nothing, <:Real} = nothing)
     return norm(a - b, 1) / factor
 end
 """
-```julia
-struct IndependentVariableTracking <: VariableTracking end
-```
+    struct IndependentVariableTracking <: VariableTracking end
 
 Independent variable-based tracking formulation.
 
@@ -220,9 +200,7 @@ Independent variable-based tracking formulation.
 """
 struct IndependentVariableTracking <: VariableTracking end
 """
-```julia
-struct DependentVariableTracking <: VariableTracking end
-```
+    struct DependentVariableTracking <: VariableTracking end
 
 Dependent variable-based tracking formulation.
 
@@ -238,12 +216,10 @@ function tracking_view(::Nothing, ::Any)
     return nothing
 end
 """
-```julia
-struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
-    fees::T1
-    w::T2
-end
-```
+    struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
+        fees::T1
+        w::T2
+    end
 
 Asset weights-based tracking algorithm.
 
@@ -256,9 +232,7 @@ Asset weights-based tracking algorithm.
 
 # Constructor
 
-```julia
-WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::AbstractVector{<:Real})
-```
+    WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::AbstractVector{<:Real})
 
 ## Validation
 
@@ -302,9 +276,7 @@ function tracking_view(tracking::WeightsTracking, i::AbstractVector)
     return WeightsTracking(; fees = fees, w = w)
 end
 """
-```julia
-tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
-```
+    tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
 
 Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
@@ -347,11 +319,9 @@ function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real}
     return calc_net_returns(tracking.w, X, tracking.fees)
 end
 """
-```julia
-struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
-    w::T1
-end
-```
+    struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
+        w::T1
+    end
 
 Returns-based tracking algorithm.
 
@@ -363,9 +333,7 @@ Returns-based tracking algorithm.
 
 # Constructor
 
-```julia
-ReturnsTracking(; w::AbstractVector{<:Real})
-```
+    ReturnsTracking(; w::AbstractVector{<:Real})
 
 ## Validation
 
@@ -400,9 +368,7 @@ function tracking_view(tracking::ReturnsTracking, ::Any)
     return tracking
 end
 """
-```julia
-tracking_benchmark(tracking::ReturnsTracking, args...)
-```
+    tracking_benchmark(tracking::ReturnsTracking, args...)
 
 Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
@@ -442,13 +408,11 @@ function factory(tracking::ReturnsTracking, ::Any)
     return tracking
 end
 """
-```julia
-struct TrackingError{T1, T2, T3} <: AbstractTracking
-    tracking::T1
-    err::T2
-    alg::T3
-end
-```
+    struct TrackingError{T1, T2, T3} <: AbstractTracking
+        tracking::T1
+        err::T2
+        alg::T3
+    end
 
 Tracking error result type.
 
@@ -462,10 +426,8 @@ Tracking error result type.
 
 # Constructor
 
-```julia
-TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
-              alg::NormTracking = SOCTracking())
-```
+    TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
+                  alg::NormTracking = SOCTracking())
 
 ## Validation
 

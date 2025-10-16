@@ -1,16 +1,14 @@
 """
-```julia
-struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractLowOrderPriorEstimator_F
-    pe::T1
-    mp::T2
-    views::T3
-    sets::T4
-    views_conf::T5
-    rf::T6
-    tau::T7
-end
-```
+    struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
+           AbstractLowOrderPriorEstimator_F
+        pe::T1
+        mp::T2
+        views::T3
+        sets::T4
+        views_conf::T5
+        rf::T6
+        tau::T7
+    end
 
 Bayesian Black-Litterman prior estimator for asset returns.
 
@@ -28,18 +26,16 @@ Bayesian Black-Litterman prior estimator for asset returns.
 
 # Constructor
 
-```julia
-BayesianBlackLittermanPrior(;
-                            pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(;
-                                                                                  pe = EmpiricalPrior(;
-                                                                                                      me = EquilibriumExpectedReturns())),
-                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                            views::Union{<:LinearConstraintEstimator,
-                                         <:BlackLittermanViews},
-                            sets::Union{Nothing, <:AssetSets} = nothing,
-                            views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                            rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
-```
+    BayesianBlackLittermanPrior(;
+                                pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(;
+                                                                                      pe = EmpiricalPrior(;
+                                                                                                          me = EquilibriumExpectedReturns())),
+                                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                views::Union{<:LinearConstraintEstimator,
+                                             <:BlackLittermanViews},
+                                sets::Union{Nothing, <:AssetSets} = nothing,
+                                views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
+                                rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -192,10 +188,8 @@ function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-```julia
-prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
-      strict::Bool = false, kwargs...)
-```
+    prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+          strict::Bool = false, kwargs...)
 
 Compute Bayesian Black-Litterman prior moments for asset returns.
 

@@ -1,12 +1,10 @@
 """
-```julia
-expected_return(ret::ArithmeticReturn, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
-                fees::Union{Nothing, Fees} = nothing, kwargs...)
-expected_return(ret::KellyReturn, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
-                fees::Union{Nothing, Fees} = nothing, kwargs...)
-expected_return(ret::JuMPReturnsEstimator, w::AbstractVector{<:AbstractVector},
-                pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, kwargs...)
-```
+    expected_return(ret::ArithmeticReturn, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
+                    fees::Union{Nothing, Fees} = nothing, kwargs...)
+    expected_return(ret::KellyReturn, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
+                    fees::Union{Nothing, Fees} = nothing, kwargs...)
+    expected_return(ret::JuMPReturnsEstimator, w::AbstractVector{<:AbstractVector},
+                    pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, kwargs...)
 
 Compute the expected portfolio return using the specified return estimator.
 
@@ -60,11 +58,9 @@ function expected_return(ret::JuMPReturnsEstimator, w::AbstractVector{<:Abstract
     return [expected_return(ret, wi, pr, fees; kwargs...) for wi in w]
 end
 """
-```julia
-expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::AbstractVector,
-               pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, rf::Real = 0,
-               kwargs...)
-```
+    expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::AbstractVector,
+                   pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, rf::Real = 0,
+                   kwargs...)
 
 Compute the expected risk-adjusted return ratio for a portfolio.
 
@@ -99,11 +95,9 @@ function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
     return (rt - rf) / rk
 end
 """
-```julia
-expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                        w::AbstractVector, pr::AbstractPriorResult;
-                        fees::Union{Nothing, Fees} = nothing, rf::Real = 0, kwargs...)
-```
+    expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
+                            w::AbstractVector, pr::AbstractPriorResult;
+                            fees::Union{Nothing, Fees} = nothing, rf::Real = 0, kwargs...)
 
 Compute expected risk, expected return, and risk-adjusted return ratio for a portfolio.
 
@@ -139,11 +133,9 @@ function expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEst
     return rk, rt, (rt - rf) / rk
 end
 """
-```julia
-expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::AbstractVector,
-              pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, rf::Real = 0,
-              kwargs...)
-```
+    expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::AbstractVector,
+                  pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, rf::Real = 0,
+                  kwargs...)
 
 Compute the risk-adjusted ratio information criterion (SRIC) for a portfolio.
 
@@ -178,11 +170,9 @@ function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
     return sr - N / (T * sr)
 end
 """
-```julia
-expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                       w::AbstractVector, pr::AbstractPriorResult;
-                       fees::Union{Nothing, Fees} = nothing, rf::Real = 0, kwargs...)
-```
+    expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
+                           w::AbstractVector, pr::AbstractPriorResult;
+                           fees::Union{Nothing, Fees} = nothing, rf::Real = 0, kwargs...)
 
 Compute expected risk, expected return, and SRIC for a portfolio.
 
@@ -218,11 +208,9 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
     return rk, rt, sr - N / (T * sr)
 end
 """
-```julia
-struct ReturnRiskMeasure{T1} <: NoOptimisationRiskMeasure
-    rt::T1
-end
-```
+    struct ReturnRiskMeasure{T1} <: NoOptimisationRiskMeasure
+        rt::T1
+    end
 
 Return-based risk measure.
 
@@ -234,9 +222,7 @@ Return-based risk measure.
 
 # Constructor
 
-```julia
-ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
-```
+    ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
 
 # Examples
 
@@ -272,10 +258,8 @@ function factory(r::ReturnRiskMeasure, args...)
     return r
 end
 """
-```julia
-expected_risk(r::ReturnRiskMeasure, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
-              fees::Union{Nothing, <:Fees} = nothing, kwargs...)
-```
+    expected_risk(r::ReturnRiskMeasure, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
+                  fees::Union{Nothing, <:Fees} = nothing, kwargs...)
 
 Compute the expected risk for a portfolio using a return-based risk measure.
 
@@ -305,13 +289,11 @@ function expected_risk(r::ReturnRiskMeasure, w::AbstractVector{<:Real},
     return expected_return(r.rt, w, pr, fees)
 end
 """
-```julia
-struct RatioRiskMeasure{T1, T2, T3} <: NoOptimisationRiskMeasure
-    rt::T1
-    rk::T2
-    rf::T3
-end
-```
+    struct RatioRiskMeasure{T1, T2, T3} <: NoOptimisationRiskMeasure
+        rt::T1
+        rk::T2
+        rf::T3
+    end
 
 Ratio-based risk measure.
 
@@ -325,10 +307,8 @@ Ratio-based risk measure.
 
 # Constructor
 
-```julia
-RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
-                 rk::AbstractBaseRiskMeasure = Variance(), rf::Real = 0.0)
-```
+    RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
+                     rk::AbstractBaseRiskMeasure = Variance(), rf::Real = 0.0)
 
 # Examples
 
@@ -378,10 +358,8 @@ function factory(r::RatioRiskMeasure, w::AbstractVector)
     return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 """
-```julia
-expected_risk(r::RatioRiskMeasure, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
-              fees::Union{Nothing, <:Fees} = nothing, kwargs...)
-```
+    expected_risk(r::RatioRiskMeasure, w::AbstractVector{<:Real}, pr::AbstractPriorResult;
+                  fees::Union{Nothing, <:Fees} = nothing, kwargs...)
 
 Compute the expected risk for a portfolio using a ratio-based risk measure.
 

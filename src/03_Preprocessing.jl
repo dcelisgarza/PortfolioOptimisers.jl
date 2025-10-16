@@ -35,17 +35,15 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
 end
 function select_kextremes(X::AbstractMatrix) end
 """
-```julia
-struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
-    nx::T1
-    X::T2
-    nf::T3
-    F::T4
-    ts::T5
-    iv::T6
-    ivpa::T7
-end
-```
+    struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
+        nx::T1
+        X::T2
+        nf::T3
+        F::T4
+        ts::T5
+        iv::T6
+        ivpa::T7
+    end
 
 A flexible container type for storing the results of asset and factor returns calculations in PortfolioOptimisers.jl.
 
@@ -64,15 +62,13 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-```julia
-ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-              X::Union{Nothing, <:AbstractMatrix} = nothing,
-              nf::Union{Nothing, <:AbstractVector} = nothing,
-              F::Union{Nothing, <:AbstractMatrix} = nothing,
-              ts::Union{Nothing, <:AbstractVector} = nothing,
-              iv::Union{Nothing, <:AbstractMatrix} = nothing,
-              ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
-```
+    ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
+                  X::Union{Nothing, <:AbstractMatrix} = nothing,
+                  nf::Union{Nothing, <:AbstractVector} = nothing,
+                  F::Union{Nothing, <:AbstractMatrix} = nothing,
+                  ts::Union{Nothing, <:AbstractVector} = nothing,
+                  iv::Union{Nothing, <:AbstractMatrix} = nothing,
+                  ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -226,17 +222,15 @@ function returns_result_view(rd::ReturnsResult, i::AbstractVector)
                          ivpa = ivpa)
 end
 """
-```julia
-prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
-                  iv::Union{Nothing, <:TimeArray} = nothing,
-                  ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                  ret_method::Symbol = :simple, padding::Bool = false,
-                  missing_col_percent::Real = 1.0,
-                  missing_row_percent::Union{Nothing, <:Real} = 1.0,
-                  collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
-                  join_method::Symbol = :outer,
-                  impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
-```
+    prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
+                      iv::Union{Nothing, <:TimeArray} = nothing,
+                      ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                      ret_method::Symbol = :simple, padding::Bool = false,
+                      missing_col_percent::Real = 1.0,
+                      missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                      collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
+                      join_method::Symbol = :outer,
+                      impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 

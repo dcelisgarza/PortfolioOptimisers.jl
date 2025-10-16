@@ -1,10 +1,8 @@
 """
-```julia
-struct BlackLittermanViews{T1, T2} <: AbstractResult
-    P::T1
-    Q::T2
-end
-```
+    struct BlackLittermanViews{T1, T2} <: AbstractResult
+        P::T1
+        Q::T2
+    end
 
 Container for Black-Litterman investor views in canonical matrix form.
 
@@ -17,9 +15,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Constructor
 
-```julia
-BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
-```
+    BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
 
 Keyword arguments correspond to the fields above.
 
@@ -54,11 +50,9 @@ function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
     return BlackLittermanViews(P, Q)
 end
 """
-```julia
-get_black_litterman_views(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
-                          sets::AssetSets; datatype::DataType = Float64,
-                          strict::Bool = false)
-```
+    get_black_litterman_views(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
+                              sets::AssetSets; datatype::DataType = Float64,
+                              strict::Bool = false)
 
 Convert parsed Black-Litterman view equations into a `BlackLittermanViews` object.
 
@@ -136,14 +130,12 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
     end
 end
 """
-```julia
-black_litterman_views(views::Union{Nothing, <:BlackLittermanViews}, args...; kwargs...)
-black_litterman_views(views::Union{<:AbstractString, Expr,
-                                   <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                      sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
-black_litterman_views(views::LinearConstraintEstimator, sets::AssetSets;
-                      datatype::DataType = Float64, strict::Bool = false)
-```
+    black_litterman_views(views::Union{Nothing, <:BlackLittermanViews}, args...; kwargs...)
+    black_litterman_views(views::Union{<:AbstractString, Expr,
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                          sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
+    black_litterman_views(views::LinearConstraintEstimator, sets::AssetSets;
+                          datatype::DataType = Float64, strict::Bool = false)
 
 Unified interface for constructing or passing through Black-Litterman investor views.
 
@@ -208,13 +200,11 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
     return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict)
 end
 """
-```julia
-assert_bl_views_conf(::Nothing, args...)
-assert_bl_views_conf(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                     views::Union{<:AbstractString, Expr,
-                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                  <:LinearConstraintEstimator, <:BlackLittermanViews})
-```
+    assert_bl_views_conf(::Nothing, args...)
+    assert_bl_views_conf(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                         views::Union{<:AbstractString, Expr,
+                                      <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                      <:LinearConstraintEstimator, <:BlackLittermanViews})
 
 Validate Black-Litterman view confidence specification.
 

@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractDistanceEstimator <: AbstractEstimator end
-```
+    abstract type AbstractDistanceEstimator <: AbstractEstimator end
 
 Abstract supertype for all distance estimator types in PortfolioOptimisers.jl.
 
@@ -16,9 +14,7 @@ All concrete types implementing distance-based estimation algorithms should subt
 """
 abstract type AbstractDistanceEstimator <: AbstractEstimator end
 """
-```julia
-abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all distance algorithm types in PortfolioOptimisers.jl.
 
@@ -38,9 +34,7 @@ All concrete types implementing specific distance-based algorithms (such as corr
 """
 abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
 """
-```julia
-struct SimpleDistance <: AbstractDistanceAlgorithm end
-```
+    struct SimpleDistance <: AbstractDistanceAlgorithm end
 
 Simple distance algorithm for portfolio optimization.
 
@@ -61,9 +55,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct SimpleDistance <: AbstractDistanceAlgorithm end
 """
-```julia
-struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
-```
+    struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
 
 Simple absolute distance algorithm for portfolio optimization.
 
@@ -84,9 +76,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
 """
-```julia
-struct LogDistance <: AbstractDistanceAlgorithm end
-```
+    struct LogDistance <: AbstractDistanceAlgorithm end
 
 Logarithmic distance algorithm for portfolio optimization.
 
@@ -107,9 +97,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct LogDistance <: AbstractDistanceAlgorithm end
 """
-```julia
-struct CorrelationDistance <: AbstractDistanceAlgorithm end
-```
+    struct CorrelationDistance <: AbstractDistanceAlgorithm end
 
 Correlation distance algorithm for portfolio optimization.
 
@@ -130,12 +118,10 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
 """
-```julia
-struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
-    bins::T1
-    normalise::T2
-end
-```
+    struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
+        bins::T1
+        normalise::T2
+    end
 
 Variation of Information (VI) distance algorithm for portfolio optimization.
 
@@ -148,10 +134,8 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
 
 # Constructor
 
-```julia
-VariationInfoDistance(; bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                      normalise::Bool = true)
-```
+    VariationInfoDistance(; bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                          normalise::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -190,9 +174,7 @@ function VariationInfoDistance(;
     return VariationInfoDistance(bins, normalise)
 end
 """
-```julia
-struct CanonicalDistance <: AbstractDistanceAlgorithm end
-```
+    struct CanonicalDistance <: AbstractDistanceAlgorithm end
 
 Canonical distance algorithm for portfolio optimization.
 

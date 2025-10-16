@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
-```
+    abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
 
 Abstract supertype for all phylogeny-based constraint estimators in PortfolioOptimisers.jl.
 
@@ -16,9 +14,7 @@ All concrete types representing phylogeny-based constraint estimators should sub
 """
 abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
 """
-```julia
-abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
-```
+    abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
 
 Abstract supertype for all phylogeny-based constraint result types in PortfolioOptimisers.jl.
 
@@ -33,12 +29,10 @@ All concrete types representing the results of phylogeny-based constraint genera
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
 """
-```julia
-struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
-    p::T2
-end
-```
+    struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
+        pe::T1
+        p::T2
+    end
 
 Estimator for generating semi-definite phylogeny-based constraints in PortfolioOptimisers.jl.
 
@@ -51,12 +45,10 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 
 # Constructor
 
-```julia
-SemiDefinitePhylogenyEstimator(;
-                               pe::Union{<:AbstractPhylogenyEstimator,
-                                         <:AbstractClusteringResult} = NetworkEstimator(),
-                               p::Real = 0.05)
-```
+    SemiDefinitePhylogenyEstimator(;
+                                   pe::Union{<:AbstractPhylogenyEstimator,
+                                             <:AbstractClusteringResult} = NetworkEstimator(),
+                                   p::Real = 0.05)
 
 ## Validation
 
@@ -115,12 +107,10 @@ function SemiDefinitePhylogenyEstimator(;
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
 """
-```julia
-struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
-    A::T1
-    p::T2
-end
-```
+    struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
+        A::T1
+        p::T2
+    end
 
 Container for the result of semi-definite phylogeny-based constraint generation.
 
@@ -133,11 +123,9 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 
 # Constructor
 
-```julia
-SemiDefinitePhylogeny(;
-                      A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
-                               <:AbstractMatrix{<:Real}}, p::Real = 0.05)
-```
+    SemiDefinitePhylogeny(;
+                          A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
+                                   <:AbstractMatrix{<:Real}}, p::Real = 0.05)
 
 ## Validation
 
@@ -198,13 +186,11 @@ function validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-```julia
-struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
-    B::T2
-    scale::T3
-end
-```
+    struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+        pe::T1
+        B::T2
+        scale::T3
+    end
 
 Estimator for generating integer phylogeny-based constraints in PortfolioOptimisers.jl.
 
@@ -218,13 +204,11 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 
 # Constructor
 
-```julia
-IntegerPhylogenyEstimator(;
-                          pe::Union{<:AbstractPhylogenyEstimator,
-                                    <:AbstractClusteringResult} = NetworkEstimator(),
-                          B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                          scale::Real = 100_000.0)
-```
+    IntegerPhylogenyEstimator(;
+                              pe::Union{<:AbstractPhylogenyEstimator,
+                                        <:AbstractClusteringResult} = NetworkEstimator(),
+                              B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
+                              scale::Real = 100_000.0)
 
 ## Validation
 
@@ -295,13 +279,11 @@ function IntegerPhylogenyEstimator(;
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
 """
-```julia
-struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
-    A::T1
-    B::T2
-    scale::T3
-end
-```
+    struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
+        A::T1
+        B::T2
+        scale::T3
+    end
 
 Container for the result of integer phylogeny-based constraint generation.
 
@@ -315,13 +297,11 @@ Container for the result of integer phylogeny-based constraint generation.
 
 # Constructor
 
-```julia
-IntegerPhylogeny(;
-                 A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
-                          <:AbstractMatrix{<:Real}},
-                 B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                 scale::Real = 100_000.0)
-```
+    IntegerPhylogeny(;
+                     A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
+                              <:AbstractMatrix{<:Real}},
+                     B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
+                     scale::Real = 100_000.0)
 
 ## Validation
 
@@ -376,12 +356,10 @@ function IntegerPhylogeny(;
     return IntegerPhylogeny(A, B, scale)
 end
 """
-```julia
-phylogeny_constraints(est::Union{<:SemiDefinitePhylogenyEstimator,
-                                 <:IntegerPhylogenyEstimator, <:SemiDefinitePhylogeny,
-                                 <:IntegerPhylogeny, Nothing}, X::AbstractMatrix;
-                      dims::Int = 1, kwargs...)
-```
+    phylogeny_constraints(est::Union{<:SemiDefinitePhylogenyEstimator,
+                                     <:IntegerPhylogenyEstimator, <:SemiDefinitePhylogeny,
+                                     <:IntegerPhylogeny, Nothing}, X::AbstractMatrix;
+                          dims::Int = 1, kwargs...)
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
 
@@ -436,9 +414,7 @@ function phylogeny_constraints(plcs::AbstractVector{<:Union{<:AbstractPhylogenyC
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """
-```julia
-abstract type VectorToRealMeasure <: AbstractAlgorithm end
-```
+    abstract type VectorToRealMeasure <: AbstractAlgorithm end
 
 Abstract supertype for algorithms mapping a vector of real values to a single real value.
 
@@ -455,9 +431,7 @@ Abstract supertype for algorithms mapping a vector of real values to a single re
 """
 abstract type VectorToRealMeasure <: AbstractAlgorithm end
 """
-```julia
-struct MinValue <: VectorToRealMeasure end
-```
+    struct MinValue <: VectorToRealMeasure end
 
 Algorithm for reducing a vector of real values to its minimum.
 
@@ -480,9 +454,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MinValue(), [1.2, 3.4, 0.7])
 """
 struct MinValue <: VectorToRealMeasure end
 """
-```julia
-struct MeanValue <: VectorToRealMeasure end
-```
+    struct MeanValue <: VectorToRealMeasure end
 
 Algorithm for reducing a vector of real values to its mean.
 
@@ -505,9 +477,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
 """
 struct MeanValue <: VectorToRealMeasure end
 """
-```julia
-struct MedianValue <: VectorToRealMeasure end
-```
+    struct MedianValue <: VectorToRealMeasure end
 
 Algorithm for reducing a vector of real values to its median.
 
@@ -530,9 +500,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
 """
 struct MedianValue <: VectorToRealMeasure end
 """
-```julia
-struct MaxValue <: VectorToRealMeasure end
-```
+    struct MaxValue <: VectorToRealMeasure end
 
 Algorithm for reducing a vector of real values to its maximum.
 
@@ -555,9 +523,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
 """
 struct MaxValue <: VectorToRealMeasure end
 """
-```julia
-vec_to_real_measure(measure::Union{<:VectorToRealMeasure, <:Real}, val::AbstractVector)
-```
+    vec_to_real_measure(measure::Union{<:VectorToRealMeasure, <:Real}, val::AbstractVector)
 
 Reduce a vector of real values to a single real value using a specified measure.
 
@@ -606,13 +572,11 @@ function vec_to_real_measure(val::Real, ::AbstractVector)
     return val
 end
 """
-```julia
-struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-    A::T1
-    B::T2
-    comp::T3
-end
-```
+    struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+        A::T1
+        B::T2
+        comp::T3
+    end
 
 Estimator for generating centrality-based portfolio constraints.
 
@@ -626,11 +590,9 @@ Estimator for generating centrality-based portfolio constraints.
 
 # Constructor
 
-```julia
-CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                     B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
-                     comp::ComparisonOperator = LEQ())
-```
+    CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
+                         B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
+                         comp::ComparisonOperator = LEQ())
 
 # Examples
 
@@ -690,11 +652,9 @@ function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
     return CentralityConstraint(A, B, comp)
 end
 """
-```julia
-centrality_constraints(ccs::Union{<:CentralityConstraint,
-                                  <:AbstractVector{<:CentralityConstraint}},
-                       X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    centrality_constraints(ccs::Union{<:CentralityConstraint,
+                                      <:AbstractVector{<:CentralityConstraint}},
+                           X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
 
@@ -775,9 +735,7 @@ function centrality_constraints(ccs::Union{<:CentralityConstraint,
     end
 end
 """
-```julia
-centrality_constraints(ccs::Union{Nothing, <:LinearConstraint}, args...; kwargs...)
-```
+    centrality_constraints(ccs::Union{Nothing, <:LinearConstraint}, args...; kwargs...)
 
 No-op fallback for centrality-based constraint propagation.
 

@@ -1,9 +1,7 @@
 """
-```julia
-struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
-    val::T1
-end
-```
+    struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
+        val::T1
+    end
 
 Estimator for buy-in threshold portfolio constraints.
 
@@ -15,11 +13,9 @@ Estimator for buy-in threshold portfolio constraints.
 
 # Constructor
 
-```julia
-BuyInThresholdEstimator(;
-                        val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}}})
-```
+    BuyInThresholdEstimator(;
+                            val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}})
 
 ## Validation
 
@@ -63,11 +59,9 @@ function BuyInThresholdEstimator(;
     return BuyInThresholdEstimator(val)
 end
 """
-```julia
-struct BuyInThreshold{T1} <: AbstractConstraintResult
-    val::T1
-end
-```
+    struct BuyInThreshold{T1} <: AbstractConstraintResult
+        val::T1
+    end
 
 Container for buy-in threshold portfolio constraints.
 
@@ -79,9 +73,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Constructor
 
-```julia
-BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
-```
+    BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
 
 ## Validation
 
@@ -129,12 +121,10 @@ end
 function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                   <:BuyInThresholdEstimator}},
                         i::AbstractVector)
-    return threshold_view.(t, Ref(i))
+    return [threshold_view(_t, i) for _t in t]
 end
 """
-```julia
-threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
-```
+    threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
 
 Propagate or pass through buy-in threshold portfolio constraints.
 
@@ -171,10 +161,8 @@ function threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwa
     return t
 end
 """
-```julia
-threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
-                      datatype::DataType = Float64, strict::Bool = false)
-```
+    threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
+                          datatype::DataType = Float64, strict::Bool = false)
 
 Generate buy-in threshold portfolio constraints from a `BuyInThresholdEstimator` and asset set.
 
@@ -222,9 +210,7 @@ function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                                                  strict = strict))
 end
 """
-```julia
-threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets; kwargs...)
-```
+    threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets; kwargs...)
 
 Generate uniform buy-in threshold portfolio constraints for all assets.
 
@@ -263,11 +249,9 @@ function threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSe
     return BuyInThreshold(; val = inv(length(sets.dict[sets.key])))
 end
 """
-```julia
-threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
-                                                <:BuyInThreshold}}, sets::AssetSets;
-                      kwargs...)
-```
+    threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
+                                                    <:BuyInThreshold}}, sets::AssetSets;
+                          kwargs...)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
@@ -276,7 +260,7 @@ Provides a uniform interface for processing multiple constraint estimators simul
 function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
                                                          <:BuyInThreshold}},
                                sets::AssetSets; kwargs...)
-    return threshold_constraints.(t, Ref(sets); kwargs...)
+    return [threshold_constraints(_t, sets; kwargs...) for _t in t]
 end
 
 export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints

@@ -13,8 +13,8 @@ using ArgCheck, AverageShiftedHistograms, Clustering, Distances, Distributions, 
     read(path, String)
 end PortfolioOptimisers
 
-# 112 files.
 src_files = String[]
+# 112 files.
 sizehint!(src_files, 112)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files

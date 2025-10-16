@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
-```
+    abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
 
 Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
 
@@ -14,9 +12,7 @@ All concrete types implementing clustering-based estimation algorithms should su
 """
 abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
 """
-```julia
-abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
-```
+    abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
 
 Abstract supertype for all clustering algorithm types in PortfolioOptimisers.jl.
 
@@ -29,9 +25,7 @@ All concrete types implementing specific clustering algorithms should subtype `A
 """
 abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
 """
-```julia
-abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
-```
+    abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 
 Abstract supertype for all optimal number of clusters estimator types in PortfolioOptimisers.jl.
 
@@ -43,9 +37,7 @@ All concrete types implementing algorithms to estimate the optimal number of clu
 """
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 """
-```julia
-abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
-```
+    abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for all optimal number of clusters algorithm types in PortfolioOptimisers.jl.
 
@@ -57,9 +49,7 @@ All concrete types implementing specific algorithms for determining the optimal 
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 """
-```julia
-abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
-```
+    abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
 Abstract supertype for all clustering result types in PortfolioOptimisers.jl.
 
@@ -72,14 +62,12 @@ All concrete types representing the result of a clustering estimation should sub
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 """
-```julia
-struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
-    clustering::T1
-    S::T2
-    D::T3
-    k::T4
-end
-```
+    struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+        clustering::T1
+        S::T2
+        D::T3
+        k::T4
+    end
 
 Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
@@ -94,10 +82,8 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-```julia
-HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                       D::AbstractMatrix, k::Integer)
-```
+    HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                           D::AbstractMatrix, k::Integer)
 
 Keyword arguments correspond to the fields above.
 
@@ -130,9 +116,7 @@ function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatr
     return HierarchicalClustering(clustering, S, D, k)
 end
 """
-```julia
-clusterise(cle::AbstractClusteringResult, args...; kwargs...)
-```
+    clusterise(cle::AbstractClusteringResult, args...; kwargs...)
 
 Return the clustering result as-is.
 
@@ -156,9 +140,7 @@ function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
 """
-```julia
-struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
-```
+    struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
 
 Algorithm type for estimating the optimal number of clusters using the second-order difference method.
 
@@ -171,11 +153,9 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
 """
 struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
 """
-```julia
-struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
-    metric::T1
-end
-```
+    struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
+        metric::T1
+    end
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
 
@@ -187,9 +167,7 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Constructor
 
-```julia
-StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
-```
+    StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -218,12 +196,10 @@ function StandardisedSilhouetteScore(;
     return StandardisedSilhouetteScore(metric)
 end
 """
-```julia
-struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
-    max_k::T1
-    alg::T2
-end
-```
+    struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
+        max_k::T1
+        alg::T2
+    end
 
 Estimator type for selecting the optimal number of clusters in PortfolioOptimisers.jl.
 
@@ -236,10 +212,8 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 
 # Constructor
 
-```julia
-OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                      alg::Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
-```
+    OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
+                          alg::Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
 
 Keyword arguments correspond to the fields above.
 
@@ -285,11 +259,9 @@ function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
     return OptimalNumberClusters(max_k, alg)
 end
 """
-```julia
-struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
-    linkage::T1
-end
-```
+    struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
+        linkage::T1
+    end
 
 Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
 
@@ -301,9 +273,7 @@ Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-```julia
-HClustAlgorithm(; linkage::Symbol = :ward)
-```
+    HClustAlgorithm(; linkage::Symbol = :ward)
 
 Keyword arguments correspond to the fields above.
 
@@ -330,14 +300,12 @@ function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
 end
 """
-```julia
-struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
-    ce::T1
-    de::T2
-    alg::T3
-    onc::T4
-end
-```
+    struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
+        ce::T1
+        de::T2
+        alg::T3
+        onc::T4
+    end
 
 Estimator type for clustering in PortfolioOptimisers.jl.
 
@@ -352,12 +320,10 @@ Estimator type for clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-```julia
-ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                    de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                    alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
-                    onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
-```
+    ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+                        alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
+                        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
 
 Keyword arguments correspond to the fields above.
 

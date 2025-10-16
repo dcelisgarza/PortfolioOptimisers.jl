@@ -1,7 +1,5 @@
 """
-```julia
-abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
-```
+    abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
 
 Abstract supertype for all dimension reduction regression algorithm targets in PortfolioOptimisers.jl.
 
@@ -18,11 +16,9 @@ These types are used to specify the dimension reduction method when constructing
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
 """
-```julia
-struct PCA{T1} <: DimensionReductionTarget
-    kwargs::T1
-end
-```
+    struct PCA{T1} <: DimensionReductionTarget
+        kwargs::T1
+    end
 
 Principal Component Analysis (PCA) dimension reduction target.
 
@@ -34,9 +30,7 @@ Principal Component Analysis (PCA) dimension reduction target.
 
 # Constructor
 
-```julia
-PCA(; kwargs::NamedTuple = ())
-```
+    PCA(; kwargs::NamedTuple = ())
 
 Keyword arguments correspond to the fields above.
 
@@ -64,9 +58,7 @@ function PCA(; kwargs::NamedTuple = (;))
     return PCA(kwargs)
 end
 """
-```julia
-StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
-```
+    StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
 
 Fit a Principal Component Analysis (PCA) model to the data matrix `X` using the configuration in `drtgt`.
 
@@ -91,11 +83,9 @@ function StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
 """
-```julia
-struct PPCA{T1} <: DimensionReductionTarget
-    kwargs::T1
-end
-```
+    struct PPCA{T1} <: DimensionReductionTarget
+        kwargs::T1
+    end
 
 Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
@@ -107,9 +97,7 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
 # Constructor
 
-```julia
-PPCA(; kwargs::NamedTuple = ())
-```
+    PPCA(; kwargs::NamedTuple = ())
 
 Keyword arguments correspond to the fields above.
 
@@ -137,9 +125,7 @@ function PPCA(; kwargs::NamedTuple = (;))
     return PPCA(kwargs)
 end
 """
-```julia
-StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
-```
+    StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
 
 Fit a Probabilistic Principal Component Analysis (PPCA) model to the data matrix `X` using the configuration in `drtgt`.
 
@@ -164,14 +150,12 @@ function StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
 """
-```julia
-struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
-    me::T1
-    ve::T2
-    drtgt::T3
-    retgt::T4
-end
-```
+    struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
+        me::T1
+        ve::T2
+        drtgt::T3
+        retgt::T4
+    end
 
 Estimator for dimension reduction regression-based moment estimation.
 
@@ -186,13 +170,11 @@ Estimator for dimension reduction regression-based moment estimation.
 
 # Constructor
 
-```julia
-DimensionReductionRegression(;
-                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                             ve::AbstractVarianceEstimator = SimpleVariance(),
-                             drtgt::DimensionReductionTarget = PCA(),
-                             retgt::AbstractRegressionTarget = LinearModel())
-```
+    DimensionReductionRegression(;
+                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                                 ve::AbstractVarianceEstimator = SimpleVariance(),
+                                 drtgt::DimensionReductionTarget = PCA(),
+                                 retgt::AbstractRegressionTarget = LinearModel())
 
 Keyword arguments correspond to the fields above.
 
@@ -243,9 +225,7 @@ function DimensionReductionRegression(;
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
 """
-```julia
-prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
-```
+    prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
 
 Prepare data for dimension reduction regression.
 
@@ -284,10 +264,8 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     return x1, Vp
 end
 """
-```julia
-regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
-           sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
-```
+    regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
+               sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
 
 Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
 
@@ -329,9 +307,7 @@ function regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::Abst
     return beta
 end
 """
-```julia
-regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)
-```
+    regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)
 
 Apply dimension reduction regression to each column of a response matrix.
 
@@ -372,7 +348,7 @@ function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::Abst
     sigma = vec(std(re.ve, F; mean = mu, dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)
-        rr[i, :] .= regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
+        rr[i, :] = regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
     end
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)

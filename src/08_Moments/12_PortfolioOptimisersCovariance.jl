@@ -1,10 +1,8 @@
 """
-```julia
-struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-    ce::T1
-    mp::T2
-end
-```
+    struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
+        ce::T1
+        mp::T2
+    end
 
 Composite covariance estimator with post-processing.
 
@@ -17,10 +15,8 @@ Composite covariance estimator with post-processing.
 
 # Constructor
 
-```julia
-PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
-```
+    PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+                                  mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
 
@@ -66,9 +62,7 @@ function factory(ce::PortfolioOptimisersCovariance,
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
-```julia
-cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
-```
+    cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -109,9 +103,7 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; di
     return sigma
 end
 """
-```julia
-cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
-```
+    cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 

@@ -155,8 +155,9 @@
         @test isapprox(pr2.kt,
                        cokurtosis(Cokurtosis(; alg = Full()), pr2.X;
                                   mean = transpose(pr2.mu)))
-        @test (pr2.sk, pr2.V) ==
-              coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
+        @test all(isapprox.((pr2.sk, pr2.V),
+                            coskewness(Coskewness(; alg = Full()), pr2.X;
+                                       mean = transpose(pr2.mu))))
     end
     @testset "Vanilla and Bayesian Black Litterman" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/BlackLitterman.csv.gz"), DataFrame)

@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
-```
+    abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
 
 Abstract supertype for all shrunk expected returns estimators in PortfolioOptimisers.jl.
 
@@ -14,9 +12,7 @@ All concrete types implementing shrinkage-based expected returns estimation algo
 """
 abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
 """
-```julia
-abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
-```
+    abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
 
 Abstract supertype for all shrinkage algorithms for expected returns estimation.
 
@@ -31,9 +27,7 @@ All concrete types implementing specific shrinkage algorithms (e.g., James-Stein
 """
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
 """
-```julia
-abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
-```
+    abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 
 Abstract supertype for all shrinkage targets used in expected returns estimation.
 
@@ -47,9 +41,7 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 """
-```julia
-struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
-```
+    struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 
 Shrinkage target representing the grand mean of expected returns.
 
@@ -62,9 +54,7 @@ Shrinkage target representing the grand mean of expected returns.
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 """
-```julia
-struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
-```
+    struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 
 Shrinkage target representing the volatility-weighted mean of expected returns.
 
@@ -77,9 +67,7 @@ Shrinkage target representing the volatility-weighted mean of expected returns.
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 """
-```julia
-struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
-```
+    struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 
 Shrinkage target representing the mean squared error of expected returns.
 
@@ -92,11 +80,9 @@ Shrinkage target representing the mean squared error of expected returns.
 """
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 """
-```julia
-struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-end
-```
+    struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
+        target::T1
+    end
 
 Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
@@ -108,9 +94,7 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
 # Constructor
 
-```julia
-JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-```
+    JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
 Keyword arguments correspond to the fields above.
 
@@ -139,11 +123,9 @@ function JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return JamesStein(target)
 end
 """
-```julia
-struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-end
-```
+    struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
+        target::T1
+    end
 
 Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
@@ -155,9 +137,7 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
 # Constructor
 
-```julia
-BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-```
+    BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
 Keyword arguments correspond to the fields above.
 
@@ -186,11 +166,9 @@ function BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BayesStein(target)
 end
 """
-```julia
-struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-end
-```
+    struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
+        target::T1
+    end
 
 Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expected returns.
 
@@ -202,9 +180,7 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
 # Constructor
 
-```julia
-BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-```
+    BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
 Keyword arguments correspond to the fields above.
 
@@ -233,13 +209,11 @@ function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = Gra
     return BodnarOkhrinParolya(target)
 end
 """
-```julia
-struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-    me::T1
-    ce::T2
-    alg::T3
-end
-```
+    struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
+        me::T1
+        ce::T2
+        alg::T3
+    end
 
 Container type for shrinkage-based expected returns estimators.
 
@@ -253,11 +227,9 @@ Container type for shrinkage-based expected returns estimators.
 
 # Constructor
 
-```julia
-ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                      ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                      alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
-```
+    ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                          alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
 
 Keyword arguments correspond to the fields above.
 
@@ -310,10 +282,8 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-```julia
-target_mean(::AbstractShrunkExpectedReturnsTarget, mu::AbstractArray, sigma::AbstractMatrix;
-            kwargs...)
-```
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::AbstractArray, sigma::AbstractMatrix;
+                kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
 
@@ -360,9 +330,7 @@ function target_mean(::MeanSquaredError, mu::AbstractArray, sigma::AbstractMatri
     return range(; start = val, stop = val, length = length(mu))
 end
 """
-```julia
-mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute shrunk expected returns using the specified estimator.
 

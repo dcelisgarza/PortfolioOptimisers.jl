@@ -1,11 +1,9 @@
 """
-```julia
-struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
-    ce::T1
-    me::T2
-    horizon::T3
-end
-```
+    struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
+        ce::T1
+        me::T2
+        horizon::T3
+    end
 
 Empirical prior estimator for asset returns.
 
@@ -19,11 +17,9 @@ Empirical prior estimator for asset returns.
 
 # Constructor
 
-```julia
-EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               horizon::Union{Nothing, <:Real} = nothing)
-```
+    EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                   me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                   horizon::Union{Nothing, <:Real} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -88,10 +84,8 @@ function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = noth
                           horizon = pe.horizon)
 end
 """
-```julia
-prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...; dims::Int = 1,
-      kwargs...)
-```
+    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...; dims::Int = 1,
+          kwargs...)
 
 Compute empirical prior moments for asset returns (no horizon adjustment).
 
@@ -130,10 +124,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, arg
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 """
-```julia
-prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...; dims::Int = 1,
-      kwargs...)
-```
+    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...; dims::Int = 1,
+          kwargs...)
 
 Compute empirical prior moments for asset returns with investment horizon adjustment.
 

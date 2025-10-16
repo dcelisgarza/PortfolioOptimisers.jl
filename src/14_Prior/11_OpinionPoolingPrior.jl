@@ -1,7 +1,5 @@
 """
-```julia
-abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
-```
+    abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for opinion pooling algorithms.
 
@@ -15,9 +13,7 @@ Abstract supertype for opinion pooling algorithms.
 """
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 """
-```julia
-struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
-```
+    struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 
 Linear opinion pooling algorithm for consensus prior estimation.
 
@@ -38,9 +34,7 @@ Linear opinion pooling algorithm for consensus prior estimation.
 """
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 """
-```julia
-struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
-```
+    struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
 
 Logarithmic opinion pooling algorithm for consensus prior estimation.
 
@@ -68,17 +62,15 @@ LogarithmicOpinionPooling()
 """
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
 """
-```julia
-struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
-    pes::T1
-    pe1::T2
-    pe2::T3
-    p::T4
-    w::T5
-    alg::T6
-    threads::T7
-end
-```
+    struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
+        pes::T1
+        pe1::T2
+        pe2::T3
+        p::T4
+        w::T5
+        alg::T6
+        threads::T7
+    end
 
 Opinion pooling prior estimator for asset returns.
 
@@ -96,9 +88,7 @@ Opinion pooling prior estimator for asset returns.
 
 # Constructor
 
-```julia
-OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, threads)
-```
+    OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, threads)
 
 Keyword arguments correspond to the fields above. All arguments are validated for type and value consistency.
 
@@ -287,10 +277,8 @@ function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
 """
-```julia
-robust_probabilities(ow::AbstractVector, args...)
-robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
-```
+    robust_probabilities(ow::AbstractVector, args...)
+    robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
 
 Compute robust opinion probabilities for consensus formation in opinion pooling.
 
@@ -327,10 +315,8 @@ function robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
     return ow
 end
 """
-```julia
-compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
-compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
-```
+    compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
+    compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
 
 Compute the consensus posterior return distribution from individual prior distributions using opinion pooling.
 
@@ -368,11 +354,9 @@ function compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector,
     return pweights(vec(exp.(u .- lse)))
 end
 """
-```julia
-prior(pe::OpinionPoolingPrior, X::AbstractMatrix;
-      F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
-      kwargs...)
-```
+    prior(pe::OpinionPoolingPrior, X::AbstractMatrix;
+          F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+          kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
 

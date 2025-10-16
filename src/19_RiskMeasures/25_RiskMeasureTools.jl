@@ -9,7 +9,7 @@ for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVarianc
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(Ref(r), pnames))...)
+                          NamedTuple{pnames}(getproperty.(r, pnames))...)
                  end
              end
          end)
@@ -27,7 +27,7 @@ for r in traverse_concrete_subtypes(RiskMeasure)
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(Ref(r), pnames))...)
+                          NamedTuple{pnames}(getproperty.(r, pnames))...)
                  end
              end
              function bounds_risk_measure(r::$(r), ub::Real)
@@ -39,7 +39,7 @@ for r in traverse_concrete_subtypes(RiskMeasure)
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(Ref(r), pnames))...)
+                          NamedTuple{pnames}(getproperty.(r, pnames))...)
                  end
              end
          end)

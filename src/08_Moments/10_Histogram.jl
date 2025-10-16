@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractBins <: AbstractAlgorithm end
-```
+    abstract type AbstractBins <: AbstractAlgorithm end
 
 Abstract supertype for all histogram binning algorithms.
 
@@ -17,9 +15,7 @@ Abstract supertype for all histogram binning algorithms.
 """
 abstract type AbstractBins <: AbstractAlgorithm end
 """
-```julia
-abstract type AstroPyBins <: AbstractBins end
-```
+    abstract type AstroPyBins <: AbstractBins end
 
 Abstract supertype for all histogram binning algorithms implemented using AstroPy's bin width selection methods.
 
@@ -34,9 +30,7 @@ Abstract supertype for all histogram binning algorithms implemented using AstroP
 """
 abstract type AstroPyBins <: AbstractBins end
 """
-```julia
-struct Knuth <: AstroPyBins end
-```
+    struct Knuth <: AstroPyBins end
 
 Histogram binning algorithm using Knuth's rule.
 
@@ -52,9 +46,7 @@ Histogram binning algorithm using Knuth's rule.
 """
 struct Knuth <: AstroPyBins end
 """
-```julia
-struct FreedmanDiaconis <: AstroPyBins end
-```
+    struct FreedmanDiaconis <: AstroPyBins end
 
 Histogram binning algorithm using the Freedman-Diaconis rule.
 
@@ -70,9 +62,7 @@ Histogram binning algorithm using the Freedman-Diaconis rule.
 """
 struct FreedmanDiaconis <: AstroPyBins end
 """
-```julia
-struct Scott <: AstroPyBins end
-```
+    struct Scott <: AstroPyBins end
 
 Histogram binning algorithm using Scott's rule.
 
@@ -88,9 +78,7 @@ Histogram binning algorithm using Scott's rule.
 """
 struct Scott <: AstroPyBins end
 """
-```julia
-struct HacineGharbiRavier <: AbstractBins end
-```
+    struct HacineGharbiRavier <: AbstractBins end
 
 Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 
@@ -107,9 +95,7 @@ Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
-```julia
-get_bin_width_func(bins::Union{<:AbstractBins, <:Integer})
-```
+    get_bin_width_func(bins::Union{<:AbstractBins, <:Integer})
 
 Return the bin width selection function associated with a histogram binning algorithm.
 
@@ -164,10 +150,8 @@ function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
 end
 """
-```julia
-calc_num_bins(bins::Union{<:AbstractBins, <:Integer}, xj::AbstractVector,
-              xi::AbstractVector, j::Integer, i::Integer, bin_width_func, T::Integer)
-```
+    calc_num_bins(bins::Union{<:AbstractBins, <:Integer}, xj::AbstractVector,
+                  xi::AbstractVector, j::Integer, i::Integer, bin_width_func, T::Integer)
 
 Compute the number of histogram bins for a pair of variables using a specified binning algorithm.
 
@@ -227,9 +211,7 @@ function calc_num_bins(bins::Integer, args...)
     return bins
 end
 """
-```julia
-calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
-```
+    calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
 
 Compute histogram-based marginal and joint distributions for two variables.
 
@@ -283,9 +265,7 @@ function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     return ex, ey, hxy
 end
 """
-```julia
-intrinsic_mutual_info(X::AbstractMatrix)
-```
+    intrinsic_mutual_info(X::AbstractMatrix)
 
 Compute the intrinsic mutual information from a joint histogram.
 
@@ -335,11 +315,9 @@ function intrinsic_mutual_info(X::AbstractMatrix)
     return sum(mi)
 end
 """
-```julia
-variation_info(X::AbstractMatrix;
-               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-               normalise::Bool = true)
-```
+    variation_info(X::AbstractMatrix;
+                   bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                   normalise::Bool = true)
 
 Compute the variation of information (VI) matrix for a set of variables.
 
@@ -437,11 +415,9 @@ function mutual_variation_info(X::AbstractMatrix,
 end
 # COV_EXCL_STOP
 """
-```julia
-mutual_info(X::AbstractMatrix;
-            bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-            normalise::Bool = true)
-```
+    mutual_info(X::AbstractMatrix;
+                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                normalise::Bool = true)
 
 Compute the mutual information (MI) matrix for a set of variables.
 

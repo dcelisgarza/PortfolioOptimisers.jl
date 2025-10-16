@@ -1,7 +1,5 @@
 """
-```julia
-abstract type AbstractDetoneEstimator <: AbstractEstimator end
-```
+    abstract type AbstractDetoneEstimator <: AbstractEstimator end
 
 Abstract supertype for all detoning estimators in PortfolioOptimisers.jl.
 
@@ -15,11 +13,9 @@ All concrete types representing detoning estimators (such as [`Detone`](@ref)) s
 """
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
-```julia
-struct Detone{T1} <: AbstractDetoneEstimator
-    n::T1
-end
-```
+    struct Detone{T1} <: AbstractDetoneEstimator
+        n::T1
+    end
 
 A concrete detoning estimator for removing the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -29,9 +25,7 @@ A concrete detoning estimator for removing the top `n` principal components (mar
 
 # Constructor
 
-```julia
-Detone(; n::Integer = 1)
-```
+    Detone(; n::Integer = 1)
 
 Keyword arguments correspond to the fields above.
 
@@ -63,10 +57,8 @@ function Detone(; n::Integer = 1)
     return Detone(n)
 end
 """
-```julia
-detone!(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
-detone!(::Nothing, args...)
-```
+    detone!(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
+    detone!(::Nothing, args...)
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -149,10 +141,8 @@ function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = 
     return nothing
 end
 """
-```julia
-detone(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
-detone(::Nothing, args...)
-```
+    detone(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
+    detone(::Nothing, args...)
 
 Out-of-place version of [`detone!`](@ref).
 

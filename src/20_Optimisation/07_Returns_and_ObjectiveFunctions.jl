@@ -189,7 +189,7 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
                  return if isempty(pnames)
                      $(r)(; lb = lb)
                  else
-                     $(r)(; lb = lb, NamedTuple{pnames}(getproperty.(Ref(r), pnames))...)
+                     $(r)(; lb = lb, NamedTuple{pnames}(getproperty.(r, pnames))...)
                  end
              end
          end)

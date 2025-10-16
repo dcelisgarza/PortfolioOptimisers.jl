@@ -1,7 +1,5 @@
 """
-```julia
-block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
-```
+    block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
 
 Block vectorisation operator.
 
@@ -54,9 +52,9 @@ function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
         Aj = Matrix{eltype(A)}(undef, m, p * q)
         for i in 0:(m - 1)
             Aij = vec(A[(1 + (i * p)):((i + 1) * p), (1 + (j * q)):((j + 1) * q)])
-            Aj[i + 1, :] .= Aij
+            Aj[i + 1, :] = Aij
         end
-        A_vec[(1 + (j * m)):((j + 1) * m), :] .= Aj
+        A_vec[(1 + (j * m)):((j + 1) * m), :] = Aj
     end
 
     return A_vec
@@ -191,9 +189,7 @@ function summation_matrix(n::Int, diag::Bool = true)
 end
 # COV_EXCL_STOP
 """
-```julia
-dup_elim_sum_matrices(n::Int)
-```
+    dup_elim_sum_matrices(n::Int)
 
 Construct duplication, elimination, and summation matrices for symmetric matrix vectorisation.
 
@@ -330,13 +326,11 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     end
 end
 """
-```julia
-struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
-    pe::T1
-    kte::T2
-    ske::T3
-end
-```
+    struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
+        pe::T1
+        kte::T2
+        ske::T3
+    end
 
 High order prior estimator for asset returns.
 
@@ -350,13 +344,11 @@ High order prior estimator for asset returns.
 
 # Constructor
 
-```julia
-HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                        kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
-                                                                                alg = Full()),
-                        ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
-                                                                                alg = Full()))
-```
+    HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+                            kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
+                                                                                    alg = Full()),
+                            ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
+                                                                                    alg = Full()))
 
 Keyword arguments correspond to the fields above.
 
@@ -486,10 +478,9 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
         end
     end
     pr = prior(pe.pe, X, F; kwargs...)
-    (; X, mu) = pr
-    kt = cokurtosis(pe.kte, X; mean = transpose(mu), kwargs...)
-    L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(length(mu))[2:3] : (nothing, nothing)
-    sk, V = coskewness(pe.ske, X; mean = transpose(mu), kwargs...)
+    kt = cokurtosis(pe.kte, pr.X; kwargs...)
+    L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(size(pr.X, 2))[2:3] : (nothing, nothing)
+    sk, V = coskewness(pe.ske, pr.X; kwargs...)
     return HighOrderPrior(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
                           skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end

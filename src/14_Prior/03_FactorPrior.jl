@@ -1,13 +1,11 @@
 """
-```julia
-struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
-    pe::T1
-    mp::T2
-    re::T3
-    ve::T4
-    rsd::T5
-end
-```
+    struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
+        pe::T1
+        mp::T2
+        re::T3
+        ve::T4
+        rsd::T5
+    end
 
 Factor-based prior estimator for asset returns.
 
@@ -23,12 +21,10 @@ Factor-based prior estimator for asset returns.
 
 # Constructor
 
-```julia
-FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-            re::AbstractRegressionEstimator = StepwiseRegression(),
-            ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
-```
+    FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                re::AbstractRegressionEstimator = StepwiseRegression(),
+                ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -121,9 +117,7 @@ function Base.getproperty(obj::FactorPrior, sym::Symbol)
     end
 end
 """
-```julia
-prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1, kwargs...)
-```
+    prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
