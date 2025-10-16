@@ -161,6 +161,8 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
         model[key], key
     end
 end
+"""
+"""
 function variance_risk_bounds_val(flag::Bool, ub::Frontier)
     return _Frontier(; N = ub.N, factor = 1, flag = flag)
 end
@@ -376,6 +378,8 @@ function set_second_moment_risk!(model::JuMP.Model, ::SqrtRiskExpr, i::Any, fact
     factor = sqrt(factor)
     return model[key] = @expression(model, factor * tsecond_moment), factor
 end
+"""
+"""
 function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::Frontier, factor::Real)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SqrtRiskExpr))
 end

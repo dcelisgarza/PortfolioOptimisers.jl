@@ -145,9 +145,9 @@ Unified interface for constructing or passing through Black-Litterman investor v
 
   - `views`:
 
-      + If views is `nothing` or already a [`BlackLittermanViews`](@ref) object, it is returned unchanged.
-      + If `views` is `Union{<:AbstractString, Expr, <:AbstractVector{<:Union{<:AbstractString, Expr}}}`, the view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
-      + If `views` is a [`LinearConstraintEstimator`](@ref), calls the method described above using the `val` field of the estimator.
+      + `nothing` or [`BlackLittermanViews`](@ref): it is returned unchanged.
+      + `Union{<:AbstractString, Expr, <:AbstractVector{<:Union{<:AbstractString, Expr}}}`: the view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
+      + [`LinearConstraintEstimator`](@ref): calls the method described above using the `val` field of the estimator.
 
   - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
   - `datatype`: Numeric type for coefficients and expected returns.

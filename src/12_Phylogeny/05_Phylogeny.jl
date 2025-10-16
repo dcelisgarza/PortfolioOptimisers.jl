@@ -21,7 +21,7 @@ Keyword arguments correspond to the fields above.
 
   - `!isempty(X)`.
 
-  - If `X` is a matrix:
+  - If `X` is a `AbstractMatrix`:
 
       + Must be symmetric, `issymmetric(X) == true`.
       + Must have zero diagonal, `all(iszero, diag(X)) == true`.

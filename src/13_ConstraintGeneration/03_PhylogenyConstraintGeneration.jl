@@ -165,6 +165,41 @@ function SemiDefinitePhylogeny(;
                                         <:AbstractMatrix{<:Real}}, p::Real = 0.05)
     return SemiDefinitePhylogeny(A, p)
 end
+"""
+    _validate_length_integer_phylogeny_constraint_B(alg::Union{Nothing, <:Integer},
+                                                    B::AbstractVector)
+
+Validate that the length of the vector `B` does not exceed the integer value `alg`.
+
+This function is used internally to ensure that the number of groups or allocations specified by `B` does not exceed the allowed maximum defined by `alg`. If the validation fails, a `DomainError` is thrown.
+
+# Arguments
+
+  - `alg`:
+
+      + `Nothing`: No validation is performed.
+      + `Integer`: specifying the maximum allowed length for `B`.
+
+  - `B`: Vector of integers representing group sizes or allocations.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Validation
+
+  - Throws `DomainError` if `length(B) > alg`.
+
+# Details
+
+  - Checks that `length(B) <= alg`.
+  - Used in the construction and validation of integer phylogeny constraints.
+
+# Related
+
+  - [`validate_length_integer_phylogeny_constraint_B`](@ref)
+  - [`IntegerPhylogenyEstimator`](@ref)
+"""
 function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::AbstractVector)
     @argcheck(length(B) <= alg,
               DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
@@ -173,6 +208,38 @@ end
 function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
+"""
+    validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator, B::AbstractVector)
+    validate_length_integer_phylogeny_constraint_B(args...)
+
+Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pe`.
+
+# Arguments
+
+  - `pe`: Clustering estimator containing algorithm and maximum group information.
+  - `B`: Vector of integers representing group sizes or allocations.
+  - `args...`: No validation is performed.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Validation
+
+  - Throws `DomainError` if `length(B) > pe.onc.max_k` (when `max_k` is set).
+  - Calls internal [`_validate_length_integer_phylogeny_constraint_B`](@ref) for further checks.
+
+# Details
+
+  - Checks if `pe.onc.max_k` is set and validates `length(B)` accordingly.
+  - Delegates to `_validate_length_integer_phylogeny_constraint_B` for algorithm-specific validation.
+  - Used in the construction and validation of integer phylogeny constraints.
+
+# Related
+
+  - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
+  - [`IntegerPhylogenyEstimator`](@ref)
+"""
 function validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator,
                                                         B::AbstractVector)
     if !isnothing(pe.onc.max_k)
@@ -212,8 +279,9 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 
 ## Validation
 
-  - If `B` is a vector: `!isempty(B)`, `all(x -> x >= 0, B)`, and if `pe` is a clustering estimator, its length length must be at most the maximum number of clusters/predefined number of clusters in the estimator.
-  - If `B` is an integer: `B >= 0`.
+  - `B` is validated with [`assert_nonneg_finite_val`](@ref).
+
+      + `AbstractVector`: it is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
 
 # Examples
 
@@ -261,12 +329,9 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
                                                  <:AbstractClusteringResult},
                                        B::Union{<:Integer, <:AbstractVector{<:Integer}},
                                        scale::Real)
+        assert_nonneg_finite_val(B)
         if isa(B, AbstractVector)
-            @argcheck(!isempty(B))
-            @argcheck(all(x -> x >= zero(x), B))
             validate_length_integer_phylogeny_constraint_B(pe, B)
-        else
-            @argcheck(B >= zero(B))
         end
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
     end
@@ -306,8 +371,10 @@ Container for the result of integer phylogeny-based constraint generation.
 ## Validation
 
   - `issymmetric(A)` and `all(iszero, diag(A))`.
-  - If `B` is a vector: `!isempty(B)`, `all(x -> x >= 0, B)`, and `size(unique(A + I; dims = 1), 1) == length(B)`.
-  - If `B` is an integer: `B >= 0`.
+
+  - `B` is validated with [`assert_nonneg_finite_val`](@ref).
+
+      + `AbstractVector`: `size(unique(A + I; dims = 1), 1) == length(B)`.
 
 # Examples
 
@@ -334,12 +401,9 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
         @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
+        assert_nonneg_finite_val(B)
         if isa(B, AbstractVector)
-            @argcheck(!isempty(B))
             @argcheck(size(A, 1) == length(B))
-            @argcheck(all(x -> x >= zero(x), B))
-        else
-            @argcheck(B >= zero(B))
         end
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
@@ -380,9 +444,10 @@ Generate phylogeny-based portfolio constraints from an estimator or result.
 
 # Details
 
-  - If `est` is an estimator, computes the phylogeny matrix using the estimator.
-  - If `est` is a result, returns it unchanged.
-  - If `est` is `nothing`, returns `nothing`.
+  - `est`:
+
+      + `Union{<:SemiDefinitePhylogenyEstimator, <:IntegerPhylogenyEstimator}`: computes the phylogeny matrix using the estimator.
+      + `Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny}`: returns it unchanged.
 
 # Related
 
@@ -532,7 +597,7 @@ Reduce a vector of real values to a single real value using a specified measure.
 # Arguments
 
   - `measure`: An instance of a concrete subtype of [`VectorToRealMeasure`](@ref), or the predefined value to return.
-  - `val`: A vector of real values to be reduced (ignored if `measure` is a real value).
+  - `val`: A vector of real values to be reduced (ignored if `measure` is a `Real`).
 
 # Returns
 

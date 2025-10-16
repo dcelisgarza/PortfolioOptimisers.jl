@@ -4,6 +4,7 @@
 brinson_attribution
 traverse_concrete_subtypes
 PortfolioOptimisers.AbstractReturnsResult
+PortfolioOptimisers.assert_nonneg_finite_val
 PortfolioOptimisers.assert_matrix_issquare
 PortfolioOptimisers.:⊗
 PortfolioOptimisers.:⊙

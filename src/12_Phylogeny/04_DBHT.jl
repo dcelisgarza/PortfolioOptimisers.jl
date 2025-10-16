@@ -942,8 +942,8 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
 # Arguments
 
-  - `Apm::AbstractMatrix{<:Real}`: Adjacency matrix of the MPG, where nonzero entries indicate edges.
-  - `root::DBHTRootMethod`: Root selection method for the clique hierarchy.
+  - `Apm`: Adjacency matrix of the MPG, where nonzero entries indicate edges.
+  - `root`: Root selection method for the clique hierarchy.
 
 # Details
 
@@ -1020,11 +1020,11 @@ This function assigns directions to each separating 3-clique in the undirected b
 
 # Arguments
 
-  - `Rpm::AbstractMatrix{<:Real}`: `N×N` sparse weighted adjacency matrix of the PMFG.
-  - `Hb::AbstractMatrix{<:Real}`: Undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)).
-  - `Mb::AbstractMatrix{<:Real}`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv::AbstractMatrix{<:Real}`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `CliqList::AbstractMatrix{<:Real}`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
+  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
+  - `Hb`: Undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)).
+  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
+  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
 # Details
 
@@ -1103,12 +1103,12 @@ This function assigns each vertex to a cluster based on the directed bubble hier
 
 # Arguments
 
-  - `Rpm::AbstractMatrix{<:Real}`: `N×N` sparse weighted adjacency matrix of the PMFG.
-  - `Dpm::AbstractMatrix{<:Real}`: `N×N` shortest path lengths matrix of the PMFG.
-  - `Hb::AbstractMatrix{<:Real}`: Undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
-  - `Mb::AbstractMatrix{<:Real}`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv::AbstractMatrix{<:Real}`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `CliqList::AbstractMatrix{<:Real}`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
+  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
+  - `Dpm`: `N×N` shortest path lengths matrix of the PMFG.
+  - `Hb`: Undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
+  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
+  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
 # Details
 

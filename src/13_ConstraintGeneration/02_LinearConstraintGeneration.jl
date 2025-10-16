@@ -487,10 +487,12 @@ Recursively evaluate numeric functions and constants in a Julia expression.
 
 # Details
 
-    - If `expr` is a numeric constant, it is returned as-is.
-    - If `expr` is the symbol `:Inf`, returns `Inf`.
-    - If `expr` is an expression representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
-    - Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
+  - `expr`:
+
+      + `Real`: it is returned as-is.
+      + `:Inf`: returns `Inf`.
+      + `Expr`: representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
+      + Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
 
 # Returns
 
@@ -568,16 +570,18 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
 # Details
 
-  - If `expr` is a `Number`, appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
+  - `expr`:
 
-  - If `expr` is a `Symbol`, appends `(coeff, string(expr))` to `terms`.
-  - If `expr` is an `Expr`:
+      + `Number`: appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
 
-      + For multiplication (`*`), distributes the coefficient to the numeric part.
-      + For division (`/`), divides the coefficient by the numeric denominator.
-      + For addition (`+`), recursively collects terms from all arguments.
-      + For subtraction (`-`), recursively collects terms from all arguments except the last, which is negated.
-      + For all other expressions, treats as a variable and appends as `(coeff, string(expr))`.
+      + `Symbol`: appends `(coeff, string(expr))` to `terms`.
+      + `Expr`:
+
+          * For multiplication (`*`), distributes the coefficient to the numeric part.
+          * For division (`/`), divides the coefficient by the numeric denominator.
+          * For addition (`+`), recursively collects terms from all arguments.
+          * For subtraction (`-`), recursively collects terms from all arguments except the last, which is negated.
+          * For all other expressions, treats as a variable and appends as `(coeff, string(expr))`.
 
 # Returns
 
@@ -896,7 +900,7 @@ end
                             sets::AssetSets; bl_flag::Bool = false, prior_flag::Bool = false,
                             rho_flag::Bool = false)
 
-If `res` is a vector of `ParsingResult` objects, this function will be applied to each element of the vector.
+If `res` is a vector of [`ParsingResult`](@ref) objects, this function will be applied to each element of the vector.
 
 Expand group or special variable references in a [`ParsingResult`](@ref) to their corresponding asset names.
 
@@ -1296,6 +1300,7 @@ LinearConstraint
   - [`PartialLinearConstraint`](@ref)
   - [`LinearConstraint`](@ref)
   - [`AssetSets`](@ref)
+  - [`linear_constraints`](@ref)
 """
 function linear_constraints(eqn::Union{<:AbstractString, Expr,
                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
@@ -1313,13 +1318,17 @@ end
                        sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false)
 
-If `lcs` is a vector of `LinearConstraintEstimator` objects, this function is broadcast over the vector.
+If `lcs` is a vector of [`LinearConstraintEstimator`](@ref) objects, this function is broadcast over the vector.
 
 This method is a wrapper calling:
 
     linear_constraints(lcs.val, sets; datatype = datatype, strict = strict, bl_flag = bl_flag)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
+
+# Related
+
+  - [`linear_constraints`](@ref)
 """
 function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
                             datatype::DataType = Float64, strict::Bool = false,
@@ -1406,14 +1415,13 @@ Container for a risk budget allocation mapping or vector.
 
     RiskBudgetEstimator(;
                         val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                   <:AbstractVector{<:Union{<:Pair{<:AbstractString, <:Real}}}})
+                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}}})
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `val` is a container, `!isempty(val)`.
-  - All numeric values must be non-negative.
+  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -1437,21 +1445,9 @@ struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
     val::T1
     function RiskBudgetEstimator(val::Union{<:AbstractDict,
                                             <:Pair{<:AbstractString, <:Real},
-                                            <:AbstractVector{<:Union{<:Pair{<:AbstractString,
-                                                                            <:Real}}}})
-        if isa(val, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(val), IsEmptyError(non_empty_msg("`val`") * "."))
-            if isa(val, AbstractDict)
-                @argcheck(all(x -> x >= zero(x), values(val)),
-                          DomainError("All entries of `val` must be non-negative"))
-            elseif isa(val, AbstractVector{<:Pair})
-                @argcheck(all(x -> x >= zero(x), getproperty.(val, :second)),
-                          DomainError("The numerical value of all entries of `val` must be non-negative"))
-            end
-        elseif isa(val, Pair)
-            @argcheck(val.second >= zero(val.second),
-                      DomainError("The numerical value of `val` must be non-negative:\nval.second => $(val.second)"))
-        end
+                                            <:AbstractVector{<:Pair{<:AbstractString,
+                                                                    <:Real}}})
+        assert_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
@@ -1594,13 +1590,17 @@ end
                                       <:AbstractVector{<:RiskBudgetEstimator}}, sets::AssetSets;
                             strict::Bool = false, kwargs...)
 
-If `rb` is a vector of `RiskBudgetEstimator` objects, this function is broadcast over the vector.
+If `rb` is a vector of [`RiskBudgetEstimator`](@ref) objects, this function is broadcast over the vector.
 
 This method is a wrapper calling:
 
     risk_budget_constraints(rb.val, sets; strict = strict)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
+
+# Related
+
+  - [`risk_budget_constraints`](@ref)
 """
 function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
@@ -1757,6 +1757,10 @@ This method is a wrapper calling:
     asset_sets_matrix(smtx.val, sets)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
+
+# Related
+
+  - [`asset_sets_matrix`](@ref)
 """
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)

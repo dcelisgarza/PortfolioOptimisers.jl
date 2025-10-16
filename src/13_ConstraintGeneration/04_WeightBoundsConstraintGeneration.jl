@@ -163,7 +163,7 @@ Estimator for portfolio weight bounds constraints.
 
 ## Validation
 
-  - If `lb` or `ub` is a dictionary or vector, it must be non-empty.
+  - If `lb` or `ub` is a `AbstractDict` or `AbstractVector`, it must be non-empty.
 
 # Details
 
