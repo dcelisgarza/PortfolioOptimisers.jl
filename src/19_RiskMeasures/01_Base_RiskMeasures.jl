@@ -176,8 +176,11 @@ Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, 
 # Examples
 
 ```jldoctest
-julia> RiskMeasureSettings(; scale = 2.0, ub = 0.5, rke = false)
-RiskMeasureSettings{Float64, Float64, Bool}(2.0, 0.5, 0)
+julia> RiskMeasureSettings()
+RiskMeasureSettings
+  scale | Float64: 1.0
+     ub | nothing
+    rke | Bool: true
 ```
 
 # Related
@@ -220,7 +223,9 @@ Used for `HierarchicalRiskMeasure`, where it is impossible to set a risk upper b
 # Constructors
 
 ```julia
-HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
+julia> HierarchicalRiskMeasureSettings()
+HierarchicalRiskMeasureSettings
+  scale | Float64: 1.0
 ```
 
 Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling factor.

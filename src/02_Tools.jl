@@ -14,8 +14,9 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    assert_nonneg_finite_val(val::Union{Nothing, <:Real, <:Pair, <:AbstractDict,
+    assert_nonneg_finite_val(val::Union{<:Real, <:Pair, <:AbstractDict,
                                         <:AbstractVector{<:Real}, <:AbstractVector{<:Pair}})
+    assert_nonneg_finite_val(args...)
 
 Validate that the input value is non-negative and finite.
 
@@ -31,7 +32,7 @@ Checks that the provided value (scalar, vector, dictionary, or pair) contains on
 
 # Validation
 
-  - `nothing`: always passes.
+  - `args...`: always passes.
   - `Real`: `isfinite(val)` and `val >= 0`.
   - `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
   - `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
@@ -66,7 +67,7 @@ function assert_nonneg_finite_val(val::Real)
     @argcheck(val >= zero(val))
     return nothing
 end
-function assert_nonneg_finite_val(::Nothing)
+function assert_nonneg_finite_val(args...)
     return nothing
 end
 """
