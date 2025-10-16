@@ -5,7 +5,7 @@ struct SOCRiskExpr <: VarianceAlgorithm end
 struct RSOCRiskExpr <: SecondMomentAlgorithm end
 struct SqrtRiskExpr <: SecondMomentAlgorithm end
 const QuadSqrtRiskExpr = Union{<:SqrtRiskExpr, <:QuadRiskExpr}
-struct Variance{T1, T2, T3, T4} <: JuMPRiskContributionSigmaRiskMeasure
+struct Variance{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     sigma::T2
     rc::T3
@@ -41,7 +41,7 @@ function risk_measure_view(r::Variance, i::AbstractVector, args...)
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
-struct StandardDeviation{T1, T2} <: SigmaRiskMeasure
+struct StandardDeviation{T1, T2} <: RiskMeasure
     settings::T1
     sigma::T2
     function StandardDeviation(settings::RiskMeasureSettings,
@@ -68,7 +68,7 @@ function risk_measure_view(r::StandardDeviation, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-struct UncertaintySetVariance{T1, T2, T3} <: SigmaRiskMeasure
+struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     ucs::T2
     sigma::T3

@@ -1,4 +1,4 @@
-struct NegativeSkewness{T1, T2, T3, T4, T5} <: AbstractNegativeSkewRiskMeasure
+struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     mp::T2
     sk::T3

@@ -1,4 +1,4 @@
-struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: SquareRootKurtosisRiskMeasure
+struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: RiskMeasure
     settings::T1
     w::T2
     mu::T3

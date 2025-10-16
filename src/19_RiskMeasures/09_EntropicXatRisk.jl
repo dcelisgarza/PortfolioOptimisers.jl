@@ -32,7 +32,7 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
         NaN
     end
 end
-struct EntropicValueatRisk{T1, T2, T3, T4} <: SolverRiskMeasure
+struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -67,7 +67,7 @@ function factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
     slv = solver_factory(r.slv, slv)
     return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
 end
-struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: SolverRiskMeasure
+struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -109,7 +109,7 @@ function factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                     beta = r.beta, w = w)
 end
-struct EntropicDrawdownatRisk{T1, T2, T3} <: SolverRiskMeasure
+struct EntropicDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -143,7 +143,7 @@ function (r::EntropicDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return ERM(dd, r.slv, r.alpha)
 end
-struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: SolverHierarchicalRiskMeasure
+struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3

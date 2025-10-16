@@ -68,7 +68,7 @@ for alg in (LowOrderDeviation, HighOrderDeviation)
              end
          end)
 end
-struct LowOrderMoment{T1, T2, T3, T4} <: AbstractMomentRiskMeasure
+struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -95,7 +95,7 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         alg::AbstractUnionLowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
-struct HighOrderMoment{T1, T2, T3, T4} <: AbstractMomentHierarchicalRiskMeasure
+struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -144,11 +144,8 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:An
                             ::Any)
     return r.mu
 end
-function calc_moment_val(r::Union{<:AbstractMomentRiskMeasure,
-                                  <:AbstractMomentHierarchicalRiskMeasure,
-                                  <:AbstractMomentNoOptimisationRiskMeasure},
-                         w::AbstractVector, X::AbstractMatrix,
-                         fees::Union{Nothing, <:Fees} = nothing)
+function calc_moment_val(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
+                         X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target

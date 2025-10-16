@@ -1,24 +1,8 @@
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
 abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
-abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
-abstract type AbstractMomentNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
-
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 abstract type RiskMeasure <: OptimisationRiskMeasure end
-abstract type SigmaRiskMeasure <: RiskMeasure end
-abstract type JuMPRiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
-abstract type SolverRiskMeasure <: RiskMeasure end
-abstract type AbstractNegativeSkewRiskMeasure <: RiskMeasure end
-abstract type SquareRootKurtosisRiskMeasure <: RiskMeasure end
-abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
-abstract type MuRiskMeasure <: RiskMeasure end
-abstract type AbstractMomentRiskMeasure <: MuRiskMeasure end
-
 abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
-abstract type SolverHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
-abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
-abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
-
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
 struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     N::T1
@@ -67,13 +51,6 @@ end
 function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
     return HierarchicalRiskMeasureSettings(scale)
 end
-const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
-                             MuNoOptimisationRiskMeasure, SquareRootKurtosisRiskMeasure}
-const MomentRiskMeasures = Union{AbstractMomentRiskMeasure,
-                                 AbstractMomentHierarchicalRiskMeasure,
-                                 AbstractMomentNoOptimisationRiskMeasure}
-
-const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
 function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
