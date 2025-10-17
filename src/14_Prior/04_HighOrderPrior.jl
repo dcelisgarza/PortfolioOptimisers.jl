@@ -297,7 +297,11 @@ function prior_view(pr::HighOrderPrior, i::AbstractVector)
     sk = pr.sk
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
-    V = __coskewness(sk, view(pr.X, :, i), skmp)
+    if !isnothing(sk)
+        V = __coskewness(sk, view(pr.X, :, i), skmp)
+    else
+        V = nothing
+    end
     return HighOrderPrior(; pr = prior_view(pr.pr, i),
                           kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
                           sk = sk, V = V, skmp = skmp)

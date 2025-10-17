@@ -25,7 +25,7 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     end
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                          mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+                          mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                           sk::Union{Nothing, <:AbstractMatrix} = nothing,
                           V::Union{Nothing, <:AbstractMatrix} = nothing,
                           alg::UnionSOCRiskExpr = SOCRiskExpr())

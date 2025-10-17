@@ -2019,8 +2019,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    V = isnothing(r.V) ? pr.V : r.V
-    G = real(sqrt(V))
+    G = cholesky(isnothing(r.V) ? pr.V : r.V).U
     nskew_risk = model[key] = @variable(model)
     model[Symbol(:cnskew_soc_, i)] = @constraint(model,
                                                  [sc * nskew_risk; sc * G * w] in
@@ -2037,8 +2036,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:qnskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    V = isnothing(r.V) ? pr.V : r.V
-    G = real(sqrt(V))
+    G = cholesky(isnothing(r.V) ? pr.V : r.V).U
     t_qnskew_risk = model[Symbol(:t_qnskew_risk_, i)] = @variable(model)
     model[Symbol(:cqnskew_soc_, i)] = @constraint(model,
                                                   [sc * t_qnskew_risk; sc * G * w] in
