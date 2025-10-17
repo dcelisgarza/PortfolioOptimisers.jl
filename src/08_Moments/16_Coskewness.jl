@@ -144,7 +144,7 @@ function _coskewness(y::AbstractMatrix, X::AbstractMatrix,
     o = transpose(range(; start = one(eltype(y)), stop = one(eltype(y)),
                         length = size(X, 2)))
     z = kron(o, y) ⊙ kron(y, o)
-    cskew = transpose(X) * z / size(X, 1)
+    cskew = transpose(y) * z / size(y, 1)
     V = __coskewness(cskew, X, mp)
     return cskew, V
 end
