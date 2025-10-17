@@ -39,7 +39,6 @@ struct RSOCRiskExpr <: SecondMomentAlgorithm end
 Second-order cone risk expression optimisation formulation for variance-based risk measures. Implements the standard deviation (squar root of the variance)
 """
 struct SOCRiskExpr <: SecondMomentAlgorithm end
-const UnionSOCRiskExpr = Union{<:SOCRiskExpr, <:SquaredSOCRiskExpr}
 struct Variance{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     sigma::T2

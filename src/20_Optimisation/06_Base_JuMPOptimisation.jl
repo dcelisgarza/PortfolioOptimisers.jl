@@ -11,6 +11,13 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     end
     return model[:G]
 end
+function get_chol_or_V_pm(model::JuMP.Model, pr::AbstractPriorResult)
+    if !haskey(model, :GV)
+        G = cholesky(pr.V).U
+        @expression(model, GV, G)
+    end
+    return model[:GV]
+end
 function get_chol_or_sigma_pm(model::JuMP.Model,
                               pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any,
                                                         <:AbstractMatrix, <:Any, <:Any,
