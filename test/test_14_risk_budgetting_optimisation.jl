@@ -103,7 +103,7 @@
                 2.5e-1
             elseif i == 26
                 1e-2
-            elseif i ∈ (28, 29)
+            elseif i == 29
                 1e-3
             else
                 5e-4
@@ -154,9 +154,9 @@
                 success = m2 == 19 || m2 == 18
             end
             @test success
-            rtol = if i ∈ (3, 24, 28)
+            rtol = if i ∈ (3, 24)
                 1e-3
-            elseif i ∈ (8, 11, 13, 23, 27, 29)
+            elseif i ∈ (8, 11, 13, 23, 27)
                 5e-3
             elseif i == 9
                 5e-1
@@ -166,6 +166,8 @@
                 1e-1
             elseif i ∈ (16, 18)
                 5e-2
+            elseif i in (28, 29)
+                1e-3
             else
                 5e-4
             end
@@ -243,7 +245,7 @@
             v2 = maximum(rkc[1:5])
             rtol = if i ∈ (1, 2, 10, 17)
                 5e-1
-            elseif i ∈ (4, 5, 7, 13, 24, 28)
+            elseif i ∈ (4, 5, 7, 13, 24)
                 5e-4
             elseif i == 6
                 1e-4
@@ -254,8 +256,6 @@
             elseif i == 14
                 2.5e-1
             elseif i == 26
-                5e-3
-            elseif i == 29
                 5e-3
             else
                 5e-2
@@ -317,10 +317,12 @@
                 1
             elseif i ∈ (10, 11, 14, 16)
                 2.5e-1
-            elseif i ∈ (13, 15, 17, 18, 19, 20, 21, 22, 28, 29)
+            elseif i ∈ (13, 15, 17, 18, 19, 20, 21, 22)
                 5e-1
             elseif i == 26
                 1e-3
+            elseif i in (28, 29)
+                0.25
             else
                 5e-2
             end

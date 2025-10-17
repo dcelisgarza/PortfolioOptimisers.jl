@@ -36,7 +36,8 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::AbstractVector)
     return sqrt(dot(w, r.V, w))
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr})(w::AbstractVector)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
+                              <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector)
     return dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, prior::HighOrderPrior, args...; kwargs...)
