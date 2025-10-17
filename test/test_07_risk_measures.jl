@@ -141,7 +141,7 @@
     end
     @testset "Expected risk" begin
         r1 = factory(NegativeSkewness(), pr)
-        r2 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
+        r2 = factory(NegativeSkewness(; alg = SquaredSOCRiskExpr()), pr)
         @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
         @test isapprox(expected_risk(SquareRootKurtosis(; alg = Semi()), w, rd.X),
                        0.0002291596657404573)
@@ -154,12 +154,12 @@
         @test isapprox(expected_risk(LowOrderMoment(;
                                                     alg = LowOrderDeviation(;
                                                                             alg = SecondLowerMoment(;
-                                                                                                    alg = SqrtRiskExpr()))),
+                                                                                                    alg = SOCRiskExpr()))),
                                      w, rd.X), 0.009123864007588172)
         @test isapprox(expected_risk(LowOrderMoment(; mu = dot(w, pr.mu),
                                                     alg = LowOrderDeviation(;
                                                                             alg = SecondLowerMoment(;
-                                                                                                    alg = SqrtRiskExpr()))),
+                                                                                                    alg = SOCRiskExpr()))),
                                      w, rd.X),
                        sqrt(expected_risk(LowOrderMoment(;
                                                          alg = LowOrderDeviation(;
@@ -169,12 +169,12 @@
         @test isapprox(expected_risk(LowOrderMoment(;
                                                     alg = LowOrderDeviation(;
                                                                             alg = SecondCentralMoment(;
-                                                                                                      alg = SqrtRiskExpr()))),
+                                                                                                      alg = SOCRiskExpr()))),
                                      w, rd.X), 0.012828296955991162)
         @test isapprox(expected_risk(LowOrderMoment(; mu = dot(w, pr.mu),
                                                     alg = LowOrderDeviation(;
                                                                             alg = SecondCentralMoment(;
-                                                                                                      alg = SqrtRiskExpr()))),
+                                                                                                      alg = SOCRiskExpr()))),
                                      w, rd.X),
                        sqrt(expected_risk(LowOrderMoment(;
                                                          alg = LowOrderDeviation(;

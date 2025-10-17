@@ -129,7 +129,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
     return model[key] = @expression(model, tr(sigma_W))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
-                            r::Variance{<:Any, <:Any, <:Any, <:SOCRiskExpr},
+                            r::Variance{<:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -367,12 +367,12 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, fact
                                           sc * second_moment] in RotatedSecondOrderCone())
     return model[key] = @expression(model, factor * tsecond_moment), sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Real,
-                                 second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
-                                 tsecond_moment::AbstractJuMPScalar)
+function set_second_moment_risk!(model::JuMP.Model, ::SquaredSOCRiskExpr, i::Any,
+                                 factor::Real, second_moment, key::Symbol, keyt::Symbol,
+                                 keyc::Symbol, tsecond_moment::AbstractJuMPScalar)
     return model[key] = @expression(model, factor * tsecond_moment^2), sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::SqrtRiskExpr, i::Any, factor::Real,
+function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Real,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  tsecond_moment::AbstractJuMPScalar)
     factor = sqrt(factor)
@@ -381,14 +381,14 @@ end
 """
 """
 function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::Frontier, factor::Real)
-    return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SqrtRiskExpr))
+    return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end
 function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::AbstractVector,
                                  factor::Real)
-    return inv(factor) * (isa(alg, SqrtRiskExpr) ? ub : sqrt.(ub))
+    return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt.(ub))
 end
 function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::Real, factor::Real)
-    return inv(factor) * (isa(alg, SqrtRiskExpr) ? ub : sqrt(ub))
+    return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt(ub))
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
     return nothing
@@ -2012,7 +2012,7 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                   <:SqrtRiskExpr},
+                                                   <:SOCRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::HighOrderPrior, args...;
                                kwargs...)
@@ -2030,7 +2030,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                   <:QuadRiskExpr},
+                                                   <:SquaredSOCRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::HighOrderPrior, args...;
                                kwargs...)

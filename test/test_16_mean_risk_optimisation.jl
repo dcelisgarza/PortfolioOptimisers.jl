@@ -171,12 +171,12 @@
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             alg = SqrtRiskExpr()))),
+                                                                             alg = SOCRiskExpr()))),
               LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondCentralMoment(;
-                                                                               alg = SqrtRiskExpr()))),
+                                                                               alg = SOCRiskExpr()))),
               LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
               ConditionalValueatRisk(), ConditionalValueatRiskRange(),
@@ -188,7 +188,7 @@
               OrderedWeightsArray(),
               OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
               OrderedWeightsArrayRange(), NegativeSkewness(),
-              NegativeSkewness(; alg = QuadRiskExpr()),
+              NegativeSkewness(; alg = SquaredSOCRiskExpr()),
               DistributionallyRobustConditionalValueatRisk(),
               ValueatRisk(; alg = DistributionValueatRisk()),
               DistributionallyRobustConditionalValueatRiskRange(),

@@ -1,10 +1,45 @@
+"""
+    abstract type SecondMomentAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for optimisation formulations of second moment risk measures in PortfolioOptimisers.jl.
+
+# Related Types
+
+  - [`VarianceAlgorithm`](@ref)
+  - [`QuadRiskExpr`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
+"""
 abstract type SecondMomentAlgorithm <: AbstractAlgorithm end
+"""
+    abstract type VarianceAlgorithm <: SecondMomentAlgorithm end
+
+Abstract supertype for optimisation formulations of variance-based risk measures in PortfolioOptimisers.jl.
+
+# Related Types
+
+  - [`QuadRiskExpr`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+"""
 abstract type VarianceAlgorithm <: SecondMomentAlgorithm end
+"""
+Direct quadratic risk expression optimisation formulation for variance-based risk measures. Implements the variance directly.
+"""
 struct QuadRiskExpr <: VarianceAlgorithm end
-struct SOCRiskExpr <: VarianceAlgorithm end
+"""
+Squared second-order cone risk expression optimisation formulation for variance-based risk measures. Implements the variance as the square of the standard deviation.
+"""
+struct SquaredSOCRiskExpr <: VarianceAlgorithm end
+"""
+Rotated second-order cone risk expression optimisation formulation for variance-based risk measures. Used as a sum of squares formulation using historical data.
+"""
 struct RSOCRiskExpr <: SecondMomentAlgorithm end
-struct SqrtRiskExpr <: SecondMomentAlgorithm end
-const QuadSqrtRiskExpr = Union{<:SqrtRiskExpr, <:QuadRiskExpr}
+"""
+Second-order cone risk expression optimisation formulation for variance-based risk measures. Implements the standard deviation (squar root of the variance)
+"""
+struct SOCRiskExpr <: SecondMomentAlgorithm end
+const UnionSOCRiskExpr = Union{<:SOCRiskExpr, <:SquaredSOCRiskExpr}
 struct Variance{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     sigma::T2
@@ -25,7 +60,7 @@ end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                   rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
-                  alg::VarianceAlgorithm = SOCRiskExpr())
+                  alg::VarianceAlgorithm = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end
 function (r::Variance)(w::AbstractVector)
@@ -118,5 +153,5 @@ function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector, args...
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 
-export SqrtRiskExpr, QuadRiskExpr, SOCRiskExpr, RSOCRiskExpr, Variance, StandardDeviation,
-       UncertaintySetVariance
+export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, Variance,
+       StandardDeviation, UncertaintySetVariance

@@ -15,7 +15,7 @@ struct SecondLowerMoment{T1} <: DeviationLowerMoment
         return new{typeof(alg)}(alg)
     end
 end
-function SecondLowerMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
+function SecondLowerMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
     return SecondLowerMoment(alg)
 end
 struct SecondCentralMoment{T1} <: DeviationLowerMoment
@@ -24,7 +24,7 @@ struct SecondCentralMoment{T1} <: DeviationLowerMoment
         return new{typeof(alg)}(alg)
     end
 end
-function SecondCentralMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
+function SecondCentralMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
 struct MeanAbsoluteDeviation <: DeviationLowerMoment end
@@ -158,10 +158,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::Abstrac
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment{<:SqrtRiskExpr}}})(w::AbstractVector,
-                                                                                              X::AbstractMatrix,
-                                                                                              fees::Union{Nothing,
-                                                                                                          <:Fees} = nothing)
+                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment{<:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                             X::AbstractMatrix,
+                                                                                             fees::Union{Nothing,
+                                                                                                         <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -175,10 +175,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:LowOrderDeviation{<:Any,
-                                                <:SecondCentralMoment{<:SqrtRiskExpr}}})(w::AbstractVector,
-                                                                                         X::AbstractMatrix,
-                                                                                         fees::Union{Nothing,
-                                                                                                     <:Fees} = nothing)
+                                                <:SecondCentralMoment{<:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                        X::AbstractMatrix,
+                                                                                        fees::Union{Nothing,
+                                                                                                    <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end

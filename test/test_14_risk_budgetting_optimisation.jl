@@ -51,12 +51,12 @@
           LowOrderMoment(;
                          alg = LowOrderDeviation(;
                                                  alg = SecondLowerMoment(;
-                                                                         alg = SqrtRiskExpr()))),
+                                                                         alg = SOCRiskExpr()))),
           LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
           LowOrderMoment(;
                          alg = LowOrderDeviation(;
                                                  alg = SecondCentralMoment(;
-                                                                           alg = SqrtRiskExpr()))),
+                                                                           alg = SOCRiskExpr()))),
           LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
           LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
           ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
@@ -66,7 +66,7 @@
           RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2), SquareRootKurtosis(),
           OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
           OrderedWeightsArrayRange(), NegativeSkewness(),
-          NegativeSkewness(; alg = QuadRiskExpr())]
+          NegativeSkewness(; alg = SquaredSOCRiskExpr())]
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],

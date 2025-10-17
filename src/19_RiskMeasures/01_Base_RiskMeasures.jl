@@ -237,8 +237,9 @@ Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling 
 # Examples
 
 ```jldoctest
-julia> HierarchicalRiskMeasureSettings(; scale = 2.0)
-HierarchicalRiskMeasureSettings{Float64}(2.0)
+julia> HierarchicalRiskMeasureSettings()
+HierarchicalRiskMeasureSettings
+  scale | Float64: 1.0
 ```
 
 # Related
@@ -270,9 +271,117 @@ function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::Abs
                            X::AbstractMatrix)
     return [risk_measure_view(r, i, X) for r in rs]
 end
-abstract type Scalariser end
+"""
+    abstract type Scalariser <: AbstractEstimator end
+
+Abstract supertype for scalarisation strategies used to combine multiple risk measures into a single scalar value for optimisation.
+
+Subtype `Scalariser` to implement different methods for aggregating risk measures, such as weighted sum, maximum, or log-sum-exp. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+
+# Related Types
+
+  - [`SumScalariser`](@ref)
+  - [`MaxScalariser`](@ref)
+  - [`LogSumExpScalariser`](@ref)
+"""
+abstract type Scalariser <: AbstractEstimator end
+"""
+    struct SumScalariser <: Scalariser end
+
+Scalariser that combines multiple risk measures using a weighted sum.
+
+`SumScalariser` aggregates a vector of risk measures by computing the weighted sum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). This scalarisation strategy is used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+
+```math
+\\begin{align}
+\\phi &= \\sum_{i=1}^{N} w_i \\cdot r_i
+\\end{align}
+```
+
+where ``N`` is the number of risk measuresk, the subscript denotes the ``i``'th risk measure, ``w_i`` is its weight, and ``r_i`` is the risk measure value.
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`MaxScalariser`](@ref)
+  - [`LogSumExpScalariser`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+"""
 struct SumScalariser <: Scalariser end
+"""
+    struct MaxScalariser <: Scalariser end
+
+Scalariser that selects the risk expression whose scaled value is the largest.
+
+`MaxScalariser` aggregates a vector of risk measures by selecting the maximum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+
+```math
+\\begin{align}
+\\phi &= \\underset{i=1,\\,\\ldots,\\,N}{\\max}  w_i  r_i
+\\end{align}
+```
+
+where ``N`` is the number of risk measuresk, the subscript denotes the ``i``'th risk measure, ``w_i`` is its weight, and ``r_i`` is the risk measure value.
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`SumScalariser`](@ref)
+  - [`LogSumExpScalariser`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+"""
 struct MaxScalariser <: Scalariser end
+"""
+    struct LogSumExpScalariser{T1} <: Scalariser
+        gamma::T1
+    end
+
+Scalariser that aggregates multiple risk measures using the log-sum-exp function.
+
+`LogSumExpScalariser` combines a vector of risk measures by applying the log-sum-exp transformation to their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref).
+
+The parameter `gamma` controls the approximation accuracy to the maximum function: as `gamma → 0`, the function approaches the weighted sum; as `gamma → ∞`, it approaches the maximum. This behaviour is only true in `JuMP`-based optimisations. In clustering optimisations, each cluster's risk is computed separately, so there is no coherence between clusters.
+
+```math
+\\begin{align}
+\\phi &= \\frac{1}{\\gamma} \\log \\left( \\sum_{i=1}^{N} \\exp \\left[ \\gamma w_i r_i \\right] \\right)
+\\end{align}
+```
+
+where ``N`` is the number of risk measuresk, the subscript denotes the ``i``'th risk measure, ``w_i`` is its weight, ``r_i`` is the risk measure value, and ``\\gamma`` is a positive parameter.
+
+# Fields
+
+  - `gamma`: Positive parameter controlling the approximation accuracy to the maximum function.
+
+# Constructors
+
+    LogSumExpScalariser(; gamma::Real = 1.0)
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `gamma > 0`.
+
+# Examples
+
+```jldoctest
+julia> LogSumExpScalariser()
+LogSumExpScalariser
+  gamma | Float64: 1.0
+```
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`SumScalariser`](@ref)
+  - [`MaxScalariser`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+"""
 struct LogSumExpScalariser{T1} <: Scalariser
     gamma::T1
     function LogSumExpScalariser(gamma::Real)
@@ -282,6 +391,40 @@ struct LogSumExpScalariser{T1} <: Scalariser
 end
 function LogSumExpScalariser(; gamma::Real = 1.0)
     return LogSumExpScalariser(gamma)
+end
+function nothing_scalar_array_factory(::Nothing, ::Nothing)
+    return nothing
+end
+function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
+    return risk_variable
+end
+function nothing_scalar_array_factory(::Nothing, prior_variable::AbstractArray)
+    return prior_variable
+end
+function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::AbstractVector)
+    throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+end
+function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Real,
+                                                                     <:AbstractArray},
+                                                ::Any, i::AbstractVector)
+    return nothing_scalar_array_view(risk_variable, i)
+end
+function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::AbstractArray,
+                                                i::AbstractVector)
+    return nothing_scalar_array_view(prior_variable, i)
+end
+function risk_measure_nothing_scalar_array_view(risk_variable::Union{Nothing, <:Real},
+                                                ::AbstractVector)
+    return risk_variable
+end
+function solver_factory(risk_solvers::Union{<:Solver, <:AbstractVector{<:Solver}}, ::Any)
+    return risk_solvers
+end
+function solver_factory(::Nothing, slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+    return slv
+end
+function solver_factory(::Nothing, ::Nothing)
+    throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
 function expected_risk end
 function no_bounds_risk_measure end
