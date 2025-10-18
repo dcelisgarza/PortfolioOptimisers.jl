@@ -107,15 +107,15 @@ function __coskewness(cskew::AbstractMatrix, X::AbstractMatrix,
         j = (i - 1) * N + 1
         k = i * N
         coskew_jk = view(cskew, :, j:k)
-        # matrix_processing!(mp, coskew_jk, X)
         vals, vecs = eigen(coskew_jk)
-        #=
-        vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
-                clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
-        V .-= real(vecs * Diagonal(vals) * transpose(vecs))
-        =#
-        vals .= clamp.(vals, typemin(eltype(cskew)), zero(eltype(cskew)))
-        V .-= vecs * Diagonal(vals) * transpose(vecs)
+        if isa(eltype(vals), Real)
+            vals .= clamp.(vals, typemin(eltype(cskew)), zero(eltype(cskew)))
+            V .-= vecs * Diagonal(vals) * transpose(vecs)
+        else
+            vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
+                    clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
+            V .-= real(vecs * Diagonal(vals) * transpose(vecs))
+        end
     end
     matrix_processing!(mp, V, X)
     return V
