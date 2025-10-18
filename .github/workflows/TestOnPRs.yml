@@ -61,11 +61,3 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-          - version: "1.12-nightly"
-            os: ubuntu-latest
-            arch: x64
-            allow_failure: true
-          - version: "1.12-nightly"
-            os: macOS-latest
-            arch: x64
-            allow_failure: true
