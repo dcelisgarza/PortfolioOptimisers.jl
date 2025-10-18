@@ -325,7 +325,7 @@ RatioRiskMeasure
      |            |     rke | Bool: true
      |      sigma | nothing
      |         rc | nothing
-     |        alg | SOCRiskExpr()
+     |        alg | SquaredSOCRiskExpr()
   rf | Float64: 0.0
 ```
 

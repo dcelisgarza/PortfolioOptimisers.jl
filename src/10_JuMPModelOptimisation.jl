@@ -41,7 +41,9 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `settings` is a dictionary or vector, `!isempty(settings)`.
+  - `settings`:
+
+      + `Union{<:AbstractDict, <:AbstractVector}`: `!isempty(settings)`.
 
 # Examples
 

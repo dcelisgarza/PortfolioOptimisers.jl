@@ -13,7 +13,7 @@
         pes = [HighOrderPriorEstimator(; pe = EmpiricalPrior()),
                HighOrderPriorEstimator(;
                                        kte = Cokurtosis(; alg = Semi(),
-                                                        mp = NonPositiveDefiniteMatrixProcessing()),
+                                                        mp = DefaultMatrixProcessing()),
                                        ske = Coskewness(; alg = Semi()),
                                        pe = EmpiricalPrior(;
                                                            me = SimpleExpectedReturns(;
@@ -55,7 +55,7 @@
                                                                                                                                  alg = FixedDenoise())))),
                            re = StepwiseRegression(; target = GeneralisedLinearModel(),
                                                    crit = AIC(), alg = Backward()),
-                           mp = NonPositiveDefiniteMatrixProcessing()),
+                           mp = DefaultMatrixProcessing()),
                FactorPrior(;
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;

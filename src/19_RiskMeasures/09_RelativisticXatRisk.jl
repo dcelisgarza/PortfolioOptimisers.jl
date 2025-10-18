@@ -76,7 +76,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
         end
     end
 end
-struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: SolverRiskMeasure
+struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -118,7 +118,7 @@ end
 function (r::RelativisticValueatRisk)(x::AbstractVector)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
-struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: SolverRiskMeasure
+struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -167,7 +167,7 @@ function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
 end
-struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: SolverRiskMeasure
+struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -207,7 +207,7 @@ function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end
-struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: SolverHierarchicalRiskMeasure
+struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3

@@ -2,7 +2,6 @@
 
 ```@docs
 DefaultMatrixProcessing
-NonPositiveDefiniteMatrixProcessing
 matrix_processing!
 matrix_processing
 PortfolioOptimisers.AbstractMatrixProcessingEstimator

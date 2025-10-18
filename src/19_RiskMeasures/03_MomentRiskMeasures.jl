@@ -15,7 +15,7 @@ struct SecondLowerMoment{T1} <: DeviationLowerMoment
         return new{typeof(alg)}(alg)
     end
 end
-function SecondLowerMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
+function SecondLowerMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
     return SecondLowerMoment(alg)
 end
 struct SecondCentralMoment{T1} <: DeviationLowerMoment
@@ -24,7 +24,7 @@ struct SecondCentralMoment{T1} <: DeviationLowerMoment
         return new{typeof(alg)}(alg)
     end
 end
-function SecondCentralMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
+function SecondCentralMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
 struct MeanAbsoluteDeviation <: DeviationLowerMoment end
@@ -68,7 +68,7 @@ for alg in (LowOrderDeviation, HighOrderDeviation)
              end
          end)
 end
-struct LowOrderMoment{T1, T2, T3, T4} <: AbstractMomentRiskMeasure
+struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -95,7 +95,7 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         alg::AbstractUnionLowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
-struct HighOrderMoment{T1, T2, T3, T4} <: AbstractMomentHierarchicalRiskMeasure
+struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -144,11 +144,8 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:An
                             ::Any)
     return r.mu
 end
-function calc_moment_val(r::Union{<:AbstractMomentRiskMeasure,
-                                  <:AbstractMomentHierarchicalRiskMeasure,
-                                  <:AbstractMomentNoOptimisationRiskMeasure},
-                         w::AbstractVector, X::AbstractMatrix,
-                         fees::Union{Nothing, <:Fees} = nothing)
+function calc_moment_val(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
+                         X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -161,10 +158,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::Abstrac
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment{<:SqrtRiskExpr}}})(w::AbstractVector,
-                                                                                              X::AbstractMatrix,
-                                                                                              fees::Union{Nothing,
-                                                                                                          <:Fees} = nothing)
+                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment{<:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                             X::AbstractMatrix,
+                                                                                             fees::Union{Nothing,
+                                                                                                         <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -178,10 +175,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:LowOrderDeviation{<:Any,
-                                                <:SecondCentralMoment{<:SqrtRiskExpr}}})(w::AbstractVector,
-                                                                                         X::AbstractMatrix,
-                                                                                         fees::Union{Nothing,
-                                                                                                     <:Fees} = nothing)
+                                                <:SecondCentralMoment{<:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                        X::AbstractMatrix,
+                                                                                        fees::Union{Nothing,
+                                                                                                    <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end

@@ -19,7 +19,7 @@ Estimator for buy-in threshold portfolio constraints.
 
 ## Validation
 
-  - If `val` is a dictionary or vector, `!isempty(val)`.
+  - If `val` is a `AbstractDict` or `AbstractVector`, `!isempty(val)`.
 
 # Examples
 
@@ -77,8 +77,7 @@ Container for buy-in threshold portfolio constraints.
 
 ## Validation
 
-  - If `val` is a scalar: `isfinite(val) && val >= 0`.
-  - If `val` is a vector: `all(x -> (isfinite(x) && x >= 0), val)`.
+  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -101,11 +100,7 @@ BuyInThreshold
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
     function BuyInThreshold(val::Union{<:Real, <:AbstractVector{<:Real}})
-        if isa(val, Real)
-            @argcheck(isfinite(val) && val >= zero(val))
-        elseif isa(val, AbstractVector)
-            @argcheck(all(x -> (isfinite(x) && x >= 0), val))
-        end
+        assert_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end

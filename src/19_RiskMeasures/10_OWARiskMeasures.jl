@@ -11,7 +11,7 @@ end
 function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4, 10, 50])
     return ApproxOrderedWeightsArray(p)
 end
-struct OrderedWeightsArray{T1, T2, T3} <: OrderedWeightsArrayRiskMeasure
+struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
     settings::T1
     w::T2
     alg::T3
@@ -33,7 +33,7 @@ function (r::OrderedWeightsArray)(x::AbstractVector)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return dot(w, sort!(x))
 end
-struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: OrderedWeightsArrayRiskMeasure
+struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     w1::T2
     w2::T3

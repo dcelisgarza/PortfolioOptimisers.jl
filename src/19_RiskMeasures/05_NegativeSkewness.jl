@@ -1,4 +1,4 @@
-struct NegativeSkewness{T1, T2, T3, T4, T5} <: AbstractNegativeSkewRiskMeasure
+struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     mp::T2
     sk::T3
@@ -7,7 +7,9 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: AbstractNegativeSkewRiskMeasure
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator,
                               sk::Union{Nothing, <:AbstractMatrix},
-                              V::Union{Nothing, <:AbstractMatrix}, alg::QuadSqrtRiskExpr)
+                              V::Union{Nothing, <:AbstractMatrix},
+                              alg::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr,
+                                         <:SOCRiskExpr})
         sk_flag = isnothing(sk)
         V_flag = isnothing(V)
         if sk_flag || V_flag
@@ -25,16 +27,17 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: AbstractNegativeSkewRiskMeasure
     end
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                          mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+                          mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                           sk::Union{Nothing, <:AbstractMatrix} = nothing,
                           V::Union{Nothing, <:AbstractMatrix} = nothing,
-                          alg::QuadSqrtRiskExpr = SqrtRiskExpr())
+                          alg::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr} = SOCRiskExpr())
     return NegativeSkewness(settings, mp, sk, V, alg)
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SqrtRiskExpr})(w::AbstractVector)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::AbstractVector)
     return sqrt(dot(w, r.V, w))
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr})(w::AbstractVector)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
+                              <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector)
     return dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, prior::HighOrderPrior, args...; kwargs...)

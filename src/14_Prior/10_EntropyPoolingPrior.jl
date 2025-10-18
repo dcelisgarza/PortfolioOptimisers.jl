@@ -321,7 +321,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `slv` is a vector, it must be non-empty.
+  - If `slv` is a vector, `!isempty(slv)`.
   - `sc1 >= 0`
   - `sc2 >= 0`
   - `so >= 0`

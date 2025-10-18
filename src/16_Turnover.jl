@@ -25,8 +25,7 @@ Estimator for turnover portfolio constraints.
 ## Validation
 
   - `!isempty(w)`.
-  - If `val` is a vector: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-  - If `val` is a scalar: `isfinite(val)` and `val >= 0`.
+  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -132,8 +131,11 @@ Container for turnover portfolio constraints.
 ## Validation
 
   - `!isempty(w)`.
-  - If `val` is a vector: `!isempty(val)`, `length(w) == length(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-  - If `val` is a scalar: `isfinite(val)` and `val >= 0`.
+
+  - `val`:
+
+      + `AbstractVector`: `!isempty(val)`, `length(w) == length(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+      + `Real`: `isfinite(val)` and `val >= 0`.
 
 # Examples
 

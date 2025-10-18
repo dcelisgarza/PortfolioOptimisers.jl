@@ -36,7 +36,7 @@ Estimator for portfolio transaction fees constraints.
 
 ## Validation
 
-  - If any fee input (`l`, `s`, `fl`, `fs`) is a dictionary or vector, it must be non-empty, finite, and non-negative.
+  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -197,8 +197,7 @@ Container for portfolio transaction fee constraints.
 
 ## Validation
 
-  - If any fee (`l`, `s`, `fl`, `fs`) is a scalar: must be finite and non-negative.
-  - If any fee is a vector: must be non-empty, all elements finite, and non-negative.
+  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -440,8 +439,8 @@ Compute the actual turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
-      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+      + `tn.val::Real`: single turnover fee applied to all assets.
+      + `tn.val::AbstractVector{<:Real}`: vector of turnover fees per asset.
 
 # Returns
 
@@ -576,8 +575,8 @@ Compute the turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
-      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+      + `tn.val::Real`: single turnover fee applied to all assets.
+      + `tn.val::AbstractVector{<:Real}`: vector of turnover fees per asset.
 
 # Returns
 
@@ -772,8 +771,8 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
-      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+      + `tn.val::Real`: single turnover fee applied to all assets.
+      + `tn.val::AbstractVector{<:Real}`: vector of turnover fees per asset.
 
 # Returns
 
@@ -916,8 +915,8 @@ Compute the per asset turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
-      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+      + `tn.val::Real`: single turnover fee applied to all assets.
+      + `tn.val::AbstractVector{<:Real}`: vector of turnover fees per asset.
 
 # Returns
 

@@ -171,12 +171,12 @@
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             alg = SqrtRiskExpr()))),
+                                                                             alg = SOCRiskExpr()))),
               LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondCentralMoment(;
-                                                                               alg = SqrtRiskExpr()))),
+                                                                               alg = SOCRiskExpr()))),
               LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
               ConditionalValueatRisk(), ConditionalValueatRiskRange(),
@@ -188,7 +188,7 @@
               OrderedWeightsArray(),
               OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
               OrderedWeightsArrayRange(), NegativeSkewness(),
-              NegativeSkewness(; alg = QuadRiskExpr()),
+              NegativeSkewness(; alg = SquaredSOCRiskExpr()),
               DistributionallyRobustConditionalValueatRisk(),
               ValueatRisk(; alg = DistributionValueatRisk()),
               DistributionallyRobustConditionalValueatRiskRange(),
@@ -207,15 +207,15 @@
             @test isa(res.retcode, OptimisationSuccess)
             rtol = if i in
                       (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141,
-                       148, 154, 175, 186, 196)
+                       148, 154, 175, 184, 196)
                 5e-5
             elseif i in
                    (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
-                    179, 204, 214, 216)
+                    179, 192, 204, 214, 216)
                 5e-6
             elseif i in (18, 157, 158, 174, 228)
                 5e-4
-            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 184)
+            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176)
                 1e-5
             elseif i in (160, 164, 180)
                 5e-3
@@ -282,9 +282,9 @@
             else
                 @test isa(res.retcode, OptimisationSuccess)
             end
-            rtol = if i in (12, 14, 17, 30)
+            rtol = if i in (12, 14, 30)
                 5e-4
-            elseif i in (13, 16)
+            elseif i in (13, 16, 17)
                 0.05
             elseif i in (15, 28)
                 0.1
@@ -319,7 +319,7 @@
             res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rtol = if i in (16, 30)
-                1e-5
+                5e-5
             elseif i == 24
                 5e-6
             elseif i == 27
@@ -619,6 +619,103 @@
                                                                                      dist = TDist(5)),),
                                   opt = opt))
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv[7:end])
+        r = factory(NegativeSkewness(; alg = SquaredSOCRiskExpr()), pr)
+        res_min = optimise(MeanRisk(; r = r, opt = opt))
+        res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
+        rk_min = expected_risk(r, res_min.w, pr)
+        rk_max = expected_risk(r, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
+        res1 = optimise(MeanRisk(;
+                                 r = NegativeSkewness(; alg = SquaredSOCRiskExpr(),
+                                                      settings = RiskMeasureSettings(;
+                                                                                     ub = Frontier(;
+                                                                                                   N = 5))),
+                                 obj = MaximumReturn(), opt = opt))
+        res2 = optimise(MeanRisk(;
+                                 r = NegativeSkewness(; alg = QuadRiskExpr(),
+                                                      settings = RiskMeasureSettings(;
+                                                                                     ub = Frontier(;
+                                                                                                   N = 5))),
+                                 obj = MaximumReturn(), opt = opt))
+        res = isapprox(hcat(res1.w...), hcat(res2.w...); rtol = 5e-4)
+        if !res
+            println("Frontier formulation failed")
+            find_tol(hcat(res1.w...), hcat(res2.w...))
+        end
+        rks = expected_risk.(r, res1.w, pr)
+        @test issorted(rks)
+        @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
+        rts = expected_return.(ArithmeticReturn(), res1.w, pr)
+        @test issorted(rts)
+        @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        res3 = optimise(MeanRisk(;
+                                 r = NegativeSkewness(; alg = SquaredSOCRiskExpr(),
+                                                      settings = RiskMeasureSettings(;
+                                                                                     ub = range(;
+                                                                                                start = rk_min,
+                                                                                                stop = rk_max,
+                                                                                                length = 5))),
+                                 obj = MaximumReturn(), opt = opt))
+        res4 = optimise(MeanRisk(;
+                                 r = NegativeSkewness(; alg = QuadRiskExpr(),
+                                                      settings = RiskMeasureSettings(;
+                                                                                     ub = range(;
+                                                                                                start = rk_min,
+                                                                                                stop = rk_max,
+                                                                                                length = 5))),
+                                 obj = MaximumReturn(), opt = opt))
+        res = isapprox(hcat(res3.w...), hcat(res4.w...); rtol = 1e-6)
+        if !res
+            println("Frontier formulation failed")
+            find_tol(hcat(res3.w...), hcat(res4.w...))
+        end
+        rks = expected_risk.(r, res3.w, pr)
+        @test issorted(rks)
+        @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
+        rts = expected_return.(ArithmeticReturn(), res3.w, pr)
+        @test issorted(rts)
+        @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv[7:end],
+                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+        res5 = optimise(MeanRisk(; r = NegativeSkewness(; alg = SquaredSOCRiskExpr()),
+                                 opt = opt))
+        res6 = optimise(MeanRisk(; r = NegativeSkewness(; alg = QuadRiskExpr()), opt = opt))
+        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-4)
+        if !res
+            println("Frontier formulation failed")
+            find_tol(hcat(res5.w...), hcat(res6.w...))
+        end
+        rks = expected_risk.(r, res5.w, pr)
+        @test issorted(rks)
+        @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
+        rts = expected_return.(ArithmeticReturn(), res5.w, pr)
+        @test issorted(rts)
+        @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv[7:end],
+                            ret = ArithmeticReturn(;
+                                                   lb = range(; start = rt_min,
+                                                              stop = rt_max, length = 5)))
+        res7 = optimise(MeanRisk(; r = NegativeSkewness(; alg = SquaredSOCRiskExpr()),
+                                 opt = opt))
+        res8 = optimise(MeanRisk(; r = NegativeSkewness(; alg = QuadRiskExpr()), opt = opt))
+        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-4)
+        if !res
+            println("Frontier formulation failed")
+            find_tol(hcat(res7.w...), hcat(res8.w...))
+        end
+        rks = expected_risk.(r, res7.w, pr)
+        @test issorted(rks)
+        @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
+        rts = expected_return.(ArithmeticReturn(), res7.w, pr)
+        @test issorted(rts)
+        @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr2, slv = slv)
         mr = MeanRisk(;

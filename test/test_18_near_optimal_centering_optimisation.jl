@@ -279,7 +279,7 @@
         @test success
     end
     @testset "Scalarisers" begin
-        r1 = NegativeSkewness(; alg = SqrtRiskExpr(),
+        r1 = NegativeSkewness(; alg = SOCRiskExpr(),
                               settings = RiskMeasureSettings(; scale = 50))
         r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
 

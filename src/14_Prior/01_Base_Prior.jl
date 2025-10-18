@@ -441,15 +441,15 @@ Keyword arguments correspond to the fields above.
 ## Validation
 
   - `X`, `mu`, and `sigma` must be non-empty.
-  - `sigma` must be square.
+  - `size(sigma, 1) == size(sigma, 2)`.
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
-  - If `w` is provided, it must be non-empty and `length(w) == size(X, 1)`.
-  - If `kld` is a vector, it must be non-empty.
-  - If `ow` is provided, it must be non-empty.
+  - If `w` is provided, `!isempty(w)` and `length(w) == size(X, 1)`.
+  - If `kld` is an `AbstractVector`, `!isempty(kld)`.
+  - If `ow` is provided, `!isempty(ow)`.
   - If any of `rr`, `f_mu`, or `f_sigma` are provided, all must be provided and non-empty, `size(rr.M, 2) == length(f_mu) == size(f_sigma, 1)`, and `size(rr.M, 1) == length(mu)`.
   - If `f_sigma` is provided, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
   - If `chol` is provided, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
-  - If `f_w` is provided, it must be non-empty and `length(f_w) == size(X, 1)`.
+  - If `f_w` is provided, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
 
 # Examples
 
@@ -589,7 +589,7 @@ Container type for high order prior results in PortfolioOptimisers.jl.
                    S2::Union{Nothing, <:AbstractMatrix} = nothing,
                    sk::Union{Nothing, <:AbstractMatrix} = nothing,
                    V::Union{Nothing, <:AbstractMatrix} = nothing,
-                   skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
+                   skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
 
@@ -608,7 +608,7 @@ julia> HighOrderPrior(;
                                          sigma = [0.0001 0.0002; 0.0002 0.0003]), kt = rand(4, 4),
                       L2 = PortfolioOptimisers.elimination_matrix(2),
                       S2 = PortfolioOptimisers.summation_matrix(2), sk = rand(2, 4),
-                      V = rand(2, 2), skmp = NonPositiveDefiniteMatrixProcessing())
+                      V = rand(2, 2))
 HighOrderPrior
     pr | LowOrderPrior
        |         X | 2×2 Matrix{Float64}
@@ -628,10 +628,7 @@ HighOrderPrior
     S2 | 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
     sk | 2×4 Matrix{Float64}
      V | 2×2 Matrix{Float64}
-  skmp | NonPositiveDefiniteMatrixProcessing
-       |   denoise | nothing
-       |    detone | nothing
-       |       alg | nothing
+  skmp | nothing
 ```
 
 # Related

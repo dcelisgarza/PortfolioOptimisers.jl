@@ -13,7 +13,32 @@ and optimization routines.
   - [`ReturnsResult`](@ref)
 """
 abstract type AbstractReturnsResult <: AbstractResult end
+"""
+    assert_nonneg_finite_val(val::Union{<:Real, <:Pair, <:AbstractDict,
+                                        <:AbstractVector{<:Real}, <:AbstractVector{<:Pair}})
+    assert_nonneg_finite_val(args...)
 
+Validate that the input value is non-negative and finite.
+
+Checks that the provided value (scalar, vector, dictionary, or pair) contains only finite and non-negative entries. Used for defensive programming and input validation throughout PortfolioOptimisers.jl.
+
+# Arguments
+
+  - `val`: Input value to validate.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Validation
+
+  - `args...`: always passes.
+  - `Real`: `isfinite(val)` and `val >= 0`.
+  - `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
+  - `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
+  - `AbstractVector{<:Real}`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+  - `AbstractVector{<:Pair}`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+"""
 function assert_nonneg_finite_val(val::AbstractDict)
     @argcheck(!isempty(val))
     @argcheck(any(isfinite, values(val)))
@@ -42,13 +67,13 @@ function assert_nonneg_finite_val(val::Real)
     @argcheck(val >= zero(val))
     return nothing
 end
-function assert_nonneg_finite_val(::Nothing)
+function assert_nonneg_finite_val(args...)
     return nothing
 end
 """
     assert_matrix_issquare(A::AbstractMatrix)
 
-Assert that `A` is a square matrix.
+Assert that `size(A, 1) == size(A, 2)`.
 """
 function assert_matrix_issquare(A::AbstractMatrix)
     @argcheck(size(A, 1) == size(A, 2),
@@ -258,14 +283,8 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 
 Efficient scalar and vector dot product utility.
 
-  - If one argument is a scalar and the other a vector, returns the scalar times the sum of the vector.
-  - If both arguments are vectors, returns their dot product.
-
-# Arguments
-
-  - `a::Real`, `b::AbstractVector`: Multiplies `a` by the sum of `b`.
-  - `a::AbstractVector`, `b::Real`: Multiplies the sum of `a` by `b`.
-  - `a::AbstractVector`, `b::AbstractVector`: Computes the dot product of `a` and `b`.
+  - If one argument is a `Real` and the other an `AbstractVector`, returns the scalar times the sum of the vector.
+  - If both arguments are `AbstractVector`s, returns their `dot` product.
 
 # Returns
 
@@ -298,12 +317,13 @@ end
 
 Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
 
-  - If `x` is `nothing`, returns `nothing`.
+  - `x`: Input value.
 
-  - If `x` is a scalar, returns `x`.
-  - If `x` is a vector, returns `view(x, i)`.
-  - If `x` is a vector of vectors, returns `[view(_x, i) for _x in x]`.
-  - If `x` is a matrix or higher array, returns `view(x, i, i)`.
+      + `nothing`: returns `nothing`.
+      + `Real`: returns `x`.
+      + `AbstractVector{<:Real}`: returns `view(x, i)`.
+      + `AbstractVector{<:AbstractVector}`: returns `[view(_x, i) for _x in x]`.
+      + `AbstractArray`: returns `view(x, i, i)`.
 
 # Arguments
 
@@ -387,10 +407,12 @@ end
 
 Utility for safely indexing into possibly `nothing`, scalar, vector, or array values.
 
-  - If `x` is `nothing`, returns `nothing`.
-  - If `x` is a scalar, returns `x`.
-  - If `x` is a vector, returns `x[i]`.
-  - If `x` is a matrix, returns `x[i, i]` or `x[i, j]`.
+  - `x`: Input value.
+
+      + `nothing`: returns `nothing`.
+      + `Real`: returns `x`.
+      + `AbstractVector`: returns `x[i]`.
+      + `AbstractMatrix`: returns `x[i, i]` or `x[i, j]`.
 
 # Arguments
 
