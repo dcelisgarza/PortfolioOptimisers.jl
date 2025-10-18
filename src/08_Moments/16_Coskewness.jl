@@ -43,7 +43,9 @@ julia> Coskewness()
 Coskewness
    me | SimpleExpectedReturns
       |   w | nothing
-   mp | NonPositiveDefiniteMatrixProcessing
+   mp | DefaultMatrixProcessing
+      |       pdm | Posdef
+      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
       |   denoise | nothing
       |    detone | nothing
       |       alg | nothing
@@ -194,15 +196,15 @@ julia> cskew, V = coskewness(Coskewness(), X);
 
 julia> cskew
 3×9 Matrix{Float64}:
- -0.456556   0.104588   0.391789  …   0.391789  -0.283963   0.025956
- -0.136453  -0.191539  -0.139315     -0.139315   0.210037  -0.0952308
-  0.176565  -0.219895   0.24526       0.24526    0.105632  -0.772302
+ -0.329646    0.0782455   0.325842  …   0.325842  -0.250881   0.16769
+  0.0782455  -0.236104   -0.250881     -0.250881   0.266005   0.144546
+  0.325842   -0.250881    0.16769       0.16769    0.144546  -0.605589
 
 julia> V
 3×3 Matrix{Float64}:
- 0.74159    0.428314   0.0676831
- 0.428314   0.316494   0.0754933
- 0.0676831  0.0754933  0.833249
+  0.513743   -0.0452078  -0.290893
+ -0.0452078   0.402765   -0.0372996
+ -0.290893   -0.0372996   0.837701
 ```
 
 # Related

@@ -392,7 +392,9 @@ HighOrderPriorEstimator
   ske | Coskewness
       |    me | SimpleExpectedReturns
       |       |   w | nothing
-      |    mp | NonPositiveDefiniteMatrixProcessing
+      |    mp | DefaultMatrixProcessing
+      |       |       pdm | Posdef
+      |       |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
       |       |   denoise | nothing
       |       |    detone | nothing
       |       |       alg | nothing
