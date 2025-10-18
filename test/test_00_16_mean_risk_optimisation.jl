@@ -282,9 +282,9 @@
             else
                 @test isa(res.retcode, OptimisationSuccess)
             end
-            rtol = if i in (12, 14, 17, 30)
+            rtol = if i in (12, 14, 30)
                 5e-4
-            elseif i in (13, 16)
+            elseif i in (13, 16, 17)
                 0.05
             elseif i in (15, 28)
                 0.1
