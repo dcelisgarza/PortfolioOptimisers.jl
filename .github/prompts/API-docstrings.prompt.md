@@ -5,6 +5,7 @@ description: Generate Julia docstrings.
 
 Create Julia docstrings for the selected code.
 
+  - Extremely important to follow the established style.
   - Place the type (without constructor), function (with type information), or macro (with type information).
   - Give a general description.
 
