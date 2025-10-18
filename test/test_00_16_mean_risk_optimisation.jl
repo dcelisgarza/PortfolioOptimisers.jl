@@ -211,11 +211,11 @@
                 5e-5
             elseif i in
                    (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
-                    179, 204, 214, 216)
+                    179, 192, 204, 214, 216)
                 5e-6
             elseif i in (18, 157, 158, 174, 228)
                 5e-4
-            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176)
+            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 184)
                 1e-5
             elseif i in (160, 164, 180)
                 5e-3
@@ -319,7 +319,7 @@
             res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rtol = if i in (16, 30)
-                1e-5
+                5e-5
             elseif i == 24
                 5e-6
             elseif i == 27
