@@ -109,8 +109,8 @@
         sigma2 = copy(pr.sigma)
         sigma3 = copy(pr.sigma)
         sigma4 = matrix_processing(DefaultMatrixProcessing(), sigma1, pr.X)
-        sigma5 = matrix_processing(NonPositiveDefiniteMatrixProcessing(), sigma1, pr.X)
+        sigma5 = matrix_processing(nothing, sigma1, pr.X)
         sigma4 == matrix_processing!(DefaultMatrixProcessing(), sigma2, pr.X)
-        sigma5 == matrix_processing!(NonPositiveDefiniteMatrixProcessing(), sigma3, pr.X)
+        sigma5 == matrix_processing!(nothing, sigma3, pr.X)
     end
 end

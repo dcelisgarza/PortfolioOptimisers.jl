@@ -31,7 +31,7 @@ Container type for coskewness estimators.
 # Constructor
 
     Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                alg::AbstractMomentAlgorithm = Full())
 
 Keyword arguments correspond to the fields above.

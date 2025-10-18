@@ -589,7 +589,7 @@ Container type for high order prior results in PortfolioOptimisers.jl.
                    S2::Union{Nothing, <:AbstractMatrix} = nothing,
                    sk::Union{Nothing, <:AbstractMatrix} = nothing,
                    V::Union{Nothing, <:AbstractMatrix} = nothing,
-                   skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
+                   skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
 
@@ -608,7 +608,7 @@ julia> HighOrderPrior(;
                                          sigma = [0.0001 0.0002; 0.0002 0.0003]), kt = rand(4, 4),
                       L2 = PortfolioOptimisers.elimination_matrix(2),
                       S2 = PortfolioOptimisers.summation_matrix(2), sk = rand(2, 4),
-                      V = rand(2, 2), skmp = NonPositiveDefiniteMatrixProcessing())
+                      V = rand(2, 2))
 HighOrderPrior
     pr | LowOrderPrior
        |         X | 2×2 Matrix{Float64}
@@ -628,10 +628,7 @@ HighOrderPrior
     S2 | 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
     sk | 2×4 Matrix{Float64}
      V | 2×2 Matrix{Float64}
-  skmp | NonPositiveDefiniteMatrixProcessing
-       |   denoise | nothing
-       |    detone | nothing
-       |       alg | nothing
+  skmp | nothing
 ```
 
 # Related

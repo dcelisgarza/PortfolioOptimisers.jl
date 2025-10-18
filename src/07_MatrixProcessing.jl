@@ -9,7 +9,6 @@ All concrete types that implement matrix processing routines—such as covarianc
 
   - [`AbstractEstimator`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
@@ -23,7 +22,6 @@ All concrete types that implement a specific matrix processing algorithm (e.g., 
 
   - [`AbstractAlgorithm`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 """
@@ -47,7 +45,6 @@ These methods are called internally when no matrix processing algorithm is speci
 
   - [`matrix_processing_algorithm`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 function matrix_processing_algorithm!(::Nothing, args...; kwargs...)
     return nothing
@@ -61,7 +58,6 @@ Same as [`matrix_processing_algorithm!`](@ref), but meant for returning a new ma
 
   - [`matrix_processing_algorithm!`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 function matrix_processing_algorithm(::Nothing, args...; kwargs...)
     return nothing
@@ -127,7 +123,6 @@ DefaultMatrixProcessing
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
 struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
     pdm::T1
@@ -150,80 +145,6 @@ function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """
-    struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
-        denoise::T1
-        detone::T2
-        alg::T3
-    end
-
-A container type for matrix processing pipelines that do **not** enforce positive definiteness in PortfolioOptimisers.jl.
-
-`NonPositiveDefiniteMatrixProcessing` is intended for workflows where positive definiteness is not required or is handled externally. It supports denoising, detoning, and optional custom matrix processing algorithms, but skips positive definite projection.
-
-# Fields
-
-  - `denoise`: Denoising estimator (see [`Denoise`](@ref)), or `nothing` to skip.
-  - `detone`: Detoning estimator (see [`Detone`](@ref)), or `nothing` to skip.
-  - `alg`: Optional custom matrix processing algorithm, or `nothing` to skip.
-
-# Constructor
-
-    NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
-                                        detone::Union{Nothing, <:Detone} = nothing,
-                                        alg::Union{Nothing,
-                                                   <:AbstractMatrixProcessingAlgorithm} = nothing)
-
-Keyword arguments correspond to the fields above.
-
-# Examples
-
-```jldoctest
-julia> mp = NonPositiveDefiniteMatrixProcessing()
-NonPositiveDefiniteMatrixProcessing
-  denoise | nothing
-   detone | nothing
-      alg | nothing
-
-julia> mp = NonPositiveDefiniteMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
-NonPositiveDefiniteMatrixProcessing
-  denoise | Denoise
-          |      alg | ShrunkDenoise
-          |          |   alpha | Float64: 0.0
-          |     args | Tuple{}: ()
-          |   kwargs | @NamedTuple{}: NamedTuple()
-          |   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-          |        m | Int64: 10
-          |        n | Int64: 1000
-   detone | Detone
-          |   n | Int64: 2
-      alg | nothing
-```
-
-# Related
-
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`matrix_processing!`](@ref)
-  - [`matrix_processing`](@ref)
-  - [`DefaultMatrixProcessing`](@ref)
-"""
-struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
-    denoise::T1
-    detone::T2
-    alg::T3
-    function NonPositiveDefiniteMatrixProcessing(denoise::Union{Nothing, <:Denoise},
-                                                 detone::Union{Nothing, <:Detone},
-                                                 alg::Union{Nothing,
-                                                            <:AbstractMatrixProcessingAlgorithm})
-        return new{typeof(denoise), typeof(detone), typeof(alg)}(denoise, detone, alg)
-    end
-end
-function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
-                                             detone::Union{Nothing, <:Detone} = nothing,
-                                             alg::Union{Nothing,
-                                                        <:AbstractMatrixProcessingAlgorithm} = nothing)
-    return NonPositiveDefiniteMatrixProcessing(denoise, detone, alg)
-end
-"""
     matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
                        X::AbstractMatrix, args...; kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
@@ -242,7 +163,6 @@ The processing pipeline consists of:
   - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator specifying the pipeline.
 
       + `mp::DefaultMatrixProcessing`: The specified matrix processing steps are applied to `sigma` using the provided data matrix `X`.
-      + `mp::NonPositiveDefiniteMatrixProcessing`: The specified matrix processing steps **without enforcing positive definiteness** are applied to `sigma` using the provided data matrix `X`.
       + `mp::Nothing`: No-op.
 
   - `sigma`: Covariance or correlation matrix to be processed (modified in-place).
@@ -321,15 +241,6 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     matrix_processing_algorithm!(mp.alg, mp.pdm, sigma, X; kwargs...)
     return nothing
 end
-function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-                            X::AbstractMatrix, args...; kwargs...)
-    T, N = size(X)
-    posdef!(nothing, sigma)
-    denoise!(mp.denoise, sigma, T / N, nothing)
-    detone!(mp.detone, sigma, nothing)
-    matrix_processing_algorithm!(mp.alg, nothing, sigma, X; kwargs...)
-    return nothing
-end
 """
     matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
                       X::AbstractMatrix, args...; kwargs...)
@@ -355,12 +266,5 @@ function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     matrix_processing!(mp, sigma, X, args...; kwargs...)
     return sigma
 end
-function matrix_processing(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-                           X::AbstractMatrix, args...; kwargs...)
-    sigma = copy(sigma)
-    matrix_processing!(mp, sigma, X, args...; kwargs...)
-    return sigma
-end
 
-export DefaultMatrixProcessing, NonPositiveDefiniteMatrixProcessing, matrix_processing,
-       matrix_processing!
+export DefaultMatrixProcessing, matrix_processing, matrix_processing!
