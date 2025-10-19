@@ -431,7 +431,7 @@ UncertaintySetVariance
            |       q | Float64: 0.05
            |     rng | Random.TaskLocalRNG: Random.TaskLocalRNG()
            |    seed | nothing
-     sigma | nothing
+     sigma | 3×3 Matrix{Float64}
 
 julia> r(w)
 1.3421705804186579

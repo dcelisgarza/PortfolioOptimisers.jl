@@ -4,6 +4,7 @@ abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
 abstract type OptimisationReturnCode <: AbstractResult end
+abstract type OptimisationModelResult <: AbstractResult end
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
@@ -28,7 +29,6 @@ end
 function SingletonOptimisation(; retcode::OptimisationReturnCode)
     return SingletonOptimisation(retcode)
 end
-abstract type OptimisationModelResult <: AbstractResult end
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end

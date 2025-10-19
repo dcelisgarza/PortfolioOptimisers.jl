@@ -6,7 +6,7 @@ abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     if !haskey(model, :G)
-        G = cholesky(pr.sigma).U
+        G = isnothing(pr.chol) ? cholesky(pr.sigma).U : pr.chol
         @expression(model, G, G)
     end
     return model[:G]
@@ -17,26 +17,6 @@ function get_chol_or_V_pm(model::JuMP.Model, pr::AbstractPriorResult)
         @expression(model, GV, G)
     end
     return model[:GV]
-end
-function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any,
-                                                        <:AbstractMatrix, <:Any, <:Any,
-                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                        <:Any},
-                                        <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
-                                                                         <:Any,
-                                                                         <:AbstractMatrix,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any},
-                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any}})
-    if !haskey(model, :G)
-        G = pr.chol
-        @expression(model, G, G)
-    end
-    return model[:G]
 end
 function jump_returns_factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
