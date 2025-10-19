@@ -14,4 +14,5 @@ PortfolioOptimisers.NoOptimisationRiskMeasure
 PortfolioOptimisers.OptimisationRiskMeasure
 PortfolioOptimisers.AbstractRiskMeasureSettings
 PortfolioOptimisers.Scalariser
+PortfolioOptimisers.nothing_scalar_array_factory
 ```

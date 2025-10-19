@@ -2033,14 +2033,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::HighOrderPrior, args...;
                                kwargs...)
-    key = Symbol(:qnskew_risk_, i)
+    key = Symbol(:sqsoc_nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
     G = isnothing(r.V) ? get_chol_or_V_pm(model, pr) : cholesky(r.V).U
-    t_qnskew_risk = model[Symbol(:t_qnskew_risk_, i)] = @variable(model)
-    model[Symbol(:cqnskew_soc_, i)] = @constraint(model,
-                                                  [sc * t_qnskew_risk; sc * G * w] in
-                                                  SecondOrderCone())
+    t_qnskew_risk = model[Symbol(:t_sqsoc_skew_risk_, i)] = @variable(model)
+    model[Symbol(:csqsoc_nskew_soc_, i)] = @constraint(model,
+                                                       [sc * t_qnskew_risk; sc * G * w] in
+                                                       SecondOrderCone())
     qnskew_risk = model[key] = @expression(model, t_qnskew_risk^2)
     ub = variance_risk_bounds_val(false, r.settings.ub)
     set_risk_upper_bound!(model, opt, t_qnskew_risk, ub, key)

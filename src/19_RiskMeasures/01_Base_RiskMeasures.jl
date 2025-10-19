@@ -5,6 +5,8 @@ Abstract supertype for all risk measure estimators in PortfolioOptimisers.jl.
 
 Defines the interface for risk measure types, which quantify portfolio risk using various statistical or econometric methods. All concrete risk measure types should subtype `AbstractBaseRiskMeasure` to ensure consistency and composability within the optimisation framework.
 
+All concrete risk measures can be used as functors (callable structs) to compute their associated risk quantity.
+
 # Related Types
 
   - [`NoOptimisationRiskMeasure`](@ref)
@@ -392,13 +394,33 @@ end
 function LogSumExpScalariser(; gamma::Real = 1.0)
     return LogSumExpScalariser(gamma)
 end
+"""
+    nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
+    nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
+    nothing_scalar_array_factory(risk_variable::Nothing,
+                                 prior_variable::Union{<:Real, <:AbstractArray})
+
+Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
+
+# Arguments
+
+  - `risk_variable` : The risk-side input.
+  - `prior_variable` : The prior-side input.
+
+# Returns
+
+  - If both inputs are `nothing` returns `nothing`.
+  - If `risk_variable` is not `nothing`, returns `risk_variable`.
+  - If `risk_variable` is `nothing` and `prior_variable` is not `nothing`, returns `prior_variable`.
+"""
 function nothing_scalar_array_factory(::Nothing, ::Nothing)
     return nothing
 end
 function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
     return risk_variable
 end
-function nothing_scalar_array_factory(::Nothing, prior_variable::AbstractArray)
+function nothing_scalar_array_factory(::Nothing,
+                                      prior_variable::Union{<:Real, <:AbstractArray})
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::AbstractVector)
