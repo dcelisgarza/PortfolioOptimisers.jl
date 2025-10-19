@@ -1,9 +1,8 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer,
                                                      <:Any},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::HighOrderPrior, args...;
-                               kwargs...)
+                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
+                               args...; kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -46,9 +45,8 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, Nothing,
                                                      <:Any},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::HighOrderPrior, args...;
-                               kwargs...)
+                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
+                               args...; kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)

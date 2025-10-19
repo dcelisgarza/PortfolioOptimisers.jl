@@ -1,5 +1,5 @@
 struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
-       JuMPOptimisationEstimator
+       RiskJuMPOptimisationEstimator
     opt::T1
     re::T2
     r::T3

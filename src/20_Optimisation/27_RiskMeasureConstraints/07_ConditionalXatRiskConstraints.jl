@@ -1,6 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:cvar_risk_, i)
     sc = model[:sc]
@@ -25,8 +24,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
     return cvar_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:cvar_range_risk_, i)
     sc = model[:sc]
@@ -89,8 +87,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:drcvar_risk_, i)
     sc = model[:sc]
@@ -184,8 +181,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRiskRange,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:drcvar_risk_range_, i)
     sc = model[:sc]
@@ -354,8 +350,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return drcvar_risk_range
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:cdar_risk_, i)
     sc = model[:sc]

@@ -1,8 +1,5 @@
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
-                                                  opt::Union{<:MeanRisk,
-                                                             <:NearOptimalCentering,
-                                                             <:RiskBudgeting,
-                                                             <:FactorRiskContribution},
+                                                  opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,
                                                   ub::Union{Nothing, <:Real,
                                                             <:AbstractVector, <:Frontier},
@@ -13,8 +10,8 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
     return nothing
 end
 function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
-                   opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult, args...; kwargs...)
+                   opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...;
+                   kwargs...)
     key = Symbol(:sd_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -26,8 +23,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
     return sd_risk, key
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     sd_risk, key = set_risk!(model, i, r, opt, pr, args...; kwargs...)
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, key)
@@ -244,8 +240,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
     return ucs_variance_risk, key
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; rd::ReturnsResult = ReturnsResult(), kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)

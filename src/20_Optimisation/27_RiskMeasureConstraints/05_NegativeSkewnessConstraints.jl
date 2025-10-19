@@ -1,9 +1,8 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                    <:SOCRiskExpr},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::HighOrderPrior, args...;
-                               kwargs...)
+                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
+                               args...; kwargs...)
     key = Symbol(:nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -18,9 +17,8 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                    <:SquaredSOCRiskExpr},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::HighOrderPrior, args...;
-                               kwargs...)
+                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
+                               args...; kwargs...)
     key = Symbol(:sqsoc_nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -38,9 +36,8 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                    <:QuadRiskExpr},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::HighOrderPrior, args...;
-                               kwargs...)
+                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
+                               args...; kwargs...)
     key = Symbol(:qnskew_risk_, i)
     sc = model[:sc]
     w = model[:w]

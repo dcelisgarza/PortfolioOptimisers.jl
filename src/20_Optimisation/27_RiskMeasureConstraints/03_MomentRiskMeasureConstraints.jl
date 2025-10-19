@@ -12,8 +12,7 @@ function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Real, <:A
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:flm_risk_, i)
     sc = model[:sc]
@@ -80,8 +79,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:StandardisedLowOrderMoment{<:Any,
                                                                               <:SecondLowerMoment}},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:second_lower_moment_risk_, i)
     sc = model[:sc]
@@ -136,8 +134,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:StandardisedLowOrderMoment{<:Any,
                                                                               <:SecondCentralMoment}},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:second_central_moment_risk_, i)
     w = model[:w]
@@ -182,8 +179,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:MeanAbsoluteDeviation},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:mad_risk_, i)
     sc = model[:sc]

@@ -12,8 +12,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ExactOrderedWeightsArray},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:owa_risk_, i)
     sc = model[:sc]
@@ -37,8 +36,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ExactOrderedWeightsArray},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:owa_range_risk_, i)
     sc = model[:sc]
@@ -65,8 +63,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ApproxOrderedWeightsArray},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:aowa_risk_, i)
     sc = model[:sc]
@@ -145,8 +142,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ApproxOrderedWeightsArray},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:aowa_range_risk_, i)
     sc = model[:sc]

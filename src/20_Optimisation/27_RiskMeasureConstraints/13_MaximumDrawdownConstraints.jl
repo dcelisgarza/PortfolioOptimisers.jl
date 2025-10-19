@@ -1,6 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::MaximumDrawdown,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     if haskey(model, :mdd_risk)
         return model[:mdd_risk]

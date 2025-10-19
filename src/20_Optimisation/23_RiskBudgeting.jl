@@ -33,7 +33,7 @@ function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i::AbstractVector
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, flag = r.flag)
 end
-struct RiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
+struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2
     rba::T3

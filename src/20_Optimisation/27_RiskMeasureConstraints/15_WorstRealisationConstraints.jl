@@ -9,8 +9,7 @@ function set_wr_risk_expression!(model::JuMP.Model, X::AbstractMatrix)
     return wr_risk
 end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     if haskey(model, :wr_risk)
         return model[:wr_risk]

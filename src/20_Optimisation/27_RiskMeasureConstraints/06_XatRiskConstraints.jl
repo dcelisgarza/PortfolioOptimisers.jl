@@ -1,7 +1,6 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
@@ -35,8 +34,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:MIPValueatRisk},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
@@ -129,8 +127,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_factory(alg.mu, pr.mu)
@@ -150,8 +147,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:DistributionValueatRisk},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_factory(alg.mu, pr.mu)

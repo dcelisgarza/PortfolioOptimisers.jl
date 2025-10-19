@@ -1,7 +1,6 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
@@ -22,8 +21,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
@@ -63,8 +61,8 @@ function set_risk_tr_constraints!(key::Any, model::JuMP.Model,
     return nothing
 end
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                    opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                               <:RiskBudgeting}, pr::AbstractPriorResult,
+                                    opt::RiskJuMPOptimisationEstimator,
+                                    pr::AbstractPriorResult,
                                     plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                                <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                     fees::Union{Nothing, <:Fees}, args...; kwargs...)
@@ -396,8 +394,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                           <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                fees::Union{Nothing, <:Fees}, args...; kwargs...)
@@ -418,8 +415,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return tracking_risk
 end
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                    opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                               <:RiskBudgeting}, pr::AbstractPriorResult,
+                                    opt::RiskJuMPOptimisationEstimator,
+                                    pr::AbstractPriorResult,
                                     plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                                <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                     fees::Union{Nothing, <:Fees}, args...; kwargs...)
@@ -538,8 +535,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:DependentVariableTracking},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                           <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                fees::Union{Nothing, <:Fees}, args...; kwargs...)

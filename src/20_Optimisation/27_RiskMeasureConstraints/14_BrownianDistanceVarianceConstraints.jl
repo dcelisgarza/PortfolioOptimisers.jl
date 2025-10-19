@@ -33,8 +33,7 @@ function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExp
     return bdvariance_risk
 end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     if haskey(model, :bdvariance_risk)
         return model[:bdvariance_risk]

@@ -1,6 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:evar_risk_, i)
     sc = model[:sc]
@@ -31,8 +30,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
     return evar_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:evar_risk_range_, i)
     sc = model[:sc]
@@ -115,8 +113,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
     return evar_risk_range
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:edar_risk_, i)
     sc = model[:sc]

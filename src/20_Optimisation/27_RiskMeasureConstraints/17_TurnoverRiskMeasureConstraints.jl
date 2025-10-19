@@ -1,7 +1,6 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, ::AbstractPriorResult, args...;
-                               kwargs...)
+                               opt::RiskJuMPOptimisationEstimator, ::AbstractPriorResult,
+                               args...; kwargs...)
     key = Symbol(:turnover_risk_, i)
     sc = model[:sc]
     w = model[:w]

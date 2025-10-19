@@ -1,6 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     if haskey(model, :uci)
         return model[:uci_risk]

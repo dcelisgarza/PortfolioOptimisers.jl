@@ -1,6 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:rlvar_risk_, i)
     sc = model[:sc]
@@ -70,8 +69,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     return rlvar_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:rlvar_range_risk_, i)
     sc = model[:sc]
@@ -205,8 +203,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     return rlvar_range_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:rldar_risk_, i)
     sc = model[:sc]
