@@ -40,7 +40,6 @@ end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Real,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  args...)
-    net_X = model[:net_X]
     sc = model[:sc]
     tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
     model[Symbol(keyc, i)] = @constraint(model,

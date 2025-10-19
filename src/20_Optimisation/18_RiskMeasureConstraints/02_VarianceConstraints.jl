@@ -64,7 +64,6 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
     W = set_sdp_constraints!(model)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model, sigma * W)
-    model[key] = @expression(model, tr(sigma_W))
     return model[key] = @expression(model, tr(sigma_W))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,

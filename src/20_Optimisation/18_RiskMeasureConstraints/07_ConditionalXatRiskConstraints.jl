@@ -5,7 +5,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    var, z_cvar = model[Symbol(:z_cvar_, i)], model[Symbol(:var_, i)] = @variables(model,
+    var, z_cvar = model[Symbol(:var_, i)], model[Symbol(:z_cvar_, i)] = @variables(model,
                                                                                    begin
                                                                                        ()
                                                                                        [1:T],

@@ -223,7 +223,7 @@ function risk_measure_view(r::Variance, i::AbstractVector, args...)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
 """
-    struct StandardDeviation{T1, T2, T3, T4} <: RiskMeasure
+    struct StandardDeviation{T1, T2} <: RiskMeasure
         settings::T1
         sigma::T2
     end
