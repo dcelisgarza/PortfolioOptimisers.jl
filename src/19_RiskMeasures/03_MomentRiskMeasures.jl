@@ -11,20 +11,20 @@ abstract type UnStandardisedSecondMomentAlgorithm <:
               UnStandardisedLowOrderMomentMeasureAlgorithm end
 struct SecondLowerMoment{T1} <: UnStandardisedSecondMomentAlgorithm
     alg::T1
-    function SecondLowerMoment(alg::SecondMomentAlgorithm)
+    function SecondLowerMoment(alg::SecondMomentFormulation)
         return new{typeof(alg)}(alg)
     end
 end
-function SecondLowerMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
+function SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondLowerMoment(alg)
 end
 struct SecondCentralMoment{T1} <: UnStandardisedSecondMomentAlgorithm
     alg::T1
-    function SecondCentralMoment(alg::SecondMomentAlgorithm)
+    function SecondCentralMoment(alg::SecondMomentFormulation)
         return new{typeof(alg)}(alg)
     end
 end
-function SecondCentralMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
+function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
 struct StandardisedLowOrderMoment{T1, T2} <: StandardisedLowOrderMomentMeasureAlgorithm

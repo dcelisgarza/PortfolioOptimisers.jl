@@ -1,19 +1,19 @@
 """
-    abstract type SecondMomentAlgorithm <: AbstractAlgorithm end
+    abstract type SecondMomentFormulation <: AbstractAlgorithm end
 
 Abstract supertype for optimisation formulations of second moment risk measures in PortfolioOptimisers.jl.
 
 # Related Types
 
-  - [`VarianceAlgorithm`](@ref)
+  - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
 """
-abstract type SecondMomentAlgorithm <: AbstractAlgorithm end
+abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
-    abstract type VarianceAlgorithm <: SecondMomentAlgorithm end
+    abstract type VarianceFormulation <: SecondMomentFormulation end
 
 Abstract supertype for optimisation formulations of variance-based risk measures in PortfolioOptimisers.jl.
 
@@ -22,60 +22,60 @@ Abstract supertype for optimisation formulations of variance-based risk measures
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
 """
-abstract type VarianceAlgorithm <: SecondMomentAlgorithm end
+abstract type VarianceFormulation <: SecondMomentFormulation end
 """
-    struct QuadRiskExpr <: VarianceAlgorithm end
+    struct QuadRiskExpr <: VarianceFormulation end
 
 Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form `w' * Σ * w`.
 
 # Related Types
 
-  - [`VarianceAlgorithm`](@ref)
+  - [`VarianceFormulation`](@ref)
   - [`Variance`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
 """
-struct QuadRiskExpr <: VarianceAlgorithm end
+struct QuadRiskExpr <: VarianceFormulation end
 """
-    struct SquaredSOCRiskExpr <: VarianceAlgorithm end
+    struct SquaredSOCRiskExpr <: VarianceFormulation end
 
 Squared second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using the square of a variable constrained by a second order cone.
 
 # Related
 
-  - [`VarianceAlgorithm`](@ref)
+  - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`Variance`](@ref)
 """
-struct SquaredSOCRiskExpr <: VarianceAlgorithm end
+struct SquaredSOCRiskExpr <: VarianceFormulation end
 """
-    struct RSOCRiskExpr <: SecondMomentAlgorithm end
+    struct RSOCRiskExpr <: SecondMomentFormulation end
 
 Rotated second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure using a variable constrained to be in a rotated second order cone representing the sum of squares.
 
 # Related Types
 
-  - [`SecondMomentAlgorithm`](@ref)
-  - [`VarianceAlgorithm`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+  - [`VarianceFormulation`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
 """
-struct RSOCRiskExpr <: SecondMomentAlgorithm end
+struct RSOCRiskExpr <: SecondMomentFormulation end
 """
-    struct SOCRiskExpr <: SecondMomentAlgorithm end
+    struct SOCRiskExpr <: SecondMomentFormulation end
 
 Second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using a variable constrained by a second order cone.
 
 # Related
 
-  - [`SecondMomentAlgorithm`](@ref)
-  - [`VarianceAlgorithm`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+  - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
 """
-struct SOCRiskExpr <: SecondMomentAlgorithm end
+struct SOCRiskExpr <: SecondMomentFormulation end
 """
     struct Variance{T1, T2, T3, T4} <: RiskMeasure
         settings::T1
@@ -98,7 +98,7 @@ Represents the portfolio variance using a covariance matrix.
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              sigma::Union{Nothing, <:AbstractMatrix} = nothing,
              rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
-             alg::VarianceAlgorithm = SquaredSOCRiskExpr())
+             alg::VarianceFormulation = SquaredSOCRiskExpr())
 
 Keyword arguments correspond to the fields above.
 
@@ -152,7 +152,7 @@ julia> r(w)
 # Related
 
   - [`RiskMeasureSettings`](@ref)
-  - [`VarianceAlgorithm`](@ref)
+  - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
@@ -168,7 +168,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     function Variance(settings::RiskMeasureSettings,
                       sigma::Union{Nothing, <:AbstractMatrix},
                       rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
-                      alg::VarianceAlgorithm)
+                      alg::VarianceFormulation)
         if isa(sigma, AbstractMatrix)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma)
@@ -180,7 +180,7 @@ end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                   rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
-                  alg::VarianceAlgorithm = SquaredSOCRiskExpr())
+                  alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end
 function (r::Variance)(w::AbstractVector)

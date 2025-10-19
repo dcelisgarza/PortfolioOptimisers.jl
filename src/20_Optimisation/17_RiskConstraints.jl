@@ -380,14 +380,14 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, facto
 end
 """
 """
-function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::Frontier, factor::Real)
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Real)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end
-function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::AbstractVector,
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::AbstractVector,
                                  factor::Real)
     return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt.(ub))
 end
-function second_moment_bound_val(alg::SecondMomentAlgorithm, ub::Real, factor::Real)
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::Real, factor::Real)
     return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt(ub))
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)

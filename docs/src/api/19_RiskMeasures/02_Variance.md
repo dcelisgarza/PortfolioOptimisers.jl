@@ -14,6 +14,6 @@ factory(r::UncertaintySetVariance, prior::PortfolioOptimisers.AbstractPriorResul
                  ucs::Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult,
                             <:PortfolioOptimisers.AbstractUncertaintySetEstimator} = nothing, args...;
                  kwargs...)
-PortfolioOptimisers.SecondMomentAlgorithm
-PortfolioOptimisers.VarianceAlgorithm
+PortfolioOptimisers.SecondMomentFormulation
+PortfolioOptimisers.VarianceFormulation
 ```
