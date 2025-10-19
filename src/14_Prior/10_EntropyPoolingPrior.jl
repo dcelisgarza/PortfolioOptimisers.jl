@@ -1965,11 +1965,12 @@ Extract the kurtosis for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
     #! Think about how to include pr.w
-    return HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))([1],
-                                                                                      reshape(pr.X[:,
-                                                                                                   i],
-                                                                                              :,
-                                                                                              1))
+    return HighOrderMoment(;
+                           alg = StandardisedHighOrderMoment(; alg = FourthCentralMoment()))([1],
+                                                                                             reshape(pr.X[:,
+                                                                                                          i],
+                                                                                                     :,
+                                                                                                     1))
 end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,

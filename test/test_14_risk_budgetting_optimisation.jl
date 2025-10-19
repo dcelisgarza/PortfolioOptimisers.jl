@@ -49,15 +49,15 @@
     rf = 4.2 / 100 / 252
     rs = [StandardDeviation(), Variance(), LowOrderMoment(),
           LowOrderMoment(;
-                         alg = LowOrderDeviation(;
-                                                 alg = SecondLowerMoment(;
-                                                                         alg = SOCRiskExpr()))),
-          LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+                         alg = StandardisedLowOrderMoment(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  alg = SOCRiskExpr()))),
+          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
           LowOrderMoment(;
-                         alg = LowOrderDeviation(;
-                                                 alg = SecondCentralMoment(;
-                                                                           alg = SOCRiskExpr()))),
-          LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+                         alg = StandardisedLowOrderMoment(;
+                                                          alg = SecondCentralMoment(;
+                                                                                    alg = SOCRiskExpr()))),
+          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondCentralMoment())),
           LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
           ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
           EntropicValueatRiskRange(), RelativisticValueatRisk(),

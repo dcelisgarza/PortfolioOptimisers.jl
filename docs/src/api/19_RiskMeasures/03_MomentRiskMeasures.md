@@ -1,4 +1,1 @@
 # Moment Risk Measures
-
-```@docs
-```

@@ -395,8 +395,8 @@ function second_moment_bound_val(::Any, ::Nothing, ::Any)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
-                                                 <:LowOrderDeviation{<:Any,
-                                                                     <:SecondLowerMoment}},
+                                                 <:StandardisedLowOrderMoment{<:Any,
+                                                                              <:SecondLowerMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -451,8 +451,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
-                                                 <:LowOrderDeviation{<:Any,
-                                                                     <:SecondCentralMoment}},
+                                                 <:StandardisedLowOrderMoment{<:Any,
+                                                                              <:SecondCentralMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
