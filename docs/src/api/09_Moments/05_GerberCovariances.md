@@ -4,9 +4,9 @@
 Gerber0
 Gerber1
 Gerber2
-NormalisedGerber0
-NormalisedGerber1
-NormalisedGerber2
+StandardisedGerber0
+StandardisedGerber1
+StandardisedGerber2
 GerberCovariance
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                         <:PortfolioOptimisers.UnStandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -18,14 +18,14 @@ PortfolioOptimisers.UnStandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix,
                 std_vec::AbstractArray)
-PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0},
+PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0},
                 X::AbstractMatrix)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
                 std_vec::AbstractArray)
-PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1},
+PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1},
                 X::AbstractMatrix)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
                 std_vec::AbstractArray)
-PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2},
+PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2},
                 X::AbstractMatrix)
 ```
