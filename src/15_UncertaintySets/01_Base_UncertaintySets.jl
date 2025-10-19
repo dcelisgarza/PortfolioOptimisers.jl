@@ -147,14 +147,9 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 
 # Returns
 
-  - `Union{Nothing, <:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: Selected uncertainty set based on availability and priority.
-
-# Details
-
-  - Returns `nothing` when both arguments are `nothing`.
-  - Prioritizes `risk_ucs` when it is provided (not `nothing`).
-  - Falls back to `prior_ucs` when `risk_ucs` is `nothing` but `prior_ucs` is provided.
-  - Used internally by factory functions to select appropriate uncertainty sets.
+  - `nothing`: If both `risk_ucs` and `prior_ucs` are `nothing`.
+  - `risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is not `nothing`.
+  - `prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
 
 # Related
 

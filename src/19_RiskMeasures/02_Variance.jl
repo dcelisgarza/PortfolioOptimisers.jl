@@ -407,9 +407,31 @@ UncertaintySetVariance
            |   scale | Float64: 1.0
            |      ub | nothing
            |     rke | Bool: true
-     sigma | 3×3 Matrix{Float64}
-        rc | nothing
-       alg | SquaredSOCRiskExpr()
+       ucs | NormalUncertaintySet
+           |      pe | EmpiricalPrior
+           |         |        ce | PortfolioOptimisersCovariance
+           |         |           |   ce | Covariance
+           |         |           |      |    me | SimpleExpectedReturns
+           |         |           |      |       |   w | nothing
+           |         |           |      |    ce | GeneralCovariance
+           |         |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           |         |           |      |       |    w | nothing
+           |         |           |      |   alg | Full()
+           |         |           |   mp | DefaultMatrixProcessing
+           |         |           |      |       pdm | Posdef
+           |         |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+           |         |           |      |   denoise | nothing
+           |         |           |      |    detone | nothing
+           |         |           |      |       alg | nothing
+           |         |        me | SimpleExpectedReturns
+           |         |           |   w | nothing
+           |         |   horizon | nothing
+           |     alg | BoxUncertaintySetAlgorithm()
+           |   n_sim | Int64: 3000
+           |       q | Float64: 0.05
+           |     rng | Random.TaskLocalRNG: Random.TaskLocalRNG()
+           |    seed | nothing
+     sigma | nothing
 
 julia> r(w)
 1.3421705804186579
