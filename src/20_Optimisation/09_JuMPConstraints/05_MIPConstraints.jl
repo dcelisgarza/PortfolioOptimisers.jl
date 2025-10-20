@@ -2,7 +2,21 @@ function get_mip_ss(ss::Real, args...)
     return ss
 end
 function get_mip_ss(::Nothing, wb::WeightBounds)
-    return max(maximum(abs.(wb.lb)), maximum(abs.(wb.ub))) * 1000
+    lb = wb.lb
+    ub = wb.ub
+    lb_mag = if isnothing(lb)
+        0.0
+    else
+        idx = isfinite.(lb)
+        isempty(idx) ? 0.0 : maximum(abs.(view(lb, idx)))
+    end
+    ub_mag = if isnothing(ub)
+        0.0
+    else
+        idx = isfinite.(ub)
+        isempty(idx) ? 0.0 : maximum(abs.(view(ub, idx)))
+    end
+    return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
 end
 function mip_wb(::Any, ::Nothing, args...)
     return nothing
