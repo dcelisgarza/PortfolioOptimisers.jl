@@ -338,7 +338,7 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
             model[:mdd_risk] = model[:oldmdd_risk]
             model[:cmdd_risk] = model[:oldcmdd_risk]
             unregister(model, :oldmdd_risk)
-            unregister(model, :cmdd_risk)
+            unregister(model, :oldcmdd_risk)
         end
     end
     if (!uci && haskey(model, :uci)) || haskey(model, :olduci)

@@ -1,3 +1,9 @@
+function get_mip_ss(ss::Real, args...)
+    return ss
+end
+function get_mip_ss(::Nothing, wb::WeightBounds)
+    return max(maximum(abs.(wb.lb)), maximum(abs.(wb.ub))) * 1000
+end
 function mip_wb(::Any, ::Nothing, args...)
     return nothing
 end
@@ -24,9 +30,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    if isnothing(ss)
-        ss = 100_000.0
-    end
+    ss = get_mip_ss(ss, wb)
     N = length(w)
     @variables(model, begin
                    ilb[1:N], (binary = true)
@@ -86,9 +90,7 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds,
     if isa(k, Real)
         @expression(model, i_mip, ib)
     else
-        if isnothing(ss)
-            ss = 100_000.0
-        end
+        ss = get_mip_ss(ss, wb)
         @variable(model, ibf[1:N] >= 0)
         @constraints(model, begin
                          ibf_ub, ibf .- k <= 0
@@ -201,9 +203,7 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    if isnothing(ss)
-        ss = 100_000.0
-    end
+    ss = get_mip_ss(ss, wb)
     N = size(smtx, 1)
     ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = @variables(model,
                                                                                        begin
@@ -297,9 +297,7 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds,
     i_smip = if isa(k, Real)
         model[Symbol(key2, i)] = @expression(model, sib)
     else
-        if isnothing(ss)
-            ss = 100_000.0
-        end
+        ss = get_mip_ss(ss, wb)
         isbf = model[Symbol(key3, i)] = @variable(model, [1:N], lower_bound = 0)
         model[Symbol(key3, :_ub_, i)], model[Symbol(key3, :d_ub_, i)], model[Symbol(key3, :d_lb_, i)] = @constraints(model,
                                                                                                                      begin
