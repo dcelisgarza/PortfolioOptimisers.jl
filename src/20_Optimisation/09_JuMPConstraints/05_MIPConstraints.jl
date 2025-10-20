@@ -48,19 +48,19 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                        isf[1:N] >= 0
                    end)
         @constraints(model, begin
-                         ilf_ub, ilf .- k <= 0
-                         isf_ub, isf .- k <= 0
-                         ilfd_ub, ilf - ss * ilb <= 0
-                         isfd_ub, isf - ss * isb <= 0
-                         ilfd_lb, (ilf + ss * (1 .- ilb)) .- k >= 0
-                         isfd_lb, (isf + ss * (1 .- isb)) .- k >= 0
+                         ilf_ub, sc * (ilf .- k) <= 0
+                         isf_ub, sc * (isf .- k) <= 0
+                         ilfd_ub, sc * (ilf - ss * ilb) <= 0
+                         isfd_ub, sc * (isf - ss * isb) <= 0
+                         ilfd_lb, sc * ((ilf + ss * (1 .- ilb)) .- k) >= 0
+                         isfd_lb, sc * ((isf + ss * (1 .- isb)) .- k) >= 0
                      end)
         @expressions(model, begin
                          il, ilf
                          is, isf
                      end)
     end
-    @constraint(model, i_mip_ub, i_mip .- 1 <= 0)
+    @constraint(model, i_mip_ub, sc * (i_mip .- 1) <= 0)
     mip_wb(model, wb, il, is)
     if lt_flag
         @constraint(model, w_mip_lt, sc * (w - il ⊙ lt.val + ss * (1 .- ilb)) >= 0)
@@ -93,9 +93,9 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds,
         ss = get_mip_ss(ss, wb)
         @variable(model, ibf[1:N] >= 0)
         @constraints(model, begin
-                         ibf_ub, ibf .- k <= 0
-                         ibfd_ub, ibf - ss * ib <= 0
-                         ibfd_lb, (ibf + ss * (1 .- ib)) .- k >= 0
+                         ibf_ub, sc * (ibf .- k) <= 0
+                         ibfd_ub, sc * (ibf - ss * ib) <= 0
+                         ibfd_lb, sc * ((ibf + ss * (1 .- ib)) .- k) >= 0
                      end)
         @expression(model, i_mip, ibf)
     end
@@ -234,31 +234,37 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
         key6 = Symbol(key1, :sfd_)
         model[Symbol(key3, :ub_, i)], model[Symbol(key4, :ub_, i)], model[Symbol(key5, :ub_, i)], model[Symbol(key6, :ub_, i)], model[Symbol(key5, :lb_, i)], model[Symbol(key6, :lb_, i)] = @constraints(model,
                                                                                                                                                                                                           begin
-                                                                                                                                                                                                              ilf .-
-                                                                                                                                                                                                              k <=
+                                                                                                                                                                                                              sc *
+                                                                                                                                                                                                              (ilf .-
+                                                                                                                                                                                                               k) <=
                                                                                                                                                                                                               0
-                                                                                                                                                                                                              isf .-
-                                                                                                                                                                                                              k <=
+                                                                                                                                                                                                              sc *
+                                                                                                                                                                                                              (isf .-
+                                                                                                                                                                                                               k) <=
                                                                                                                                                                                                               0
-                                                                                                                                                                                                              ilf -
-                                                                                                                                                                                                              ss *
-                                                                                                                                                                                                              ilb <=
-                                                                                                                                                                                                              0
-                                                                                                                                                                                                              isf -
-                                                                                                                                                                                                              ss *
-                                                                                                                                                                                                              isb <=
-                                                                                                                                                                                                              0
-                                                                                                                                                                                                              (ilf +
+                                                                                                                                                                                                              sc *
+                                                                                                                                                                                                              (ilf -
                                                                                                                                                                                                                ss *
-                                                                                                                                                                                                               (1 .-
-                                                                                                                                                                                                                ilb)) .-
-                                                                                                                                                                                                              k >=
+                                                                                                                                                                                                               ilb) <=
                                                                                                                                                                                                               0
-                                                                                                                                                                                                              (isf +
+                                                                                                                                                                                                              sc *
+                                                                                                                                                                                                              (isf -
                                                                                                                                                                                                                ss *
-                                                                                                                                                                                                               (1 .-
-                                                                                                                                                                                                                isb)) .-
-                                                                                                                                                                                                              k >=
+                                                                                                                                                                                                               isb) <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              sc *
+                                                                                                                                                                                                              ((ilf +
+                                                                                                                                                                                                                ss *
+                                                                                                                                                                                                                (1 .-
+                                                                                                                                                                                                                 ilb)) .-
+                                                                                                                                                                                                               k) >=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              sc *
+                                                                                                                                                                                                              ((isf +
+                                                                                                                                                                                                                ss *
+                                                                                                                                                                                                                (1 .-
+                                                                                                                                                                                                                 isb)) .-
+                                                                                                                                                                                                               k) >=
                                                                                                                                                                                                               0
                                                                                                                                                                                                           end)
         model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = @expressions(model,
@@ -267,7 +273,7 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                                                                     isf
                                                                                 end)
     end
-    model[Symbol(key2, :ub, i)] = @constraint(model, i_mip .- 1 <= 0)
+    model[Symbol(key2, :ub, i)] = @constraint(model, sc * (i_mip .- 1) <= 0)
     smtx_expr = model[Symbol(key7, i)] = @expression(model, smtx * w)
     smip_wb(model, wb, smtx, smtx_expr, il, is, key8, i)
     if lt_flag
@@ -301,18 +307,21 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds,
         isbf = model[Symbol(key3, i)] = @variable(model, [1:N], lower_bound = 0)
         model[Symbol(key3, :_ub_, i)], model[Symbol(key3, :d_ub_, i)], model[Symbol(key3, :d_lb_, i)] = @constraints(model,
                                                                                                                      begin
-                                                                                                                         isbf .-
-                                                                                                                         k <=
+                                                                                                                         sc *
+                                                                                                                         (isbf .-
+                                                                                                                          k) <=
                                                                                                                          0
-                                                                                                                         isbf -
-                                                                                                                         ss *
-                                                                                                                         sib <=
-                                                                                                                         0
-                                                                                                                         (isbf +
+                                                                                                                         sc *
+                                                                                                                         (isbf -
                                                                                                                           ss *
-                                                                                                                          (1 .-
-                                                                                                                           sib)) .-
-                                                                                                                         k >=
+                                                                                                                          sib) <=
+                                                                                                                         0
+                                                                                                                         sc *
+                                                                                                                         ((isbf +
+                                                                                                                           ss *
+                                                                                                                           (1 .-
+                                                                                                                            sib)) .-
+                                                                                                                          k) >=
                                                                                                                          0
                                                                                                                      end)
         model[Symbol(key2, i)] = @expression(model, isbf)
