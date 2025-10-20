@@ -9,12 +9,12 @@ StandardisedGerber1
 StandardisedGerber2
 GerberCovariance
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                        <:PortfolioOptimisers.UnStandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+                        <:PortfolioOptimisers.UntandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                        <:PortfolioOptimisers.UnStandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+                        <:PortfolioOptimisers.UntandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 PortfolioOptimisers.BaseGerberCovariance
 PortfolioOptimisers.GerberCovarianceAlgorithm
-PortfolioOptimisers.UnStandardisedGerberCovarianceAlgorithm
+PortfolioOptimisers.UntandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix,
                 std_vec::AbstractArray)

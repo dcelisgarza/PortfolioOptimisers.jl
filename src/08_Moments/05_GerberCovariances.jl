@@ -23,17 +23,17 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 # Related
 
   - [`BaseGerberCovariance`](@ref)
-  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
+  - [`UntandardisedGerberCovarianceAlgorithm`](@ref)
   - [`StandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
-    abstract type UnStandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+    abstract type UntandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 
 Abstract supertype for all unstandardised Gerber covariance algorithm types.
 
-Concrete types implementing unstandardised Gerber covariance algorithms should subtype `UnStandardisedGerberCovarianceAlgorithm`.
+Concrete types implementing unstandardised Gerber covariance algorithms should subtype `UntandardisedGerberCovarianceAlgorithm`.
 
 # Related
 
@@ -43,7 +43,7 @@ Concrete types implementing unstandardised Gerber covariance algorithms should s
   - [`Gerber2`](@ref)
   - [`GerberCovariance`](@ref)
 """
-abstract type UnStandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+abstract type UntandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 """
     abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 
@@ -61,44 +61,44 @@ Concrete types implementing standardised Gerber covariance algorithms should sub
 """
 abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 """
-    struct Gerber0 <: UnStandardisedGerberCovarianceAlgorithm end
+    struct Gerber0 <: UntandardisedGerberCovarianceAlgorithm end
 
 Implements the original Gerber covariance algorithm.
 
 # Related
 
-  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
+  - [`UntandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
 """
-struct Gerber0 <: UnStandardisedGerberCovarianceAlgorithm end
+struct Gerber0 <: UntandardisedGerberCovarianceAlgorithm end
 """
-    struct Gerber1 <: UnStandardisedGerberCovarianceAlgorithm end
+    struct Gerber1 <: UntandardisedGerberCovarianceAlgorithm end
 
 Implements the first variant of the Gerber covariance algorithm.
 
 # Related
 
-  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
+  - [`UntandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber2`](@ref)
 """
-struct Gerber1 <: UnStandardisedGerberCovarianceAlgorithm end
+struct Gerber1 <: UntandardisedGerberCovarianceAlgorithm end
 """
-    struct Gerber2 <: UnStandardisedGerberCovarianceAlgorithm end
+    struct Gerber2 <: UntandardisedGerberCovarianceAlgorithm end
 
 Implements the second variant of the Gerber covariance algorithm.
 
 # Related
 
-  - [`UnStandardisedGerberCovarianceAlgorithm`](@ref)
+  - [`UntandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
 """
-struct Gerber2 <: UnStandardisedGerberCovarianceAlgorithm end
+struct Gerber2 <: UntandardisedGerberCovarianceAlgorithm end
 """
     struct StandardisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
         me::T1
@@ -639,7 +639,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
   - `ce::GerberCovariance`: Gerber covariance estimator.
 
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnStandardisedGerberCovarianceAlgorithm}`: Compute the unstandardised Gerber correlation matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UntandardisedGerberCovarianceAlgorithm}`: Compute the unstandardised Gerber correlation matrix.
       + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber correlation matrix.
 
   - `X`: Data matrix (observations × assets).
@@ -666,7 +666,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - [`cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnStandardisedGerberCovarianceAlgorithm},
+                                             <:UntandardisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -700,7 +700,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
   - `ce::GerberCovariance`: Gerber covariance estimator.
 
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnStandardisedGerberCovarianceAlgorithm}`: Compute the unstandardised Gerber covariance matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UntandardisedGerberCovarianceAlgorithm}`: Compute the unstandardised Gerber covariance matrix.
       + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber covariance matrix.
 
   - `X`: Data matrix (observations × assets).
@@ -727,7 +727,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - [`cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnStandardisedGerberCovarianceAlgorithm},
+                                             <:UntandardisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

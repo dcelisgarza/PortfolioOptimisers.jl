@@ -15,16 +15,16 @@ StandardisedSmythBrobyGerber1
 StandardisedSmythBrobyGerber2
 SmythBrobyCovariance
 cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                             <:PortfolioOptimisers.UnStandardisedSmythBrobyCovarianceAlgorithm,
+                             <:PortfolioOptimisers.UntandardisedSmythBrobyCovarianceAlgorithm,
                              <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
 cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                             <:PortfolioOptimisers.UnStandardisedSmythBrobyCovarianceAlgorithm,
+                             <:PortfolioOptimisers.UntandardisedSmythBrobyCovarianceAlgorithm,
                              <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
 PortfolioOptimisers.BaseSmythBrobyCovariance
 PortfolioOptimisers.SmythBrobyCovarianceAlgorithm
-PortfolioOptimisers.UnStandardisedSmythBrobyCovarianceAlgorithm
+PortfolioOptimisers.UntandardisedSmythBrobyCovarianceAlgorithm
 PortfolioOptimisers.StandardisedSmythBrobyCovarianceAlgorithm
 PortfolioOptimisers.sb_delta
 PortfolioOptimisers.smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
