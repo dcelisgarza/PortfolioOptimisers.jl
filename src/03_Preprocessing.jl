@@ -369,3 +369,5 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
                          ivpa = ivpa)
 end
+
+export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns

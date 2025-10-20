@@ -1,42 +1,23 @@
 abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
+abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
 """
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     if !haskey(model, :G)
-        G = cholesky(pr.sigma).U
+        G = isnothing(pr.chol) ? cholesky(pr.sigma).U : pr.chol
         @expression(model, G, G)
     end
     return model[:G]
 end
-function get_chol_or_V_pm(model::JuMP.Model, pr::AbstractPriorResult)
+function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :GV)
         G = cholesky(pr.V).U
         @expression(model, GV, G)
     end
     return model[:GV]
-end
-function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any,
-                                                        <:AbstractMatrix, <:Any, <:Any,
-                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                        <:Any},
-                                        <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
-                                                                         <:Any,
-                                                                         <:AbstractMatrix,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any},
-                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any}})
-    if !haskey(model, :G)
-        G = pr.chol
-        @expression(model, G, G)
-    end
-    return model[:G]
 end
 function jump_returns_factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
@@ -75,15 +56,6 @@ end
 function JuMPOptimisationSolution(; w::AbstractArray)
     return JuMPOptimisationSolution(w)
 end
-function add_to_objective_penalty!(model::JuMP.Model, expr)
-    op = if !haskey(model, :op)
-        @expression(model, op, zero(AffExpr))
-    else
-        model[:op]
-    end
-    add_to_expression!(op, expr)
-    return nothing
-end
 function set_model_scales!(model::JuMP.Model, so::Real, sc::Real)
     @expressions(model, begin
                      so, so
@@ -102,72 +74,6 @@ end
 function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:AbstractVector})
     @variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
-    return nothing
-end
-function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
-    if !haskey(model, :risk_vec)
-        return nothing
-    end
-    risk_vec = model[:risk_vec]
-    if any(x -> isa(x, QuadExpr), risk_vec)
-        @expression(model, risk, zero(QuadExpr))
-    else
-        @expression(model, risk, zero(AffExpr))
-    end
-    for risk_i in risk_vec
-        add_to_expression!(risk, risk_i)
-    end
-    return nothing
-end
-function scalarise_risk_expression!(model::JuMP.Model, sce::LogSumExpScalariser)
-    if !haskey(model, :risk_vec)
-        return nothing
-    end
-    risk_vec = model[:risk_vec]
-    sc = model[:sc]
-    N = length(risk_vec)
-    gamma = sce.gamma
-    @variables(model, begin
-                   risk
-                   u_risk[1:N]
-               end)
-    @constraints(model,
-                 begin
-                     u_risk_lse, sc * (sum(u_risk) - 1) <= 0
-                     risk_lse[i = 1:N],
-                     [sc * gamma * (risk_vec[i] - risk), sc, sc * u_risk[i]] in
-                     MOI.ExponentialCone()
-                 end)
-    return nothing
-end
-function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
-    if !haskey(model, :risk_vec)
-        return nothing
-    end
-    risk_vec = model[:risk_vec]
-    @variable(model, risk)
-    @constraint(model, risk_ms, risk .- risk_vec .>= 0)
-    return nothing
-end
-function set_risk_constraints!(args...; kwargs...)
-    return nothing
-end
-function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
-                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
-    set_risk_constraints!(model, 1, r, opt, pr, plg, fees, args...; kwargs...)
-    return nothing
-end
-function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
-                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
-    for (i, r) in enumerate(rs)
-        set_risk_constraints!(model, i, r, opt, pr, plg, fees, args...; kwargs...)
-    end
     return nothing
 end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
@@ -249,5 +155,7 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::AbstractMatrix)
     @expression(model, Xap1, one(eltype(X)) .+ X)
     return Xap1
 end
+function scalarise_risk_expression! end
+function set_risk_constraints! end
 
 export JuMPOptimisationSolution

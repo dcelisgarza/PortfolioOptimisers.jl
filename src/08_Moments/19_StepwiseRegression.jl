@@ -166,7 +166,7 @@ function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
         return nothing
     end
     T, N = size(F)
-    ovec = range(; start = 1, stop = 1, length = T)
+    ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
     excluded = setdiff(indices, included)
     best_pval = typemax(eltype(x))
@@ -221,7 +221,7 @@ This method implements forward selection for stepwise regression, where variable
 """
 function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
                     F::AbstractMatrix)
-    ovec = range(; start = 1, stop = 1, length = length(x))
+    ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     indices = 1:size(F, 2)
     included = Vector{eltype(indices)}(undef, 0)
     pvals = Vector{promote_type(eltype(F), eltype(x))}(undef, 0)
@@ -377,7 +377,7 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
                                                    <:AbstractMaxValStepwiseRegressionCriteria},
                                            <:Forward}, x::AbstractVector, F::AbstractMatrix)
     T, N = size(F)
-    ovec = range(; start = 1, stop = 1, length = T)
+    ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
     criterion_func = regression_criterion_func(re.crit)
     threshold = regression_threshold(re.crit)
@@ -437,7 +437,7 @@ This method implements backward elimination for stepwise regression, where all v
 """
 function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
                     F::AbstractMatrix)
-    ovec = range(; start = 1, stop = 1, length = length(x))
+    ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     fri = fit(re.target, [ovec F], x)
     included = 1:size(F, 2)
     indices = 1:size(F, 2)
@@ -581,7 +581,7 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
                                            <:Backward}, x::AbstractVector,
                     F::AbstractMatrix)
     T, N = size(F)
-    ovec = range(; start = 1, stop = 1, length = T)
+    ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
     fri = fit(re.target, [ovec F], x)
     criterion_func = regression_criterion_func(re.crit)
@@ -646,7 +646,7 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
     features = 1:size(F, 2)
     cols = size(F, 2) + 1
     N, rows = size(X)
-    ovec = range(; start = 1, stop = 1, length = N)
+    ovec = range(one(eltype(F)), one(eltype(F)); length = N)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     for i in axes(rr, 1)
         included = regression(re, view(X, :, i), F)

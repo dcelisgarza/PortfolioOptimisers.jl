@@ -374,6 +374,15 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     set_return_bounds!(model, lb)
     return nothing
 end
+function add_to_objective_penalty!(model::JuMP.Model, expr)
+    op = if !haskey(model, :op)
+        @expression(model, op, zero(AffExpr))
+    else
+        model[:op]
+    end
+    add_to_expression!(op, expr)
+    return nothing
+end
 function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     if !haskey(model, :op)
         return nothing

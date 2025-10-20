@@ -1,5 +1,10 @@
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type ClusteringOptimisationEstimator <: OptimisationEstimator end
+abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
+struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct SquareRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct SquareAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 abstract type WeightFinaliser <: AbstractAlgorithm end
 struct IterativeWeightFinaliser{T1} <: WeightFinaliser
     iter::T1
@@ -11,11 +16,6 @@ end
 function IterativeWeightFinaliser(; iter::Integer = 100)
     return IterativeWeightFinaliser(iter)
 end
-abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
-struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
-struct SquareRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
-struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
-struct SquareAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct JuMPWeightFinaliser{T1, T2, T3, T4} <: WeightFinaliser
     slv::T1
     sc::T2

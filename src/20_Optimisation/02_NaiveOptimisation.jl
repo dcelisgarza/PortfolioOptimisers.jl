@@ -55,8 +55,8 @@ function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
-    return NaiveOptimisation(typeof(ew), nothing,
-                             range(; start = inv(N), stop = inv(N), length = N),
+    iN = inv(N)
+    return NaiveOptimisation(typeof(ew), nothing, range(iN, iN; length = N),
                              OptimisationSuccess(nothing), nothing)
 end
 struct RandomWeighted{T1} <: NaiveOptimisationEstimator

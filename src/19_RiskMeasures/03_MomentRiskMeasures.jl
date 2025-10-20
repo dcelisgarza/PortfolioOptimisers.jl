@@ -1,67 +1,68 @@
-abstract type AbstractMomentMeasureAlgorithm <: AbstractAlgorithm end
-abstract type AbstractUnionLowOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
-abstract type AbstractLowOrderMomentMeasureAlgorithm <:
-              AbstractUnionLowOrderMomentMeasureAlgorithm end
-abstract type AbstractLowOrderDeviationMeasureAlgorithm <:
-              AbstractUnionLowOrderMomentMeasureAlgorithm end
-function factory(alg::AbstractMomentMeasureAlgorithm, args...; kwargs...)
+abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+abstract type StandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
-struct FirstLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
-abstract type DeviationLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
-struct SecondLowerMoment{T1} <: DeviationLowerMoment
+struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+abstract type UnstandardisedSecondMomentAlgorithm <:
+              UnstandardisedLowOrderMomentMeasureAlgorithm end
+struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
     alg::T1
-    function SecondLowerMoment(alg::SecondMomentAlgorithm)
+    function SecondLowerMoment(alg::SecondMomentFormulation)
         return new{typeof(alg)}(alg)
     end
 end
-function SecondLowerMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
+function SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondLowerMoment(alg)
 end
-struct SecondCentralMoment{T1} <: DeviationLowerMoment
+struct SecondCentralMoment{T1} <: UnstandardisedSecondMomentAlgorithm
     alg::T1
-    function SecondCentralMoment(alg::SecondMomentAlgorithm)
+    function SecondCentralMoment(alg::SecondMomentFormulation)
         return new{typeof(alg)}(alg)
     end
 end
-function SecondCentralMoment(; alg::SecondMomentAlgorithm = SquaredSOCRiskExpr())
+function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
-struct MeanAbsoluteDeviation <: DeviationLowerMoment end
-struct LowOrderDeviation{T1, T2} <: AbstractLowOrderDeviationMeasureAlgorithm
+struct StandardisedLowOrderMoment{T1, T2} <: StandardisedLowOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
-    function LowOrderDeviation(ve::AbstractVarianceEstimator, alg::DeviationLowerMoment)
-        @argcheck(!isa(alg, MeanAbsoluteDeviation))
+    function StandardisedLowOrderMoment(ve::AbstractVarianceEstimator,
+                                        alg::UnstandardisedSecondMomentAlgorithm)
         return new{typeof(ve), typeof(alg)}(ve, alg)
     end
 end
-function LowOrderDeviation(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                           alg::DeviationLowerMoment = SecondLowerMoment())
-    return LowOrderDeviation(ve, alg)
+function StandardisedLowOrderMoment(;
+                                    ve::AbstractVarianceEstimator = SimpleVariance(;
+                                                                                   me = nothing),
+                                    alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
+    return StandardisedLowOrderMoment(ve, alg)
 end
-abstract type AbstractUnionHighOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
-abstract type AbstractHighOrderMomentMeasureAlgorithm <:
-              AbstractUnionHighOrderMomentMeasureAlgorithm end
-abstract type AbstractHighOrderDeviationMeasureAlgorithm <:
-              AbstractUnionHighOrderMomentMeasureAlgorithm end
-struct ThirdLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end
-struct FourthLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end
-struct FourthCentralMoment <: AbstractHighOrderMomentMeasureAlgorithm end
-struct HighOrderDeviation{T1, T2} <: AbstractHighOrderDeviationMeasureAlgorithm
+abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
+              HighOrderMomentMeasureAlgorithm end
+abstract type StandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
+struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+struct StandardisedHighOrderMoment{T1, T2} <: StandardisedHighOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
-    function HighOrderDeviation(ve::AbstractVarianceEstimator,
-                                alg::AbstractHighOrderMomentMeasureAlgorithm)
+    function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
+                                         alg::UnstandardisedHighOrderMomentMeasureAlgorithm)
         return new{typeof(ve), typeof(alg)}(ve, alg)
     end
 end
-function HighOrderDeviation(;
-                            ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                            alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
-    return HighOrderDeviation(ve, alg)
+function StandardisedHighOrderMoment(;
+                                     ve::AbstractVarianceEstimator = SimpleVariance(;
+                                                                                    me = nothing),
+                                     alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+    return StandardisedHighOrderMoment(ve, alg)
 end
-for alg in (LowOrderDeviation, HighOrderDeviation)
+for alg in (StandardisedLowOrderMoment, StandardisedHighOrderMoment)
     eval(quote
              function factory(alg::$(alg), w::Union{Nothing, <:AbstractWeights} = nothing)
                  return $(alg)(; ve = factory(alg.ve, w), alg = alg.alg)
@@ -76,7 +77,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     function LowOrderMoment(settings::RiskMeasureSettings,
                             w::Union{Nothing, <:AbstractWeights},
                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                            alg::AbstractUnionLowOrderMomentMeasureAlgorithm)
+                            alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
             @argcheck(!isempty(mu) && all(isfinite, mu))
         elseif isa(mu, Real)
@@ -92,7 +93,7 @@ end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Union{Nothing, <:AbstractWeights} = nothing,
                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                        alg::AbstractUnionLowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+                        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
 struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
@@ -103,7 +104,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     function HighOrderMoment(settings::RiskMeasureSettings,
                              w::Union{Nothing, <:AbstractWeights},
                              mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                             alg::AbstractUnionHighOrderMomentMeasureAlgorithm)
+                             alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
             @argcheck(!isempty(mu) && all(isfinite, mu))
         elseif isa(mu, Real)
@@ -119,7 +120,7 @@ end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Union{Nothing, <:AbstractWeights} = nothing,
                          mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                         alg::AbstractUnionHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+                         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
 function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
@@ -158,35 +159,36 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::Abstrac
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment{<:SOCRiskExpr}}})(w::AbstractVector,
-                                                                                             X::AbstractMatrix,
-                                                                                             fees::Union{Nothing,
-                                                                                                         <:Fees} = nothing)
+                            <:StandardisedLowOrderMoment{<:Any,
+                                                         <:SecondLowerMoment{<:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                               X::AbstractMatrix,
+                                                                                               fees::Union{Nothing,
+                                                                                                           <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment}})(w::AbstractVector,
-                                                                              X::AbstractMatrix,
-                                                                              fees::Union{Nothing,
-                                                                                          <:Fees} = nothing)
+                            <:StandardisedLowOrderMoment{<:Any, <:SecondLowerMoment}})(w::AbstractVector,
+                                                                                       X::AbstractMatrix,
+                                                                                       fees::Union{Nothing,
+                                                                                                   <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any,
-                                                <:SecondCentralMoment{<:SOCRiskExpr}}})(w::AbstractVector,
-                                                                                        X::AbstractMatrix,
-                                                                                        fees::Union{Nothing,
-                                                                                                    <:Fees} = nothing)
+                            <:StandardisedLowOrderMoment{<:Any,
+                                                         <:SecondCentralMoment{<:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                                 X::AbstractMatrix,
+                                                                                                 fees::Union{Nothing,
+                                                                                                             <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any, <:SecondCentralMoment}})(w::AbstractVector,
-                                                                                X::AbstractMatrix,
-                                                                                fees::Union{Nothing,
-                                                                                            <:Fees} = nothing)
+                            <:StandardisedLowOrderMoment{<:Any, <:SecondCentralMoment}})(w::AbstractVector,
+                                                                                         X::AbstractMatrix,
+                                                                                         fees::Union{Nothing,
+                                                                                                     <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -222,10 +224,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthCentralMoment})(w::Abs
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:HighOrderDeviation{<:Any, <:ThirdLowerMoment}})(w::AbstractVector,
-                                                                               X::AbstractMatrix,
-                                                                               fees::Union{Nothing,
-                                                                                           <:Fees} = nothing)
+                             <:StandardisedHighOrderMoment{<:Any, <:ThirdLowerMoment}})(w::AbstractVector,
+                                                                                        X::AbstractMatrix,
+                                                                                        fees::Union{Nothing,
+                                                                                                    <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
@@ -233,10 +235,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     return res / (sigma * sqrt(sigma))
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:HighOrderDeviation{<:Any, <:FourthLowerMoment}})(w::AbstractVector,
-                                                                                X::AbstractMatrix,
-                                                                                fees::Union{Nothing,
-                                                                                            <:Fees} = nothing)
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthLowerMoment}})(w::AbstractVector,
+                                                                                         X::AbstractMatrix,
+                                                                                         fees::Union{Nothing,
+                                                                                                     <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
@@ -244,10 +246,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     return res / sigma^2
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:HighOrderDeviation{<:Any, <:FourthCentralMoment}})(w::AbstractVector,
-                                                                                  X::AbstractMatrix,
-                                                                                  fees::Union{Nothing,
-                                                                                              <:Fees} = nothing)
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthCentralMoment}})(w::AbstractVector,
+                                                                                           X::AbstractMatrix,
+                                                                                           fees::Union{Nothing,
+                                                                                                       <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
@@ -270,5 +272,5 @@ for rt in (LowOrderMoment, HighOrderMoment)
 end
 
 export FirstLowerMoment, SecondLowerMoment, SecondCentralMoment, MeanAbsoluteDeviation,
-       ThirdLowerMoment, FourthLowerMoment, FourthCentralMoment, LowOrderDeviation,
-       HighOrderDeviation, LowOrderMoment, HighOrderMoment
+       ThirdLowerMoment, FourthLowerMoment, FourthCentralMoment, StandardisedLowOrderMoment,
+       StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment

@@ -1,4 +1,4 @@
-struct MeanRisk{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
+struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2
     obj::T3
@@ -56,7 +56,7 @@ function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
     unregister(model, :obj_expr)
     rt_min = expected_return(ret, sol_min.w, pr, fees)
     rt_max = expected_return(ret, sol_max.w, pr, fees)
-    return range(; start = rt_min, stop = rt_max, length = lbs.N)
+    return range(rt_min, rt_max; length = lbs.N)
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, ::Val{true}, ::Val{false},
@@ -93,7 +93,7 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Union{Nothing, <:
     else
         factor * sqrt(rk_min), factor * sqrt(rk_max)
     end
-    ub = range(; start = rk_min, stop = rk_max, length = N)
+    ub = range(rk_min, rk_max; length = N)
     return risk_frontier[i].first => (risk_frontier[1].second[1], ub)
 end
 function rebuild_risk_frontier(model::JuMP.Model,

@@ -76,9 +76,9 @@ function Base.show(io::IO,
     println(io, name)
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
-        val = try
-            getfield(ear, field)
-        catch
+        if hasproperty(ear, field)
+            val = getproperty(ear, field)
+        else
             continue
         end
         print(io, lpad(string(field), padding), " ")
@@ -175,4 +175,4 @@ function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
 end
 Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
 
-export IsEmptyError, IsNothingError, IsNothingEmptyError
+export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError

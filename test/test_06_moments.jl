@@ -91,17 +91,17 @@
                GerberCovariance(; alg = Gerber0(),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
-               GerberCovariance(; alg = NormalisedGerber0()),
+               GerberCovariance(; alg = StandardisedGerber0()),
                GerberCovariance(;
-                                alg = NormalisedGerber0(;
-                                                        me = SimpleExpectedReturns(;
-                                                                                   w = ew)),
+                                alg = StandardisedGerber0(;
+                                                          me = SimpleExpectedReturns(;
+                                                                                     w = ew)),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber1()),
-               GerberCovariance(; alg = NormalisedGerber1()),
+               GerberCovariance(; alg = StandardisedGerber1()),
                GerberCovariance(; alg = Gerber2()),
-               GerberCovariance(; alg = NormalisedGerber2()),
+               GerberCovariance(; alg = StandardisedGerber2()),
                SmythBrobyCovariance(; alg = SmythBroby0()),
                SmythBrobyCovariance(; alg = SmythBroby0(),
                                     me = SimpleExpectedReturns(; w = ew),
@@ -109,23 +109,23 @@
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
-               SmythBrobyCovariance(; alg = NormalisedSmythBroby0()),
-               SmythBrobyCovariance(; alg = NormalisedSmythBroby0(),
+               SmythBrobyCovariance(; alg = StandardisedSmythBroby0()),
+               SmythBrobyCovariance(; alg = StandardisedSmythBroby0(),
                                     me = SimpleExpectedReturns(; w = ew),
                                     ve = SimpleVariance(;
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
                SmythBrobyCovariance(; alg = SmythBroby1()),
-               SmythBrobyCovariance(; alg = NormalisedSmythBroby1()),
+               SmythBrobyCovariance(; alg = StandardisedSmythBroby1()),
                SmythBrobyCovariance(; alg = SmythBroby2()),
-               SmythBrobyCovariance(; alg = NormalisedSmythBroby2()),
+               SmythBrobyCovariance(; alg = StandardisedSmythBroby2()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
-               SmythBrobyCovariance(; alg = NormalisedSmythBrobyGerber0()),
+               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber0()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
-               SmythBrobyCovariance(; alg = NormalisedSmythBrobyGerber1()),
+               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber1()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
-               SmythBrobyCovariance(; alg = NormalisedSmythBrobyGerber2())]
+               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber2())]
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)

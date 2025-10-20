@@ -133,6 +133,30 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
 function sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
 end
+"""
+    ucs_factory(risk_ucs::Nothing, prior_ucs::Nothing)
+    ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}, prior_ucs::Any)
+    ucs_factory(risk_ucs::Nothing, prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator})
+
+Factory function for selecting uncertainty sets from risk measure or prior result instances.
+
+# Arguments
+
+  - `risk_ucs`: Risk measure uncertainty set estimator or result, or `nothing`.
+  - `prior_ucs`: Prior result uncertainty set estimator or result, or `nothing`.
+
+# Returns
+
+  - `nothing`: If both `risk_ucs` and `prior_ucs` are `nothing`.
+  - `risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is not `nothing`.
+  - `prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
+
+# Related
+
+  - [`AbstractUncertaintySetResult`](@ref)
+  - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`factory`](@ref)
+"""
 function ucs_factory(::Nothing, ::Nothing)
     return nothing
 end

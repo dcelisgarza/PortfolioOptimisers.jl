@@ -357,7 +357,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
             pe.w
         else
             iN = inv(size(X, 2))
-            range(; start = iN, stop = iN, length = size(X, 2))
+            range(iN, iN; length = size(X, 2))
         end
         pe.l * (vcat(a_prior_sigma, f_prior_sigma * transpose(M))) * w
     else

@@ -23,5 +23,6 @@ PortfolioOptimisers.AbstractUncertaintySetAlgorithm
 PortfolioOptimisers.AbstractUncertaintySetResult
 PortfolioOptimisers.AbstractUncertaintyKAlgorithm
 PortfolioOptimisers.AbstractEllipseUncertaintySetResultClass
+PortfolioOptimisers.ucs_factory
 PortfolioOptimisers.k_ucs
 ```

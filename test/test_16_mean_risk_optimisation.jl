@@ -169,15 +169,18 @@
         rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
               UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
               LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             alg = SOCRiskExpr()))),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+                             alg = StandardisedLowOrderMoment(;
+                                                              alg = SecondLowerMoment(;
+                                                                                      alg = SOCRiskExpr()))),
               LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondCentralMoment(;
-                                                                               alg = SOCRiskExpr()))),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+                             alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
+              LowOrderMoment(;
+                             alg = StandardisedLowOrderMoment(;
+                                                              alg = SecondCentralMoment(;
+                                                                                        alg = SOCRiskExpr()))),
+              LowOrderMoment(;
+                             alg = StandardisedLowOrderMoment(;
+                                                              alg = SecondCentralMoment())),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
               ConditionalValueatRisk(), ConditionalValueatRiskRange(),
               EntropicValueatRisk(), EntropicValueatRiskRange(), RelativisticValueatRisk(),
@@ -467,9 +470,9 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = factory(LowOrderMoment(;
-                                   alg = LowOrderDeviation(;
-                                                           alg = SecondCentralMoment(;
-                                                                                     alg = QuadRiskExpr()))),
+                                   alg = StandardisedLowOrderMoment(;
+                                                                    alg = SecondCentralMoment(;
+                                                                                              alg = QuadRiskExpr()))),
                     pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
@@ -482,18 +485,18 @@
                                                     settings = RiskMeasureSettings(;
                                                                                    ub = Frontier(;
                                                                                                  N = 5)),
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = QuadRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = QuadRiskExpr()))),
                                  obj = MaximumReturn(), opt = opt))
         res2 = optimise(MeanRisk(;
                                  r = LowOrderMoment(;
                                                     settings = RiskMeasureSettings(;
                                                                                    ub = Frontier(;
                                                                                                  N = 5)),
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = RSOCRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = RSOCRiskExpr()))),
                                  obj = MaximumReturn(), opt = opt))
         res = isapprox(hcat(res1.w...), hcat(res2.w...); rtol = 5e-3)
         if !res
@@ -514,9 +517,9 @@
                                                                                               start = rk_min,
                                                                                               stop = rk_max,
                                                                                               length = 5)),
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = QuadRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = QuadRiskExpr()))),
                                  obj = MaximumReturn(), opt = opt))
         res4 = optimise(MeanRisk(;
                                  r = LowOrderMoment(;
@@ -525,9 +528,9 @@
                                                                                               start = rk_min,
                                                                                               stop = rk_max,
                                                                                               length = 5)),
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = RSOCRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = RSOCRiskExpr()))),
                                  obj = MaximumReturn(), opt = opt))
         res = isapprox(hcat(res3.w...), hcat(res4.w...); rtol = 5e-6)
         if !res
@@ -545,15 +548,15 @@
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res5 = optimise(MeanRisk(;
                                  r = LowOrderMoment(;
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = QuadRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = QuadRiskExpr()))),
                                  opt = opt))
         res6 = optimise(MeanRisk(;
                                  r = LowOrderMoment(;
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = RSOCRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = RSOCRiskExpr()))),
                                  opt = opt))
         res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-3)
         if !res
@@ -573,15 +576,15 @@
                                                               stop = rt_max, length = 5)))
         res7 = optimise(MeanRisk(;
                                  r = LowOrderMoment(; settings = RiskMeasureSettings(;),
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = QuadRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = QuadRiskExpr()))),
                                  opt = opt))
         res8 = optimise(MeanRisk(;
                                  r = LowOrderMoment(; settings = RiskMeasureSettings(;),
-                                                    alg = LowOrderDeviation(;
-                                                                            alg = SecondCentralMoment(;
-                                                                                                      alg = RSOCRiskExpr()))),
+                                                    alg = StandardisedLowOrderMoment(;
+                                                                                     alg = SecondCentralMoment(;
+                                                                                                               alg = RSOCRiskExpr()))),
                                  opt = opt))
         res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-3)
         if !res
@@ -1249,16 +1252,26 @@
         @test all(value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
         idx = [BitVector(res.plg.A[:, i]) for i in axes(res.plg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 1) for i in idx])
-        @test isapprox(res.w,
-                       [-9.431976408001725e-15, -0.8782741689961527, -9.379228352184268e-15,
-                        -4.001985368795484e-15, 7.514829720676815e-15,
-                        -5.128614882277353e-15, -7.875395433680138e-15,
-                        -3.2602604140836353e-15, -6.293827026255587e-15,
-                        0.20017499085628088, 3.6505444231065125e-15, 0.6781009262835807,
-                        -9.805831650414789e-15, -2.2703996977265388e-15,
-                        -6.760480819135996e-15, -5.3508991062443464e-15,
-                        7.766000981009452e-15, -2.3067244875711246e-15,
-                        -3.831552897938868e-15, 0.999998251856358], rtol = 1e-6)
+        @test (isapprox(res.w,
+                        [-5.83349251195602e-14, -0.7549102373927532, -0.24489685036355585,
+                         2.5425310153855233e-16, 1.177641184405827e-13,
+                         -1.1761565067160182e-14, -3.8671847486726096e-14,
+                         1.2944646679137976e-14, -1.9475087209248426e-14,
+                         0.26951016407394074, 8.367112463199218e-14, 0.7303004971078252,
+                         -6.194837681595708e-14, 2.309812136692163e-14,
+                         -2.5460214715889667e-14, -8.58412864279287e-15,
+                         1.1757019029014802e-13, 2.1546906367143115e-14,
+                         5.7299916350654655e-15, 0.9999964265744166]; rtol = 1e-6) ||
+               isapprox(res.w,
+                        [-4.400162786139801e-14, -0.7068647775696704, -0.20178701626483694,
+                         -1.0233912058364145e-15, 8.336251924927799e-14,
+                         -1.0638713372805883e-14, -0.09129358185248605,
+                         4.326412562038434e-15, -1.626576456755123e-14, 0.2751905375771391,
+                         5.428666085696465e-14, 0.7247587488302388, -4.6429454132911124e-14,
+                         1.1792066087999556e-14, -2.2237835848208057e-14,
+                         -1.100539171494297e-14, 8.51166817026479e-14,
+                         1.0879558335436499e-14, 8.09956925306327e-16, 0.9999960892795525];
+                        rtol = 1e-6))
 
         plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
@@ -1515,9 +1528,10 @@
         mip_opt = JuMPOptimiser(; pe = pr, slv = mip_slv)
         rs1 = [LowOrderMoment(; mu = 0),
                LowOrderMoment(; mu = 0,
-                              alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+                              alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
                LowOrderMoment(; mu = 0,
-                              alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment())),
                ConditionalValueatRisk(), EntropicValueatRisk(),
                ConditionalValueatRiskRange(), EntropicValueatRiskRange(),
                DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3),
@@ -1528,9 +1542,10 @@
                ValueatRiskRange(; alg = DistributionValueatRisk())]
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
                LowOrderMoment(; mu = 0, w = wp,
-                              alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+                              alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
                LowOrderMoment(; mu = 0, w = wp,
-                              alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment())),
                ConditionalValueatRisk(; w = wp), EntropicValueatRisk(; w = wp),
                ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp),
                DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3, w = wp),

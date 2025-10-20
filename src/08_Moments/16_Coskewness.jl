@@ -148,8 +148,7 @@ Internal helper for coskewness computation.
 """
 function _coskewness(Y::AbstractMatrix, X::AbstractMatrix,
                      mp::AbstractMatrixProcessingEstimator)
-    o = transpose(range(; start = one(eltype(Y)), stop = one(eltype(Y)),
-                        length = size(Y, 2)))
+    o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
     z = kron(o, Y) ⊙ kron(Y, o)
     cskew = transpose(Y) * z / size(Y, 1)
     V = __coskewness(cskew, X, mp)

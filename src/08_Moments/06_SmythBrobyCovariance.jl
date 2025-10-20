@@ -23,205 +23,205 @@ These types are used to specify the algorithm when constructing a [`SmythBrobyCo
 # Related
 
   - [`BaseSmythBrobyCovariance`](@ref)
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
 """
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
-    abstract type UnNormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+    abstract type UnstandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 
-Abstract supertype for all unnormalised Smyth-Broby covariance algorithm types.
+Abstract supertype for all unstandardised Smyth-Broby covariance algorithm types.
 
-Concrete types implementing unnormalised Smyth-Broby covariance algorithms should subtype `UnNormalisedSmythBrobyCovarianceAlgorithm`.
-
-# Related
-
-  - [`SmythBrobyCovarianceAlgorithm`](@ref)
-  - [`SmythBroby0`](@ref)
-  - [`SmythBroby1`](@ref)
-  - [`SmythBroby2`](@ref)
-  - [`SmythBrobyGerber0`](@ref)
-  - [`SmythBrobyGerber1`](@ref)
-  - [`SmythBrobyGerber2`](@ref)
-  - [`SmythBrobyCovariance`](@ref)
-"""
-abstract type UnNormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
-"""
-    abstract type NormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
-
-Abstract supertype for all normalised Smyth-Broby covariance algorithm types. These Z-transform the data before applying the Smyth-Broby covariance algorithm.
-
-Concrete types implementing normalised Smyth-Broby covariance algorithms should subtype `NormalisedSmythBrobyCovarianceAlgorithm`.
+Concrete types implementing unstandardised Smyth-Broby covariance algorithms should subtype `UnstandardisedSmythBrobyCovarianceAlgorithm`.
 
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
+  - [`SmythBroby0`](@ref)
+  - [`SmythBroby1`](@ref)
+  - [`SmythBroby2`](@ref)
+  - [`SmythBrobyGerber0`](@ref)
+  - [`SmythBrobyGerber1`](@ref)
+  - [`SmythBrobyGerber2`](@ref)
   - [`SmythBrobyCovariance`](@ref)
 """
-abstract type NormalisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+abstract type UnstandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+    abstract type StandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 
-Implements the original Smyth-Broby covariance algorithm (unnormalised variant).
+Abstract supertype for all standardised Smyth-Broby covariance algorithm types. These Z-transform the data before applying the Smyth-Broby covariance algorithm.
+
+Concrete types implementing standardised Smyth-Broby covariance algorithms should subtype `StandardisedSmythBrobyCovarianceAlgorithm`.
 
 # Related
 
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBroby0`](@ref)
+  - [`StandardisedSmythBroby1`](@ref)
+  - [`StandardisedSmythBroby2`](@ref)
+  - [`StandardisedSmythBrobyGerber0`](@ref)
+  - [`StandardisedSmythBrobyGerber1`](@ref)
+  - [`StandardisedSmythBrobyGerber2`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+"""
+abstract type StandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+"""
+    struct SmythBroby0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+
+Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
+
+# Related
+
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby1`](@ref)
   - [`SmythBroby2`](@ref)
 """
-struct SmythBroby0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+struct SmythBroby0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBroby1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the first variant of the Smyth-Broby covariance algorithm (unnormalised).
+Implements the first variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby0`](@ref)
   - [`SmythBroby2`](@ref)
 """
-struct SmythBroby1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+struct SmythBroby1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBroby2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the second variant of the Smyth-Broby covariance algorithm (unnormalised).
+Implements the second variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby0`](@ref)
   - [`SmythBroby1`](@ref)
 """
-struct SmythBroby2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+struct SmythBroby2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBrobyGerber0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm (unnormalised).
+Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyGerber2`](@ref)
 """
-struct SmythBrobyGerber0 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+struct SmythBrobyGerber0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBrobyGerber1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm (unnormalised).
+Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber2`](@ref)
 """
-struct SmythBrobyGerber1 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+struct SmythBrobyGerber1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBrobyGerber2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm (unnormalised).
+Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber1`](@ref)
 """
-struct SmythBrobyGerber2 <: UnNormalisedSmythBrobyCovarianceAlgorithm end
+struct SmythBrobyGerber2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct NormalisedSmythBroby0 <: NormalisedSmythBrobyCovarianceAlgorithm end
+    struct StandardisedSmythBroby0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the original Smyth-Broby covariance algorithm on Z-transformed data (normalised variant).
+Implements the original Smyth-Broby covariance algorithm on Z-transformed data (standardised variant).
 
 # Related
 
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
+  - [`StandardisedSmythBroby1`](@ref)
+  - [`StandardisedSmythBroby2`](@ref)
 """
-struct NormalisedSmythBroby0 <: NormalisedSmythBrobyCovarianceAlgorithm end
+struct StandardisedSmythBroby0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct NormalisedSmythBroby1 <: NormalisedSmythBrobyCovarianceAlgorithm end
+    struct StandardisedSmythBroby1 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the first variant of the Smyth-Broby covariance algorithm on Z-transformed data (normalised).
+Implements the first variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
 # Related
 
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
+  - [`StandardisedSmythBroby0`](@ref)
+  - [`StandardisedSmythBroby2`](@ref)
 """
-struct NormalisedSmythBroby1 <: NormalisedSmythBrobyCovarianceAlgorithm end
+struct StandardisedSmythBroby1 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct NormalisedSmythBroby2 <: NormalisedSmythBrobyCovarianceAlgorithm end
+    struct StandardisedSmythBroby2 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the second variant of the Smyth-Broby covariance algorithm on Z-transformed data (normalised).
+Implements the second variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
 # Related
 
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
+  - [`StandardisedSmythBroby0`](@ref)
+  - [`StandardisedSmythBroby1`](@ref)
 """
-struct NormalisedSmythBroby2 <: NormalisedSmythBrobyCovarianceAlgorithm end
+struct StandardisedSmythBroby2 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct NormalisedSmythBrobyGerber0 <: NormalisedSmythBrobyCovarianceAlgorithm end
+    struct StandardisedSmythBrobyGerber0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (normalised).
+Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
 # Related
 
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
+  - [`StandardisedSmythBrobyGerber1`](@ref)
+  - [`StandardisedSmythBrobyGerber2`](@ref)
 """
-struct NormalisedSmythBrobyGerber0 <: NormalisedSmythBrobyCovarianceAlgorithm end
+struct StandardisedSmythBrobyGerber0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct NormalisedSmythBrobyGerber1 <: NormalisedSmythBrobyCovarianceAlgorithm end
+    struct StandardisedSmythBrobyGerber1 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (normalised).
+Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
 # Related
 
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
+  - [`StandardisedSmythBrobyGerber0`](@ref)
+  - [`StandardisedSmythBrobyGerber2`](@ref)
 """
-struct NormalisedSmythBrobyGerber1 <: NormalisedSmythBrobyCovarianceAlgorithm end
+struct StandardisedSmythBrobyGerber1 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm end
+    struct StandardisedSmythBrobyGerber2 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (normalised).
+Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
 # Related
 
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
+  - [`StandardisedSmythBrobyGerber0`](@ref)
+  - [`StandardisedSmythBrobyGerber1`](@ref)
 """
-struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm end
+struct StandardisedSmythBrobyGerber2 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
     struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
            BaseSmythBrobyCovariance
@@ -307,15 +307,15 @@ SmythBrobyCovariance
   - [`SmythBroby0`](@ref)
   - [`SmythBroby1`](@ref)
   - [`SmythBroby2`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
+  - [`StandardisedSmythBroby0`](@ref)
+  - [`StandardisedSmythBroby1`](@ref)
+  - [`StandardisedSmythBroby2`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyGerber2`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
+  - [`StandardisedSmythBrobyGerber0`](@ref)
+  - [`StandardisedSmythBrobyGerber1`](@ref)
+  - [`StandardisedSmythBrobyGerber2`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
 struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
@@ -436,7 +436,7 @@ end
                                         <:SmythBroby0, <:Any}, X::AbstractMatrix,
                mean_vec::AbstractArray, std_vec::AbstractArray)
 
-Implements the original Smyth-Broby covariance/correlation algorithm (unnormalised variant).
+Implements the original Smyth-Broby covariance/correlation algorithm (unstandardised variant).
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
 
@@ -511,15 +511,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)
+                                        <:StandardisedSmythBroby0, <:Any}, X::AbstractMatrix)
 
-Implements the original Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised variant).
+Implements the original Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised variant).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `NormalisedSmythBroby0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `StandardisedSmythBroby0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby0` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBroby0` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
@@ -540,13 +540,13 @@ The algorithm proceeds as follows:
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
+  - [`StandardisedSmythBroby0`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBroby0, <:Any},
-                    X::AbstractMatrix)
+                                             <:Any, <:Any, <:StandardisedSmythBroby0,
+                                             <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -584,15 +584,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)
+                                        <:StandardisedSmythBroby0, <:Any}, X::AbstractMatrix)
 
-Implements the original Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised variant).
+Implements the original Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised variant).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `NormalisedSmythBroby0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `StandardisedSmythBroby0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby0` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBroby0` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
@@ -613,7 +613,7 @@ The algorithm proceeds as follows:
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
+  - [`StandardisedSmythBroby0`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
@@ -662,15 +662,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)
+                                        <:StandardisedSmythBroby1, <:Any}, X::AbstractMatrix)
 
-Implements the first variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised).
+Implements the first variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `NormalisedSmythBroby1` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral (non-exceedance) co-movements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `StandardisedSmythBroby1` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral (non-exceedance) co-movements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby1` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBroby1` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
@@ -691,13 +691,13 @@ The algorithm proceeds as follows:
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
+  - [`StandardisedSmythBroby1`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBroby1, <:Any},
-                    X::AbstractMatrix)
+                                             <:Any, <:Any, <:StandardisedSmythBroby1,
+                                             <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -742,9 +742,9 @@ end
                                         <:SmythBroby2, <:Any}, X::AbstractMatrix,
                mean_vec::AbstractArray, std_vec::AbstractArray)
 
-Implements the second variant of the Smyth-Broby covariance/correlation algorithm (unnormalised).
+Implements the second variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBroby2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements. The resulting matrix is then normalised by the geometric mean of its diagonal elements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBroby2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
 # Arguments
 
@@ -755,7 +755,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, standardised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -766,7 +766,7 @@ The algorithm proceeds as follows:
  3. Apply the threshold to classify joint positive and negative co-movements.
  4. Use the `sb_delta` kernel to accumulate positive (`pos`) and negative (`neg`) contributions.
  5. The raw correlation is computed as `pos - neg`.
- 6. The resulting matrix is normalised by dividing each element by the geometric mean of the corresponding diagonal elements.
+ 6. The resulting matrix is standardised by dividing each element by the geometric mean of the corresponding diagonal elements.
  7. The matrix is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -815,20 +815,20 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)
+                                        <:StandardisedSmythBroby2, <:Any}, X::AbstractMatrix)
 
-Implements the second variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised).
+Implements the second variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `NormalisedSmythBroby2` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements. The resulting matrix is then normalised by the geometric mean of its diagonal elements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `StandardisedSmythBroby2` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby2` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBroby2` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, standardised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -839,19 +839,19 @@ The algorithm proceeds as follows:
  3. Apply the threshold to classify joint positive and negative co-movements.
  4. Use the `sb_delta` kernel (with mean 0 and standard deviation 1) to accumulate positive (`pos`) and negative (`neg`) contributions.
  5. The raw correlation is computed as `pos - neg`.
- 6. The resulting matrix is normalised by dividing each element by the geometric mean of the corresponding diagonal elements.
+ 6. The resulting matrix is standardised by dividing each element by the geometric mean of the corresponding diagonal elements.
  7. The matrix is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
+  - [`StandardisedSmythBroby2`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBroby2, <:Any},
-                    X::AbstractMatrix)
+                                             <:Any, <:Any, <:StandardisedSmythBroby2,
+                                             <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -889,7 +889,7 @@ end
                                         <:SmythBrobyGerber0, <:Any}, X::AbstractMatrix,
                mean_vec::AbstractArray, std_vec::AbstractArray)
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unnormalised).
+Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements.
 
@@ -970,16 +970,16 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBrobyGerber0, <:Any},
+                                        <:StandardisedSmythBrobyGerber0, <:Any},
                X::AbstractMatrix)
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised).
+Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `NormalisedSmythBrobyGerber0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `StandardisedSmythBrobyGerber0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber0` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBrobyGerber0` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
@@ -1000,12 +1000,12 @@ The algorithm proceeds as follows:
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
+  - [`StandardisedSmythBrobyGerber0`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber0,
+                                             <:Any, <:Any, <:StandardisedSmythBrobyGerber0,
                                              <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -1053,7 +1053,7 @@ end
                                         <:SmythBrobyGerber1, <:Any}, X::AbstractMatrix,
                mean_vec::AbstractArray, std_vec::AbstractArray)
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unnormalised).
+Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber1` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral co-movements, with additional weighting by the count of co-movements.
 
@@ -1140,16 +1140,16 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBrobyGerber1, <:Any},
+                                        <:StandardisedSmythBrobyGerber1, <:Any},
                X::AbstractMatrix)
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised).
+Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `NormalisedSmythBrobyGerber1` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral co-movements, with additional weighting by the count of co-movements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `StandardisedSmythBrobyGerber1` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral co-movements, with additional weighting by the count of co-movements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber1` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBrobyGerber1` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
@@ -1170,12 +1170,12 @@ The algorithm proceeds as follows:
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
+  - [`StandardisedSmythBrobyGerber1`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber1,
+                                             <:Any, <:Any, <:StandardisedSmythBrobyGerber1,
                                              <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -1230,9 +1230,9 @@ end
                                         <:SmythBrobyGerber2, <:Any}, X::AbstractMatrix,
                mean_vec::AbstractArray, std_vec::AbstractArray)
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unnormalised).
+Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements. The resulting matrix is then normalised by the geometric mean of its diagonal elements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
 # Arguments
 
@@ -1243,7 +1243,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, standardised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1254,7 +1254,7 @@ The algorithm proceeds as follows:
  3. Apply the threshold to classify joint positive and negative co-movements.
  4. Use the `sb_delta` kernel to accumulate positive (`pos`) and negative (`neg`) contributions, and count the number of positive (`cpos`) and negative (`cneg`) co-movements.
  5. The raw correlation is computed as `pos * cpos - neg * cneg`.
- 6. The resulting matrix is normalised by dividing each element by the geometric mean of the corresponding diagonal elements.
+ 6. The resulting matrix is standardised by dividing each element by the geometric mean of the corresponding diagonal elements.
  7. The matrix is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -1307,21 +1307,21 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                        <:NormalisedSmythBrobyGerber2, <:Any},
+                                        <:StandardisedSmythBrobyGerber2, <:Any},
                X::AbstractMatrix)
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (normalised).
+Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm on Z-transformed data (standardised).
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `NormalisedSmythBrobyGerber2` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements. The resulting matrix is then normalised by the geometric mean of its diagonal elements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `StandardisedSmythBrobyGerber2` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
 # Arguments
 
-  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber2` algorithm.
+  - `ce`: Smyth-Broby covariance estimator configured with the `StandardisedSmythBrobyGerber2` algorithm.
   - `X`: Z-transformed data matrix (observations × assets).
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, standardised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1332,18 +1332,18 @@ The algorithm proceeds as follows:
  3. Apply the threshold to classify joint positive and negative co-movements.
  4. Use the `sb_delta` kernel (with mean 0 and standard deviation 1) to accumulate positive (`pos`) and negative (`neg`) contributions, and count the number of positive (`cpos`) and negative (`cneg`) co-movements.
  5. The raw correlation is computed as `pos * cpos - neg * cneg`.
- 6. The resulting matrix is normalised by dividing each element by the geometric mean of the corresponding diagonal elements.
+ 6. The resulting matrix is standardised by dividing each element by the geometric mean of the corresponding diagonal elements.
  7. The matrix is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
+  - [`StandardisedSmythBrobyGerber2`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber2,
+                                             <:Any, <:Any, <:StandardisedSmythBrobyGerber2,
                                              <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -1392,8 +1392,8 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
   - `ce`: Smyth-Broby covariance estimator.
 
-      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unnormalised Smyth-Broby correlation matrix.
-      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the normalised Smyth-Broby correlation matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnstandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unstandardised Smyth-Broby correlation matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the standardised Smyth-Broby correlation matrix.
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the correlation.
@@ -1411,25 +1411,25 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
-                                                 <:UnNormalisedSmythBrobyCovarianceAlgorithm,
+                                                 <:UnstandardisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
@@ -1444,7 +1444,7 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
 end
 function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
-                                                 <:NormalisedSmythBrobyCovarianceAlgorithm,
+                                                 <:StandardisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
@@ -1469,8 +1469,8 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
   - `ce`: Smyth-Broby covariance estimator.
 
-      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unnormalised Smyth-Broby covariance matrix.
-      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the normalised Smyth-Broby covariance matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnstandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unstandardised Smyth-Broby covariance matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the standardised Smyth-Broby covariance matrix.
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the covariance.
@@ -1488,25 +1488,25 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
-                                                 <:UnNormalisedSmythBrobyCovarianceAlgorithm,
+                                                 <:UnstandardisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
@@ -1521,7 +1521,7 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
 end
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
-                                                 <:NormalisedSmythBrobyCovarianceAlgorithm,
+                                                 <:StandardisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
@@ -1537,6 +1537,6 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
 end
 
 export SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, SmythBrobyGerber1,
-       SmythBrobyGerber2, NormalisedSmythBroby0, NormalisedSmythBroby1,
-       NormalisedSmythBroby2, NormalisedSmythBrobyGerber0, NormalisedSmythBrobyGerber1,
-       NormalisedSmythBrobyGerber2, SmythBrobyCovariance
+       SmythBrobyGerber2, StandardisedSmythBroby0, StandardisedSmythBroby1,
+       StandardisedSmythBroby2, StandardisedSmythBrobyGerber0,
+       StandardisedSmythBrobyGerber1, StandardisedSmythBrobyGerber2, SmythBrobyCovariance

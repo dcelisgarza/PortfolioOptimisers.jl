@@ -70,20 +70,20 @@
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   ce = GerberCovariance(;
-                                                                                                        alg = NormalisedGerber0()))),
+                                                                                                        alg = StandardisedGerber0()))),
                            re = StepwiseRegression(; crit = BIC()),
                            ve = SimpleVariance(; corrected = false)),
                FactorPrior(;
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   ce = GerberCovariance(;
-                                                                                                        alg = NormalisedGerber1()))),
+                                                                                                        alg = StandardisedGerber1()))),
                            re = StepwiseRegression(; crit = RSquared())),
                FactorPrior(;
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   ce = GerberCovariance(;
-                                                                                                        alg = NormalisedGerber2()))),
+                                                                                                        alg = StandardisedGerber2()))),
                            re = StepwiseRegression(; crit = AdjustedRSquared())),
                FactorPrior(;
                            pe = EmpiricalPrior(; me = EquilibriumExpectedReturns(),
@@ -129,8 +129,8 @@
                                          pe = EmpiricalPrior(;
                                                              ce = PortfolioOptimisersCovariance(;
                                                                                                 ce = SmythBrobyCovariance(;
-                                                                                                                          alg = NormalisedSmythBroby0()))))]
-        # Missing NormalisedSmythBroby1, NormalisedSmythBroby2, SmythBrobyGerber0, SmythBrobyGerber2, NormalisedSmythBrobyGerber0, NormalisedSmythBrobyGerber1, NormalisedSmythBrobyGerber2
+                                                                                                                          alg = StandardisedSmythBroby0()))))]
+        # Missing StandardisedSmythBroby1, StandardisedSmythBroby2, SmythBrobyGerber0, SmythBrobyGerber2, StandardisedSmythBrobyGerber0, StandardisedSmythBrobyGerber1, StandardisedSmythBrobyGerber2
         for pe in pes
             pr = prior(pe, rd)
         end

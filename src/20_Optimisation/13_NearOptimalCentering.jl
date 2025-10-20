@@ -28,7 +28,7 @@ function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
     end
 end
 struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
-       JuMPOptimisationEstimator
+       RiskJuMPOptimisationEstimator
     opt::T1
     r::T2
     obj::T3
@@ -394,7 +394,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     return retcodes, sols
 end
 function compute_ret_lbs(lbs::Frontier, rt_min::Real, rt_max::Real)
-    return range(; start = rt_min, stop = rt_max, length = lbs.N)
+    return range(rt_min, rt_max; length = lbs.N)
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,

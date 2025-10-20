@@ -411,7 +411,7 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F; strict = strict, kwargs...).X : X
     T = size(X, 1)
     M = length(pe.pes)
-    ow = isnothing(pe.w) ? range(; start = inv(M), stop = inv(M), length = M) : pe.w
+    ow = isnothing(pe.w) ? range(inv(M), inv(M); length = M) : pe.w
     rw = one(eltype(ow)) - sum(ow)
     if rw > eps(typeof(rw))
         pw = Matrix{eltype(X)}(undef, T, M + 1)

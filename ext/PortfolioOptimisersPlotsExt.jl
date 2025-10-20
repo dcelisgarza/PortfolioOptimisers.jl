@@ -368,7 +368,7 @@ function PortfolioOptimisers.plot_histogram(w::AbstractArray, X::AbstractMatrix,
     mu = mean(ret)
     sigma = std(ret)
     mir, mar = extrema(ret)
-    x = range(mir; stop = mar, length = points)
+    x = range(mir, mar; length = points)
     mad = LowOrderMoment(; w = rw, alg = MeanAbsoluteDeviation())(w, X, fees)
     gmd = OrderedWeightsArray()(copy(ret))
     risks = (mu, mu - sigma, mu - mad, mu - gmd,

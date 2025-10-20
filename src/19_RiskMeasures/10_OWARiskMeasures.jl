@@ -4,7 +4,7 @@ struct ApproxOrderedWeightsArray{T1} <: OrderedWeightsArrayFormulation
     p::T1
     function ApproxOrderedWeightsArray(p::AbstractVector{<:Real})
         @argcheck(!isempty(p))
-        @argcheck(all(x -> x > zero(x), p))
+        @argcheck(all(x -> x > one(x), p))
         return new{typeof(p)}(p)
     end
 end

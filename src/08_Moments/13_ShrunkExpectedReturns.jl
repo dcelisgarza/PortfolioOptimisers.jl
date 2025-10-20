@@ -314,7 +314,7 @@ Compute the shrinkage target vector for expected returns estimation.
 """
 function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
     val = mean(mu)
-    return range(; start = val, stop = val, length = length(mu))
+    return range(val, val; length = length(mu))
 end
 function target_mean(::VolatilityWeighted, mu::AbstractArray, sigma::AbstractMatrix;
                      isigma = nothing, kwargs...)
@@ -322,12 +322,12 @@ function target_mean(::VolatilityWeighted, mu::AbstractArray, sigma::AbstractMat
         isigma = sigma \ I
     end
     val = sum(isigma * mu) / sum(isigma)
-    return range(; start = val, stop = val, length = length(mu))
+    return range(val, val; length = length(mu))
 end
 function target_mean(::MeanSquaredError, mu::AbstractArray, sigma::AbstractMatrix;
                      T::Integer, kwargs...)
     val = tr(sigma) / T
-    return range(; start = val, stop = val, length = length(mu))
+    return range(val, val; length = length(mu))
 end
 """
     mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)

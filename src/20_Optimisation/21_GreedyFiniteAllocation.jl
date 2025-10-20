@@ -91,7 +91,7 @@ function finite_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
     aw = if any(!iszero, cost)
         cost / sum(cost) * bgt
     else
-        range(; start = 0, stop = 0, length = N)
+        range(zero(eltype(w)), zero(eltype(w)); length = N)
     end
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
