@@ -568,5 +568,4 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
-       brinson_attribution, factory, traverse_concrete_subtypes
+export brinson_attribution, factory, traverse_concrete_subtypes
