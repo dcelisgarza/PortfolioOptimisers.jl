@@ -26,7 +26,7 @@ abstract type VarianceFormulation <: SecondMomentFormulation end
 """
     struct QuadRiskExpr <: VarianceFormulation end
 
-Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form `w' * Σ * w`.
+Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form.
 
 # Related Types
 
@@ -89,7 +89,7 @@ Represents the portfolio variance using a covariance matrix.
 # Fields
 
   - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector of weights.
+  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
   - `rc`: Optional specification of risk contribution constraints.
   - `alg`: The optimisation formulation used to represent the variance risk expression.
 
@@ -106,6 +106,39 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
+## `JuMP` Formulations
+
+Depending on the `alg` field, the variance risk measure is formulated using `JuMP` as follows:
+
+### SquaredSOCRiskExpr
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{\\Sigma}``: is an `N×N` covariance matrix.
+
+### QuadRiskExpr
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\sigma^2\\nonumber\\\\
+\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{x} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{G}``: is a suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\sigma``: is the variable representing the optimised portfolio's standard deviation.
+  - ``\\lVert \\cdot \\rVert_{2}``: is the L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+
 # Functor
 
     (r::Variance)(w::AbstractVector)
@@ -114,14 +147,14 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{Variance}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: is the `N×1` vector of weights.
-  - ``\\mathbf{\\Sigma}``: is the `N×N` covariance matrix.
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{\\Sigma}``: is an `N×N` covariance matrix.
 
 ## Arguments
 
@@ -233,7 +266,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 # Fields
 
   - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector of weights.
+  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
 
 # Constructors
 
@@ -246,6 +279,22 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
+## `JuMP` Formulation
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\sigma\\nonumber\\\\
+\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{x} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{G}``: is a suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\sigma``: is the variable representing the optimised portfolio's standard deviation.
+  - ``\\lVert \\cdot \\rVert_{2}``: is the L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+
 # Functor
 
     (r::StandardDeviation)(w::AbstractVector)
@@ -254,14 +303,14 @@ Computes the standard deviation risk of a portfolio with weights `w` using the c
 
 ```math
 \\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: is the `N×1` vector of weights.
-  - ``\\mathbf{\\Sigma}``: is the `N×N` covariance matrix.
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{\\Sigma}``: is an `N×N` covariance matrix.
 
 ## Arguments
 
@@ -355,7 +404,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
   - `settings`: Risk measure configuration.
   - `ucs`: Uncertainty set estimator or result that defines the uncertainty model for the variance calculation.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector of weights.
+  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
 
 # Constructors
 
@@ -370,6 +419,48 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)`.
 
+## `JuMP` Formulations
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{\\Sigma}``: is an `N×N` covariance matrix.
+  - ``U_{\\mathbf{\\Sigma}}``: is the uncertainty set for the covariance matrix.
+
+### Box Uncertainty set
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left(\\mathbf{A}_u \\mathbf{\\Sigma}_u\\right) - \\mathrm{Tr}\\left(\\mathbf{A}_l \\mathbf{\\Sigma}_l\\right)\\\\
+\\textrm{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
+               & \\quad \\mathbf{A}_l \\geq 0\\\\
+               & \\quad \\begin{bmatrix}
+                            \\mathbf{X} & \\boldsymbol{x}\\\\
+                            \\boldsymbol{x}^\\intercal & k
+                        \\end{bmatrix} \\succeq 0 \\\\
+               & \\quad \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{X}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+
+  - ``\\mathbf{X}``, ``\\mathbf{A}_u``, ``\\mathbf{A}_l``: are `N×N` auxiliary symmetric matrices.
+  - ``k``: is a scalar variable/constant.
+
+      + If the objective is *not* the risk-adjusted return, it is equal to 1.
+      + Else it is a free, non-negative variable.
+  - ``\\mathrm{Tr}(\\cdot)``: is the trace operator.
+
+### Ellipse Uncertainty set
+
 # Functor
 
     (r::UncertaintySetVariance)(w::AbstractVector)
@@ -378,14 +469,14 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 ```math
 \\begin{align}
-\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{UncertaintySetVariance}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: is the `N×1` vector of weights.
-  - ``\\mathbf{\\Sigma}``: is the `N×N` covariance matrix.
+  - ``\\boldsymbol{x}``: is an `N×1` vector.
+  - ``\\mathbf{\\Sigma}``: is an `N×N` covariance matrix.
 
 ## Arguments
 
