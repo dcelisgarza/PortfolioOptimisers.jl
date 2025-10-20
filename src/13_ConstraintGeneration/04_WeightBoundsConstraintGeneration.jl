@@ -474,7 +474,7 @@ function weight_bounds_constraints_side(wb::Real, N::Integer, val::Real)
     return if isinf(wb)
         fill(val, N)
     elseif isa(wb, Real)
-        range(; start = wb, stop = wb, length = N)
+        range(wb, wb; length = N)
     end
 end
 """

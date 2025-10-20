@@ -82,8 +82,8 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
     rv = log.(rv)
     iv = log.(iv)
     # criterion_func = regression_criterion_func(alg.crit)
-    ovec = range(; start = one(promote_type(eltype(rv), eltype(iv))),
-                 stop = one(promote_type(eltype(rv), eltype(iv))), length = T2 - 1)
+    ovec = range(one(promote_type(eltype(rv), eltype(iv))),
+                 one(promote_type(eltype(rv), eltype(iv))); length = T2 - 1)
     # reg = Matrix{promote_type(eltype(rv), eltype(iv))}(undef, N, 3)
     # r2s = Vector{promote_type(eltype(rv), eltype(iv))}(undef, N)
     rv_p = Vector{promote_type(eltype(rv), eltype(iv))}(undef, N)

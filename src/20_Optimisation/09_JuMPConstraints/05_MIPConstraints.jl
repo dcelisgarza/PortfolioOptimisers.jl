@@ -8,13 +8,15 @@ function get_mip_ss(::Nothing, wb::WeightBounds)
         0.0
     else
         idx = isfinite.(lb)
-        isempty(idx) ? 0.0 : maximum(abs.(view(lb, idx)))
+        lbv = view(lb, idx)
+        isempty(lbv) ? 0.0 : maximum(abs.(lbv))
     end
     ub_mag = if isnothing(ub)
         0.0
     else
         idx = isfinite.(ub)
-        isempty(idx) ? 0.0 : maximum(abs.(view(ub, idx)))
+        ubv = view(ub, idx)
+        isempty(ubv) ? 0.0 : maximum(abs.(ubv))
     end
     return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
 end

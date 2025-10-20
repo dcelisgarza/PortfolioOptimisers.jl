@@ -240,7 +240,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector
         risk = isnothing(w) ? typemax(eltype(pr.X)) : dot(w, r.sigma, w)
         return w, risk
     end
-    gammas = range(; start = zero(max_gamma), stop = max_gamma, length = params.alg.N)
+    gammas = range(zero(max_gamma), max_gamma; length = params.alg.N)
     risks = fill(typemax(eltype(pr.X)), size(gammas))
     w, risk = objective(gammas[1])
     risks[1] = risk

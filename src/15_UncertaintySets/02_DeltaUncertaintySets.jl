@@ -108,7 +108,9 @@ function ucs(ue::DeltaUncertaintySet, X::AbstractMatrix,
              F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     d_sigma = ue.dsigma * abs.(pr.sigma)
-    return BoxUncertaintySet(; lb = range(; start = 0, stop = 0, length = length(pr.mu)),
+    return BoxUncertaintySet(;
+                             lb = range(zero(eltype(pr.mu)), zero(eltype(pr.mu));
+                                        length = length(pr.mu)),
                              ub = ue.dmu * abs.(pr.mu) * 2),
            BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
 end
@@ -146,7 +148,9 @@ Constructs a box uncertainty set for expected returns (mean) using delta bounds 
 function mu_ucs(ue::DeltaUncertaintySet, X::AbstractMatrix,
                 F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    return BoxUncertaintySet(; lb = range(; start = 0, stop = 0, length = length(pr.mu)),
+    return BoxUncertaintySet(;
+                             lb = range(zero(eltype(pr.mu)), zero(eltype(pr.mu));
+                                        length = length(pr.mu)),
                              ub = ue.dmu * abs.(pr.mu) * 2)
 end
 """

@@ -394,7 +394,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     return retcodes, sols
 end
 function compute_ret_lbs(lbs::Frontier, rt_min::Real, rt_max::Real)
-    return range(; start = rt_min, stop = rt_max, length = lbs.N)
+    return range(rt_min, rt_max; length = lbs.N)
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,

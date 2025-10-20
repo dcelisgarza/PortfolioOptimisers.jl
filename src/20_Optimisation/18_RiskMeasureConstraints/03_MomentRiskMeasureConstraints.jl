@@ -87,7 +87,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    bound_key = Symbol(:sqrt_lower_central_moment_, i)
+    bound_key = Symbol(:sqrt_second_lower_moment_, i)
     sqrt_second_lower_moment, second_lower_moment = model[bound_key], model[Symbol(:second_lower_moment_, i)] = @variables(model,
                                                                                                                            begin
                                                                                                                                ()
@@ -110,19 +110,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                 key, :tsecond_lower_moment_, :csecond_lower_moment_rsoc_,
                                 sqrt_second_lower_moment)
     end
-    model[Symbol(:csqrt_second_central_moment_soc_, i)], model[Symbol(:csecond_lower_moment_mar_, i)] = @constraints(model,
-                                                                                                                     begin
-                                                                                                                         [sc *
-                                                                                                                          sqrt_second_lower_moment
-                                                                                                                          sc *
-                                                                                                                          second_lower_moment] in
-                                                                                                                         SecondOrderCone()
-                                                                                                                         sc *
-                                                                                                                         ((net_X +
-                                                                                                                           second_lower_moment) .-
-                                                                                                                          target) >=
-                                                                                                                         0
-                                                                                                                     end)
+    model[Symbol(:csqrt_second_lower_moment_soc_, i)], model[Symbol(:csecond_lower_moment_mar_, i)] = @constraints(model,
+                                                                                                                   begin
+                                                                                                                       [sc *
+                                                                                                                        sqrt_second_lower_moment
+                                                                                                                        sc *
+                                                                                                                        second_lower_moment] in
+                                                                                                                       SecondOrderCone()
+                                                                                                                       sc *
+                                                                                                                       ((net_X +
+                                                                                                                         second_lower_moment) .-
+                                                                                                                        target) >=
+                                                                                                                       0
+                                                                                                                   end)
     ub = second_moment_bound_val(r.alg.alg.alg, r.settings.ub, factor)
     set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_lower_moment, ub,
                                              bound_key, second_lower_moment_risk,

@@ -149,7 +149,7 @@ function commutation_matrix(X::AbstractMatrix)
     mn = m * n
     row = 1:mn
     col = vec(transpose(reshape(row, m, n)))
-    data = range(; start = 1, stop = 1, length = mn)
+    data = range(1, 1; length = mn)
     return sparse(row, col, data, mn, mn)
 end
 """
@@ -212,7 +212,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     posdef!(ue.pe.ce.mp.pdm, sigma_l)
     posdef!(ue.pe.ce.mp.pdm, sigma_u)
     mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma_mu)) * 2
-    mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)), length = N)
+    mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = N)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
@@ -257,8 +257,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     sigma = pr.sigma
     q = ue.q * 0.5
     mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pr.X, 1))) * 2
-    mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)),
-                 length = size(pr.X, 2))
+    mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = size(pr.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 """

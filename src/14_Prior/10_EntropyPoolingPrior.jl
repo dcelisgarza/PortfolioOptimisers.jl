@@ -2100,7 +2100,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     end
     T, N = size(X)
     w1 = w0 = if isnothing(pe.w)
-        pweights(range(; start = inv(T), stop = inv(T), length = T))
+        iT = inv(T)
+        pweights(range(iT, iT; length = T))
     else
         @argcheck(length(pe.w) == T)
     end
@@ -2224,7 +2225,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     end
     T = size(X, 1)
     w0 = if isnothing(pe.w)
-        pweights(range(; start = inv(T), stop = inv(T), length = T))
+        iT = inv(T)
+        pweights(range(iT, iT; length = T))
     else
         @argcheck(length(pe.w) == T)
         pweights(pe.w)

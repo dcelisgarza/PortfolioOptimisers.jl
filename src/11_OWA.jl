@@ -401,7 +401,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumE
     T = size(weights, 1)
     sc = method.sc
     so = method.so
-    ovec = range(; start = sc, stop = sc, length = T)
+    ovec = range(sc, sc; length = T)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variables(model, begin
@@ -454,7 +454,7 @@ Compute the Ordered Weights Array (OWA) of the Gini Mean Difference (GMD) risk m
   - `w::Range`: Vector of OWA weights of length `T`.
 """
 function owa_gmd(T::Integer)
-    return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
+    return (4 * (1:T) .- 2 * (T + 1)) / (T * (T - 1))
 end
 """
     owa_cvar(T::Integer; alpha::Real = 0.05)
@@ -549,7 +549,7 @@ This function approximates the tail Gini risk measure by integrating over a rang
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
     @argcheck(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
               AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
-    alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
+    alphas = range(alpha_i, alpha; length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
     w[1] = alphas[2] * alphas[1] / alphas[n]^2

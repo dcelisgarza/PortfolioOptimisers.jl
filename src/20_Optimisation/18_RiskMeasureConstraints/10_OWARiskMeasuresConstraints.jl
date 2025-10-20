@@ -18,7 +18,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     T = size(pr.X, 1)
     owa = set_owa_constraints!(model, pr.X)
-    ovec = range(1; stop = 1, length = T)
+    ovec = range(one(eltype(pr.X)), one(eltype(pr.X)); length = T)
     owa_a, owa_b = model[Symbol(:owa_a_, i)], model[Symbol(:owa_b_, i)] = @variables(model,
                                                                                      begin
                                                                                          [1:T]
@@ -42,7 +42,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     T = size(pr.X, 1)
     owa = set_owa_constraints!(model, pr.X)
-    ovec = range(1; stop = 1, length = T)
+    ovec = range(one(eltype(pr.X)), one(eltype(pr.X)); length = T)
     owa_a, owa_b = model[Symbol(:owa_range_a_, i)], model[Symbol(:owa_range_b_, i)] = @variables(model,
                                                                                                  begin
                                                                                                      [1:T]

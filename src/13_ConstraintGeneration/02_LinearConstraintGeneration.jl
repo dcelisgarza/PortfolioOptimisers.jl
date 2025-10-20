@@ -1495,7 +1495,7 @@ RiskBudgetResult
 """
 function risk_budget_constraints(::Nothing, args...; N::Real, kwargs...)
     iN = inv(N)
-    return RiskBudgetResult(; val = range(; start = iN, stop = iN, length = N))
+    return RiskBudgetResult(; val = range(iN, iN; length = N))
 end
 """
     risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
