@@ -25,7 +25,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     k = model[:k]
     sc = model[:sc]
     if isnothing(ss)
-        ss = 1_000
+        ss = 100_000.0
     end
     N = length(w)
     @variables(model, begin
@@ -202,7 +202,7 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     k = model[:k]
     sc = model[:sc]
     if isnothing(ss)
-        ss = 1_000
+        ss = 100_000.0
     end
     N = size(smtx, 1)
     ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = @variables(model,
