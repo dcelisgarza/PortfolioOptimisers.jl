@@ -76,8 +76,8 @@ function Base.show(io::IO,
     println(io, name)
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
-        if hasfield(ear, field)
-            val = getfield(ear, field)
+        if hasproperty(ear, field)
+            val = getproperty(ear, field)
         else
             continue
         end
