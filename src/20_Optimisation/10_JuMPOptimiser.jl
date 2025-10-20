@@ -69,7 +69,7 @@ end
 function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in (:oe, :pa, :retcode, :sol, :model)
+    elseif sym in (:oe, :pa, :retcode, :sol, :model, :attempts)
         getfield(r, sym)
     else
         getfield(r.pa, sym)
@@ -78,7 +78,7 @@ end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in (:oe, :pa, :frc_plg, :retcode, :sol, :model)
+    elseif sym in (:oe, :pa, :frc_plg, :retcode, :sol, :model, :attempts)
         getfield(r, sym)
     else
         getfield(r.pa, sym)
@@ -87,7 +87,7 @@ end
 function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
     return if sym == :w
         r.sol.w
-    elseif sym in (:oe, :pa, :prb, :retcode, :sol, :model)
+    elseif sym in (:oe, :pa, :prb, :retcode, :sol, :model, :attempts)
         getfield(r, sym)
     else
         getfield(r.pa, sym)
