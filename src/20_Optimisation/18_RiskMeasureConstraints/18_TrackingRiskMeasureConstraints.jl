@@ -182,7 +182,7 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                          fees, args...; kwargs...)
 
     if (!variance_flag && haskey(model, :variance_flag)) || haskey(model, :oldvariance_flag)
-        model[Symbol(:trdv_, i, :_variance_flag)] = model[:variance_flag]
+        model[Symbol(:triv_, i, :_variance_flag)] = model[:variance_flag]
         unregister(model, :variance_flag)
 
         if haskey(model, :oldvariance_flag)
@@ -191,7 +191,7 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         end
     end
     if (!rc_variance && haskey(model, :rc_variance)) || haskey(model, :oldrc_variance)
-        model[Symbol(:trdv_, i, :_rc_variance)] = model[:rc_variance]
+        model[Symbol(:triv_, i, :_rc_variance)] = model[:rc_variance]
         unregister(model, :rc_variance)
 
         if haskey(model, :oldrc_variance)
@@ -200,9 +200,9 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         end
     end
     if (!W && haskey(model, :W)) || haskey(model, :oldW)
-        model[Symbol(:trdv_, i, :_W)] = model[:W]
-        model[Symbol(:trdv_, i, :_M)] = model[:M]
-        model[Symbol(:trdv_, i, :_M_PSD)] = model[:M_PSD]
+        model[Symbol(:triv_, i, :_W)] = model[:W]
+        model[Symbol(:triv_, i, :_M)] = model[:M]
+        model[Symbol(:triv_, i, :_M_PSD)] = model[:M_PSD]
         unregister(model, :W)
         unregister(model, :M)
         unregister(model, :M_PSD)
@@ -217,9 +217,9 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         end
     end
     if (!Au && haskey(model, :Au)) || haskey(model, :oldAu)
-        model[Symbol(:trdv_, i, :_Au)] = model[:Au]
-        model[Symbol(:trdv_, i, :_Al)] = model[:Al]
-        model[Symbol(:trdv_, i, :_cbucs_variance)] = model[:cbucs_variance]
+        model[Symbol(:triv_, i, :_Au)] = model[:Au]
+        model[Symbol(:triv_, i, :_Al)] = model[:Al]
+        model[Symbol(:triv_, i, :_cbucs_variance)] = model[:cbucs_variance]
         unregister(model, :Au)
         unregister(model, :Al)
         unregister(model, :cbucs_variance)
@@ -234,9 +234,9 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         end
     end
     if (!E && haskey(model, :E)) || haskey(model, :oldE)
-        model[Symbol(:trdv_, i, :_E)] = model[:E]
-        model[Symbol(:trdv_, i, :_WpE)] = model[:WpE]
-        model[Symbol(:trdv_, i, :_ceucs_variance)] = model[:ceucs_variance]
+        model[Symbol(:triv_, i, :_E)] = model[:E]
+        model[Symbol(:triv_, i, :_WpE)] = model[:WpE]
+        model[Symbol(:triv_, i, :_ceucs_variance)] = model[:ceucs_variance]
         unregister(model, :E)
         unregister(model, :WpE)
         unregister(model, :ceucs_variance)
