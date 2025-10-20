@@ -436,12 +436,16 @@ function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = n
                     b::Union{Nothing, <:AbstractVector} = nothing)
     return Regression(M, L, b)
 end
-function Base.getproperty(re::Regression, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L
-        val = getfield(re, :L)
-        if isnothing(val)
-            val = getfield(re, :M)
-        end
+        getfield(re, :M)
+    else
+        getfield(re, sym)
+    end
+end
+function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
+    return if sym == :L
+        getfield(re, :L)
     else
         getfield(re, sym)
     end
