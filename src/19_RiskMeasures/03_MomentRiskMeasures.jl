@@ -1,15 +1,15 @@
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
-abstract type UntandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 abstract type StandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
-struct FirstLowerMoment <: UntandardisedLowOrderMomentMeasureAlgorithm end
-struct MeanAbsoluteDeviation <: UntandardisedLowOrderMomentMeasureAlgorithm end
-abstract type UntandardisedSecondMomentAlgorithm <:
-              UntandardisedLowOrderMomentMeasureAlgorithm end
-struct SecondLowerMoment{T1} <: UntandardisedSecondMomentAlgorithm
+struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+abstract type UnstandardisedSecondMomentAlgorithm <:
+              UnstandardisedLowOrderMomentMeasureAlgorithm end
+struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
     alg::T1
     function SecondLowerMoment(alg::SecondMomentFormulation)
         return new{typeof(alg)}(alg)
@@ -18,7 +18,7 @@ end
 function SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondLowerMoment(alg)
 end
-struct SecondCentralMoment{T1} <: UntandardisedSecondMomentAlgorithm
+struct SecondCentralMoment{T1} <: UnstandardisedSecondMomentAlgorithm
     alg::T1
     function SecondCentralMoment(alg::SecondMomentFormulation)
         return new{typeof(alg)}(alg)
@@ -31,35 +31,35 @@ struct StandardisedLowOrderMoment{T1, T2} <: StandardisedLowOrderMomentMeasureAl
     ve::T1
     alg::T2
     function StandardisedLowOrderMoment(ve::AbstractVarianceEstimator,
-                                        alg::UntandardisedSecondMomentAlgorithm)
+                                        alg::UnstandardisedSecondMomentAlgorithm)
         return new{typeof(ve), typeof(alg)}(ve, alg)
     end
 end
 function StandardisedLowOrderMoment(;
                                     ve::AbstractVarianceEstimator = SimpleVariance(;
                                                                                    me = nothing),
-                                    alg::UntandardisedSecondMomentAlgorithm = SecondLowerMoment())
+                                    alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
     return StandardisedLowOrderMoment(ve, alg)
 end
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
-abstract type UntandardisedHighOrderMomentMeasureAlgorithm <:
+abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
 abstract type StandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
-struct ThirdLowerMoment <: UntandardisedHighOrderMomentMeasureAlgorithm end
-struct FourthLowerMoment <: UntandardisedHighOrderMomentMeasureAlgorithm end
-struct FourthCentralMoment <: UntandardisedHighOrderMomentMeasureAlgorithm end
+struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 struct StandardisedHighOrderMoment{T1, T2} <: StandardisedHighOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
     function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
-                                         alg::UntandardisedHighOrderMomentMeasureAlgorithm)
+                                         alg::UnstandardisedHighOrderMomentMeasureAlgorithm)
         return new{typeof(ve), typeof(alg)}(ve, alg)
     end
 end
 function StandardisedHighOrderMoment(;
                                      ve::AbstractVarianceEstimator = SimpleVariance(;
                                                                                     me = nothing),
-                                     alg::UntandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+                                     alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return StandardisedHighOrderMoment(ve, alg)
 end
 for alg in (StandardisedLowOrderMoment, StandardisedHighOrderMoment)

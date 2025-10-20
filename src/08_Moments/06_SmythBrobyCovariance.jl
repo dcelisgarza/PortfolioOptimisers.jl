@@ -23,17 +23,17 @@ These types are used to specify the algorithm when constructing a [`SmythBrobyCo
 # Related
 
   - [`BaseSmythBrobyCovariance`](@ref)
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
 """
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
-    abstract type UntandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+    abstract type UnstandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 
 Abstract supertype for all unstandardised Smyth-Broby covariance algorithm types.
 
-Concrete types implementing unstandardised Smyth-Broby covariance algorithms should subtype `UntandardisedSmythBrobyCovarianceAlgorithm`.
+Concrete types implementing unstandardised Smyth-Broby covariance algorithms should subtype `UnstandardisedSmythBrobyCovarianceAlgorithm`.
 
 # Related
 
@@ -46,7 +46,7 @@ Concrete types implementing unstandardised Smyth-Broby covariance algorithms sho
   - [`SmythBrobyGerber2`](@ref)
   - [`SmythBrobyCovariance`](@ref)
 """
-abstract type UntandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+abstract type UnstandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 """
     abstract type StandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 
@@ -67,83 +67,83 @@ Concrete types implementing standardised Smyth-Broby covariance algorithms shoul
 """
 abstract type StandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby0 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBroby0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
 Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
 
 # Related
 
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby1`](@ref)
   - [`SmythBroby2`](@ref)
 """
-struct SmythBroby0 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+struct SmythBroby0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby1 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBroby1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
 Implements the first variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby0`](@ref)
   - [`SmythBroby2`](@ref)
 """
-struct SmythBroby1 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+struct SmythBroby1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby2 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBroby2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
 Implements the second variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBroby0`](@ref)
   - [`SmythBroby1`](@ref)
 """
-struct SmythBroby2 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+struct SmythBroby2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber0 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBrobyGerber0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
 Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyGerber2`](@ref)
 """
-struct SmythBrobyGerber0 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+struct SmythBrobyGerber0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber1 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBrobyGerber1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
 Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber2`](@ref)
 """
-struct SmythBrobyGerber1 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+struct SmythBrobyGerber1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber2 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+    struct SmythBrobyGerber2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 
 Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
 # Related
 
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyGerber0`](@ref)
   - [`SmythBrobyGerber1`](@ref)
 """
-struct SmythBrobyGerber2 <: UntandardisedSmythBrobyCovarianceAlgorithm end
+struct SmythBrobyGerber2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
     struct StandardisedSmythBroby0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 
@@ -1392,7 +1392,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
   - `ce`: Smyth-Broby covariance estimator.
 
-      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UntandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unstandardised Smyth-Broby correlation matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnstandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unstandardised Smyth-Broby correlation matrix.
       + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the standardised Smyth-Broby correlation matrix.
 
   - `X`: Data matrix (observations × assets).
@@ -1411,7 +1411,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
@@ -1429,7 +1429,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 """
 function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
-                                                 <:UntandardisedSmythBrobyCovarianceAlgorithm,
+                                                 <:UnstandardisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
@@ -1469,7 +1469,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
   - `ce`: Smyth-Broby covariance estimator.
 
-      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UntandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unstandardised Smyth-Broby covariance matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnstandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unstandardised Smyth-Broby covariance matrix.
       + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the standardised Smyth-Broby covariance matrix.
 
   - `X`: Data matrix (observations × assets).
@@ -1488,7 +1488,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-  - [`UntandardisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`UnstandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`StandardisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
@@ -1506,7 +1506,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 """
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
-                                                 <:UntandardisedSmythBrobyCovarianceAlgorithm,
+                                                 <:UnstandardisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
