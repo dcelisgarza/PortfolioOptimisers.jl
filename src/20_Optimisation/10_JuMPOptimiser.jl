@@ -176,12 +176,12 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     cobj::T26
     sc::T27
     so::T28
-    card::T29
-    scard::T30
-    nea::T31
-    l1::T32
-    l2::T33
-    ss::T34
+    ss::T29
+    card::T30
+    scard::T31
+    nea::T32
+    l1::T33
+    l2::T34
     strict::T35
     function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                            slv::Union{<:Solver, <:AbstractVector{<:Solver}},
@@ -237,11 +237,10 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ret::JuMPReturnsEstimator, sce::Scalariser,
                            ccnt::Union{Nothing, <:CustomJuMPConstraint},
                            cobj::Union{Nothing, <:CustomJuMPObjective}, sc::Real, so::Real,
-                           card::Union{Nothing, <:Integer},
+                           ss::Union{Nothing, <:Real}, card::Union{Nothing, <:Integer},
                            scard::Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
                            nea::Union{Nothing, <:Real}, l1::Union{Nothing, <:Real},
-                           l2::Union{Nothing, <:Real}, ss::Union{Nothing, <:Real},
-                           strict::Bool)
+                           l2::Union{Nothing, <:Real}, strict::Bool)
         if isa(bgt, Real)
             @argcheck(isfinite(bgt))
         elseif isa(bgt, BudgetCostEstimator)
@@ -367,35 +366,42 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(sgcard), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
                    typeof(sglt), typeof(sgst), typeof(sets), typeof(plg), typeof(tn),
                    typeof(te), typeof(fees), typeof(ret), typeof(sce), typeof(ccnt),
-                   typeof(cobj), typeof(sc), typeof(so), typeof(card), typeof(scard),
-                   typeof(nea), typeof(l1), typeof(l2), typeof(ss), typeof(strict)}(pe, slv,
-                                                                                    wb, bgt,
-                                                                                    sbgt,
-                                                                                    lt, st,
-                                                                                    lcs,
-                                                                                    cent,
-                                                                                    gcard,
-                                                                                    sgcard,
-                                                                                    smtx,
-                                                                                    sgmtx,
-                                                                                    slt,
-                                                                                    sst,
-                                                                                    sglt,
-                                                                                    sgst,
-                                                                                    sets,
-                                                                                    plg, tn,
-                                                                                    te,
-                                                                                    fees,
-                                                                                    ret,
-                                                                                    sce,
-                                                                                    ccnt,
-                                                                                    cobj,
-                                                                                    sc, so,
-                                                                                    card,
-                                                                                    scard,
-                                                                                    nea, l1,
-                                                                                    l2, ss,
-                                                                                    strict)
+                   typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
+                   typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(strict)}(pe,
+                                                                                       slv,
+                                                                                       wb,
+                                                                                       bgt,
+                                                                                       sbgt,
+                                                                                       lt,
+                                                                                       st,
+                                                                                       lcs,
+                                                                                       cent,
+                                                                                       gcard,
+                                                                                       sgcard,
+                                                                                       smtx,
+                                                                                       sgmtx,
+                                                                                       slt,
+                                                                                       sst,
+                                                                                       sglt,
+                                                                                       sgst,
+                                                                                       sets,
+                                                                                       plg,
+                                                                                       tn,
+                                                                                       te,
+                                                                                       fees,
+                                                                                       ret,
+                                                                                       sce,
+                                                                                       ccnt,
+                                                                                       cobj,
+                                                                                       sc,
+                                                                                       so,
+                                                                                       ss,
+                                                                                       card,
+                                                                                       scard,
+                                                                                       nea,
+                                                                                       l1,
+                                                                                       l2,
+                                                                                       strict)
     end
 end
 function JuMPOptimiser(;
@@ -450,15 +456,15 @@ function JuMPOptimiser(;
                        sce::Scalariser = SumScalariser(),
                        ccnt::Union{Nothing, <:CustomJuMPConstraint} = nothing,
                        cobj::Union{Nothing, <:CustomJuMPObjective} = nothing, sc::Real = 1,
-                       so::Real = 1, card::Union{Nothing, <:Integer} = nothing,
+                       so::Real = 1, ss::Union{Nothing, <:Real} = nothing,
+                       card::Union{Nothing, <:Integer} = nothing,
                        scard::Union{Nothing, <:Integer, <:AbstractVector{<:Integer}} = nothing,
                        nea::Union{Nothing, <:Real} = nothing,
                        l1::Union{Nothing, <:Real} = nothing,
-                       l2::Union{Nothing, <:Real} = nothing,
-                       ss::Union{Nothing, <:Real} = nothing, strict::Bool = false)
+                       l2::Union{Nothing, <:Real} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sce,
-                         ccnt, cobj, sc, so, card, scard, nea, l1, l2, ss, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
@@ -498,8 +504,8 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
                          slt = slt, sst = sst, sglt = sglt, sgst = sgst, sets = sets,
                          plg = opt.plg, tn = tn, te = te, fees = fees, ret = ret,
                          sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
-                         card = opt.card, scard = opt.scard, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, ss = opt.ss, strict = opt.strict)
+                         ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
+                         l1 = opt.l1, l2 = opt.l2, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
@@ -559,8 +565,8 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          sglt = sglt, sgst = sgst, sets = opt.sets, plg = plg, tn = tn,
                          te = opt.te, fees = fees, ret = ret, sce = opt.sce,
                          ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
-                         card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
-                         ss = opt.ss, strict = opt.strict)
+                         ss = opt.ss, card = opt.card, nea = opt.nea, l1 = opt.l1,
+                         l2 = opt.l2, strict = opt.strict)
 end
 
 export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimisationRiskBudgeting,
