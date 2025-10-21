@@ -43,16 +43,17 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
-                                <:ThirdCentralMoment, <:Skewness},
-                       w::AbstractVector{<:Real}, X::AbstractMatrix,
-                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+                                <:ThirdCentralMoment, <:Skewness,
+                                <:MedianAbsoluteDeviation}, w::AbstractVector{<:Real},
+                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
-                                <:ThirdCentralMoment, <:Skewness},
-                       w::AbstractVector{<:Real}, pr::AbstractPriorResult,
-                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+                                <:ThirdCentralMoment, <:Skewness,
+                                <:MedianAbsoluteDeviation}, w::AbstractVector{<:Real},
+                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
+                       kwargs...)
     return r(w, pr.X, fees)
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,

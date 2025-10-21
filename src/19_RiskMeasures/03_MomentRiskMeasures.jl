@@ -1,7 +1,6 @@
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
-abstract type StandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
@@ -27,7 +26,7 @@ end
 function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
-struct StandardisedLowOrderMoment{T1, T2} <: StandardisedLowOrderMomentMeasureAlgorithm
+struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
     function StandardisedLowOrderMoment(ve::AbstractVarianceEstimator,
@@ -44,11 +43,10 @@ end
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
-abstract type StandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
-struct StandardisedHighOrderMoment{T1, T2} <: StandardisedHighOrderMomentMeasureAlgorithm
+struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
     function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
