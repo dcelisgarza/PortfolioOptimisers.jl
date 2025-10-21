@@ -93,8 +93,7 @@ makedocs(; #modules = [PortfolioOptimisers],
                                                "Constraints" => joinpath.(api_pages[10][1][idx1:end],
                                                                           api_pages[10][3])
                                                "Risk Constraints" => joinpath.(api_pages[11][1][idx1:end],
-                                                                               api_pages[11][3])
-                                               ]];
+                                                                               api_pages[11][3])]];
                   "Contribute" => contribute;
                   "References" => root_pages[2]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
