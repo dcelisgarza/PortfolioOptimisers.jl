@@ -1,11 +1,76 @@
+"""
+    abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for all moment-based risk measure algorithms in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using statistical moments (e.g., mean, variance, skewness, kurtosis) of the return distribution. All concrete moment risk measure algorithms should subtype `MomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+"""
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+"""
+    abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+
+Abstract supertype for all low-order moment-based risk measure algorithms in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using low-order statistical moments (e.g., mean, variance, mean absolute deviation) of the return distribution. All concrete low-order moment risk measure algorithms should subtype `LowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`StandardisedLowOrderMoment`](@ref)
+"""
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+"""
+    abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+
+Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using low-order statistical moments without normalising by the variance. All concrete unstandardised low-order moment risk measure algorithms should subtype `UnstandardisedLowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`FirstLowerMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
+"""
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
+"""
+    struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+
+Represents the first lower moment risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the first lower moment, which is the negative mean of the deviations of the returns series below a target value.
+
+# Related
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMoment`](@ref)
+"""
 struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+"""
+    struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+
+Represents the mean absolute deviation risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk as the mean of the absolute deviations of the returns series from a target value.
+
+# Related
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMoment`](@ref)
+"""
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+"""
+"""
 abstract type UnstandardisedSecondMomentAlgorithm <:
               UnstandardisedLowOrderMomentMeasureAlgorithm end
 struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
@@ -26,6 +91,8 @@ end
 function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
+"""
+"""
 struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
@@ -40,6 +107,8 @@ function StandardisedLowOrderMoment(;
                                     alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
     return StandardisedLowOrderMoment(ve, alg)
 end
+"""
+"""
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
@@ -67,6 +136,8 @@ for alg in (StandardisedLowOrderMoment, StandardisedHighOrderMoment)
              end
          end)
 end
+"""
+"""
 struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     w::T2
