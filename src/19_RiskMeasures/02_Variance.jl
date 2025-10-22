@@ -106,11 +106,11 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
-## `JuMP` Formulations
+# `JuMP` Formulations
 
 Depending on the `alg` field, the variance risk measure is formulated using `JuMP` as follows:
 
-### SquaredSOCRiskExpr
+## `SquaredSOCRiskExpr`
 
 ```math
 \\begin{align}
@@ -123,7 +123,7 @@ Where:
   - ``\\boldsymbol{x}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
-### QuadRiskExpr
+## `QuadRiskExpr`
 
 ```math
 \\begin{align}
@@ -419,7 +419,7 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)`.
 
-## `JuMP` Formulations
+# `JuMP` Formulations
 
 When using an uncertainty set on the variance, the optimisation problem becomes:
 
@@ -437,7 +437,7 @@ Where:
 
 This problem can be reformulated depending on the type of uncertainty set used.
 
-### Box uncertainty set
+## Box uncertainty set
 
 ```math
 \\begin{align}
@@ -465,7 +465,7 @@ Where:
       + Else it is equal to 1.
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
 
-### Ellipse uncertainty set
+## Ellipse uncertainty set
 
 ```math
 \\begin{align}
@@ -516,8 +516,6 @@ Where:
 ## Arguments
 
   - `w::AbstractVector`: Asset weights.
-
-# Examples
 
 # Examples
 
