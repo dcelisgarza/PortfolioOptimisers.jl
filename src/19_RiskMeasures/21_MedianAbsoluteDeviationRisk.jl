@@ -4,45 +4,43 @@ struct MeanCentering <: MedianCenteringFunction end
 struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
-    center::T3
+    mu::T3
     flag::T4
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
                                      w::Union{Nothing, <:AbstractWeights},
-                                     center::Union{<:Real, <:AbstractVector{<:Real},
-                                                   <:MedianCenteringFunction},
+                                     mu::Union{<:Real, <:AbstractVector{<:Real},
+                                               <:VecScalar, <:MedianCenteringFunction},
                                      flag::Bool = true)
-        if isa(center, AbstractVector)
-            @argcheck(!isempty(center) && all(isfinite, center))
-        elseif isa(center, Real)
-            @argcheck(isfinite(center))
+        if isa(mu, AbstractVector)
+            @argcheck(!isempty(mu) && all(isfinite, mu))
+        elseif isa(mu, Real)
+            @argcheck(isfinite(mu))
         end
         if isa(w, AbstractWeights)
             @argcheck(!isempty(w))
         end
-        return new{typeof(settings), typeof(w), typeof(center), typeof(flag)}(settings, w,
-                                                                              center, flag)
+        return new{typeof(settings), typeof(w), typeof(mu), typeof(flag)}(settings, w, mu,
+                                                                          flag)
     end
 end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                  w::Union{Nothing, <:AbstractWeights} = nothing,
-                                 center::Union{<:Real, <:AbstractVector{<:Real},
-                                               <:MedianCenteringFunction} = MedianCentering(),
+                                 mu::Union{<:Real, <:AbstractVector{<:Real}, <:VecScalar,
+                                           <:MedianCenteringFunction} = MedianCentering(),
                                  flag::Bool = true)
-    return MedianAbsoluteDeviation(settings, w, center, flag)
+    return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
 function factory(r::MedianAbsoluteDeviation, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
-    return MedianAbsoluteDeviation(; settings = r.settings, w = w, center = r.center,
-                                   flag = r.flag)
+    return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
     return x
 end
 function risk_measure_view(r::MedianAbsoluteDeviation, i::AbstractVector, args...)
-    center = nothing_scalar_array_view(r.center, i)
-    return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, center = center,
-                                   flag = r.flag)
+    mu = nothing_scalar_array_view(r.mu, i)
+    return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end
 function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCentering,
                                                       <:Any}, ::Any, x::AbstractVector)
@@ -64,11 +62,15 @@ function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:AbstractWeights,
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:AbstractVector,
                                                        <:Any}, w::AbstractVector, ::Any)
-    return dot(w, r.center)
+    return dot(w, r.mu)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:Real, <:Any}, ::Any,
                             ::Any)
-    return r.center
+    return r.mu
+end
+function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecScalar, <:Any},
+                            w::AbstractVector, ::Any)
+    return dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_val(r::MedianAbsoluteDeviation, w::AbstractVector, X::AbstractMatrix,
                          fees::Union{Nothing, <:Fees} = nothing)
@@ -78,7 +80,8 @@ function calc_moment_val(r::MedianAbsoluteDeviation, w::AbstractVector, X::Abstr
 end
 function (r::MedianAbsoluteDeviation)(w::AbstractVector, X::AbstractMatrix,
                                       fees::Union{Nothing, <:Fees} = nothing)
-    return mad(calc_moment_val(r, w, X, fees); center = zero(eltype(X)), normalize = r.flag)
+    val = calc_moment_val(r, w, X, fees)
+    return mad(val; center = zero(eltype(X)), normalize = r.flag)
 end
 
 export MedianAbsoluteDeviation, MedianCentering, MeanCentering

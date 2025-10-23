@@ -194,9 +194,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_factory(r.w, pr.w)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
-        @expression(model, mean(2 * mad))
+        @expression(model, 2 * mean(mad))
     else
-        @expression(model, mean(2 * mad, wi))
+        @expression(model, 2 * mean(mad, wi))
     end
     model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * ((net_X + mad) .- target) >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)

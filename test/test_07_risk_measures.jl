@@ -255,16 +255,15 @@
                        0.011730101952145106)
         @test isapprox(expected_risk(MedianAbsoluteDeviation(; w = wt), w, rd.X),
                        0.011730101952145106)
-        @test isapprox(expected_risk(MedianAbsoluteDeviation(; center = MeanCentering()), w,
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = MeanCentering()), w,
                                      rd.X), 0.011649020215754542)
-        @test isapprox(expected_risk(MedianAbsoluteDeviation(; center = MeanCentering(),
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = MeanCentering(),
                                                              w = wt), w, rd.X),
                        0.011649020215754542)
-        @test isapprox(expected_risk(MedianAbsoluteDeviation(;
-                                                             center = zeros(size(pr.X, 2)),
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = zeros(size(pr.X, 2)),
                                                              w = wt), w, rd.X),
                        0.011807455957080073)
-        @test isapprox(expected_risk(MedianAbsoluteDeviation(; center = 0, w = wt), w,
-                                     rd.X), 0.011807455957080073)
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = 0, w = wt), w, rd.X),
+                       0.011807455957080073)
     end
 end

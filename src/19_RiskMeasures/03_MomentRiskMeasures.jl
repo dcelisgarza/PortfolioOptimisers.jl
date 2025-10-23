@@ -439,6 +439,7 @@ Where:
 
   - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
   - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 As an optimisation problem, it can be formulated as:
 
@@ -456,6 +457,7 @@ Where:
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
   - ``\\mathrm{R}``: `T×N` return matrix.
   - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 ## `MeanAbsoluteDeviation`
 
@@ -463,22 +465,32 @@ The mean absolute deviation is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{R}, \\tau) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{R} - \\tau \\right\\rvert\\right]
+\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{R}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right] \\right\\rvert\\right]
 \\end{align}
 ```
 
 Where:
 
   - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad
+\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
+  - ``\\mathrm{R}``: `T×N` return matrix.
+  - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 # Functor
 
