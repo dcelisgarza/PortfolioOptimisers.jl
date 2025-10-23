@@ -6,6 +6,10 @@ function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:AbstractV
                                                        <:Any}, w::AbstractVector, args...)
     return dot(w, r.mu)
 end
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+                                     w::AbstractVector, ::Any, k)
+    return dot(w, r.mu.v) + r.mu.s * k
+end
 function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Real, <:Any}, ::Any,
                                      ::Any, k)
     return r.mu * k

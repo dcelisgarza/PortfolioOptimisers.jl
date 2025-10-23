@@ -313,6 +313,58 @@ function dot_scalar(a::AbstractVector, b::AbstractVector)
     return dot(a, b)
 end
 """
+    struct VecScalar{T1, T2} <: AbstractResult
+        v::T1
+        s::T2
+    end
+
+Represents a composite result containing a vector and a scalar in PortfolioOptimisers.jl.
+
+Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
+
+# Fields
+
+  - `v`: Vector value.
+  - `s`: Scalar value.
+
+# Constructors
+
+    VecScalar(; v::AbstractVector, s::Real)
+
+Arguments correspond to the fields above.
+
+## Validation
+
+  - `v`: `!isempty(v)` and `all(isfinite, v)`.
+  - `s`: `isfinite(s)`.
+
+# Examples
+
+```jldoctest
+julia> VecScalar([1.0, 2.0, 3.0], 4.2)
+VecScalar
+  v | Vector{Float64}: [1.0, 2.0, 3.0]
+  s | Float64: 4.2
+```
+
+# Related
+
+  - [`AbstractResult`](@ref)
+"""
+struct VecScalar{T1, T2} <: AbstractResult
+    v::T1
+    s::T2
+    function VecScalar(v::AbstractVector, s::Real)
+        @argcheck(!isempty(v))
+        @argcheck(all(isfinite, v))
+        @argcheck(isfinite(s))
+        return new{typeof(v), typeof(s)}(v, s)
+    end
+end
+function VecScalar(; v::AbstractVector, s::Real)
+    return VecScalar(v, s)
+end
+"""
     nothing_scalar_array_view(x, i)
 
 Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
@@ -367,6 +419,9 @@ function nothing_scalar_array_view(x::AbstractVector{<:AbstractVector}, i)
 end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
+end
+function nothing_scalar_array_view(x::VecScalar, i)
+    return VecScalar(; v = view(x.v, i), s = x.s)
 end
 """
     nothing_scalar_array_view_odd_order(x, i, j)
@@ -458,6 +513,9 @@ function nothing_scalar_array_getindex(::Nothing, i, j)
 end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
+end
+function nothing_scalar_array_getindex(x::VecScalar, i)
+    return VecScalar(x.v[i], x.s)
 end
 """
     fourth_moment_index_factory(N::Integer, i::AbstractVector)
@@ -568,4 +626,4 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export brinson_attribution, factory, traverse_concrete_subtypes
+export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes

@@ -7,7 +7,8 @@ struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: RiskMeasure
     alg::T6
     function SquareRootKurtosis(settings::RiskMeasureSettings,
                                 w::Union{Nothing, <:AbstractWeights},
-                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                          <:VecScalar},
                                 kt::Union{Nothing, <:AbstractMatrix},
                                 N::Union{Nothing, <:Integer}, alg::AbstractMomentAlgorithm)
         mu_flag = isa(mu, AbstractVector)
@@ -36,7 +37,8 @@ struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: RiskMeasure
 end
 function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                             w::Union{Nothing, <:AbstractWeights} = nothing,
-                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                      <:VecScalar} = nothing,
                             kt::Union{Nothing, <:AbstractMatrix} = nothing,
                             N::Union{Nothing, <:Integer} = nothing,
                             alg::AbstractMomentAlgorithm = Full())
@@ -53,6 +55,10 @@ end
 function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:AbstractVector, <:Any,
                                                   <:Any, <:Any}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
+end
+function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:VecScalar, <:Any, <:Any,
+                                                  <:Any}, w::AbstractVector, ::Any)
+    return dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:Real, <:Any, <:Any,
                                                   <:Any}, ::Any, ::Any)

@@ -724,21 +724,56 @@
         mr = MeanRisk(;
                       r = BrownianDistanceVariance(; algc = IneqBrownianDistanceVariance()),
                       opt = opt)
-        res1 = optimise(mr)
+        res9 = optimise(mr)
 
         mr = MeanRisk(; r = BrownianDistanceVariance(; alg = RSOCRiskExpr()), opt = opt)
-        res2 = optimise(mr)
+        res10 = optimise(mr)
 
         mr = MeanRisk(;
                       r = BrownianDistanceVariance(; alg = RSOCRiskExpr(),
                                                    algc = IneqBrownianDistanceVariance()),
                       opt = opt)
-        res3 = optimise(mr)
-        @test isapprox(res1.w,
+        res11 = optimise(mr)
+        @test isapprox(res9.w,
                        CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"),
                                 DataFrame)[!, 1], rtol = 5e-4)
-        @test isapprox(res1.w, res2.w; rtol = 5e-4)
-        @test isapprox(res1.w, res3.w; rtol = 1e-3)
+        @test isapprox(res9.w, res10.w; rtol = 5e-4)
+        @test isapprox(res9.w, res11.w; rtol = 1e-3)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        r = factory(LowOrderMoment(; mu = VecScalar(; v = pr.mu, s = 4.2 / 252 / 100)), pr)
+        res_min = optimise(MeanRisk(; r = r, opt = opt))
+        res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
+        rk_min = expected_risk(r, res_min.w, pr)
+        rk_max = expected_risk(r, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
+        res12 = optimise(MeanRisk(;
+                                  r = LowOrderMoment(;
+                                                     mu = VecScalar(; v = pr.mu,
+                                                                    s = 4.2 / 252 / 100),
+                                                     settings = RiskMeasureSettings(;
+                                                                                    ub = Frontier(;
+                                                                                                  N = 5))),
+                                  obj = MaximumReturn(), opt = opt))
+        res13 = optimise(MeanRisk(;
+                                  r = LowOrderMoment(; mu = pr.mu .- 4.2 / 252 / 100,
+                                                     settings = RiskMeasureSettings(;
+                                                                                    ub = Frontier(;
+                                                                                                  N = 5))),
+                                  obj = MaximumReturn(), opt = opt))
+
+        res = !isapprox(hcat(res12.w...), hcat(res13.w...); rtol = 1e-2)
+        if !res
+            println("Frontier formulation failed")
+            find_tol(hcat(res12.w...), hcat(res13.w...))
+        end
+        rks = expected_risk.(r, res12.w, pr)
+        @test issorted(rks)
+        @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
+        rts = expected_return.(ArithmeticReturn(), res12.w, pr)
+        @test issorted(rts)
+        @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
     end
     @testset "Scalarisers" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)

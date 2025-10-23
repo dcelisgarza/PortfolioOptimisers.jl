@@ -385,6 +385,131 @@ for alg in (StandardisedLowOrderMoment, StandardisedHighOrderMoment)
          end)
 end
 """
+    struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
+        settings::T1
+        w::T2
+        mu::T3
+        alg::T4
+    end
+
+Represents a low-order moment risk measure in PortfolioOptimisers.jl.
+
+Computes portfolio risk using a low-order moment algorithm (such as first lower moment, mean absolute deviation, or second moment), optionally with custom weights and target values. This type is used for risk measures based on mean, variance, or related statistics.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `w`: Optional vector of observation weights.
+  - `mu`: Optional target value or vector for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `alg`: Low-order moment risk measure algorithm.
+
+# Constructors
+
+    LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                   w::Union{Nothing, <:AbstractWeights} = nothing,
+                   mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                   alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Real`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+# `JuMP` Formulations
+
+Depending on the `alg` field, the risk measure is formulated using `JuMP` as follows:
+
+## `FirstLowerMoment`
+
+The first lower moment is computed as:
+
+```math
+\\begin{align}
+\\mathrm{FirstLowerMoment}(\\boldsymbol{R},\\, \\tau) &= \\mathbb{E}\\left[\\max\\left(\\tau - \\boldsymbol{R},\\, 0\\right)\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\tau``: minimum acceptable return.
+
+As an optimisation problem, it can be formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
+  - ``\\mathrm{R}``: `T×N` return matrix.
+  - ``\\tau``: minimum acceptable return.
+
+## `MeanAbsoluteDeviation`
+
+The mean absolute deviation is computed as:
+
+```math
+\\begin{align}
+\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{R}, \\tau) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{R} - \\tau \\right\\rvert\\right]
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\tau``: minimum acceptable return.
+
+As an optimisation problem, it can be formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad
+\\end{align}
+```
+
+# Functor
+
+    (r::LowOrderMoment)(w::AbstractVector, X::AbstractMatrix;
+                        fees::Union{Nothing, <:Fees} = nothing)
+
+Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+
+# Examples
+
+```jldoctest
+julia> LowOrderMoment()
+LowOrderMoment
+  settings | RiskMeasureSettings
+           |   scale | Float64: 1.0
+           |      ub | nothing
+           |     rke | Bool: true
+         w | nothing
+        mu | nothing
+       alg | FirstLowerMoment()
+```
+
+# Related
+
+  - [`RiskMeasureSettings`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`FirstLowerMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`SecondLowerMoment`](@ref)
+  - [`SecondCentralMoment`](@ref)
+  - [`StandardisedLowOrderMoment`](@ref)
 """
 struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
@@ -393,8 +518,8 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     alg::T4
     function LowOrderMoment(settings::RiskMeasureSettings,
                             w::Union{Nothing, <:AbstractWeights},
-                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                            alg::LowOrderMomentMeasureAlgorithm)
+                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                      <:VecScalar}, alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
             @argcheck(!isempty(mu) && all(isfinite, mu))
         elseif isa(mu, Real)
@@ -409,7 +534,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Union{Nothing, <:AbstractWeights} = nothing,
-                        mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                        mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -422,8 +547,8 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     alg::T4
     function HighOrderMoment(settings::RiskMeasureSettings,
                              w::Union{Nothing, <:AbstractWeights},
-                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                             alg::HighOrderMomentMeasureAlgorithm)
+                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                       <:VecScalar}, alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
             @argcheck(!isempty(mu) && all(isfinite, mu))
         elseif isa(mu, Real)
@@ -438,7 +563,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Union{Nothing, <:AbstractWeights} = nothing,
-                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
@@ -458,6 +583,11 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVe
                                      <:HighOrderMoment{<:Any, <:Any, <:AbstractVector,
                                                        <:Any}}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
+end
+function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+                                     <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
+                            w::AbstractVector, ::Any)
+    return dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any,

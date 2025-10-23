@@ -412,9 +412,10 @@ function LogSumExpScalariser(; gamma::Real = 1.0)
 end
 """
     nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
+    nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray, <:VecScalar},
+                                 ::Any)
     nothing_scalar_array_factory(risk_variable::Nothing,
-                                 prior_variable::Union{<:Real, <:AbstractArray})
+                                 prior_variable::Union{<:Real, <:AbstractArray, <:VecScalar})
 
 Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
@@ -432,11 +433,13 @@ Utility to select a non-nothing value when provided by a risk measure, or fall b
 function nothing_scalar_array_factory(::Nothing, ::Nothing)
     return nothing
 end
-function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
+function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray,
+                                                           <:VecScalar}, ::Any)
     return risk_variable
 end
 function nothing_scalar_array_factory(::Nothing,
-                                      prior_variable::Union{<:Real, <:AbstractArray})
+                                      prior_variable::Union{<:Real, <:AbstractArray,
+                                                            <:VecScalar})
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::AbstractVector)
