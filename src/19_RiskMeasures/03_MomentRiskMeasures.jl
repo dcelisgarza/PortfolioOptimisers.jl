@@ -400,7 +400,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
   - `settings`: Risk measure configuration.
   - `w`: Optional vector of observation weights.
-  - `mu`: Optional target value or vector for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
   - `alg`: Low-order moment risk measure algorithm.
 
 # Constructors
@@ -492,6 +492,22 @@ Where:
   - ``\\tau``: minimum acceptable return.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
+## `StandardisedLowOrderMoment`
+
+Depending on the `alg` field the risk measure can either compute the second central moment or second lower moment.
+
+### `SecondCentralMoment`
+
+### `SecondLowerMoment`
+
+### `JuMP` Formulations
+
+!!! info
+
+    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires an affine variable in the denominator.
+
+Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments they can be formulated
+
 # Functor
 
     (r::LowOrderMoment)(w::AbstractVector, X::AbstractMatrix;
@@ -551,6 +567,71 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     return LowOrderMoment(settings, w, mu, alg)
 end
 """
+    struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
+        settings::T1
+        w::T2
+        mu::T3
+        alg::T4
+    end
+
+Represents a high-order moment risk measure in PortfolioOptimisers.jl.
+
+Computes portfolio risk using a high-order moment algorithm (such as semi-skewness, semi-kurtosis, or kurtosis), optionally with custom weights and target values. This type is used for risk measures based on third or fourth moments of the return distribution.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `w`: Optional vector of observation weights.
+  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `alg`: High-order moment risk measure algorithm.
+
+# Constructors
+
+    HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                    w::Union{Nothing, <:AbstractWeights} = nothing,
+                    mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                    alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Real`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+# Functor
+
+    (r::HighOrderMoment)(w::AbstractVector, X::AbstractMatrix;
+                        fees::Union{Nothing, <:Fees} = nothing)
+
+Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+
+# Examples
+
+```jldoctest
+julia> HighOrderMoment()
+HighOrderMoment
+  settings | RiskMeasureSettings
+           |   scale | Float64: 1.0
+           |      ub | nothing
+           |     rke | Bool: true
+         w | nothing
+        mu | nothing
+       alg | ThirdLowerMoment()
+```
+
+# Related
+
+  - [`RiskMeasureSettings`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`ThirdLowerMoment`](@ref)
+  - [`FourthLowerMoment`](@ref)
+  - [`FourthCentralMoment`](@ref)
+  - [`StandardisedHighOrderMoment`](@ref)
 """
 struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1

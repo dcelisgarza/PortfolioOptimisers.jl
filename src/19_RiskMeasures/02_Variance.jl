@@ -108,9 +108,13 @@ Keyword arguments correspond to the fields above.
 
 # `JuMP` Formulations
 
+!!! info
+
+    Regardless of the formulation used, an auxiliary variable representing the standard deviation is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires an affine variable in the denominator.
+
 Depending on the `alg` field, the variance risk measure is formulated using `JuMP` as follows:
 
-## `SquaredSOCRiskExpr`
+## `QuadRiskExpr`
 
 ```math
 \\begin{align}
@@ -123,7 +127,7 @@ Where:
   - ``\\boldsymbol{x}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
-## `QuadRiskExpr`
+## `SquaredSOCRiskExpr`
 
 ```math
 \\begin{align}
@@ -261,7 +265,7 @@ end
         sigma::T2
     end
 
-Represents the portfolio standard deviation using a covariance matrix. It square root of the variance.
+Represents the portfolio standard deviation using a covariance matrix. It is the square root of the variance.
 
 # Fields
 
