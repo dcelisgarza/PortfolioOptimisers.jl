@@ -496,17 +496,33 @@ Where:
 
 Depending on the `alg` field the risk measure can either compute the second central moment or second lower moment.
 
+!!! info
+
+    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
+
+Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments, they can be formulated in a variety of ways.
+
 ### `SecondCentralMoment`
+
+#### `SquaredSOCRiskExpr`
+
+#### `RSOCRiskExpr`
+
+#### `QuadRiskExpr`
+
+#### `SOCRiskExpr`
 
 ### `SecondLowerMoment`
 
+#### `SquaredSOCRiskExpr`
+
+#### `RSOCRiskExpr`
+
+#### `QuadRiskExpr`
+
+#### `SOCRiskExpr`
+
 ### `JuMP` Formulations
-
-!!! info
-
-    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires an affine variable in the denominator.
-
-Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments they can be formulated
 
 # Functor
 

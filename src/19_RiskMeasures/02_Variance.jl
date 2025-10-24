@@ -26,7 +26,35 @@ abstract type VarianceFormulation <: SecondMomentFormulation end
 """
     struct QuadRiskExpr <: VarianceFormulation end
 
-Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form.
+Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form. This can be in two ways.
+
+# Summary statistics
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` co-moment matrix.
+
+# Scenario-based
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
+\\textrm{s.t.} &\\qquad \\boldsymbol{d} \\in \\mathcal{S}_{x}.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` deviations vector.
+  - ``\\mathcal{S}_{x}``: Scenario set for portfolio `x`.
 
 # Related Types
 
@@ -110,7 +138,7 @@ Keyword arguments correspond to the fields above.
 
 !!! info
 
-    Regardless of the formulation used, an auxiliary variable representing the standard deviation is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires an affine variable in the denominator.
+    Regardless of the formulation used, an auxiliary variable representing the standard deviation is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
 
 Depending on the `alg` field, the variance risk measure is formulated using `JuMP` as follows:
 
