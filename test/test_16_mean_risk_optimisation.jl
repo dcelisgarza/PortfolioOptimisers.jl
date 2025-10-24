@@ -1562,11 +1562,36 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         mip_opt = JuMPOptimiser(; pe = pr, slv = mip_slv)
         rs1 = [LowOrderMoment(; mu = 0),
+               LowOrderMoment(; mu = 0, alg = MeanAbsoluteDeviation()),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondCentralMoment())),
+               LowOrderMoment(; mu = 0,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondLowerMoment(;
+                                                                                       alg = SOCRiskExpr()))),
+               LowOrderMoment(; mu = 0,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment(;
+                                                                                         alg = SOCRiskExpr()))),
+               LowOrderMoment(; mu = 0,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondLowerMoment(;
+                                                                                       alg = RSOCRiskExpr()))),
+               LowOrderMoment(; mu = 0,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment(;
+                                                                                         alg = RSOCRiskExpr()))),
+               LowOrderMoment(; mu = 0,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondLowerMoment(;
+                                                                                       alg = QuadRiskExpr()))),
+               LowOrderMoment(; mu = 0,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment(;
+                                                                                         alg = QuadRiskExpr()))),
                ConditionalValueatRisk(), EntropicValueatRisk(),
                ConditionalValueatRiskRange(), EntropicValueatRiskRange(),
                DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3),
@@ -1576,11 +1601,36 @@
                ValueatRisk(; alg = DistributionValueatRisk()),
                ValueatRiskRange(; alg = DistributionValueatRisk())]
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
+               LowOrderMoment(; mu = 0, w = wp, alg = MeanAbsoluteDeviation()),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondCentralMoment())),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondLowerMoment(;
+                                                                                       alg = SOCRiskExpr()))),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment(;
+                                                                                         alg = SOCRiskExpr()))),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondLowerMoment(;
+                                                                                       alg = RSOCRiskExpr()))),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment(;
+                                                                                         alg = RSOCRiskExpr()))),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondLowerMoment(;
+                                                                                       alg = QuadRiskExpr()))),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondCentralMoment(;
+                                                                                         alg = QuadRiskExpr()))),
                ConditionalValueatRisk(; w = wp), EntropicValueatRisk(; w = wp),
                ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp),
                DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3, w = wp),
@@ -1601,12 +1651,14 @@
                 optimise(MeanRisk(; r = r1, opt = opt)),
                 optimise(MeanRisk(; r = r2, opt = opt))
             end
-            rtol = if i ∈ (2, 7)
-                5e-5
-            elseif i == 3
+            rtol = if i in (3, 5)
+                5e-6
+            elseif i in (4, 8)
                 5e-3
-            elseif i == 5
-                1e-4
+            elseif i in (6, 12, 14)
+                5e-5
+            elseif i == 7
+                5e-4
             else
                 1e-6
             end

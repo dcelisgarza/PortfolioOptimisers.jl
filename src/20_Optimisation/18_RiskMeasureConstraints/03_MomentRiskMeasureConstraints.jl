@@ -59,19 +59,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return mad_risk
 end
-function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, wi, factor::Real,
+function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Real,
                                  second_moment, key::Symbol, args...)
     return model[key] = @expression(model, factor * dot(second_moment, second_moment)),
                         sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, wi,
-                                 factor::Real, second_moment, key::Symbol, keyt::Symbol,
-                                 keyc::Symbol, args...)
-    if !isnothing(wi)
-        second_moment = model[Symbol(:scaled_second_lower_moment_, i)] = @expression(model,
-                                                                                     dot(wi,
-                                                                                         second_lower_moment))
-    end
+function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Real,
+                                 second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
+                                 args...)
     sc = model[:sc]
     tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
     model[Symbol(keyc, i)] = @constraint(model,
@@ -80,14 +75,14 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, wi,
                                           sc * second_moment] in RotatedSecondOrderCone())
     return model[key] = @expression(model, factor * tsecond_moment), sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::SquaredSOCRiskExpr, i::Any, ::Any,
+function set_second_moment_risk!(model::JuMP.Model, ::SquaredSOCRiskExpr, i::Any,
                                  factor::Real, second_moment, key::Symbol, keyt::Symbol,
                                  keyc::Symbol, tsecond_moment::AbstractJuMPScalar)
     return model[key] = @expression(model, factor * tsecond_moment^2), sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, ::Any,
-                                 factor::Real, second_moment, key::Symbol, keyt::Symbol,
-                                 keyc::Symbol, tsecond_moment::AbstractJuMPScalar)
+function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Real,
+                                 second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
+                                 tsecond_moment::AbstractJuMPScalar)
     factor = sqrt(factor)
     return model[key] = @expression(model, factor * tsecond_moment), factor
 end
@@ -126,35 +121,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                [1:T],
                                                                                                                                (lower_bound = 0)
                                                                                                                            end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
-    second_lower_moment_risk, factor = if isnothing(wi)
-        factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
-        model[Symbol(:csqrt_second_lower_moment_soc_, i)] = @constraint(model,
-                                                                        [sc *
-                                                                         sqrt_second_lower_moment
-                                                                         sc *
-                                                                         second_lower_moment] in
-                                                                        SecondOrderCone())
-        set_second_moment_risk!(model, r.alg.alg.alg, i, nothing, factor,
-                                second_lower_moment, key, :tsecond_lower_moment_,
-                                :csecond_lower_moment_rsoc_, sqrt_second_lower_moment)
-    else
-        factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
-        wi = sqrt.(wi)
-        model[Symbol(:csqrt_second_lower_moment_soc_, i)] = @constraints(model,
-                                                                         [sc *
-                                                                          sqrt_second_lower_moment
-                                                                          sc * wi .*
-                                                                          second_lower_moment] in
-                                                                         SecondOrderCone())
-        set_second_moment_risk!(model, r.alg.alg.alg, i, wi, factor, second_lower_moment,
-                                key, :tsecond_lower_moment_, :csecond_lower_moment_rsoc_,
-                                sqrt_second_lower_moment)
-    end
     model[Symbol(:csecond_lower_moment_mar_, i)] = @constraint(model,
                                                                sc * ((net_X +
                                                                       second_lower_moment) .-
                                                                      target) >= 0)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
+    second_lower_moment_risk, factor = if isnothing(wi)
+        factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
+        set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_lower_moment, key,
+                                :tsecond_lower_moment_, :csecond_lower_moment_rsoc_,
+                                sqrt_second_lower_moment)
+    else
+        factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
+        wi = sqrt.(wi)
+        second_lower_moment = model[Symbol(:scaled_second_lower_moment_, i)] = @expression(model,
+                                                                                           wi .*
+                                                                                           second_lower_moment)
+        set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_lower_moment, key,
+                                :tsecond_lower_moment_, :csecond_lower_moment_rsoc_,
+                                sqrt_second_lower_moment)
+    end
+    model[Symbol(:csqrt_second_lower_moment_soc_, i)] = @constraint(model,
+                                                                    [sc *
+                                                                     sqrt_second_lower_moment
+                                                                     sc *
+                                                                     second_lower_moment] in
+                                                                    SecondOrderCone())
     ub = second_moment_bound_val(r.alg.alg.alg, r.settings.ub, factor)
     set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_lower_moment, ub,
                                              bound_key, second_lower_moment_risk,
@@ -182,29 +174,25 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     wi = nothing_scalar_array_factory(r.w, pr.w)
     second_central_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
-        model[Symbol(:csqrt_second_central_moment_soc_, i)] = @constraint(model,
-                                                                          [sc *
-                                                                           sqrt_second_central_moment
-                                                                           sc *
-                                                                           second_central_moment] in
-                                                                          SecondOrderCone())
-        set_second_moment_risk!(model, r.alg.alg.alg, i, nothing, factor,
-                                second_central_moment, key, :tsecond_central_moment_,
-                                :csecond_central_moment_rsoc_, sqrt_second_central_moment)
+        set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_central_moment, key,
+                                :tsecond_central_moment_, :csecond_central_moment_rsoc_,
+                                sqrt_second_central_moment)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
         wi = sqrt.(wi)
-        model[Symbol(:csqrt_second_central_moment_soc_, i)] = @constraint(model,
-                                                                          [sc *
-                                                                           sqrt_second_central_moment
-                                                                           sc * wi .*
-                                                                           second_central_moment] in
-                                                                          SecondOrderCone())
-        set_second_moment_risk!(model, r.alg.alg.alg, i, nothing, factor,
-                                second_central_moment, key, :tsecond_central_moment_,
-                                :csecond_central_moment_rsoc_, sqrt_second_central_moment)
+        second_central_moment = model[Symbol(:scaled_second_central_moment_, i)] = @expression(model,
+                                                                                               wi .*
+                                                                                               second_central_moment)
+        set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_central_moment, key,
+                                :tsecond_central_moment_, :csecond_central_moment_rsoc_,
+                                sqrt_second_central_moment)
     end
-
+    model[Symbol(:csqrt_second_central_moment_soc_, i)] = @constraint(model,
+                                                                      [sc *
+                                                                       sqrt_second_central_moment
+                                                                       sc *
+                                                                       second_central_moment] in
+                                                                      SecondOrderCone())
     ub = second_moment_bound_val(r.alg.alg.alg, r.settings.ub, factor)
     set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_central_moment, ub,
                                              bound_key, second_central_moment_risk,
