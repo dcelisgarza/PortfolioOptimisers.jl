@@ -76,7 +76,7 @@
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tracking = WeightsTracking(; w = w0),
                                   alg = DependentVariableTracking()),
-          RiskRatioRiskMeasure()]
+          RiskRatioRiskMeasure(), MedianAbsoluteDeviation()]
     @testset "HierarchicalRiskParity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"),
                       DataFrame)

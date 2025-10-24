@@ -296,11 +296,16 @@ Scalariser that combines multiple risk measures using a weighted sum.
 
 ```math
 \\begin{align}
-\\phi &= \\sum_{i=1}^{N} w_i \\cdot r_i
+\\phi &= \\sum_{i=1}^{N} w_i \\cdot r_i \\,.
 \\end{align}
 ```
 
-where ``N`` is the number of risk measuresk, the subscript denotes the ``i``'th risk measure, ``w_i`` is its weight, and ``r_i`` is the risk measure value.
+Where:
+
+  - ``N``: number of risk measures.
+  - ``i``: subscript denoting the `i`'th risk measure.
+  - ``r_i``: `i`'th risk measure value.
+  - ``w_i``: weight of the `i`'th risk measure.
 
 # Related
 
@@ -320,11 +325,16 @@ Scalariser that selects the risk expression whose scaled value is the largest.
 
 ```math
 \\begin{align}
-\\phi &= \\underset{i=1,\\,\\ldots,\\,N}{\\max}  w_i  r_i
+\\phi &= \\underset{i \\in (1,\\,N)}{\\max}  \\left( w_i \\cdot r_i \\right)\\,.
 \\end{align}
 ```
 
-where ``N`` is the number of risk measuresk, the subscript denotes the ``i``'th risk measure, ``w_i`` is its weight, and ``r_i`` is the risk measure value.
+Where:
+
+  - ``N``: number of risk measures.
+  - ``i``: subscript denoting the `i`'th risk measure.
+  - ``r_i``: `i`'th risk measure value.
+  - ``w_i``: weight of the `i`'th risk measure.
 
 # Related
 
@@ -348,15 +358,21 @@ The parameter `gamma` controls the approximation accuracy to the maximum functio
 
 ```math
 \\begin{align}
-\\phi &= \\frac{1}{\\gamma} \\log \\left( \\sum_{i=1}^{N} \\exp \\left[ \\gamma w_i r_i \\right] \\right)
+\\phi &= \\frac{1}{\\gamma} \\log \\left( \\sum_{i=1}^{N} \\exp \\left[ \\gamma \\cdot w_i \\cdot r_i \\right] \\right)\\,.
 \\end{align}
 ```
 
-where ``N`` is the number of risk measuresk, the subscript denotes the ``i``'th risk measure, ``w_i`` is its weight, ``r_i`` is the risk measure value, and ``\\gamma`` is a positive parameter.
+Where:
+
+  - ``N``: number of risk measures.
+  - ``i``: subscript denoting the `i`'th risk measure.
+  - ``r_i``: `i`'th risk measure value.
+  - ``w_i``: weight of the `i`'th risk measure.
+  - ``\\gamma``: positive parameter controlling the interpolation between the weighted sum and the maximum functions.
 
 # Fields
 
-  - `gamma`: Positive parameter controlling the approximation accuracy to the maximum function.
+  - `gamma`: Positive parameter controlling the interpolation between the weighted sum and the maximum functions.
 
 # Constructors
 
@@ -396,9 +412,10 @@ function LogSumExpScalariser(; gamma::Real = 1.0)
 end
 """
     nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
+    nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray, <:VecScalar},
+                                 ::Any)
     nothing_scalar_array_factory(risk_variable::Nothing,
-                                 prior_variable::Union{<:Real, <:AbstractArray})
+                                 prior_variable::Union{<:Real, <:AbstractArray, <:VecScalar})
 
 Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
@@ -416,11 +433,13 @@ Utility to select a non-nothing value when provided by a risk measure, or fall b
 function nothing_scalar_array_factory(::Nothing, ::Nothing)
     return nothing
 end
-function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray}, ::Any)
+function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray,
+                                                           <:VecScalar}, ::Any)
     return risk_variable
 end
 function nothing_scalar_array_factory(::Nothing,
-                                      prior_variable::Union{<:Real, <:AbstractArray})
+                                      prior_variable::Union{<:Real, <:AbstractArray,
+                                                            <:VecScalar})
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::AbstractVector)

@@ -24,7 +24,8 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     w::T1
     mu::T2
     function ThirdCentralMoment(w::Union{Nothing, <:AbstractWeights},
-                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                          <:VecScalar})
         if isa(w, AbstractWeights)
             @argcheck(!isempty(w))
         end
@@ -35,7 +36,8 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     end
 end
 function ThirdCentralMoment(; w::Union{Nothing, <:AbstractWeights} = nothing,
-                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                      <:VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
 struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
@@ -43,7 +45,7 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     w::T2
     mu::T3
     function Skewness(ve::AbstractVarianceEstimator, w::Union{Nothing, <:AbstractWeights},
-                      mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+                      mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar})
         if isa(w, AbstractWeights)
             @argcheck(!isempty(w))
         end
@@ -55,7 +57,7 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Union{Nothing, <:AbstractWeights} = nothing,
-                  mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                  mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},
@@ -72,6 +74,11 @@ function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:AbstractVecto
                                      <:Skewness{<:Any, <:Any, <:AbstractVector}},
                             w::AbstractVector, ::Any)
     return dot(w, r.mu)
+end
+function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:VecScalar},
+                                     <:Skewness{<:Any, <:Any, <:VecScalar}},
+                            w::AbstractVector, ::Any)
+    return dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Real},
                                      <:Skewness{<:Any, <:Any, <:Real}}, ::Any, ::Any)

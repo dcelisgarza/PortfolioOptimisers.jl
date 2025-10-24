@@ -250,5 +250,20 @@
                        0.14712227931904298)
         @test isapprox(expected_risk(BrownianDistanceVariance(), w, rd.X),
                        0.0005291680154419391)
+
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(), w, rd.X),
+                       0.011730101952145106)
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; w = wt), w, rd.X),
+                       0.011730101952145106)
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = MeanCentering()), w,
+                                     rd.X), 0.011649020215754542)
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = MeanCentering(),
+                                                             w = wt), w, rd.X),
+                       0.011649020215754542)
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = zeros(size(pr.X, 2)),
+                                                             w = wt), w, rd.X),
+                       0.011807455957080073)
+        @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = 0, w = wt), w, rd.X),
+                       0.011807455957080073)
     end
 end

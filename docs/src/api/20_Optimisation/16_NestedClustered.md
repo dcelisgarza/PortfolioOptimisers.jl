@@ -1,4 +1,4 @@
-# Nested Clustering
+# Nested Clustered
 
 ```@docs
 NestedClustered

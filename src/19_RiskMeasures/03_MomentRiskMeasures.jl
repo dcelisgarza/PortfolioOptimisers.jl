@@ -1,14 +1,134 @@
+"""
+    abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for all moment-based risk measure algorithms in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using statistical moments (e.g., mean, variance, skewness, kurtosis) of the return distribution. All concrete moment risk measure algorithms should subtype `MomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+"""
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+"""
+    abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+
+Abstract supertype for all low-order moment-based risk measure algorithms in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using low-order statistical moments (e.g., mean, variance, mean absolute deviation) of the return distribution. All concrete low-order moment risk measure algorithms should subtype `LowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`StandardisedLowOrderMoment`](@ref)
+"""
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+"""
+    abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+
+Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using low-order statistical moments without normalising by the variance. All concrete unstandardised low-order moment risk measure algorithms should subtype `UnstandardisedLowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`FirstLowerMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
+"""
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
-abstract type StandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
+"""
+    struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+
+Represents the first lower moment risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the first lower moment, which is the negative mean of the deviations of the returns series below a target value.
+
+# Related
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMoment`](@ref)
+"""
 struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+"""
+    struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+
+Represents the mean absolute deviation risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk as the mean of the absolute deviations of the returns series from a target value.
+
+# Related
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMoment`](@ref)
+"""
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+"""
+    abstract type UnstandardisedSecondMomentAlgorithm <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+
+Abstract supertype for unstandardised second moment risk measure algorithms in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using the second moment (such as variance or semi-variance) of the return distribution, without normalising by the variance. All concrete unstandardised second moment risk measure algorithms should subtype `UnstandardisedSecondMomentAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`SecondLowerMoment`](@ref)
+  - [`SecondCentralMoment`](@ref)
+"""
 abstract type UnstandardisedSecondMomentAlgorithm <:
               UnstandardisedLowOrderMomentMeasureAlgorithm end
+"""
+    struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
+        alg::T1
+    end
+
+Represents the second lower moment risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the second lower moment (semi-variance or semi-standard deviation), which quantifies downside risk by considering only deviations below a target value.
+
+# Fields
+
+  - `alg`: The second moment formulation algorithm used to compute the risk measure.
+
+# Constructors
+
+    SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
+
+Keyword arguments correspond to the fields above.
+
+# Formulations
+
+Depending on the `alg` field, this can represent either the semi-variance or semi-standard deviation.
+
+## `SOCRiskExpr`
+
+Computes the semi-standard deviation (square root of semi-variance) of the returns below the target.
+
+## `QuadRiskExpr`, `SquaredSOCRiskExpr`, `RSOCRiskExpr`
+
+Computes the semi-variance of the returns below the target.
+
+# Examples
+
+```jldoctest
+julia> SecondLowerMoment()
+SecondLowerMoment
+  alg | SquaredSOCRiskExpr()
+```
+
+# Related
+
+  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`LowOrderMoment`](@ref)
+"""
 struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
     alg::T1
     function SecondLowerMoment(alg::SecondMomentFormulation)
@@ -18,6 +138,52 @@ end
 function SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondLowerMoment(alg)
 end
+"""
+    struct SecondCentralMoment{T1} <: UnstandardisedSecondMomentAlgorithm
+        alg::T1
+    end
+
+Represents the second central moment risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the second central moment (variance or standard deviation), which quantifies risk by considering all deviations from a target value.
+
+# Fields
+
+  - `alg`: The second moment formulation algorithm used to compute the risk measure.
+
+# Constructors
+
+    SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
+
+Keyword arguments correspond to the fields above.
+
+# Formulations
+
+Depending on the `alg` field, this can represent either the variance or standard deviation.
+
+## `SOCRiskExpr`
+
+Computes the standard deviation (square root of variance) of the returns below the target.
+
+## `QuadRiskExpr`, `SquaredSOCRiskExpr`, `RSOCRiskExpr`
+
+Computes the variance of the returns below the target.
+
+# Examples
+
+```jldoctest
+julia> SecondCentralMoment()
+SecondCentralMoment
+  alg | SquaredSOCRiskExpr()
+```
+
+# Related
+
+  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`LowOrderMoment`](@ref)
+"""
 struct SecondCentralMoment{T1} <: UnstandardisedSecondMomentAlgorithm
     alg::T1
     function SecondCentralMoment(alg::SecondMomentFormulation)
@@ -27,7 +193,49 @@ end
 function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
-struct StandardisedLowOrderMoment{T1, T2} <: StandardisedLowOrderMomentMeasureAlgorithm
+"""
+    struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
+        ve::T1
+        alg::T2
+    end
+
+Represents a standardised low-order moment risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using a low-order moment algorithm, standardised by a variance estimator. This enables risk measures such as semi-standard deviation or standardised semi-variance, which normalise the risk by the portfolio variance.
+
+# Fields
+
+  - `ve`: Variance estimator used for standardisation.
+  - `alg`: Unstandardised second moment algorithm used to compute the risk measure.
+
+# Constructors
+
+    StandardisedLowOrderMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+                               alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> StandardisedLowOrderMoment()
+StandardisedLowOrderMoment
+   ve | SimpleVariance
+      |          me | nothing
+      |           w | nothing
+      |   corrected | Bool: true
+  alg | SecondLowerMoment
+      |   alg | SquaredSOCRiskExpr()
+```
+
+# Related
+
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`SecondLowerMoment`](@ref)
+"""
+struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
     function StandardisedLowOrderMoment(ve::AbstractVarianceEstimator,
@@ -41,14 +249,121 @@ function StandardisedLowOrderMoment(;
                                     alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
     return StandardisedLowOrderMoment(ve, alg)
 end
+"""
+    abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+
+Abstract supertype for all high-order moment-based risk measure algorithms in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (e.g., skewness, kurtosis) of the return distribution. All concrete high-order moment risk measure algorithms should subtype `HighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`StandardisedHighOrderMoment`](@ref)
+"""
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+"""
+    abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
+
+Abstract supertype for high-order moment risk measure algorithms that are not standardised by the variance in PortfolioOptimisers.jl.
+
+Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (such as skewness, kurtosis) without normalising by the variance. All concrete unstandardised high-order moment risk measure algorithms should subtype `UnstandardisedHighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
+
+# Related Types
+
+  - [`ThirdLowerMoment`](@ref)
+  - [`FourthLowerMoment`](@ref)
+  - [`FourthCentralMoment`](@ref)
+"""
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
-abstract type StandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
+"""
+    struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+
+Represents the unstandardised semi-skewness risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the third lower moment (unstandardised semi-skewness), which quantifies downside asymmetry by considering only the cubed deviations below a target value. This algorithm is unstandardised and operates directly on the return distribution.
+
+# Related
+
+  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMoment`](@ref)
+"""
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+"""
+    struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+
+Represents the unstandardised semi-kurtosis risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the fourth lower moment (unstandardised semi-kurtosis), which quantifies downside tail risk by considering only the quartic deviations below a target value. This algorithm is unstandardised and operates directly on the return distribution.
+
+# Related
+
+  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMoment`](@ref)
+"""
 struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+"""
+    struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+
+Represents the unstandardised kurtosis risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using the fourth central moment (unstandardised kurtosis), which quantifies tail risk by considering all quartic deviations from a target value. This algorithm is unstandardised and operates directly on the return distribution.
+
+# Related
+
+  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`HighOrderMoment`](@ref)
+"""
 struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
-struct StandardisedHighOrderMoment{T1, T2} <: StandardisedHighOrderMomentMeasureAlgorithm
+"""
+    struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
+        ve::T1
+        alg::T2
+    end
+
+Represents a standardised high-order moment risk measure algorithm in PortfolioOptimisers.jl.
+
+Computes portfolio risk using a high-order moment algorithm (such as semi-skewness or semi-kurtosis), standardised by a variance estimator. This enables risk measures such as standardised semi-skewness or standardised semi-kurtosis, which normalise the risk by the portfolio variance.
+
+# Fields
+
+  - `ve`: Variance estimator used for standardisation.
+  - `alg`: Unstandardised high-order moment algorithm used to compute the risk measure.
+
+# Constructors
+
+    StandardisedHighOrderMoment(;
+                                ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+                                alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> StandardisedHighOrderMoment()
+StandardisedHighOrderMoment
+   ve | SimpleVariance
+      |          me | nothing
+      |           w | nothing
+      |   corrected | Bool: true
+  alg | ThirdLowerMoment()
+```
+
+# Related
+
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`ThirdLowerMoment`](@ref)
+  - [`FourthLowerMoment`](@ref)
+  - [`FourthCentralMoment`](@ref)
+"""
+struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
     ve::T1
     alg::T2
     function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
@@ -69,6 +384,177 @@ for alg in (StandardisedLowOrderMoment, StandardisedHighOrderMoment)
              end
          end)
 end
+"""
+    struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
+        settings::T1
+        w::T2
+        mu::T3
+        alg::T4
+    end
+
+Represents a low-order moment risk measure in PortfolioOptimisers.jl.
+
+Computes portfolio risk using a low-order moment algorithm (such as first lower moment, mean absolute deviation, or second moment), optionally with custom weights and target values. This type is used for risk measures based on mean, variance, or related statistics.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `w`: Optional vector of observation weights.
+  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `alg`: Low-order moment risk measure algorithm.
+
+# Constructors
+
+    LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                   w::Union{Nothing, <:AbstractWeights} = nothing,
+                   mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                   alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Real`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+# `JuMP` Formulations
+
+Depending on the `alg` field, the risk measure is formulated using `JuMP` as follows:
+
+## `FirstLowerMoment`
+
+The first lower moment is computed as:
+
+```math
+\\begin{align}
+\\mathrm{FirstLowerMoment}(\\boldsymbol{R},\\, \\tau) &= \\mathbb{E}\\left[\\max\\left(\\tau - \\boldsymbol{R},\\, 0\\right)\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+
+As an optimisation problem, it can be formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
+  - ``\\mathrm{R}``: `T×N` return matrix.
+  - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+
+## `MeanAbsoluteDeviation`
+
+The mean absolute deviation is computed as:
+
+```math
+\\begin{align}
+\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{R}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right] \\right\\rvert\\right]
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+
+As an optimisation problem, it can be formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
+  - ``\\mathrm{R}``: `T×N` return matrix.
+  - ``\\tau``: minimum acceptable return.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+
+## `StandardisedLowOrderMoment`
+
+Depending on the `alg` field the risk measure can either compute the second central moment or second lower moment.
+
+!!! info
+
+    Regardless of the formulation used, an auxiliary variable representing the square root of the central/lower moment is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
+
+Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments, they can be formulated in a variety of ways.
+
+### `SecondCentralMoment`
+
+#### `SquaredSOCRiskExpr`
+
+#### `RSOCRiskExpr`
+
+#### `QuadRiskExpr`
+
+#### `SOCRiskExpr`
+
+### `SecondLowerMoment`
+
+#### `SquaredSOCRiskExpr`
+
+#### `RSOCRiskExpr`
+
+#### `QuadRiskExpr`
+
+#### `SOCRiskExpr`
+
+### `JuMP` Formulations
+
+# Functor
+
+    (r::LowOrderMoment)(w::AbstractVector, X::AbstractMatrix;
+                        fees::Union{Nothing, <:Fees} = nothing)
+
+Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+
+# Examples
+
+```jldoctest
+julia> LowOrderMoment()
+LowOrderMoment
+  settings | RiskMeasureSettings
+           |   scale | Float64: 1.0
+           |      ub | nothing
+           |     rke | Bool: true
+         w | nothing
+        mu | nothing
+       alg | FirstLowerMoment()
+```
+
+# Related
+
+  - [`RiskMeasureSettings`](@ref)
+  - [`LowOrderMomentMeasureAlgorithm`](@ref)
+  - [`FirstLowerMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`SecondLowerMoment`](@ref)
+  - [`SecondCentralMoment`](@ref)
+  - [`StandardisedLowOrderMoment`](@ref)
+"""
 struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     w::T2
@@ -76,8 +562,8 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     alg::T4
     function LowOrderMoment(settings::RiskMeasureSettings,
                             w::Union{Nothing, <:AbstractWeights},
-                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                            alg::LowOrderMomentMeasureAlgorithm)
+                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                      <:VecScalar}, alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
             @argcheck(!isempty(mu) && all(isfinite, mu))
         elseif isa(mu, Real)
@@ -92,10 +578,77 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Union{Nothing, <:AbstractWeights} = nothing,
-                        mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                        mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
+"""
+    struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
+        settings::T1
+        w::T2
+        mu::T3
+        alg::T4
+    end
+
+Represents a high-order moment risk measure in PortfolioOptimisers.jl.
+
+Computes portfolio risk using a high-order moment algorithm (such as semi-skewness, semi-kurtosis, or kurtosis), optionally with custom weights and target values. This type is used for risk measures based on third or fourth moments of the return distribution.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `w`: Optional vector of observation weights.
+  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `alg`: High-order moment risk measure algorithm.
+
+# Constructors
+
+    HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                    w::Union{Nothing, <:AbstractWeights} = nothing,
+                    mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                    alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Real`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+# Functor
+
+    (r::HighOrderMoment)(w::AbstractVector, X::AbstractMatrix;
+                        fees::Union{Nothing, <:Fees} = nothing)
+
+Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+
+# Examples
+
+```jldoctest
+julia> HighOrderMoment()
+HighOrderMoment
+  settings | RiskMeasureSettings
+           |   scale | Float64: 1.0
+           |      ub | nothing
+           |     rke | Bool: true
+         w | nothing
+        mu | nothing
+       alg | ThirdLowerMoment()
+```
+
+# Related
+
+  - [`RiskMeasureSettings`](@ref)
+  - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`ThirdLowerMoment`](@ref)
+  - [`FourthLowerMoment`](@ref)
+  - [`FourthCentralMoment`](@ref)
+  - [`StandardisedHighOrderMoment`](@ref)
+"""
 struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
@@ -103,8 +656,8 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     alg::T4
     function HighOrderMoment(settings::RiskMeasureSettings,
                              w::Union{Nothing, <:AbstractWeights},
-                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                             alg::HighOrderMomentMeasureAlgorithm)
+                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                       <:VecScalar}, alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
             @argcheck(!isempty(mu) && all(isfinite, mu))
         elseif isa(mu, Real)
@@ -119,7 +672,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Union{Nothing, <:AbstractWeights} = nothing,
-                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
@@ -139,6 +692,11 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVe
                                      <:HighOrderMoment{<:Any, <:Any, <:AbstractVector,
                                                        <:Any}}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
+end
+function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+                                     <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
+                            w::AbstractVector, ::Any)
+    return dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any,

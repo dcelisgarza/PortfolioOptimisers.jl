@@ -26,7 +26,35 @@ abstract type VarianceFormulation <: SecondMomentFormulation end
 """
     struct QuadRiskExpr <: VarianceFormulation end
 
-Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form `w' * Σ * w`.
+Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form. This can be in two ways.
+
+# Summary statistics
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` co-moment matrix.
+
+# Scenario-based
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
+\\textrm{s.t.} &\\qquad \\boldsymbol{d} \\in \\mathcal{S}_{x}.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` deviations vector.
+  - ``\\mathcal{S}_{x}``: Scenario set for portfolio `x`.
 
 # Related Types
 
@@ -89,7 +117,7 @@ Represents the portfolio variance using a covariance matrix.
 # Fields
 
   - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector of weights.
+  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
   - `rc`: Optional specification of risk contribution constraints.
   - `alg`: The optimisation formulation used to represent the variance risk expression.
 
@@ -106,6 +134,43 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
+# `JuMP` Formulations
+
+!!! info
+
+    Regardless of the formulation used, an auxiliary variable representing the standard deviation is needed in order to constrain the risk or maximise the risk-adjusted return ratio. This is because quadratic constraints are not strictly convex, and the transformation needed to maximise the risk-adjusted return ratio requires affine variables in the numerator and denominator.
+
+Depending on the `alg` field, the variance risk measure is formulated using `JuMP` as follows:
+
+## `QuadRiskExpr`
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+
+## `SquaredSOCRiskExpr`
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\sigma^2\\nonumber\\\\
+\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{x} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
+  - ``\\mathbf{G}``: Suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+
 # Functor
 
     (r::Variance)(w::AbstractVector)
@@ -114,18 +179,18 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{Variance}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: is the `N×1` vector of weights.
-  - ``\\mathbf{\\Sigma}``: is the `N×N` covariance matrix.
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## Arguments
 
-  - `w::AbstractVector`: Portfolio weights.
+  - `w::AbstractVector`: Asset weights.
 
 # Examples
 
@@ -233,7 +298,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 # Fields
 
   - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector of weights.
+  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
 
 # Constructors
 
@@ -246,6 +311,22 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
+## `JuMP` Formulation
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\sigma\\nonumber\\\\
+\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{x} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
+  - ``\\mathbf{G}``: Suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+
 # Functor
 
     (r::StandardDeviation)(w::AbstractVector)
@@ -254,18 +335,18 @@ Computes the standard deviation risk of a portfolio with weights `w` using the c
 
 ```math
 \\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: is the `N×1` vector of weights.
-  - ``\\mathbf{\\Sigma}``: is the `N×N` covariance matrix.
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## Arguments
 
-  - `w::AbstractVector`: Portfolio weights.
+  - `w::AbstractVector`: Asset weights.
 
 # Examples
 
@@ -355,7 +436,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
   - `settings`: Risk measure configuration.
   - `ucs`: Uncertainty set estimator or result that defines the uncertainty model for the variance calculation.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector of weights.
+  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
 
 # Constructors
 
@@ -370,6 +451,83 @@ Keyword arguments correspond to the fields above.
 
   - If `sigma` is provided, `!isempty(sigma)`.
 
+# `JuMP` Formulations
+
+When using an uncertainty set on the variance, the optimisation problem becomes:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
+
+This problem can be reformulated depending on the type of uncertainty set used.
+
+## Box uncertainty set
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left(\\mathbf{A}_u \\mathbf{\\Sigma}_u\\right) - \\mathrm{Tr}\\left(\\mathbf{A}_l \\mathbf{\\Sigma}_l\\right)\\\\
+\\textrm{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
+               & \\quad \\mathbf{A}_l \\geq 0\\\\
+               & \\quad \\begin{bmatrix}
+                            \\mathbf{X} & \\boldsymbol{x}\\\\
+                            \\boldsymbol{x}^\\intercal & k
+                        \\end{bmatrix} \\succeq 0 \\\\
+               & \\quad \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{X}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+
+  - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{X}``: `N×N` auxiliary symmetric matrices.
+  - ``\\mathbf{\\Sigma}_l``: `N×N` lower bound of the covariance matrix.
+  - ``\\mathbf{\\Sigma}_u``: `N×N` upper bound of the covariance matrix.
+  - ``k``: Scalar variable/constant.
+
+      + If the objective risk-adjusted return, it is a non-negative variable.
+      + Else it is equal to 1.
+  - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
+
+## Ellipse uncertainty set
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{X} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
+\\textrm{s.t.} & \\quad \\begin{bmatrix}
+                            \\mathbf{X} & \\boldsymbol{x}\\\\
+                            \\boldsymbol{x}^\\intercal & k
+                        \\end{bmatrix} \\succeq 0 \\\\
+               & \\quad \\mathbf{E} \\succeq 0 \\\\
+               & \\quad \\lVert \\mathbf{G} \\mathrm{vec}\\left( \\mathbf{X} + \\mathbf{E} \\right) \\rVert_{2} \\leq \\sigma \\\\
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+
+  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+  - ``\\mathbf{X}``, ``\\mathbf{E}``: `N×N` auxiliary symmetric matrices.
+  - ``k_{\\mathbf{\\Sigma}}``: Scalar constant defining the size of the uncertainty set.
+  - ``\\sigma``: Variable representing the portfolio's variance of the variance.
+  - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
+  - ``k``: Scalar variable/constant.
+
+      + If the objective risk-adjusted return, it is a non-negative variable.
+      + Else it is equal to 1.
+  - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
+  - ``\\mathrm{vec}(\\cdot)``: Vectorisation operator, which unrolls a matrix as a column vector in column-major order.
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+
 # Functor
 
     (r::UncertaintySetVariance)(w::AbstractVector)
@@ -378,20 +536,18 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 ```math
 \\begin{align}
-\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\mathrm{UncertaintySetVariance}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{w}``: is the `N×1` vector of weights.
-  - ``\\mathbf{\\Sigma}``: is the `N×N` covariance matrix.
+  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## Arguments
 
-  - `w::AbstractVector`: Portfolio weights.
-
-# Examples
+  - `w::AbstractVector`: Asset weights.
 
 # Examples
 

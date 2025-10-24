@@ -1,6 +1,7 @@
 # Tools
 
 ```@docs
+VecScalar
 brinson_attribution
 traverse_concrete_subtypes
 PortfolioOptimisers.AbstractReturnsResult
