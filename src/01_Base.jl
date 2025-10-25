@@ -65,6 +65,7 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
+#=
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
@@ -108,6 +109,57 @@ function Base.show(io::IO,
             println(io, "| $(tval): ", val)
         else
             println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+    return nothing
+end
+=#
+function Base.show(io::IO,
+                   ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                              <:AbstractCovarianceEstimator})
+    fields = propertynames(ear)
+    if isempty(fields)
+        return println(io, string(typeof(ear), "()"))
+    end
+    name = Base.typename(typeof(ear)).wrapper
+    println(io, name)
+    padding = maximum(map(length, map(string, fields))) + 2
+    for (i, field) in enumerate(fields)
+        if hasproperty(ear, field)
+            val = getproperty(ear, field)
+        else
+            continue
+        end
+        flag = isa(val,
+                   Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                         <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
+        sym = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
+                     '└', '├')
+        print(io, lpad(string(field), padding), " ")
+        if isnothing(val)
+            println(io, "$(sym) nothing")
+        elseif isa(val, AbstractMatrix)
+            println(io, "$(sym) $(size(val,1))×$(size(val,2)) $(typeof(val))")
+        elseif isa(val, AbstractVector) && length(val) > 6
+            println(io, "$(sym) $(length(val))-element $(typeof(val))")
+        elseif flag
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "$(sym) ", alglines[1])
+            for l in alglines[2:end]
+                if isempty(l) || l == '\n'
+                    continue
+                end
+                println(io, lpad("│ ", padding + 3), l)
+            end
+        elseif isa(val, DataType)
+            tval = typeof(val)
+            val = Base.typename(tval).wrapper
+            println(io, "$(sym) $(tval): ", val)
+        else
+            println(io, "$(sym) $(typeof(val)): ", repr(val))
         end
     end
     return nothing
