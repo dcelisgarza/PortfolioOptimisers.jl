@@ -229,9 +229,9 @@ Return-based risk measure.
 ```jldoctest
 julia> ReturnRiskMeasure()
 ReturnRiskMeasure
-  rt | ArithmeticReturn
-     |   ucs | nothing
-     |    lb | nothing
+  rt ├ ArithmeticReturn
+     │   ucs ├ nothing
+     │    lb └ nothing
 ```
 
 # Related
@@ -315,18 +315,18 @@ Ratio-based risk measure.
 ```jldoctest
 julia> RatioRiskMeasure()
 RatioRiskMeasure
-  rt | ArithmeticReturn
-     |   ucs | nothing
-     |    lb | nothing
-  rk | Variance
-     |   settings | RiskMeasureSettings
-     |            |   scale | Float64: 1.0
-     |            |      ub | nothing
-     |            |     rke | Bool: true
-     |      sigma | nothing
-     |         rc | nothing
-     |        alg | SquaredSOCRiskExpr()
-  rf | Float64: 0.0
+  rt ├ ArithmeticReturn
+     │   ucs ├ nothing
+     │    lb └ nothing
+  rk ├ Variance
+     │   settings ├ RiskMeasureSettings
+     │            │   scale ├ Float64: 1.0
+     │            │      ub ├ nothing
+     │            │     rke └ Bool: true
+     │      sigma ├ nothing
+     │         rc ├ nothing
+     │        alg └ SquaredSOCRiskExpr()
+  rf └ Float64: 0.0
 ```
 
 # Related

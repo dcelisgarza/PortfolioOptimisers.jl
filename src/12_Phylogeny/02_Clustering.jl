@@ -176,7 +176,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedSilhouetteScore()
 StandardisedSilhouetteScore
-  metric | nothing
+  metric └ nothing
 ```
 
 # Related
@@ -227,8 +227,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> OptimalNumberClusters(; max_k = 10)
 OptimalNumberClusters
-  max_k | Int64: 10
-    alg | SecondOrderDifference()
+  max_k ├ Int64: 10
+    alg └ SecondOrderDifference()
 ```
 
 # Related
@@ -282,7 +282,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> HClustAlgorithm(; linkage = :average)
 HClustAlgorithm
-  linkage | Symbol: :average
+  linkage └ Symbol: :average
 ```
 
 # Related
@@ -332,28 +332,28 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ClusteringEstimator()
 ClusteringEstimator
-   ce | PortfolioOptimisersCovariance
-      |   ce | Covariance
-      |      |    me | SimpleExpectedReturns
-      |      |       |   w | nothing
-      |      |    ce | GeneralCovariance
-      |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      |      |       |    w | nothing
-      |      |   alg | Full()
-      |   mp | DefaultMatrixProcessing
-      |      |       pdm | Posdef
-      |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |      |   denoise | nothing
-      |      |    detone | nothing
-      |      |       alg | nothing
-   de | Distance
-      |   power | nothing
-      |     alg | CanonicalDistance()
-  alg | HClustAlgorithm
-      |   linkage | Symbol: :ward
-  onc | OptimalNumberClusters
-      |   max_k | nothing
-      |     alg | SecondOrderDifference()
+   ce ├ PortfolioOptimisersCovariance
+      │   ce ├ Covariance
+      │      │    me ├ SimpleExpectedReturns
+      │      │       │   w └ nothing
+      │      │    ce ├ GeneralCovariance
+      │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w └ nothing
+      │      │   alg └ Full()
+      │   mp ├ DefaultMatrixProcessing
+      │      │       pdm ├ Posdef
+      │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+      │      │   denoise ├ nothing
+      │      │    detone ├ nothing
+      │      │       alg └ nothing
+   de ├ Distance
+      │   power ├ nothing
+      │     alg └ CanonicalDistance()
+  alg ├ HClustAlgorithm
+      │   linkage └ Symbol: :ward
+  onc ├ OptimalNumberClusters
+      │   max_k ├ nothing
+      │     alg └ SecondOrderDifference()
 ```
 
 # Related

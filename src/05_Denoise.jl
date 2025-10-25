@@ -36,7 +36,7 @@ A denoising algorithm that sets the smallest `num_factors` eigenvalues of a cova
 # Examples
 
 ```jldoctest
-julia> alg = SpectralDenoise()
+julia> SpectralDenoise()
 SpectralDenoise()
 ```
 
@@ -55,7 +55,7 @@ A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a 
 # Examples
 
 ```jldoctest
-julia> alg = FixedDenoise()
+julia> FixedDenoise()
 FixedDenoise()
 ```
 
@@ -90,9 +90,9 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> alg = ShrunkDenoise(; alpha = 0.5)
+julia> ShrunkDenoise(; alpha = 0.5)
 ShrunkDenoise
-  alpha | Float64: 0.5
+  alpha └ Float64: 0.5
 ```
 
 # Related
@@ -148,24 +148,24 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> de = Denoise(;)
+julia> Denoise(;)
 Denoise
-     alg | ShrunkDenoise
-         |   alpha | Float64: 0.0
-    args | Tuple{}: ()
-  kwargs | @NamedTuple{}: NamedTuple()
-  kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-       m | Int64: 10
-       n | Int64: 1000
+     alg ├ ShrunkDenoise
+         │   alpha └ Float64: 0.0
+    args ├ Tuple{}: ()
+  kwargs ├ @NamedTuple{}: NamedTuple()
+  kernel ├ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+       m ├ Int64: 10
+       n └ Int64: 1000
 
-julia> de = Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
+julia> Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
 Denoise
-     alg | SpectralDenoise()
-    args | Tuple{}: ()
-  kwargs | @NamedTuple{}: NamedTuple()
-  kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-       m | Int64: 20
-       n | Int64: 500
+     alg ├ SpectralDenoise()
+    args ├ Tuple{}: ()
+  kwargs ├ @NamedTuple{}: NamedTuple()
+  kernel ├ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+       m ├ Int64: 20
+       n └ Int64: 500
 ```
 
 # Related

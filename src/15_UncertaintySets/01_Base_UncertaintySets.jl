@@ -312,8 +312,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BoxUncertaintySet(; lb = [0.1, 0.2], ub = [0.3, 0.4])
 BoxUncertaintySet
-  lb | Vector{Float64}: [0.1, 0.2]
-  ub | Vector{Float64}: [0.3, 0.4]
+  lb ├ Vector{Float64}: [0.1, 0.2]
+  ub └ Vector{Float64}: [0.3, 0.4]
 ```
 
 # Related
@@ -368,7 +368,7 @@ Keyword arguments correspond to the field above.
 ```jldoctest
 julia> NormalKUncertaintyAlgorithm()
 NormalKUncertaintyAlgorithm
-  kwargs | @NamedTuple{}: NamedTuple()
+  kwargs └ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -494,8 +494,8 @@ Ellipse uncertainty sets model uncertainty by specifying an ellipsoidal region f
 ```jldoctest
 julia> EllipseUncertaintySetAlgorithm()
 EllipseUncertaintySetAlgorithm
-    method | ChiSqKUncertaintyAlgorithm()
-  diagonal | Bool: true
+    method ├ ChiSqKUncertaintyAlgorithm()
+  diagonal └ Bool: true
 ```
 
 # Related
@@ -592,9 +592,9 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> EllipseUncertaintySet([1.0 0.2; 0.2 1.0], 2.5, SigmaEllipseUncertaintySet())
 EllipseUncertaintySet
-  sigma | 2×2 Matrix{Float64}
-      k | Float64: 2.5
-  class | SigmaEllipseUncertaintySet()
+  sigma ├ 2×2 Matrix{Float64}
+      k ├ Float64: 2.5
+  class └ SigmaEllipseUncertaintySet()
 ```
 
 # Related

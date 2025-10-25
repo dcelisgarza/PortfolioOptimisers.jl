@@ -49,53 +49,53 @@ julia> BlackLittermanPrior(; sets = AssetSets(; key = "nx", dict = Dict("nx" => 
                            views = LinearConstraintEstimator(;
                                                              val = ["A == 0.03", "B + C == 0.04"]))
 BlackLittermanPrior
-          pe | EmpiricalPrior
-             |        ce | PortfolioOptimisersCovariance
-             |           |   ce | Covariance
-             |           |      |    me | SimpleExpectedReturns
-             |           |      |       |   w | nothing
-             |           |      |    ce | GeneralCovariance
-             |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             |           |      |       |    w | nothing
-             |           |      |   alg | Full()
-             |           |   mp | DefaultMatrixProcessing
-             |           |      |       pdm | Posdef
-             |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-             |           |      |   denoise | nothing
-             |           |      |    detone | nothing
-             |           |      |       alg | nothing
-             |        me | EquilibriumExpectedReturns
-             |           |   ce | PortfolioOptimisersCovariance
-             |           |      |   ce | Covariance
-             |           |      |      |    me | SimpleExpectedReturns
-             |           |      |      |       |   w | nothing
-             |           |      |      |    ce | GeneralCovariance
-             |           |      |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             |           |      |      |       |    w | nothing
-             |           |      |      |   alg | Full()
-             |           |      |   mp | DefaultMatrixProcessing
-             |           |      |      |       pdm | Posdef
-             |           |      |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-             |           |      |      |   denoise | nothing
-             |           |      |      |    detone | nothing
-             |           |      |      |       alg | nothing
-             |           |    w | nothing
-             |           |    l | Int64: 1
-             |   horizon | nothing
-          mp | DefaultMatrixProcessing
-             |       pdm | Posdef
-             |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-             |   denoise | nothing
-             |    detone | nothing
-             |       alg | nothing
-       views | LinearConstraintEstimator
-             |   val | Vector{String}: ["A == 0.03", "B + C == 0.04"]
-        sets | AssetSets
-             |    key | String: "nx"
-             |   dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-  views_conf | nothing
-          rf | Float64: 0.0
-         tau | nothing
+          pe ├ EmpiricalPrior
+             │        ce ├ PortfolioOptimisersCovariance
+             │           │   ce ├ Covariance
+             │           │      │    me ├ SimpleExpectedReturns
+             │           │      │       │   w └ nothing
+             │           │      │    ce ├ GeneralCovariance
+             │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    w └ nothing
+             │           │      │   alg └ Full()
+             │           │   mp ├ DefaultMatrixProcessing
+             │           │      │       pdm ├ Posdef
+             │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │   denoise ├ nothing
+             │           │      │    detone ├ nothing
+             │           │      │       alg └ nothing
+             │        me ├ EquilibriumExpectedReturns
+             │           │   ce ├ PortfolioOptimisersCovariance
+             │           │      │   ce ├ Covariance
+             │           │      │      │    me ├ SimpleExpectedReturns
+             │           │      │      │       │   w └ nothing
+             │           │      │      │    ce ├ GeneralCovariance
+             │           │      │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │      │       │    w └ nothing
+             │           │      │      │   alg └ Full()
+             │           │      │   mp ├ DefaultMatrixProcessing
+             │           │      │      │       pdm ├ Posdef
+             │           │      │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │      │   denoise ├ nothing
+             │           │      │      │    detone ├ nothing
+             │           │      │      │       alg └ nothing
+             │           │    w ├ nothing
+             │           │    l └ Int64: 1
+             │   horizon └ nothing
+          mp ├ DefaultMatrixProcessing
+             │       pdm ├ Posdef
+             │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+             │   denoise ├ nothing
+             │    detone ├ nothing
+             │       alg └ nothing
+       views ├ LinearConstraintEstimator
+             │   val └ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+        sets ├ AssetSets
+             │    key ├ String: "nx"
+             │   dict └ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+  views_conf ├ nothing
+          rf ├ Float64: 0.0
+         tau └ nothing
 ```
 
 # Related

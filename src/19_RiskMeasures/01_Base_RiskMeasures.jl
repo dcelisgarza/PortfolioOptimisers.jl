@@ -121,9 +121,9 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Frontier(; N = 15)
 Frontier
-       N | Int64: 15
-  factor | Int64: 1
-    flag | Bool: true
+       N ├ Int64: 15
+  factor ├ Int64: 1
+    flag └ Bool: true
 ```
 
 # Related
@@ -180,9 +180,9 @@ Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, 
 ```jldoctest
 julia> RiskMeasureSettings()
 RiskMeasureSettings
-  scale | Float64: 1.0
-     ub | nothing
-    rke | Bool: true
+  scale ├ Float64: 1.0
+     ub ├ nothing
+    rke └ Bool: true
 ```
 
 # Related
@@ -224,11 +224,7 @@ Used for `HierarchicalRiskMeasure`, where it is impossible to set a risk upper b
 
 # Constructors
 
-```julia
-julia> HierarchicalRiskMeasureSettings()
-HierarchicalRiskMeasureSettings
-  scale | Float64: 1.0
-```
+    HierarchicalRiskMeasureSettings()
 
 Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling factor.
 
@@ -241,7 +237,7 @@ Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling 
 ```jldoctest
 julia> HierarchicalRiskMeasureSettings()
 HierarchicalRiskMeasureSettings
-  scale | Float64: 1.0
+  scale └ Float64: 1.0
 ```
 
 # Related
@@ -389,7 +385,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> LogSumExpScalariser()
 LogSumExpScalariser
-  gamma | Float64: 1.0
+  gamma └ Float64: 1.0
 ```
 
 # Related

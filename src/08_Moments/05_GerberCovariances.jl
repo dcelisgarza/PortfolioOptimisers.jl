@@ -119,10 +119,10 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ng0 = StandardisedGerber0()
+julia> StandardisedGerber0()
 StandardisedGerber0
-  me | SimpleExpectedReturns
-     |   w | nothing
+  me ├ SimpleExpectedReturns
+     │   w └ nothing
 ```
 
 # Related
@@ -164,10 +164,10 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ng0 = StandardisedGerber1()
+julia> StandardisedGerber1()
 StandardisedGerber1
-  me | SimpleExpectedReturns
-     |   w | nothing
+  me ├ SimpleExpectedReturns
+     │   w └ nothing
 ```
 
 # Related
@@ -209,10 +209,10 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ng0 = StandardisedGerber2()
+julia> StandardisedGerber2()
 StandardisedGerber2
-  me | SimpleExpectedReturns
-     |   w | nothing
+  me ├ SimpleExpectedReturns
+     │   w └ nothing
 ```
 
 # Related

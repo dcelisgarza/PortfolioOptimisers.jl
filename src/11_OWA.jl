@@ -93,7 +93,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> NormalisedConstantRelativeRiskAversion()
 NormalisedConstantRelativeRiskAversion
-  g | Float64: 0.5
+  g └ Float64: 0.5
 ```
 
 # Related
@@ -153,16 +153,16 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> OWAJuMP()
 OWAJuMP
-      slv | Solver
-          |          name | String: ""
-          |        solver | nothing
-          |      settings | nothing
-          |     check_sol | @NamedTuple{}: NamedTuple()
-          |   add_bridges | Bool: true
-  max_phi | Float64: 0.5
-       sc | Float64: 1.0
-       so | Float64: 1.0
-      alg | MaximumEntropy()
+      slv ├ Solver
+          │          name ├ String: ""
+          │        solver ├ nothing
+          │      settings ├ nothing
+          │     check_sol ├ @NamedTuple{}: NamedTuple()
+          │   add_bridges └ Bool: true
+  max_phi ├ Float64: 0.5
+       sc ├ Float64: 1.0
+       so ├ Float64: 1.0
+      alg └ MaximumEntropy()
 ```
 
 # Related

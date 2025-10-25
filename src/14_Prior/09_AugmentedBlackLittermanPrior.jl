@@ -85,75 +85,75 @@ julia> AugmentedBlackLittermanPrior(;
                                                                         val = ["F1 == 0.01",
                                                                                "F2 == 0.02"]))
 AugmentedBlackLittermanPrior
-          a_pe | EmpiricalPrior
-               |        ce | PortfolioOptimisersCovariance
-               |           |   ce | Covariance
-               |           |      |    me | SimpleExpectedReturns
-               |           |      |       |   w | nothing
-               |           |      |    ce | GeneralCovariance
-               |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               |           |      |       |    w | nothing
-               |           |      |   alg | Full()
-               |           |   mp | DefaultMatrixProcessing
-               |           |      |       pdm | Posdef
-               |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-               |           |      |   denoise | nothing
-               |           |      |    detone | nothing
-               |           |      |       alg | nothing
-               |        me | SimpleExpectedReturns
-               |           |   w | nothing
-               |   horizon | nothing
-          f_pe | EmpiricalPrior
-               |        ce | PortfolioOptimisersCovariance
-               |           |   ce | Covariance
-               |           |      |    me | SimpleExpectedReturns
-               |           |      |       |   w | nothing
-               |           |      |    ce | GeneralCovariance
-               |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               |           |      |       |    w | nothing
-               |           |      |   alg | Full()
-               |           |   mp | DefaultMatrixProcessing
-               |           |      |       pdm | Posdef
-               |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-               |           |      |   denoise | nothing
-               |           |      |    detone | nothing
-               |           |      |       alg | nothing
-               |        me | SimpleExpectedReturns
-               |           |   w | nothing
-               |   horizon | nothing
-            mp | DefaultMatrixProcessing
-               |       pdm | Posdef
-               |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-               |   denoise | nothing
-               |    detone | nothing
-               |       alg | nothing
-            re | StepwiseRegression
-               |     crit | PValue
-               |          |   threshold | Float64: 0.05
-               |      alg | Forward()
-               |   target | LinearModel
-               |          |   kwargs | @NamedTuple{}: NamedTuple()
-            ve | SimpleVariance
-               |          me | SimpleExpectedReturns
-               |             |   w | nothing
-               |           w | nothing
-               |   corrected | Bool: true
-       a_views | LinearConstraintEstimator
-               |   val | Vector{String}: ["A == 0.03", "B + C == 0.04"]
-       f_views | LinearConstraintEstimator
-               |   val | Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
-        a_sets | AssetSets
-               |    key | String: "nx"
-               |   dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-        f_sets | AssetSets
-               |    key | String: "fx"
-               |   dict | Dict{String, Vector{String}}: Dict("fx" => ["F1", "F2"])
-  a_views_conf | nothing
-  f_views_conf | nothing
-             w | nothing
-            rf | Float64: 0.0
-             l | nothing
-           tau | nothing
+          a_pe ├ EmpiricalPrior
+               │        ce ├ PortfolioOptimisersCovariance
+               │           │   ce ├ Covariance
+               │           │      │    me ├ SimpleExpectedReturns
+               │           │      │       │   w └ nothing
+               │           │      │    ce ├ GeneralCovariance
+               │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │           │      │       │    w └ nothing
+               │           │      │   alg └ Full()
+               │           │   mp ├ DefaultMatrixProcessing
+               │           │      │       pdm ├ Posdef
+               │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │   denoise ├ nothing
+               │           │      │    detone ├ nothing
+               │           │      │       alg └ nothing
+               │        me ├ SimpleExpectedReturns
+               │           │   w └ nothing
+               │   horizon └ nothing
+          f_pe ├ EmpiricalPrior
+               │        ce ├ PortfolioOptimisersCovariance
+               │           │   ce ├ Covariance
+               │           │      │    me ├ SimpleExpectedReturns
+               │           │      │       │   w └ nothing
+               │           │      │    ce ├ GeneralCovariance
+               │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │           │      │       │    w └ nothing
+               │           │      │   alg └ Full()
+               │           │   mp ├ DefaultMatrixProcessing
+               │           │      │       pdm ├ Posdef
+               │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │   denoise ├ nothing
+               │           │      │    detone ├ nothing
+               │           │      │       alg └ nothing
+               │        me ├ SimpleExpectedReturns
+               │           │   w └ nothing
+               │   horizon └ nothing
+            mp ├ DefaultMatrixProcessing
+               │       pdm ├ Posdef
+               │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+               │   denoise ├ nothing
+               │    detone ├ nothing
+               │       alg └ nothing
+            re ├ StepwiseRegression
+               │     crit ├ PValue
+               │          │   threshold └ Float64: 0.05
+               │      alg ├ Forward()
+               │   target ├ LinearModel
+               │          │   kwargs └ @NamedTuple{}: NamedTuple()
+            ve ├ SimpleVariance
+               │          me ├ SimpleExpectedReturns
+               │             │   w └ nothing
+               │           w ├ nothing
+               │   corrected └ Bool: true
+       a_views ├ LinearConstraintEstimator
+               │   val └ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+       f_views ├ LinearConstraintEstimator
+               │   val └ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
+        a_sets ├ AssetSets
+               │    key ├ String: "nx"
+               │   dict └ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+        f_sets ├ AssetSets
+               │    key ├ String: "fx"
+               │   dict └ Dict{String, Vector{String}}: Dict("fx" => ["F1", "F2"])
+  a_views_conf ├ nothing
+  f_views_conf ├ nothing
+             w ├ nothing
+            rf ├ Float64: 0.0
+             l ├ nothing
+           tau └ nothing
 ```
 
 # Related

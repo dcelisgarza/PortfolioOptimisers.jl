@@ -32,9 +32,9 @@ Estimator for turnover portfolio constraints.
 ```jldoctest
 julia> TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2), default = 0.0)
 TurnoverEstimator
-        w | Vector{Float64}: [0.2, 0.3, 0.5]
-      val | Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  default | Float64: 0.0
+        w ├ Vector{Float64}: [0.2, 0.3, 0.5]
+      val ├ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+  default └ Float64: 0.0
 ```
 
 # Related
@@ -94,8 +94,8 @@ julia> tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1, "B" => 0.2), 0.0
 
 julia> turnover_constraints(tn, sets)
 Turnover
-    w | Vector{Float64}: [0.2, 0.3, 0.5]
-  val | Vector{Float64}: [0.1, 0.2, 0.0]
+    w ├ Vector{Float64}: [0.2, 0.3, 0.5]
+  val └ Vector{Float64}: [0.1, 0.2, 0.0]
 ```
 
 # Related
@@ -142,13 +142,13 @@ Container for turnover portfolio constraints.
 ```jldoctest
 julia> Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0])
 Turnover
-    w | Vector{Float64}: [0.2, 0.3, 0.5]
-  val | Vector{Float64}: [0.1, 0.2, 0.0]
+    w ├ Vector{Float64}: [0.2, 0.3, 0.5]
+  val └ Vector{Float64}: [0.1, 0.2, 0.0]
 
 julia> Turnover(; w = [0.2, 0.3, 0.5], val = 0.02)
 Turnover
-    w | Vector{Float64}: [0.2, 0.3, 0.5]
-  val | Float64: 0.02
+    w ├ Vector{Float64}: [0.2, 0.3, 0.5]
+  val └ Float64: 0.02
 ```
 
 # Related
@@ -204,8 +204,8 @@ julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
 
 julia> turnover_constraints(tn)
 Turnover
-    w | Vector{Float64}: [0.2, 0.3, 0.5]
-  val | Vector{Float64}: [0.1, 0.2, 0.0]
+    w ├ Vector{Float64}: [0.2, 0.3, 0.5]
+  val └ Vector{Float64}: [0.1, 0.2, 0.0]
 ```
 
 # Related

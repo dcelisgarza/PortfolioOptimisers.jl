@@ -135,7 +135,7 @@ function Base.show(io::IO,
                          <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
         sym1 = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
                       '└', '├')#┴ ┼ └ ├
-        # sym1 = ifelse(i == length(fields), '┴', '┼')
+        # sym1 = ifelse(i == length(fields), '└', '├')
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
             print(io, "$(sym1) nothing", '\n')

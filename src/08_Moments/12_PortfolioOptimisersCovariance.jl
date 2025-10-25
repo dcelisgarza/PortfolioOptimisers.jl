@@ -23,21 +23,21 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ce = PortfolioOptimisersCovariance()
+julia> PortfolioOptimisersCovariance()
 PortfolioOptimisersCovariance
-  ce | Covariance
-     |    me | SimpleExpectedReturns
-     |       |   w | nothing
-     |    ce | GeneralCovariance
-     |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     |       |    w | nothing
-     |   alg | Full()
-  mp | DefaultMatrixProcessing
-     |       pdm | Posdef
-     |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-     |   denoise | nothing
-     |    detone | nothing
-     |       alg | nothing
+  ce ├ Covariance
+     │    me ├ SimpleExpectedReturns
+     │       │   w └ nothing
+     │    ce ├ GeneralCovariance
+     │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │    w └ nothing
+     │   alg └ Full()
+  mp ├ DefaultMatrixProcessing
+     │       pdm ├ Posdef
+     │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+     │   denoise ├ nothing
+     │    detone ├ nothing
+     │       alg └ nothing
 ```
 
 # Related

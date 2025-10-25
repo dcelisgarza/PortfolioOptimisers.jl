@@ -98,7 +98,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 ```jldoctest
 julia> SOCTracking()
 SOCTracking
-  ddof | Int64: 1
+  ddof └ Int64: 1
 ```
 
 # Related
@@ -243,8 +243,8 @@ Asset weights-based tracking algorithm.
 ```jldoctest
 julia> WeightsTracking(; w = [0.5, 0.5])
 WeightsTracking
-  fees | nothing
-     w | Vector{Float64}: [0.5, 0.5]
+  fees ├ nothing
+     w └ Vector{Float64}: [0.5, 0.5]
 ```
 
 # Related
@@ -344,7 +344,7 @@ Returns-based tracking algorithm.
 ```jldoctest
 julia> ReturnsTracking(; w = [0.01, 0.02, 0.03])
 ReturnsTracking
-  w | Vector{Float64}: [0.01, 0.02, 0.03]
+  w └ Vector{Float64}: [0.01, 0.02, 0.03]
 ```
 
 # Related
@@ -440,12 +440,12 @@ julia> tracking = WeightsTracking(; w = [0.5, 0.5]);
 
 julia> TrackingError(; tracking = tracking, err = 0.01)
 TrackingError
-  tracking | WeightsTracking
-           |   fees | nothing
-           |      w | Vector{Float64}: [0.5, 0.5]
-       err | Float64: 0.01
-       alg | SOCTracking
-           |   ddof | Int64: 1
+  tracking ├ WeightsTracking
+           │   fees ├ nothing
+           │      w └ Vector{Float64}: [0.5, 0.5]
+       err ├ Float64: 0.01
+       alg ├ SOCTracking
+           │   ddof └ Int64: 1
 ```
 
 # Related

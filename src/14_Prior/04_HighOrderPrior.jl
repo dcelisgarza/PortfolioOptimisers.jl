@@ -361,44 +361,44 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> HighOrderPriorEstimator()
 HighOrderPriorEstimator
-   pe | EmpiricalPrior
-      |        ce | PortfolioOptimisersCovariance
-      |           |   ce | Covariance
-      |           |      |    me | SimpleExpectedReturns
-      |           |      |       |   w | nothing
-      |           |      |    ce | GeneralCovariance
-      |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      |           |      |       |    w | nothing
-      |           |      |   alg | Full()
-      |           |   mp | DefaultMatrixProcessing
-      |           |      |       pdm | Posdef
-      |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |           |      |   denoise | nothing
-      |           |      |    detone | nothing
-      |           |      |       alg | nothing
-      |        me | SimpleExpectedReturns
-      |           |   w | nothing
-      |   horizon | nothing
-  kte | Cokurtosis
-      |    me | SimpleExpectedReturns
-      |       |   w | nothing
-      |    mp | DefaultMatrixProcessing
-      |       |       pdm | Posdef
-      |       |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |       |   denoise | nothing
-      |       |    detone | nothing
-      |       |       alg | nothing
-      |   alg | Full()
-  ske | Coskewness
-      |    me | SimpleExpectedReturns
-      |       |   w | nothing
-      |    mp | DefaultMatrixProcessing
-      |       |       pdm | Posdef
-      |       |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |       |   denoise | nothing
-      |       |    detone | nothing
-      |       |       alg | nothing
-      |   alg | Full()
+   pe ├ EmpiricalPrior
+      │        ce ├ PortfolioOptimisersCovariance
+      │           │   ce ├ Covariance
+      │           │      │    me ├ SimpleExpectedReturns
+      │           │      │       │   w └ nothing
+      │           │      │    ce ├ GeneralCovariance
+      │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w └ nothing
+      │           │      │   alg └ Full()
+      │           │   mp ├ DefaultMatrixProcessing
+      │           │      │       pdm ├ Posdef
+      │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      │   denoise ├ nothing
+      │           │      │    detone ├ nothing
+      │           │      │       alg └ nothing
+      │        me ├ SimpleExpectedReturns
+      │           │   w └ nothing
+      │   horizon └ nothing
+  kte ├ Cokurtosis
+      │    me ├ SimpleExpectedReturns
+      │       │   w └ nothing
+      │    mp ├ DefaultMatrixProcessing
+      │       │       pdm ├ Posdef
+      │       │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+      │       │   denoise ├ nothing
+      │       │    detone ├ nothing
+      │       │       alg └ nothing
+      │   alg └ Full()
+  ske ├ Coskewness
+      │    me ├ SimpleExpectedReturns
+      │       │   w └ nothing
+      │    mp ├ DefaultMatrixProcessing
+      │       │       pdm ├ Posdef
+      │       │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
+      │       │   denoise ├ nothing
+      │       │    detone ├ nothing
+      │       │       alg └ nothing
+      │   alg └ Full()
 ```
 
 # Related

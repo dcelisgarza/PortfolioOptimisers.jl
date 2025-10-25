@@ -32,21 +32,21 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> using StatsBase
 
-julia> sv = SimpleVariance()
+julia> SimpleVariance()
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | nothing
-  corrected | Bool: true
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ nothing
+  corrected └ Bool: true
 
 julia> w = Weights([0.2, 0.3, 0.5]);
 
-julia> svw = SimpleVariance(; w = w, corrected = false)
+julia> SimpleVariance(; w = w, corrected = false)
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  corrected | Bool: false
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  corrected └ Bool: false
 ```
 
 # Related
@@ -102,10 +102,10 @@ This method computes the standard deviation of the input array `X` using the con
 ```jldoctest
 julia> sv = SimpleVariance()
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | nothing
-  corrected | Bool: true
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ nothing
+  corrected └ Bool: true
 
 julia> Xmat = [1.0 2.0; 3.0 4.0];
 
@@ -156,10 +156,10 @@ julia> using StatsBase
 
 julia> sv = SimpleVariance()
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | nothing
-  corrected | Bool: true
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ nothing
+  corrected └ Bool: true
 
 julia> X = [1.0, 2.0, 3.0];
 
@@ -170,10 +170,10 @@ julia> w = Weights([0.2, 0.3, 0.5]);
 
 julia> svw = SimpleVariance(; w = w, corrected = false)
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  corrected | Bool: false
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  corrected └ Bool: false
 
 julia> std(svw, X)
 0.7810249675906654
@@ -218,10 +218,10 @@ This method computes the variance of the input array `X` using the configuration
 ```jldoctest
 julia> sv = SimpleVariance()
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | nothing
-  corrected | Bool: true
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ nothing
+  corrected └ Bool: true
 
 julia> Xmat = [1.0 2.0; 3.0 4.0];
 
@@ -271,10 +271,10 @@ julia> using StatsBase
 
 julia> sv = SimpleVariance()
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | nothing
-  corrected | Bool: true
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ nothing
+  corrected └ Bool: true
 
 julia> X = [1.0, 2.0, 3.0];
 
@@ -285,10 +285,10 @@ julia> w = Weights([0.2, 0.3, 0.5]);
 
 julia> svw = SimpleVariance(; w = w, corrected = false)
 SimpleVariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-          w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  corrected | Bool: false
+         me ├ SimpleExpectedReturns
+            │   w └ nothing
+          w ├ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  corrected └ Bool: false
 
 julia> var(svw, X)
 0.61

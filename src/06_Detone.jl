@@ -36,9 +36,9 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> dt = Detone(; n = 2)
+julia> Detone(; n = 2)
 Detone
-  n | Int64: 2
+  n └ Int64: 2
 ```
 
 # Related
