@@ -676,28 +676,103 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
+"""
+    calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
+                               <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
+                       ::Any, x::AbstractVector)
+
+Compute the target value for moment calculations when neither a target value (`mu`) nor observation weights are provided in the risk measure.
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with both `w` and `mu` fields set to `nothing`.
+  - `_`: Unused argument (typically asset weights, ignored in this method).
+  - `x`: Returns vector.
+
+# Returns
+
+  - `target::eltype(x)`: The mean of the returns vector.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
                                     <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
                             ::Any, x::AbstractVector)
     return mean(x)
 end
+"""
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
+                                <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any}},
+                       ::Any, x::AbstractVector)
+
+Compute the target value for moment calculations when the risk measure provides an observation weights vector but no explicit target value (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `w` set to an observation weights vector and `mu` set to `nothing`.
+  - `_`: Unused argument (typically asset weights, ignored in this method).
+  - `x`: Returns vector.
+
+# Returns
+
+  - `target::eltype(x)`: The weighted mean of the returns vector, using the observation weights from `r.w`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing,
                                                       <:Any},
                                      <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing,
                                                        <:Any}}, ::Any, x::AbstractVector)
     return mean(x, r.w)
 end
+"""
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVector, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:AbstractVector, <:Any}},
+                       w::AbstractVector, ::Any)
+
+Compute the target value for moment calculations when the risk measure provides an explicit expected returns vector (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to an expected returns vector.
+  - `w`: Asset weights vector.
+  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+
+# Returns
+
+  - `target::eltype(w)`: The dot product of the asset weights and the expected returns vector.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVector,
                                                       <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:AbstractVector,
                                                        <:Any}}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
+"""
+Computes the target value for moment calculations based on the provided risk measure. The mu value is a `VecScalar` structure which includes an expected returns vector plus a scalar value, so the target is the dot product of the asset weights and expected returns plus the scalar value.
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
                             w::AbstractVector, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
+"""
+Computes the target value for moment calculations based on the provided risk measure. The mu value is a scalar value, so the target is the value itself.
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any,
                             ::Any)
