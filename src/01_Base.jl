@@ -71,10 +71,10 @@ function Base.show(io::IO,
                               <:AbstractCovarianceEstimator})
     fields = propertynames(ear)
     if isempty(fields)
-        return println(io, string(typeof(ear), "()"))
+        return print(io, string(typeof(ear), "()"),'\n')
     end
     name = Base.typename(typeof(ear)).wrapper
-    println(io, name)
+    print(io, name,'\n')
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
         if hasproperty(ear, field)
@@ -84,31 +84,31 @@ function Base.show(io::IO,
         end
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
-            println(io, "| nothing")
+            print(io, "| nothing",'\n')
         elseif isa(val, AbstractMatrix)
-            println(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))")
+            print(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))",'\n')
         elseif isa(val, AbstractVector) && length(val) > 6
-            println(io, "| $(length(val))-element $(typeof(val))")
+            print(io, "| $(length(val))-element $(typeof(val))",'\n')
         elseif isa(val,
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                          <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
             ioalg = IOBuffer()
-            show(ioalg, val)
+            print(ioalg, val,'\n')
             algstr = String(take!(ioalg))
             alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
+            print(io, "| ", alglines[1],'\n')
             for l in alglines[2:end]
                 if isempty(l) || l == '\n'
                     continue
                 end
-                println(io, lpad("| ", padding + 3), l)
+                print(io, lpad("| ", padding + 3), l,'\n')
             end
         elseif isa(val, DataType)
             tval = typeof(val)
             val = Base.typename(tval).wrapper
-            println(io, "| $(tval): ", val)
+            print(io, "| $(tval): ", val,'\n')
         else
-            println(io, "| $(typeof(val)): ", repr(val))
+            print(io, "| $(typeof(val)): ", repr(val),'\n')
         end
     end
     return nothing
@@ -119,10 +119,10 @@ function Base.show(io::IO,
                               <:AbstractCovarianceEstimator})
     fields = propertynames(ear)
     if isempty(fields)
-        return println(io, string(typeof(ear), "()"))
+        return print(io, string(typeof(ear), "()"), '\n')
     end
     name = Base.typename(typeof(ear)).wrapper
-    println(io, name)
+    print(io, name, '\n')
     padding = maximum(map(length, map(string, fields))) + 2
     for (i, field) in enumerate(fields)
         if hasproperty(ear, field)
@@ -133,33 +133,36 @@ function Base.show(io::IO,
         flag = isa(val,
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                          <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
-        sym = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
-                     '└', '├')
+        sym1 = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
+                      '└', '├')#┴ ┼ └ ├
+        # sym1 = ifelse(i == length(fields), '┴', '┼')
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
-            println(io, "$(sym) nothing")
+            print(io, "$(sym1) nothing", '\n')
         elseif isa(val, AbstractMatrix)
-            println(io, "$(sym) $(size(val,1))×$(size(val,2)) $(typeof(val))")
+            print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
         elseif isa(val, AbstractVector) && length(val) > 6
-            println(io, "$(sym) $(length(val))-element $(typeof(val))")
+            print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
         elseif flag
             ioalg = IOBuffer()
             show(ioalg, val)
             algstr = String(take!(ioalg))
             alglines = split(algstr, '\n')
-            println(io, "$(sym) ", alglines[1])
+            print(io, "$(sym1) ", alglines[1], '\n')
             for l in alglines[2:end]
                 if isempty(l) || l == '\n'
                     continue
                 end
-                println(io, lpad("│ ", padding + 3), l)
+                # sym2 = ifelse(i == length(fields), ' ', '│')
+                sym2 = '│'
+                print(io, lpad("$sym2 ", padding + 3), l, '\n')
             end
         elseif isa(val, DataType)
             tval = typeof(val)
             val = Base.typename(tval).wrapper
-            println(io, "$(sym) $(tval): ", val)
+            print(io, "$(sym1) $(tval): ", val, '\n')
         else
-            println(io, "$(sym) $(typeof(val)): ", repr(val))
+            print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
         end
     end
     return nothing
