@@ -504,23 +504,43 @@ Both central and lower moments can be formulated as quadratic moments (variance 
 
 ### `SecondCentralMoment`
 
+Depending on the `alg` field, it can represent the variance (using different formulations) or standard deviation.
+
 #### `SquaredSOCRiskExpr`
+
+Represents the variance using the square of a second order cone constrained variable.
 
 #### `RSOCRiskExpr`
 
+Represents the variance using a sum of squares formulation via a rotated second order cone.
+
 #### `QuadRiskExpr`
 
+Represents the variance using the deviations vector dotted with itself.
+
 #### `SOCRiskExpr`
+
+Represents the standard deviation using a second order cone constrained variable.
 
 ### `SecondLowerMoment`
 
+Depending on the `alg` field, it can represent the semi-variance (using different formulations) or semi-standard deviation.
+
 #### `SquaredSOCRiskExpr`
+
+Represents the semi-variance using the square of a second order cone constrained variable.
 
 #### `RSOCRiskExpr`
 
+Represents the semi-variance using a sum of squares formulation via a rotated second order cone.
+
 #### `QuadRiskExpr`
 
+Represents the semi-variance using the deviations vector dotted with itself.
+
 #### `SOCRiskExpr`
+
+Represents the semi-standard deviation using a second order cone constrained variable.
 
 ### `JuMP` Formulations
 
@@ -763,7 +783,28 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVe
     return dot(w, r.mu)
 end
 """
-Computes the target value for moment calculations based on the provided risk measure. The mu value is a `VecScalar` structure which includes an expected returns vector plus a scalar value, so the target is the dot product of the asset weights and expected returns plus the scalar value.
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
+                       w::AbstractVector, ::Any)
+
+Compute the target value for moment calculations when the risk measure provides a `VecScalar` as the expected returns (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to a `VecScalar` (an object with fields `v` for the expected returns vector and `s` for a scalar offset).
+  - `w`: Asset weights vector.
+  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+
+# Returns
+
+  - `target::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `dot(w, r.mu.v) + r.mu.s`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`dot`](https://docs.julialang.org/en/v1/base/math/#Base.dot)
 """
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
@@ -771,13 +812,66 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar,
     return dot(w, r.mu.v) + r.mu.s
 end
 """
-Computes the target value for moment calculations based on the provided risk measure. The mu value is a scalar value, so the target is the value itself.
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any, ::Any)
+
+Compute the target value for moment calculations when the risk measure provides a scalar value for the expected returns (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to a scalar value.
+  - `::Any`: Unused argument (typically asset weights, ignored in this method).
+  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+
+# Returns
+
+  - `target::Real`: The scalar value of `r.mu`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
 """
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any,
                             ::Any)
     return r.mu
 end
+"""
+    calc_moment_val(
+        r::Union{<:LowOrderMoment, <:HighOrderMoment},
+        w::AbstractVector,
+        X::AbstractMatrix,
+        fees::Union{Nothing, <:Fees} = nothing
+    )
+
+Compute the vector of deviations from the target value for moment-based risk measures.
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure specifying the moment calculation algorithm and target.
+  - `w`: Asset weights vector.
+  - `X`: Return matrix.
+  - `fees`: Optional fees object to adjust net returns.
+
+# Returns
+
+  - `val::AbstractVector`: The vector of deviations between net portfolio returns and the computed moment target.
+
+# Details
+
+  - Computes net portfolio returns using the provided weights, return matrix, and optional fees.
+  - Computes the target value for the moment calculation using [`calc_moment_target`](@ref).
+  - Returns the element-wise difference between net returns and the target value.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_moment_val(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
                          X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
