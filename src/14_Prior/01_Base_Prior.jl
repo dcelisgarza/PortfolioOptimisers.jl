@@ -457,18 +457,18 @@ Keyword arguments correspond to the fields above.
 julia> LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
                      sigma = [0.0001 0.0002; 0.0002 0.0003])
 LowOrderPrior
-        X ├ 2×2 Matrix{Float64}
-       mu ├ Vector{Float64}: [0.02, 0.03]
-    sigma ├ 2×2 Matrix{Float64}
-     chol ├ nothing
-        w ├ nothing
-      ens ├ nothing
-      kld ├ nothing
-       ow ├ nothing
-       rr ├ nothing
-     f_mu ├ nothing
-  f_sigma ├ nothing
-      f_w └ nothing
+        X ┼ 2×2 Matrix{Float64}
+       mu ┼ Vector{Float64}: [0.02, 0.03]
+    sigma ┼ 2×2 Matrix{Float64}
+     chol ┼ nothing
+        w ┼ nothing
+      ens ┼ nothing
+      kld ┼ nothing
+       ow ┼ nothing
+       rr ┼ nothing
+     f_mu ┼ nothing
+  f_sigma ┼ nothing
+      f_w ┴ nothing
 ```
 
 # Related
@@ -610,25 +610,25 @@ julia> HighOrderPrior(;
                       S2 = PortfolioOptimisers.summation_matrix(2), sk = rand(2, 4),
                       V = rand(2, 2))
 HighOrderPrior
-    pr ├ LowOrderPrior
-       │         X ├ 2×2 Matrix{Float64}
-       │        mu ├ Vector{Float64}: [0.02, 0.03]
-       │     sigma ├ 2×2 Matrix{Float64}
-       │      chol ├ nothing
-       │         w ├ nothing
-       │       ens ├ nothing
-       │       kld ├ nothing
-       │        ow ├ nothing
-       │        rr ├ nothing
-       │      f_mu ├ nothing
-       │   f_sigma ├ nothing
-       │       f_w └ nothing
-    kt ├ 4×4 Matrix{Float64}
-    L2 ├ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
-    S2 ├ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
-    sk ├ 2×4 Matrix{Float64}
-     V ├ 2×2 Matrix{Float64}
-  skmp └ nothing
+    pr ┼ LowOrderPrior
+       │         X ┼ 2×2 Matrix{Float64}
+       │        mu ┼ Vector{Float64}: [0.02, 0.03]
+       │     sigma ┼ 2×2 Matrix{Float64}
+       │      chol ┼ nothing
+       │         w ┼ nothing
+       │       ens ┼ nothing
+       │       kld ┼ nothing
+       │        ow ┼ nothing
+       │        rr ┼ nothing
+       │      f_mu ┼ nothing
+       │   f_sigma ┼ nothing
+       │       f_w ┴ nothing
+    kt ┼ 4×4 Matrix{Float64}
+    L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    S2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    sk ┼ 2×4 Matrix{Float64}
+     V ┼ 2×2 Matrix{Float64}
+  skmp ┴ nothing
 ```
 
 # Related

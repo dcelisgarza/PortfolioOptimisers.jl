@@ -103,7 +103,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> JamesStein()
 JamesStein
-  target └ GrandMean()
+  target ┴ GrandMean()
 ```
 
 # Related
@@ -146,7 +146,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BayesStein()
 BayesStein
-  target └ GrandMean()
+  target ┴ GrandMean()
 ```
 
 # Related
@@ -189,7 +189,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BodnarOkhrinParolya()
 BodnarOkhrinParolya
-  target └ GrandMean()
+  target ┴ GrandMean()
 ```
 
 # Related
@@ -238,24 +238,24 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ShrunkExpectedReturns()
 ShrunkExpectedReturns
-   me ├ SimpleExpectedReturns
-      │   w └ nothing
-   ce ├ PortfolioOptimisersCovariance
-      │   ce ├ Covariance
-      │      │    me ├ SimpleExpectedReturns
-      │      │       │   w └ nothing
-      │      │    ce ├ GeneralCovariance
-      │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │    w └ nothing
-      │      │   alg └ Full()
-      │   mp ├ DefaultMatrixProcessing
-      │      │       pdm ├ Posdef
-      │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-      │      │   denoise ├ nothing
-      │      │    detone ├ nothing
-      │      │       alg └ nothing
-  alg ├ JamesStein
-      │   target └ GrandMean()
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+   ce ┼ PortfolioOptimisersCovariance
+      │   ce ┼ Covariance
+      │      │    me ┼ SimpleExpectedReturns
+      │      │       │   w ┴ nothing
+      │      │    ce ┼ GeneralCovariance
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
+      │      │   alg ┴ Full()
+      │   mp ┼ DefaultMatrixProcessing
+      │      │       pdm ┼ Posdef
+      │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │      │   denoise ┼ nothing
+      │      │    detone ┼ nothing
+      │      │       alg ┴ nothing
+  alg ┼ JamesStein
+      │   target ┴ GrandMean()
 ```
 
 # Related

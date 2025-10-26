@@ -107,7 +107,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> LinearModel()
 LinearModel
-  kwargs └ @NamedTuple{}: NamedTuple()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -176,8 +176,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> GeneralisedLinearModel()
 GeneralisedLinearModel
-    args ├ Tuple{Distributions.Normal{Float64}}: (Distributions.Normal{Float64}(μ=0.0, σ=1.0),)
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{Distributions.Normal{Float64}}: (Distributions.Normal{Float64}(μ=0.0, σ=1.0),)
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -406,9 +406,9 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Regression(; M = [1 2 3; 4 5 6], L = [1 2 3 4; 5 6 7 8], b = [1, 2])
 Regression
-  M ├ 2×3 Matrix{Int64}
-  L ├ 2×4 Matrix{Int64}
-  b └ Vector{Int64}: [1, 2]
+  M ┼ 2×3 Matrix{Int64}
+  L ┼ 2×4 Matrix{Int64}
+  b ┴ Vector{Int64}: [1, 2]
 ```
 
 # Related
@@ -471,15 +471,15 @@ This function constructs a new `Regression` result, where the coefficient matrix
 ```jldoctest
 julia> re = Regression(; M = [1 2; 3 4; 5 6], L = [10 20; 30 40; 50 60], b = [7, 8, 9])
 Regression
-  M ├ 3×2 Matrix{Int64}
-  L ├ 3×2 Matrix{Int64}
-  b └ Vector{Int64}: [7, 8, 9]
+  M ┼ 3×2 Matrix{Int64}
+  L ┼ 3×2 Matrix{Int64}
+  b ┴ Vector{Int64}: [7, 8, 9]
 
 julia> PortfolioOptimisers.regression_view(re, [1, 3])
 Regression
-  M ├ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
-  L ├ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
-  b └ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
+  M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+  L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+  b ┴ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
 ```
 
 # Related

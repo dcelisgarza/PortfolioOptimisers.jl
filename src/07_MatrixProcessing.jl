@@ -95,27 +95,27 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DefaultMatrixProcessing()
 DefaultMatrixProcessing
-      pdm ├ Posdef
-          │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-  denoise ├ nothing
-   detone ├ nothing
-      alg └ nothing
+      pdm ┼ Posdef
+          │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+  denoise ┼ nothing
+   detone ┼ nothing
+      alg ┴ nothing
 
 julia> DefaultMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
 DefaultMatrixProcessing
-      pdm ├ Posdef
-          │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-  denoise ├ Denoise
-          │      alg ├ ShrunkDenoise
-          │          │   alpha └ Float64: 0.0
-          │     args ├ Tuple{}: ()
-          │   kwargs ├ @NamedTuple{}: NamedTuple()
-          │   kernel ├ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-          │        m ├ Int64: 10
-          │        n └ Int64: 1000
-   detone ├ Detone
-          │   n └ Int64: 2
-      alg └ nothing
+      pdm ┼ Posdef
+          │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+  denoise ┼ Denoise
+          │      alg ┼ ShrunkDenoise
+          │          │   alpha ┴ Float64: 0.0
+          │     args ┼ Tuple{}: ()
+          │   kwargs ┼ @NamedTuple{}: NamedTuple()
+          │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+          │        m ┼ Int64: 10
+          │        n ┴ Int64: 1000
+   detone ┼ Detone
+          │   n ┴ Int64: 2
+      alg ┴ nothing
 ```
 
 # Related

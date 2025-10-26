@@ -29,8 +29,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> PartialLinearConstraint(; A = [1.0 2.0; 3.0 4.0], B = [5.0, 6.0])
 PartialLinearConstraint
-  A ├ 2×2 Matrix{Float64}
-  B └ Vector{Float64}: [5.0, 6.0]
+  A ┼ 2×2 Matrix{Float64}
+  B ┴ Vector{Float64}: [5.0, 6.0]
 ```
 
 # Related
@@ -85,12 +85,12 @@ julia> eq = PartialLinearConstraint(; A = [7.0 8.0; 9.0 10.0], B = [11.0, 12.0])
 
 julia> LinearConstraint(; ineq = ineq, eq = eq)
 LinearConstraint
-  ineq ├ PartialLinearConstraint
-       │   A ├ 2×2 Matrix{Float64}
-       │   B └ Vector{Float64}: [5.0, 6.0]
-    eq ├ PartialLinearConstraint
-       │   A ├ 2×2 Matrix{Float64}
-       │   B └ Vector{Float64}: [11.0, 12.0]
+  ineq ┼ PartialLinearConstraint
+       │   A ┼ 2×2 Matrix{Float64}
+       │   B ┴ Vector{Float64}: [5.0, 6.0]
+    eq ┼ PartialLinearConstraint
+       │   A ┼ 2×2 Matrix{Float64}
+       │   B ┴ Vector{Float64}: [11.0, 12.0]
 ```
 
 # Related
@@ -273,8 +273,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]))
 AssetSets
-   key ├ String: "nx"
-  dict └ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
+   key ┼ String: "nx"
+  dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
 # Related
@@ -845,11 +845,11 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
 ```jldoctest
 julia> parse_equation("w_A + 2w_B <= 1")
 ParsingResult
-  vars ├ Vector{String}: ["w_A", "w_B"]
-  coef ├ Vector{Float64}: [1.0, 2.0]
-    op ├ String: "<="
-   rhs ├ Float64: 1.0
-   eqn └ SubString{String}: "w_A + 2.0*w_B <= 1.0"
+  vars ┼ Vector{String}: ["w_A", "w_B"]
+  coef ┼ Vector{Float64}: [1.0, 2.0]
+    op ┼ String: "<="
+   rhs ┼ Float64: 1.0
+   eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
 ```
 
 # Related
@@ -938,19 +938,19 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "grou
 
 julia> res = parse_equation("group1 + 2C == 1")
 ParsingResult
-  vars ├ Vector{String}: ["C", "group1"]
-  coef ├ Vector{Float64}: [2.0, 1.0]
-    op ├ String: "=="
-   rhs ├ Float64: 1.0
-   eqn └ SubString{String}: "2.0*C + group1 == 1.0"
+  vars ┼ Vector{String}: ["C", "group1"]
+  coef ┼ Vector{Float64}: [2.0, 1.0]
+    op ┼ String: "=="
+   rhs ┼ Float64: 1.0
+   eqn ┴ SubString{String}: "2.0*C + group1 == 1.0"
 
 julia> replace_group_by_assets(res, sets)
 ParsingResult
-  vars ├ Vector{String}: ["C", "A", "B"]
-  coef ├ Vector{Float64}: [2.0, 1.0, 1.0]
-    op ├ String: "=="
-   rhs ├ Float64: 1.0
-   eqn └ String: "2.0*C + 1.0*A + 1.0*B == 1.0"
+  vars ┼ Vector{String}: ["C", "A", "B"]
+  coef ┼ Vector{Float64}: [2.0, 1.0, 1.0]
+    op ┼ String: "=="
+   rhs ┼ Float64: 1.0
+   eqn ┴ String: "2.0*C + 1.0*A + 1.0*B == 1.0"
 ```
 
 # Related
@@ -1187,12 +1187,12 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["w_A", "w_B"]));
 
 julia> linear_constraints(lce, sets)
 LinearConstraint
-  ineq ├ PartialLinearConstraint
-       │   A ├ 1×2 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-       │   B └ Vector{Float64}: [-0.1]
-    eq ├ PartialLinearConstraint
-       │   A ├ 1×2 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-       │   B └ Vector{Float64}: [1.0]
+  ineq ┼ PartialLinearConstraint
+       │   A ┼ 1×2 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       │   B ┴ Vector{Float64}: [-0.1]
+    eq ┼ PartialLinearConstraint
+       │   A ┼ 1×2 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       │   B ┴ Vector{Float64}: [1.0]
 ```
 
 # Related
@@ -1285,12 +1285,12 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["w_A", "w_B", "w_C"])
 
 julia> linear_constraints(["w_A + w_B == 1", "w_A >= 0.1"], sets)
 LinearConstraint
-  ineq ├ PartialLinearConstraint
-       │   A ├ 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-       │   B └ Vector{Float64}: [-0.1]
-    eq ├ PartialLinearConstraint
-       │   A ├ 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-       │   B └ Vector{Float64}: [1.0]
+  ineq ┼ PartialLinearConstraint
+       │   A ┼ 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       │   B ┴ Vector{Float64}: [-0.1]
+    eq ┼ PartialLinearConstraint
+       │   A ┼ 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       │   B ┴ Vector{Float64}: [1.0]
 ```
 
 # Related
@@ -1371,7 +1371,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> RiskBudgetResult(; val = [0.2, 0.3, 0.5])
 RiskBudgetResult
-  val └ Vector{Float64}: [0.2, 0.3, 0.5]
+  val ┴ Vector{Float64}: [0.2, 0.3, 0.5]
 ```
 
 # Related
@@ -1428,11 +1428,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> RiskBudgetEstimator(; val = Dict("A" => 0.2, "B" => 0.3, "C" => 0.5))
 RiskBudgetEstimator
-  val └ Dict{String, Float64}: Dict("B" => 0.3, "A" => 0.2, "C" => 0.5)
+  val ┴ Dict{String, Float64}: Dict("B" => 0.3, "A" => 0.2, "C" => 0.5)
 
 julia> RiskBudgetEstimator(; val = ["A" => 0.2, "B" => 0.3, "C" => 0.5])
 RiskBudgetEstimator
-  val └ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
+  val ┴ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
 ```
 
 # Related
@@ -1485,7 +1485,7 @@ This method returns a uniform risk budget allocation when no explicit risk budge
 ```jldoctest
 julia> risk_budget_constraints(nothing; N = 3)
 RiskBudgetResult
-  val └ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(0.3333333333333333, 0.0, 3)
+  val ┴ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(0.3333333333333333, 0.0, 3)
 ```
 
 # Related
@@ -1519,7 +1519,7 @@ This method returns the input [`RiskBudgetResult`](@ref) object unchanged. It is
 ```jldoctest
 julia> RiskBudgetResult(; val = [0.2, 0.3, 0.5])
 RiskBudgetResult
-  val └ Vector{Float64}: [0.2, 0.3, 0.5]
+  val ┴ Vector{Float64}: [0.2, 0.3, 0.5]
 ```
 
 # Related
@@ -1566,7 +1566,7 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "grou
 
 julia> risk_budget_constraints(Dict("A" => 0.2, "group1" => 0.8), sets)
 RiskBudgetResult
-  val └ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
+  val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
 ```
 
 # Related
@@ -1642,7 +1642,7 @@ julia> sets = AssetSets(; key = "nx",
 
 julia> est = AssetSetsMatrixEstimator(; val = "sector")
 AssetSetsMatrixEstimator
-  val └ String: "sector"
+  val ┴ String: "sector"
 
 julia> asset_sets_matrix(est, sets)
 2×3 transpose(::BitMatrix) with eltype Bool:

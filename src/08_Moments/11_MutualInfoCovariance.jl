@@ -32,13 +32,13 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> MutualInfoCovariance()
 MutualInfoCovariance
-         ve ├ SimpleVariance
-            │          me ├ SimpleExpectedReturns
-            │             │   w └ nothing
-            │           w ├ nothing
-            │   corrected └ Bool: true
-       bins ├ HacineGharbiRavier()
-  normalise └ Bool: true
+         ve ┼ SimpleVariance
+            │          me ┼ SimpleExpectedReturns
+            │             │   w ┴ nothing
+            │           w ┼ nothing
+            │   corrected ┴ Bool: true
+       bins ┼ HacineGharbiRavier()
+  normalise ┴ Bool: true
 ```
 
 # Related

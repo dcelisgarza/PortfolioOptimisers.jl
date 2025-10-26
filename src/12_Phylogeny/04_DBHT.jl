@@ -127,8 +127,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> GeneralExponentialSimilarity()
 GeneralExponentialSimilarity
-   coef ├ Float64: 1.0
-  power └ Float64: 1.0
+   coef ┼ Float64: 1.0
+  power ┴ Float64: 1.0
 ```
 
 # Related
@@ -217,8 +217,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DBHT()
 DBHT
-   sim ├ MaximumDistanceSimilarity()
-  root └ UniqueRoot()
+   sim ┼ MaximumDistanceSimilarity()
+  root ┴ UniqueRoot()
 ```
 
 # Related
@@ -1863,10 +1863,10 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> LoGo()
 LoGo
-  dist ├ Distance
-       │   power ├ nothing
-       │     alg └ CanonicalDistance()
-   sim └ MaximumDistanceSimilarity()
+  dist ┼ Distance
+       │   power ┼ nothing
+       │     alg ┴ CanonicalDistance()
+   sim ┴ MaximumDistanceSimilarity()
 ```
 
 # Related

@@ -121,6 +121,11 @@ function Base.show(io::IO,
     if isempty(fields)
         return print(io, string(typeof(ear), "()"), '\n')
     end
+    if get(io, :compact, false)
+        return print(io, string(typeof(ear), "{...}(...)"), '\n')
+    end
+    custom_type = Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                        <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust}
     name = Base.typename(typeof(ear)).wrapper
     print(io, name, '\n')
     padding = maximum(map(length, map(string, fields))) + 2
@@ -130,20 +135,14 @@ function Base.show(io::IO,
         else
             continue
         end
-        flag = isa(val,
-                   Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                         <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
+        flag = isa(val, custom_type)
         sym1 = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
-                      '└', '├')#┴ ┼ └ ├
-        # sym1 = ifelse(i == length(fields), '└', '├')
+                      '┴', '┼')#┴ ┼ └ ├
+        # sym1 = ifelse(i == length(fields), '┴', '┼')
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
             print(io, "$(sym1) nothing", '\n')
-        elseif isa(val, AbstractMatrix)
-            print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
-        elseif isa(val, AbstractVector) && length(val) > 6
-            print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
-        elseif flag
+        elseif flag || isa(val, AbstractVector{<:custom_type}) && length(val) <= 6
             ioalg = IOBuffer()
             show(ioalg, val)
             algstr = String(take!(ioalg))
@@ -157,6 +156,10 @@ function Base.show(io::IO,
                 sym2 = '│'
                 print(io, lpad("$sym2 ", padding + 3), l, '\n')
             end
+        elseif isa(val, AbstractMatrix)
+            print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
+        elseif isa(val, AbstractVector) && length(val) > 6
+            print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
         elseif isa(val, DataType)
             tval = typeof(val)
             val = Base.typename(tval).wrapper

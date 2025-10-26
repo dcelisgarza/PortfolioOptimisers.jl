@@ -119,7 +119,7 @@ Computes the semi-variance of the returns below the target.
 ```jldoctest
 julia> SecondLowerMoment()
 SecondLowerMoment
-  alg └ SquaredSOCRiskExpr()
+  alg ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
@@ -174,7 +174,7 @@ Computes the variance of the returns below the target.
 ```jldoctest
 julia> SecondCentralMoment()
 SecondCentralMoment
-  alg └ SquaredSOCRiskExpr()
+  alg ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
@@ -220,12 +220,12 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedLowOrderMoment()
 StandardisedLowOrderMoment
-   ve ├ SimpleVariance
-      │          me ├ nothing
-      │           w ├ nothing
-      │   corrected └ Bool: true
-  alg ├ SecondLowerMoment
-      │   alg └ SquaredSOCRiskExpr()
+   ve ┼ SimpleVariance
+      │          me ┼ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  alg ┼ SecondLowerMoment
+      │   alg ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
@@ -347,11 +347,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedHighOrderMoment()
 StandardisedHighOrderMoment
-   ve ├ SimpleVariance
-      │          me ├ nothing
-      │           w ├ nothing
-      │   corrected └ Bool: true
-  alg └ ThirdLowerMoment()
+   ve ┼ SimpleVariance
+      │          me ┼ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  alg ┴ ThirdLowerMoment()
 ```
 
 # Related
@@ -536,13 +536,13 @@ Computes the the low order moment risk measure as defined in `r` using portfolio
 ```jldoctest
 julia> LowOrderMoment()
 LowOrderMoment
-  settings ├ RiskMeasureSettings
-           │   scale ├ Float64: 1.0
-           │      ub ├ nothing
-           │     rke └ Bool: true
-         w ├ nothing
-        mu ├ nothing
-       alg └ FirstLowerMoment()
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+         w ┼ nothing
+        mu ┼ nothing
+       alg ┴ FirstLowerMoment()
 ```
 
 # Related
@@ -631,13 +631,13 @@ Computes the the high order moment risk measure as defined in `r` using portfoli
 ```jldoctest
 julia> HighOrderMoment()
 HighOrderMoment
-  settings ├ RiskMeasureSettings
-           │   scale ├ Float64: 1.0
-           │      ub ├ nothing
-           │     rke └ Bool: true
-         w ├ nothing
-        mu ├ nothing
-       alg └ ThirdLowerMoment()
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+         w ┼ nothing
+        mu ┼ nothing
+       alg ┴ ThirdLowerMoment()
 ```
 
 # Related

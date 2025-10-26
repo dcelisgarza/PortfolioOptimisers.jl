@@ -39,7 +39,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> PCA()
 PCA
-  kwargs └ @NamedTuple{}: NamedTuple()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -106,7 +106,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> PPCA()
 PPCA
-  kwargs └ @NamedTuple{}: NamedTuple()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -183,17 +183,17 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DimensionReductionRegression()
 DimensionReductionRegression
-     me ├ SimpleExpectedReturns
-        │   w └ nothing
-     ve ├ SimpleVariance
-        │          me ├ SimpleExpectedReturns
-        │             │   w └ nothing
-        │           w ├ nothing
-        │   corrected └ Bool: true
-  drtgt ├ PCA
-        │   kwargs └ @NamedTuple{}: NamedTuple()
-  retgt ├ LinearModel
-        │   kwargs └ @NamedTuple{}: NamedTuple()
+     me ┼ SimpleExpectedReturns
+        │   w ┴ nothing
+     ve ┼ SimpleVariance
+        │          me ┼ SimpleExpectedReturns
+        │             │   w ┴ nothing
+        │           w ┼ nothing
+        │   corrected ┴ Bool: true
+  drtgt ┼ PCA
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+  retgt ┼ LinearModel
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related

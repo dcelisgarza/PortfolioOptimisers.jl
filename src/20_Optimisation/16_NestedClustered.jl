@@ -9,11 +9,11 @@ struct NestedClusteredOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     cv::T7
     retcode::T8
     w::T9
-    attempts::T10
+    fb::T10
 end
-function opt_attempt_factory(res::NestedClusteredOptimisation, attempts)
+function opt_attempt_factory(res::NestedClusteredOptimisation, fb)
     return NestedClusteredOptimisation(res.oe, res.pr, res.wb, res.clr, res.resi, res.reso,
-                                       res.cv, res.retcode, res.w, attempts)
+                                       res.cv, res.retcode, res.w, fb)
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
@@ -84,7 +84,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     cwf::T8
     strict::T9
     threads::T10
-    fallback::T11
+    fb::T11
     function NestedClustered(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                              cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                              wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
@@ -93,7 +93,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                              cv::Union{Nothing, <:CrossValidationEstimator},
                              cwf::WeightFinaliser, strict::Bool,
                              threads::FLoops.Transducers.Executor,
-                             fallback::Union{Nothing, <:OptimisationEstimator})
+                             fb::Union{Nothing, <:OptimisationEstimator})
         assert_external_optimiser(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)
@@ -103,8 +103,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
         end
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
                    typeof(opto), typeof(cv), typeof(cwf), typeof(strict), typeof(threads),
-                   typeof(fallback)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict,
-                                     threads, fallback)
+                   typeof(fb)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
     end
 end
 function NestedClustered(;
@@ -117,9 +116,8 @@ function NestedClustered(;
                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
                          threads::FLoops.Transducers.Executor = ThreadedEx(),
-                         fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads,
-                           fallback)
+                         fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)
     @argcheck(!isa(opt.cle, AbstractClusteringResult))
@@ -148,7 +146,7 @@ function opt_view(nco::NestedClustered, i::AbstractVector, X::AbstractMatrix)
     opto = opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, sets = sets, opti = opti,
                            opto = opto, cv = nco.cv, cwf = nco.cwf, strict = nco.strict,
-                           threads = nco.threads, fallback = nco.fallback)
+                           threads = nco.threads, fb = nco.fb)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
                                                <:WeightBounds},

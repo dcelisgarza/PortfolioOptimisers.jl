@@ -31,13 +31,13 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> LTDCovariance()
 LTDCovariance
-       ve ├ SimpleVariance
-          │          me ├ SimpleExpectedReturns
-          │             │   w └ nothing
-          │           w ├ nothing
-          │   corrected └ Bool: true
-    alpha ├ Float64: 0.05
-  threads └ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+       ve ┼ SimpleVariance
+          │          me ┼ SimpleExpectedReturns
+          │             │   w ┴ nothing
+          │           w ┼ nothing
+          │   corrected ┴ Bool: true
+    alpha ┼ Float64: 0.05
+  threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related

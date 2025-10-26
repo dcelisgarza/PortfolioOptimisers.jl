@@ -92,7 +92,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ShrunkDenoise(; alpha = 0.5)
 ShrunkDenoise
-  alpha └ Float64: 0.5
+  alpha ┴ Float64: 0.5
 ```
 
 # Related
@@ -150,22 +150,22 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Denoise(;)
 Denoise
-     alg ├ ShrunkDenoise
-         │   alpha └ Float64: 0.0
-    args ├ Tuple{}: ()
-  kwargs ├ @NamedTuple{}: NamedTuple()
-  kernel ├ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-       m ├ Int64: 10
-       n └ Int64: 1000
+     alg ┼ ShrunkDenoise
+         │   alpha ┴ Float64: 0.0
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+  kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+       m ┼ Int64: 10
+       n ┴ Int64: 1000
 
 julia> Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
 Denoise
-     alg ├ SpectralDenoise()
-    args ├ Tuple{}: ()
-  kwargs ├ @NamedTuple{}: NamedTuple()
-  kernel ├ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-       m ├ Int64: 20
-       n └ Int64: 500
+     alg ┼ SpectralDenoise()
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+  kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+       m ┼ Int64: 20
+       n ┴ Int64: 500
 ```
 
 # Related

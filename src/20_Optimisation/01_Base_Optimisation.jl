@@ -41,20 +41,20 @@ function optimise(or::OptimisationResult, args...)
 end
 function opt_attempt_factory end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
-    attempts = Tuple{OptimisationEstimator, OptimisationResult}[]
+    fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = opt
     res = nothing
     while true
         res = _optimise(current_opt, args...; kwargs...)
-        if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fallback)
+        if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fb)
             break
         else
-            push!(attempts, (current_opt, res))
-            current_opt = current_opt.fallback
+            push!(fb, (current_opt, res))
+            current_opt = current_opt.fb
             @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         end
     end
-    return isempty(attempts) ? res : opt_attempt_factory(res, attempts)
+    return isempty(fb) ? res : opt_attempt_factory(res, fb)
 end
 function assert_internal_optimiser(::OptimisationResult)
     return nothing

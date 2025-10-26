@@ -8,11 +8,11 @@ struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: OptimisationR
     cv::T6
     retcode::T7
     w::T8
-    attempts::T9
+    fb::T9
 end
-function opt_attempt_factory(res::StackingOptimisation, attempts)
+function opt_attempt_factory(res::StackingOptimisation, fb)
     return StackingOptimisation(res.oe, res.pr, res.wb, res.resi, res.reso, res.cv,
-                                res.retcode, res.w, attempts)
+                                res.retcode, res.w, fb)
 end
 struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        BaseStackingOptimisationEstimator
@@ -25,7 +25,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     cwf::T7
     strict::T8
     threads::T9
-    fallback::T10
+    fb::T10
     function Stacking(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                       wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
                       sets::Union{Nothing, <:AssetSets},
@@ -34,15 +34,22 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                       opto::OptimisationEstimator,
                       cv::Union{Nothing, <:CrossValidationEstimator}, cwf::WeightFinaliser,
                       strict::Bool, threads::FLoops.Transducers.Executor,
-                      fallback::Union{Nothing, <:OptimisationEstimator})
+                      fb::Union{Nothing, <:OptimisationEstimator})
         assert_external_optimiser(opto)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                   typeof(cv), typeof(cwf), typeof(strict), typeof(threads),
-                   typeof(fallback)}(pe, wb, sets, opti, opto, cv, cwf, strict, threads,
-                                     fallback)
+                   typeof(cv), typeof(cwf), typeof(strict), typeof(threads), typeof(fb)}(pe,
+                                                                                         wb,
+                                                                                         sets,
+                                                                                         opti,
+                                                                                         opto,
+                                                                                         cv,
+                                                                                         cwf,
+                                                                                         strict,
+                                                                                         threads,
+                                                                                         fb)
     end
 end
 function Stacking(;
@@ -55,8 +62,8 @@ function Stacking(;
                   cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   threads::FLoops.Transducers.Executor = ThreadedEx(),
-                  fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, threads, fallback)
+                  fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -82,8 +89,7 @@ function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
     return Stacking(; pe = pe, wb = wb, opti = opti, opto = opto, cv = st.cv, cwf = st.cwf,
-                    sets = sets, strict = st.strict, threads = st.threads,
-                    fallback = st.fallback)
+                    sets = sets, strict = st.strict, threads = st.threads, fb = st.fb)
 end
 function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,

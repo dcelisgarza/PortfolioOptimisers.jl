@@ -8,7 +8,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     sets::T6
     wi::T7
     flag::T8
-    fallback::T9
+    fb::T9
     function FactorRiskContribution(opt::JuMPOptimiser,
                                     re::Union{<:Regression, <:AbstractRegressionEstimator},
                                     r::Union{<:RiskMeasure,
@@ -21,8 +21,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
                                                        <:AbstractPhylogenyConstraintResult}},
                                     sets::Union{Nothing, <:AssetSets},
                                     wi::Union{Nothing, <:AbstractVector{<:Real}},
-                                    flag::Bool,
-                                    fallback::Union{Nothing, <:OptimisationEstimator})
+                                    flag::Bool, fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -32,10 +31,8 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
         # @argcheck(!isa(opt.plg,
         #                Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
         return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(plg),
-                   typeof(sets), typeof(wi), typeof(flag), typeof(fallback)}(opt, re, r,
-                                                                             obj, plg, sets,
-                                                                             wi, flag,
-                                                                             fallback)
+                   typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj, plg,
+                                                                       sets, wi, flag, fb)
     end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
@@ -49,8 +46,8 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 sets::Union{Nothing, <:AssetSets} = nothing,
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                 flag::Bool = true,
-                                fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fallback)
+                                fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fb)
 end
 function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
@@ -59,7 +56,7 @@ function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMat
     r = risk_measure_view(frc.r, i, X)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj, plg = frc.plg,
                                   sets = frc.sets, wi = frc.wi, flag = frc.flag,
-                                  fallback = frc.fallback)
+                                  fb = frc.fb)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:Regression,

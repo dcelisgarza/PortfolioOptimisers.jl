@@ -142,30 +142,30 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ARCHUncertaintySet()
 ARCHUncertaintySet
-          pe ├ EmpiricalPrior
-             │        ce ├ PortfolioOptimisersCovariance
-             │           │   ce ├ Covariance
-             │           │      │    me ├ SimpleExpectedReturns
-             │           │      │       │   w └ nothing
-             │           │      │    ce ├ GeneralCovariance
-             │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │    w └ nothing
-             │           │      │   alg └ Full()
-             │           │   mp ├ DefaultMatrixProcessing
-             │           │      │       pdm ├ Posdef
-             │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-             │           │      │   denoise ├ nothing
-             │           │      │    detone ├ nothing
-             │           │      │       alg └ nothing
-             │        me ├ SimpleExpectedReturns
-             │           │   w └ nothing
-             │   horizon └ nothing
-         alg ├ BoxUncertaintySetAlgorithm()
-       n_sim ├ Int64: 3000
-  block_size ├ Int64: 3
-           q ├ Float64: 0.05
-        seed ├ nothing
-   bootstrap └ StationaryBootstrap()
+          pe ┼ EmpiricalPrior
+             │        ce ┼ PortfolioOptimisersCovariance
+             │           │   ce ┼ Covariance
+             │           │      │    me ┼ SimpleExpectedReturns
+             │           │      │       │   w ┴ nothing
+             │           │      │    ce ┼ GeneralCovariance
+             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    w ┴ nothing
+             │           │      │   alg ┴ Full()
+             │           │   mp ┼ DefaultMatrixProcessing
+             │           │      │       pdm ┼ Posdef
+             │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │   denoise ┼ nothing
+             │           │      │    detone ┼ nothing
+             │           │      │       alg ┴ nothing
+             │        me ┼ SimpleExpectedReturns
+             │           │   w ┴ nothing
+             │   horizon ┴ nothing
+         alg ┼ BoxUncertaintySetAlgorithm()
+       n_sim ┼ Int64: 3000
+  block_size ┼ Int64: 3
+           q ┼ Float64: 0.05
+        seed ┼ nothing
+   bootstrap ┴ StationaryBootstrap()
 ```
 
 # Related

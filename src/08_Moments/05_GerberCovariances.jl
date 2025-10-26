@@ -121,8 +121,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedGerber0()
 StandardisedGerber0
-  me ├ SimpleExpectedReturns
-     │   w └ nothing
+  me ┼ SimpleExpectedReturns
+     │   w ┴ nothing
 ```
 
 # Related
@@ -166,8 +166,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedGerber1()
 StandardisedGerber1
-  me ├ SimpleExpectedReturns
-     │   w └ nothing
+  me ┼ SimpleExpectedReturns
+     │   w ┴ nothing
 ```
 
 # Related
@@ -211,8 +211,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedGerber2()
 StandardisedGerber2
-  me ├ SimpleExpectedReturns
-     │   w └ nothing
+  me ┼ SimpleExpectedReturns
+     │   w ┴ nothing
 ```
 
 # Related

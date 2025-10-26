@@ -16,38 +16,35 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     rba::T2
     wi::T3
     alg::T4
-    fallback::T5
+    fb::T5
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Union{Nothing, <:AbstractVector{<:Real}},
                                   alg::RelaxedRiskBudgetingAlgorithm,
-                                  fallback::Union{Nothing, <:OptimisationEstimator})
+                                  fb::Union{Nothing, <:OptimisationEstimator})
         if isa(wi, AbstractVector)
             @argcheck(!isempty(wi))
         end
         if isa(rba.rkb, RiskBudgetEstimator)
             @argcheck(!isnothing(opt.sets))
         end
-        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fallback)}(opt,
-                                                                                        rba,
-                                                                                        wi,
-                                                                                        alg,
-                                                                                        fallback)
+        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
+                                                                                  wi, alg,
+                                                                                  fb)
     end
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-                              fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return RelaxedRiskBudgeting(opt, rba, wi, alg, fallback)
+                              fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
 function opt_view(rrb::RelaxedRiskBudgeting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rba = risk_budgeting_algorithm_view(rrb.rba, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg,
-                                fallback = rrb.fallback)
+    return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg, fb = rrb.fb)
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model,

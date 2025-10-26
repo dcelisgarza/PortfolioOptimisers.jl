@@ -6,11 +6,11 @@ struct HierarchicalOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationR
     clr::T5
     retcode::T6
     w::T7
-    attempts::T8
+    fb::T8
 end
-function opt_attempt_factory(res::HierarchicalOptimisation, attempts)
+function opt_attempt_factory(res::HierarchicalOptimisation, fb)
     return HierarchicalOptimisation(res.oe, res.pr, res.fees, res.wb, res.clr, res.retcode,
-                                    res.w, attempts)
+                                    res.w, fb)
 end
 struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
        BaseClusteringOptimisationEstimator

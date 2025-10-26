@@ -59,29 +59,29 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 ```jldoctest
 julia> SemiDefinitePhylogenyEstimator()
 SemiDefinitePhylogenyEstimator
-  pe ├ NetworkEstimator
-     │    ce ├ PortfolioOptimisersCovariance
-     │       │   ce ├ Covariance
-     │       │      │    me ├ SimpleExpectedReturns
-     │       │      │       │   w └ nothing
-     │       │      │    ce ├ GeneralCovariance
-     │       │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │    w └ nothing
-     │       │      │   alg └ Full()
-     │       │   mp ├ DefaultMatrixProcessing
-     │       │      │       pdm ├ Posdef
-     │       │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-     │       │      │   denoise ├ nothing
-     │       │      │    detone ├ nothing
-     │       │      │       alg └ nothing
-     │    de ├ Distance
-     │       │   power ├ nothing
-     │       │     alg └ CanonicalDistance()
-     │   alg ├ KruskalTree
-     │       │     args ├ Tuple{}: ()
-     │       │   kwargs └ @NamedTuple{}: NamedTuple()
-     │     n └ Int64: 1
-   p └ Float64: 0.05
+  pe ┼ NetworkEstimator
+     │    ce ┼ PortfolioOptimisersCovariance
+     │       │   ce ┼ Covariance
+     │       │      │    me ┼ SimpleExpectedReturns
+     │       │      │       │   w ┴ nothing
+     │       │      │    ce ┼ GeneralCovariance
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │      │       │    w ┴ nothing
+     │       │      │   alg ┴ Full()
+     │       │   mp ┼ DefaultMatrixProcessing
+     │       │      │       pdm ┼ Posdef
+     │       │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+     │       │      │   denoise ┼ nothing
+     │       │      │    detone ┼ nothing
+     │       │      │       alg ┴ nothing
+     │    de ┼ Distance
+     │       │   power ┼ nothing
+     │       │     alg ┴ CanonicalDistance()
+     │   alg ┼ KruskalTree
+     │       │     args ┼ Tuple{}: ()
+     │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │     n ┴ Int64: 1
+   p ┴ Float64: 0.05
 ```
 
 # Related
@@ -137,8 +137,8 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 ```jldoctest
 julia> SemiDefinitePhylogeny([0.0 1.0; 1.0 0.0], 0.05)
 SemiDefinitePhylogeny
-  A ├ 2×2 Matrix{Float64}
-  p └ Float64: 0.05
+  A ┼ 2×2 Matrix{Float64}
+  p ┴ Float64: 0.05
 ```
 
 # Related
@@ -288,30 +288,30 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 ```jldoctest
 julia> IntegerPhylogenyEstimator()
 IntegerPhylogenyEstimator
-     pe ├ NetworkEstimator
-        │    ce ├ PortfolioOptimisersCovariance
-        │       │   ce ├ Covariance
-        │       │      │    me ├ SimpleExpectedReturns
-        │       │      │       │   w └ nothing
-        │       │      │    ce ├ GeneralCovariance
-        │       │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │       │      │       │    w └ nothing
-        │       │      │   alg └ Full()
-        │       │   mp ├ DefaultMatrixProcessing
-        │       │      │       pdm ├ Posdef
-        │       │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-        │       │      │   denoise ├ nothing
-        │       │      │    detone ├ nothing
-        │       │      │       alg └ nothing
-        │    de ├ Distance
-        │       │   power ├ nothing
-        │       │     alg └ CanonicalDistance()
-        │   alg ├ KruskalTree
-        │       │     args ├ Tuple{}: ()
-        │       │   kwargs └ @NamedTuple{}: NamedTuple()
-        │     n └ Int64: 1
-      B ├ Int64: 1
-  scale └ Float64: 100000.0
+     pe ┼ NetworkEstimator
+        │    ce ┼ PortfolioOptimisersCovariance
+        │       │   ce ┼ Covariance
+        │       │      │    me ┼ SimpleExpectedReturns
+        │       │      │       │   w ┴ nothing
+        │       │      │    ce ┼ GeneralCovariance
+        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │       │      │       │    w ┴ nothing
+        │       │      │   alg ┴ Full()
+        │       │   mp ┼ DefaultMatrixProcessing
+        │       │      │       pdm ┼ Posdef
+        │       │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+        │       │      │   denoise ┼ nothing
+        │       │      │    detone ┼ nothing
+        │       │      │       alg ┴ nothing
+        │    de ┼ Distance
+        │       │   power ┼ nothing
+        │       │     alg ┴ CanonicalDistance()
+        │   alg ┼ KruskalTree
+        │       │     args ┼ Tuple{}: ()
+        │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     n ┴ Int64: 1
+      B ┼ Int64: 1
+  scale ┴ Float64: 100000.0
 ```
 
 # Related
@@ -381,9 +381,9 @@ Container for the result of integer phylogeny-based constraint generation.
 ```jldoctest
 julia> IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2, scale = 100_000.0)
 IntegerPhylogeny
-      A ├ 1×2 Matrix{Float64}
-      B ├ Int64: 2
-  scale └ Float64: 100000.0
+      A ┼ 1×2 Matrix{Float64}
+      B ┼ Int64: 2
+  scale ┴ Float64: 100000.0
 ```
 
 # Related
@@ -664,34 +664,34 @@ Estimator for generating centrality-based portfolio constraints.
 ```jldoctest
 julia> CentralityConstraint()
 CentralityConstraint
-     A ├ CentralityEstimator
-       │     ne ├ NetworkEstimator
-       │        │    ce ├ PortfolioOptimisersCovariance
-       │        │       │   ce ├ Covariance
-       │        │       │      │    me ├ SimpleExpectedReturns
-       │        │       │      │       │   w └ nothing
-       │        │       │      │    ce ├ GeneralCovariance
-       │        │       │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │        │       │      │       │    w └ nothing
-       │        │       │      │   alg └ Full()
-       │        │       │   mp ├ DefaultMatrixProcessing
-       │        │       │      │       pdm ├ Posdef
-       │        │       │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-       │        │       │      │   denoise ├ nothing
-       │        │       │      │    detone ├ nothing
-       │        │       │      │       alg └ nothing
-       │        │    de ├ Distance
-       │        │       │   power ├ nothing
-       │        │       │     alg └ CanonicalDistance()
-       │        │   alg ├ KruskalTree
-       │        │       │     args ├ Tuple{}: ()
-       │        │       │   kwargs └ @NamedTuple{}: NamedTuple()
-       │        │     n └ Int64: 1
-       │   cent ├ DegreeCentrality
-       │        │     kind ├ Int64: 0
-       │        │   kwargs └ @NamedTuple{}: NamedTuple()
-     B ├ MinValue()
-  comp └ LEQ: LEQ()
+     A ┼ CentralityEstimator
+       │     ne ┼ NetworkEstimator
+       │        │    ce ┼ PortfolioOptimisersCovariance
+       │        │       │   ce ┼ Covariance
+       │        │       │      │    me ┼ SimpleExpectedReturns
+       │        │       │      │       │   w ┴ nothing
+       │        │       │      │    ce ┼ GeneralCovariance
+       │        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │        │       │      │       │    w ┴ nothing
+       │        │       │      │   alg ┴ Full()
+       │        │       │   mp ┼ DefaultMatrixProcessing
+       │        │       │      │       pdm ┼ Posdef
+       │        │       │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+       │        │       │      │   denoise ┼ nothing
+       │        │       │      │    detone ┼ nothing
+       │        │       │      │       alg ┴ nothing
+       │        │    de ┼ Distance
+       │        │       │   power ┼ nothing
+       │        │       │     alg ┴ CanonicalDistance()
+       │        │   alg ┼ KruskalTree
+       │        │       │     args ┼ Tuple{}: ()
+       │        │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │        │     n ┴ Int64: 1
+       │   cent ┼ DegreeCentrality
+       │        │     kind ┼ Int64: 0
+       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     B ┼ MinValue()
+  comp ┴ LEQ: LEQ()
 ```
 
 # Related

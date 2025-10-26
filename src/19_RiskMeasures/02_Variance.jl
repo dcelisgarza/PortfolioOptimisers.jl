@@ -202,13 +202,13 @@ julia> r = Variance(;
                              -0.06400 3.28564 1.84588;
                              0.84818 1.84588 2.16317])
 Variance
-  settings ├ RiskMeasureSettings
-           │   scale ├ Float64: 1.0
-           │      ub ├ nothing
-           │     rke └ Bool: true
-     sigma ├ 3×3 Matrix{Float64}
-        rc ├ nothing
-       alg └ SquaredSOCRiskExpr()
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+     sigma ┼ 3×3 Matrix{Float64}
+        rc ┼ nothing
+       alg ┴ SquaredSOCRiskExpr()
 
 julia> r(w)
 1.3421705804186579
@@ -358,11 +358,11 @@ julia> r = StandardDeviation(;
                                       -0.06400 3.28564 1.84588;
                                       0.84818 1.84588 2.16317])
 StandardDeviation
-  settings ├ RiskMeasureSettings
-           │   scale ├ Float64: 1.0
-           │      ub ├ nothing
-           │     rke └ Bool: true
-     sigma └ 3×3 Matrix{Float64}
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+     sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
 1.1585208588621345
@@ -559,35 +559,35 @@ julia> r = UncertaintySetVariance(;
                                            -0.06400 3.28564 1.84588;
                                            0.84818 1.84588 2.16317])
 UncertaintySetVariance
-  settings ├ RiskMeasureSettings
-           │   scale ├ Float64: 1.0
-           │      ub ├ nothing
-           │     rke └ Bool: true
-       ucs ├ NormalUncertaintySet
-           │      pe ├ EmpiricalPrior
-           │         │        ce ├ PortfolioOptimisersCovariance
-           │         │           │   ce ├ Covariance
-           │         │           │      │    me ├ SimpleExpectedReturns
-           │         │           │      │       │   w └ nothing
-           │         │           │      │    ce ├ GeneralCovariance
-           │         │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │         │           │      │       │    w └ nothing
-           │         │           │      │   alg └ Full()
-           │         │           │   mp ├ DefaultMatrixProcessing
-           │         │           │      │       pdm ├ Posdef
-           │         │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-           │         │           │      │   denoise ├ nothing
-           │         │           │      │    detone ├ nothing
-           │         │           │      │       alg └ nothing
-           │         │        me ├ SimpleExpectedReturns
-           │         │           │   w └ nothing
-           │         │   horizon └ nothing
-           │     alg ├ BoxUncertaintySetAlgorithm()
-           │   n_sim ├ Int64: 3000
-           │       q ├ Float64: 0.05
-           │     rng ├ Random.TaskLocalRNG: Random.TaskLocalRNG()
-           │    seed └ nothing
-     sigma └ 3×3 Matrix{Float64}
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+       ucs ┼ NormalUncertaintySet
+           │      pe ┼ EmpiricalPrior
+           │         │        ce ┼ PortfolioOptimisersCovariance
+           │         │           │   ce ┼ Covariance
+           │         │           │      │    me ┼ SimpleExpectedReturns
+           │         │           │      │       │   w ┴ nothing
+           │         │           │      │    ce ┼ GeneralCovariance
+           │         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │         │           │      │       │    w ┴ nothing
+           │         │           │      │   alg ┴ Full()
+           │         │           │   mp ┼ DefaultMatrixProcessing
+           │         │           │      │       pdm ┼ Posdef
+           │         │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+           │         │           │      │   denoise ┼ nothing
+           │         │           │      │    detone ┼ nothing
+           │         │           │      │       alg ┴ nothing
+           │         │        me ┼ SimpleExpectedReturns
+           │         │           │   w ┴ nothing
+           │         │   horizon ┴ nothing
+           │     alg ┼ BoxUncertaintySetAlgorithm()
+           │   n_sim ┼ Int64: 3000
+           │       q ┼ Float64: 0.05
+           │     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+           │    seed ┴ nothing
+     sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
 1.3421705804186579

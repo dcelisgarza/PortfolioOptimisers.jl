@@ -37,7 +37,7 @@ julia> using LinearAlgebra
 
 julia> Posdef()
 Posdef
-  alg └ UnionAll: NearestCorrelationMatrix.Newton
+  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
 ```
 
 # Related
@@ -84,7 +84,7 @@ julia> using LinearAlgebra
 
 julia> est = Posdef()
 Posdef
-  alg └ UnionAll: NearestCorrelationMatrix.Newton
+  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
 
 julia> X = [1.0 0.9; 0.9 1.0];
 

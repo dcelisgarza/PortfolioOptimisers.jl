@@ -111,114 +111,114 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-      pes ├ Vector{EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}}: EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
-           pe ├ EmpiricalPrior
-              │        ce ├ PortfolioOptimisersCovariance
-              │           │   ce ├ Covariance
-              │           │      │    me ├ SimpleExpectedReturns
-              │           │      │       │   w └ nothing
-              │           │      │    ce ├ GeneralCovariance
-              │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-              │           │      │       │    w └ nothing
-              │           │      │   alg └ Full()
-              │           │   mp ├ DefaultMatrixProcessing
-              │           │      │       pdm ├ Posdef
-              │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-              │           │      │   denoise ├ nothing
-              │           │      │    detone ├ nothing
-              │           │      │       alg └ nothing
-              │        me ├ SimpleExpectedReturns
-              │           │   w └ nothing
-              │   horizon └ nothing
-     mu_views ├ LinearConstraintEstimator
-              │   val └ Vector{String}: ["A == 0.03", "B + C == 0.04"]
-    var_views ├ nothing
-   cvar_views ├ nothing
-  sigma_views ├ nothing
-     sk_views ├ nothing
-     kt_views ├ nothing
-    rho_views ├ nothing
-    var_alpha ├ nothing
-   cvar_alpha ├ nothing
-         sets ├ AssetSets
-              │    key ├ String: "nx"
-              │   dict └ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-       ds_opt ├ nothing
-       dm_opt ├ nothing
-          opt ├ OptimEntropyPooling
-              │     args ├ Tuple{}: ()
-              │   kwargs ├ @NamedTuple{}: NamedTuple()
-              │      sc1 ├ Int64: 1
-              │      sc2 ├ Float64: 1000.0
-              │      alg └ ExpEntropyPooling()
-            w ├ nothing
-          alg └ H1_EntropyPooling()
-, EntropyPoolingPrior
-           pe ├ EmpiricalPrior
-              │        ce ├ PortfolioOptimisersCovariance
-              │           │   ce ├ Covariance
-              │           │      │    me ├ SimpleExpectedReturns
-              │           │      │       │   w └ nothing
-              │           │      │    ce ├ GeneralCovariance
-              │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-              │           │      │       │    w └ nothing
-              │           │      │   alg └ Full()
-              │           │   mp ├ DefaultMatrixProcessing
-              │           │      │       pdm ├ Posdef
-              │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-              │           │      │   denoise ├ nothing
-              │           │      │    detone ├ nothing
-              │           │      │       alg └ nothing
-              │        me ├ SimpleExpectedReturns
-              │           │   w └ nothing
-              │   horizon └ nothing
-     mu_views ├ LinearConstraintEstimator
-              │   val └ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
-    var_views ├ nothing
-   cvar_views ├ nothing
-  sigma_views ├ nothing
-     sk_views ├ nothing
-     kt_views ├ nothing
-    rho_views ├ nothing
-    var_alpha ├ nothing
-   cvar_alpha ├ nothing
-         sets ├ AssetSets
-              │    key ├ String: "nx"
-              │   dict └ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-       ds_opt ├ nothing
-       dm_opt ├ nothing
-          opt ├ OptimEntropyPooling
-              │     args ├ Tuple{}: ()
-              │   kwargs ├ @NamedTuple{}: NamedTuple()
-              │      sc1 ├ Int64: 1
-              │      sc2 ├ Float64: 1000.0
-              │      alg └ ExpEntropyPooling()
-            w ├ nothing
-          alg └ H1_EntropyPooling()
-]
-      pe1 ├ nothing
-      pe2 ├ EmpiricalPrior
-          │        ce ├ PortfolioOptimisersCovariance
-          │           │   ce ├ Covariance
-          │           │      │    me ├ SimpleExpectedReturns
-          │           │      │       │   w └ nothing
-          │           │      │    ce ├ GeneralCovariance
-          │           │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-          │           │      │       │    w └ nothing
-          │           │      │   alg └ Full()
-          │           │   mp ├ DefaultMatrixProcessing
-          │           │      │       pdm ├ Posdef
-          │           │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-          │           │      │   denoise ├ nothing
-          │           │      │    detone ├ nothing
-          │           │      │       alg └ nothing
-          │        me ├ SimpleExpectedReturns
-          │           │   w └ nothing
-          │   horizon └ nothing
-        p ├ nothing
-        w ├ nothing
-      alg ├ LinearOpinionPooling()
-  threads └ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+          │            pe ┼ EmpiricalPrior
+          │               │        ce ┼ PortfolioOptimisersCovariance
+          │               │           │   ce ┼ Covariance
+          │               │           │      │    me ┼ SimpleExpectedReturns
+          │               │           │      │       │   w ┴ nothing
+          │               │           │      │    ce ┼ GeneralCovariance
+          │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          │               │           │      │       │    w ┴ nothing
+          │               │           │      │   alg ┴ Full()
+          │               │           │   mp ┼ DefaultMatrixProcessing
+          │               │           │      │       pdm ┼ Posdef
+          │               │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │               │           │      │   denoise ┼ nothing
+          │               │           │      │    detone ┼ nothing
+          │               │           │      │       alg ┴ nothing
+          │               │        me ┼ SimpleExpectedReturns
+          │               │           │   w ┴ nothing
+          │               │   horizon ┴ nothing
+          │      mu_views ┼ LinearConstraintEstimator
+          │               │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+          │     var_views ┼ nothing
+          │    cvar_views ┼ nothing
+          │   sigma_views ┼ nothing
+          │      sk_views ┼ nothing
+          │      kt_views ┼ nothing
+          │     rho_views ┼ nothing
+          │     var_alpha ┼ nothing
+          │    cvar_alpha ┼ nothing
+          │          sets ┼ AssetSets
+          │               │    key ┼ String: "nx"
+          │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+          │        ds_opt ┼ nothing
+          │        dm_opt ┼ nothing
+          │           opt ┼ OptimEntropyPooling
+          │               │     args ┼ Tuple{}: ()
+          │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
+          │               │      sc1 ┼ Int64: 1
+          │               │      sc2 ┼ Float64: 1000.0
+          │               │      alg ┴ ExpEntropyPooling()
+          │             w ┼ nothing
+          │           alg ┴ H1_EntropyPooling()
+          │ , EntropyPoolingPrior
+          │            pe ┼ EmpiricalPrior
+          │               │        ce ┼ PortfolioOptimisersCovariance
+          │               │           │   ce ┼ Covariance
+          │               │           │      │    me ┼ SimpleExpectedReturns
+          │               │           │      │       │   w ┴ nothing
+          │               │           │      │    ce ┼ GeneralCovariance
+          │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          │               │           │      │       │    w ┴ nothing
+          │               │           │      │   alg ┴ Full()
+          │               │           │   mp ┼ DefaultMatrixProcessing
+          │               │           │      │       pdm ┼ Posdef
+          │               │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │               │           │      │   denoise ┼ nothing
+          │               │           │      │    detone ┼ nothing
+          │               │           │      │       alg ┴ nothing
+          │               │        me ┼ SimpleExpectedReturns
+          │               │           │   w ┴ nothing
+          │               │   horizon ┴ nothing
+          │      mu_views ┼ LinearConstraintEstimator
+          │               │   val ┴ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
+          │     var_views ┼ nothing
+          │    cvar_views ┼ nothing
+          │   sigma_views ┼ nothing
+          │      sk_views ┼ nothing
+          │      kt_views ┼ nothing
+          │     rho_views ┼ nothing
+          │     var_alpha ┼ nothing
+          │    cvar_alpha ┼ nothing
+          │          sets ┼ AssetSets
+          │               │    key ┼ String: "nx"
+          │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+          │        ds_opt ┼ nothing
+          │        dm_opt ┼ nothing
+          │           opt ┼ OptimEntropyPooling
+          │               │     args ┼ Tuple{}: ()
+          │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
+          │               │      sc1 ┼ Int64: 1
+          │               │      sc2 ┼ Float64: 1000.0
+          │               │      alg ┴ ExpEntropyPooling()
+          │             w ┼ nothing
+          │           alg ┴ H1_EntropyPooling()
+          │ ]
+      pe1 ┼ nothing
+      pe2 ┼ EmpiricalPrior
+          │        ce ┼ PortfolioOptimisersCovariance
+          │           │   ce ┼ Covariance
+          │           │      │    me ┼ SimpleExpectedReturns
+          │           │      │       │   w ┴ nothing
+          │           │      │    ce ┼ GeneralCovariance
+          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          │           │      │       │    w ┴ nothing
+          │           │      │   alg ┴ Full()
+          │           │   mp ┼ DefaultMatrixProcessing
+          │           │      │       pdm ┼ Posdef
+          │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │           │      │   denoise ┼ nothing
+          │           │      │    detone ┼ nothing
+          │           │      │       alg ┴ nothing
+          │        me ┼ SimpleExpectedReturns
+          │           │   w ┴ nothing
+          │   horizon ┴ nothing
+        p ┼ nothing
+        w ┼ nothing
+      alg ┼ LinearOpinionPooling()
+  threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related

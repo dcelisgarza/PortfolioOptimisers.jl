@@ -36,11 +36,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> KendallCovariance()
 KendallCovariance
-  ve ├ SimpleVariance
-     │          me ├ SimpleExpectedReturns
-     │             │   w └ nothing
-     │           w ├ nothing
-     │   corrected └ Bool: true
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
 ```
 
 # Related
@@ -155,11 +155,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> SpearmanCovariance()
 SpearmanCovariance
-  ve ├ SimpleVariance
-     │          me ├ SimpleExpectedReturns
-     │             │   w └ nothing
-     │           w ├ nothing
-     │   corrected └ Bool: true
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
 ```
 
 # Related

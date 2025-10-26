@@ -38,7 +38,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Detone(; n = 2)
 Detone
-  n └ Int64: 2
+  n ┴ Int64: 2
 ```
 
 # Related

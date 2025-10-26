@@ -45,15 +45,15 @@ julia> FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1),
                      l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                      fl = Dict("A" => 5.0), fs = ["B" => 10.0])
 FeesEstimator
-      tn ├ TurnoverEstimator
-         │         w ├ Vector{Float64}: [0.2, 0.3, 0.5]
-         │       val ├ Dict{String, Float64}: Dict("A" => 0.1)
-         │   default └ Float64: 0.0
-       l ├ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
-       s ├ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
-      fl ├ Dict{String, Float64}: Dict("A" => 5.0)
-      fs ├ Vector{Pair{String, Float64}}: ["B" => 10.0]
-  kwargs └ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      tn ┼ TurnoverEstimator
+         │         w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │       val ┼ Dict{String, Float64}: Dict("A" => 0.1)
+         │   default ┴ Float64: 0.0
+       l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
+       s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
+      fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
+      fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
 
 # Related
@@ -129,14 +129,14 @@ julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" =
 
 julia> fees_constraints(fees, sets)
 Fees
-      tn ├ Turnover
-         │     w ├ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val └ Vector{Float64}: [0.1, 0.0, 0.0]
-       l ├ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ├ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ├ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ├ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs └ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      tn ┼ Turnover
+         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
+      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
 
 # Related
@@ -205,14 +205,14 @@ Container for portfolio transaction fee constraints.
 julia> Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
             s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0])
 Fees
-      tn ├ Turnover
-         │     w ├ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val └ Vector{Float64}: [0.1, 0.0, 0.0]
-       l ├ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ├ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ├ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ├ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs └ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      tn ┼ Turnover
+         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
+      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
 
 # Related
@@ -290,14 +290,14 @@ julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" =
 
 julia> fees_constraints(fees, sets)
 Fees
-      tn ├ Turnover
-         │     w ├ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val └ Vector{Float64}: [0.1, 0.0, 0.0]
-       l ├ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ├ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ├ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ├ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs └ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      tn ┼ Turnover
+         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
+      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
 
 # Related
@@ -339,14 +339,14 @@ julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001
 
 julia> fees_constraints(fees)
 Fees
-      tn ├ Turnover
-         │     w ├ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val └ Vector{Float64}: [0.1, 0.0, 0.0]
-       l ├ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ├ nothing
-      fl ├ nothing
-      fs ├ nothing
-  kwargs └ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      tn ┼ Turnover
+         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ nothing
+      fl ┼ nothing
+      fs ┼ nothing
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 
 julia> fees_constraints(nothing)
 

@@ -31,11 +31,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0])
 PhylogenyResult
-  X └ 3×3 Matrix{Int64}
+  X ┴ 3×3 Matrix{Int64}
 
 julia> PhylogenyResult(; X = [0.2, 0.5, 0.3])
 PhylogenyResult
-  X └ Vector{Float64}: [0.2, 0.5, 0.3]
+  X ┴ Vector{Float64}: [0.2, 0.5, 0.3]
 ```
 
 # Related
@@ -82,7 +82,7 @@ julia> ph = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
 
 julia> phylogeny_matrix(ph)
 PhylogenyResult
-  X └ 3×3 Matrix{Int64}
+  X ┴ 3×3 Matrix{Int64}
 ```
 
 # Related
@@ -117,7 +117,7 @@ julia> ph = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
 
 julia> centrality_vector(ph)
 PhylogenyResult
-  X └ Vector{Float64}: [0.2, 0.5, 0.3]
+  X ┴ Vector{Float64}: [0.2, 0.5, 0.3]
 ```
 
 # Related
@@ -179,8 +179,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BetweennessCentrality()
 BetweennessCentrality
-    args ├ Tuple{}: ()
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{}: ()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -224,8 +224,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ClosenessCentrality()
 ClosenessCentrality
-    args ├ Tuple{}: ()
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{}: ()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -273,8 +273,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DegreeCentrality(; kind = 1)
 DegreeCentrality
-    kind ├ Int64: 1
-  kwargs └ @NamedTuple{}: NamedTuple()
+    kind ┼ Int64: 1
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -330,7 +330,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> KatzCentrality(; alpha = 0.5)
 KatzCentrality
-  alpha └ Float64: 0.5
+  alpha ┴ Float64: 0.5
 ```
 
 # Related
@@ -381,9 +381,9 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Pagerank(; alpha = 0.9, n = 200, epsilon = 1e-8)
 Pagerank
-        n ├ Int64: 200
-    alpha ├ Float64: 0.9
-  epsilon └ Float64: 1.0e-8
+        n ┼ Int64: 200
+    alpha ┼ Float64: 0.9
+  epsilon ┴ Float64: 1.0e-8
 ```
 
 # Related
@@ -443,8 +443,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StressCentrality()
 StressCentrality
-    args ├ Tuple{}: ()
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{}: ()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -564,8 +564,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> KruskalTree()
 KruskalTree
-    args ├ Tuple{}: ()
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{}: ()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -609,8 +609,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BoruvkaTree()
 BoruvkaTree
-    args ├ Tuple{}: ()
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{}: ()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -654,8 +654,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> PrimTree()
 PrimTree
-    args ├ Tuple{}: ()
-  kwargs └ @NamedTuple{}: NamedTuple()
+    args ┼ Tuple{}: ()
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -755,27 +755,27 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> NetworkEstimator()
 NetworkEstimator
-   ce ├ PortfolioOptimisersCovariance
-      │   ce ├ Covariance
-      │      │    me ├ SimpleExpectedReturns
-      │      │       │   w └ nothing
-      │      │    ce ├ GeneralCovariance
-      │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │    w └ nothing
-      │      │   alg └ Full()
-      │   mp ├ DefaultMatrixProcessing
-      │      │       pdm ├ Posdef
-      │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-      │      │   denoise ├ nothing
-      │      │    detone ├ nothing
-      │      │       alg └ nothing
-   de ├ Distance
-      │   power ├ nothing
-      │     alg └ CanonicalDistance()
-  alg ├ KruskalTree
-      │     args ├ Tuple{}: ()
-      │   kwargs └ @NamedTuple{}: NamedTuple()
-    n └ Int64: 1
+   ce ┼ PortfolioOptimisersCovariance
+      │   ce ┼ Covariance
+      │      │    me ┼ SimpleExpectedReturns
+      │      │       │   w ┴ nothing
+      │      │    ce ┼ GeneralCovariance
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
+      │      │   alg ┴ Full()
+      │   mp ┼ DefaultMatrixProcessing
+      │      │       pdm ┼ Posdef
+      │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │      │   denoise ┼ nothing
+      │      │    detone ┼ nothing
+      │      │       alg ┴ nothing
+   de ┼ Distance
+      │   power ┼ nothing
+      │     alg ┴ CanonicalDistance()
+  alg ┼ KruskalTree
+      │     args ┼ Tuple{}: ()
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    n ┴ Int64: 1
 ```
 
 # Related
@@ -845,31 +845,31 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> CentralityEstimator()
 CentralityEstimator
-    ne ├ NetworkEstimator
-       │    ce ├ PortfolioOptimisersCovariance
-       │       │   ce ├ Covariance
-       │       │      │    me ├ SimpleExpectedReturns
-       │       │      │       │   w └ nothing
-       │       │      │    ce ├ GeneralCovariance
-       │       │      │       │   ce ├ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │       │      │       │    w └ nothing
-       │       │      │   alg └ Full()
-       │       │   mp ├ DefaultMatrixProcessing
-       │       │      │       pdm ├ Posdef
-       │       │      │           │   alg └ UnionAll: NearestCorrelationMatrix.Newton
-       │       │      │   denoise ├ nothing
-       │       │      │    detone ├ nothing
-       │       │      │       alg └ nothing
-       │    de ├ Distance
-       │       │   power ├ nothing
-       │       │     alg └ CanonicalDistance()
-       │   alg ├ KruskalTree
-       │       │     args ├ Tuple{}: ()
-       │       │   kwargs └ @NamedTuple{}: NamedTuple()
-       │     n └ Int64: 1
-  cent ├ DegreeCentrality
-       │     kind ├ Int64: 0
-       │   kwargs └ @NamedTuple{}: NamedTuple()
+    ne ┼ NetworkEstimator
+       │    ce ┼ PortfolioOptimisersCovariance
+       │       │   ce ┼ Covariance
+       │       │      │    me ┼ SimpleExpectedReturns
+       │       │      │       │   w ┴ nothing
+       │       │      │    ce ┼ GeneralCovariance
+       │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │       │      │       │    w ┴ nothing
+       │       │      │   alg ┴ Full()
+       │       │   mp ┼ DefaultMatrixProcessing
+       │       │      │       pdm ┼ Posdef
+       │       │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+       │       │      │   denoise ┼ nothing
+       │       │      │    detone ┼ nothing
+       │       │      │       alg ┴ nothing
+       │    de ┼ Distance
+       │       │   power ┼ nothing
+       │       │     alg ┴ CanonicalDistance()
+       │   alg ┼ KruskalTree
+       │       │     args ┼ Tuple{}: ()
+       │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │     n ┴ Int64: 1
+  cent ┼ DegreeCentrality
+       │     kind ┼ Int64: 0
+       │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related

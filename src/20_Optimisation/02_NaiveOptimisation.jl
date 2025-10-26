@@ -10,27 +10,27 @@ struct NaiveOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
     pr::T2
     w::T3
     retcode::T4
-    attempts::T5
+    fb::T5
 end
-function opt_attempt_factory(res::NaiveOptimisation, attempts)
-    return NaiveOptimisation(res.oe, res.pr, res.w, res.retcode, attempts)
+function opt_attempt_factory(res::NaiveOptimisation, fb)
+    return NaiveOptimisation(res.oe, res.pr, res.w, res.retcode, fb)
 end
 struct InverseVolatility{T1, T2} <: NaiveOptimisationEstimator
     pe::T1
-    fallback::T2
+    fb::T2
     function InverseVolatility(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                               fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-        return new{typeof(pe), typeof(fallback)}(pe, fallback)
+                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+        return new{typeof(pe), typeof(fb)}(pe, fb)
     end
 end
 function InverseVolatility(;
                            pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                           fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return InverseVolatility(pe, fallback)
+                           fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return InverseVolatility(pe, fb)
 end
 function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
     pe = prior_view(opt.pe, i)
-    return InverseVolatility(; pe = pe, fallback = opt.fallback)
+    return InverseVolatility(; pe = pe, fb = opt.fb)
 end
 function assert_external_optimiser(opt::InverseVolatility)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.

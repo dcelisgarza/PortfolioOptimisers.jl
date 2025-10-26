@@ -26,7 +26,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> PValue()
 PValue
-  threshold └ Float64: 0.05
+  threshold ┴ Float64: 0.05
 ```
 
 # Related
@@ -102,11 +102,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StepwiseRegression()
 StepwiseRegression
-    crit ├ PValue
-         │   threshold └ Float64: 0.05
-     alg ├ Forward()
-  target ├ LinearModel
-         │   kwargs └ @NamedTuple{}: NamedTuple()
+    crit ┼ PValue
+         │   threshold ┴ Float64: 0.05
+     alg ┼ Forward()
+  target ┼ LinearModel
+         │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related

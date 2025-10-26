@@ -25,9 +25,9 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ExcessExpectedReturns()
 ExcessExpectedReturns
-  me ├ SimpleExpectedReturns
-     │   w └ nothing
-  rf └ Float64: 0.0
+  me ┼ SimpleExpectedReturns
+     │   w ┴ nothing
+  rf ┴ Float64: 0.0
 ```
 
 # Related

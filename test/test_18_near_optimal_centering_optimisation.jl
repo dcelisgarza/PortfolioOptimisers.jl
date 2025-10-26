@@ -111,7 +111,7 @@
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fallback = InverseVolatility(; pe = pr)))
+                                            fb = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
 
         w0 = range(; start = inv(length(pr.mu)), stop = inv(length(pr.mu)),
@@ -133,7 +133,7 @@
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fallback = InverseVolatility(; pe = pr)))
+                                            fb = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Constrained" begin
@@ -195,7 +195,7 @@
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fallback = InverseVolatility(; pe = pr)))
+                                            fb = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Pareto Surface" begin

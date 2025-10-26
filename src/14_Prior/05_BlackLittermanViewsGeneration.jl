@@ -29,8 +29,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BlackLittermanViews(; P = [1 2 3 4; 5 6 7 8], Q = [9; 10])
 BlackLittermanViews
-  P ├ 2×4 Matrix{Int64}
-  Q └ Vector{Int64}: [9, 10]
+  P ┼ 2×4 Matrix{Int64}
+  Q ┴ Vector{Int64}: [9, 10]
 ```
 
 # Related
@@ -85,8 +85,8 @@ julia> lcs = parse_equation(["A + B == 0.05", "C == 0.02"]);
 
 julia> PortfolioOptimisers.get_black_litterman_views(lcs, sets)
 BlackLittermanViews
-  P ├ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-  Q └ Vector{Float64}: [0.05, 0.02]
+  P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+  Q ┴ Vector{Float64}: [0.05, 0.02]
 ```
 
 # Related
@@ -164,15 +164,15 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"]));
 
 julia> black_litterman_views(["A + B == 0.05", "C == 0.02"], sets)
 BlackLittermanViews
-  P ├ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-  Q └ Vector{Float64}: [0.05, 0.02]
+  P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+  Q ┴ Vector{Float64}: [0.05, 0.02]
 
 julia> lce = LinearConstraintEstimator(; val = ["A == 0.03", "B + C == 0.04"]);
 
 julia> black_litterman_views(lce, sets)
 BlackLittermanViews
-  P ├ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-  Q └ Vector{Float64}: [0.03, 0.04]
+  P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+  Q ┴ Vector{Float64}: [0.03, 0.04]
 ```
 
 # Related

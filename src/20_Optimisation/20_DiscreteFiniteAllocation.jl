@@ -10,36 +10,33 @@ struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T
     s_model::T8
     l_model::T9
     cash::T10
-    attempts::T11
+    fb::T11
 end
-function opt_attempt_factory(res::DiscreteAllocationOptimisation, attempts)
+function opt_attempt_factory(res::DiscreteAllocationOptimisation, fb)
     return DiscreteAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
                                           res.s_retcode, res.l_retcode, res.s_model,
-                                          res.l_model, res.cash, attempts)
+                                          res.l_model, res.cash, fb)
 end
 struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
     so::T3
-    fallback::T4
+    fb::T4
     function DiscreteAllocation(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
                                 so::Real,
-                                fallback::Union{Nothing,
-                                                <:FiniteAllocationOptimisationEstimator})
+                                fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator})
         if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc > zero(sc))
         @argcheck(so > zero(so))
-        return new{typeof(slv), typeof(sc), typeof(so), typeof(fallback)}(slv, sc, so,
-                                                                          fallback)
+        return new{typeof(slv), typeof(sc), typeof(so), typeof(fb)}(slv, sc, so, fb)
     end
 end
 function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             sc::Real = 1, so::Real = 1,
-                            fallback::Union{Nothing,
-                                            <:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
-    return DiscreteAllocation(slv, sc, so, fallback)
+                            fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
+    return DiscreteAllocation(slv, sc, so, fb)
 end
 function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
                                da::DiscreteAllocation, str_names::Bool = false)

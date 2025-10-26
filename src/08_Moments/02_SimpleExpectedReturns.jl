@@ -66,7 +66,7 @@ julia> X = [0.01 0.02; 0.03 0.04];
 
 julia> ser = SimpleExpectedReturns()
 SimpleExpectedReturns
-  w └ nothing
+  w ┴ nothing
 
 julia> mean(ser, X)
 1×2 Matrix{Float64}:
@@ -76,7 +76,7 @@ julia> w = Weights([0.2, 0.8]);
 
 julia> serw = SimpleExpectedReturns(; w = w)
 SimpleExpectedReturns
-  w └ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
 
 julia> mean(serw, X)
 1×2 Matrix{Float64}:

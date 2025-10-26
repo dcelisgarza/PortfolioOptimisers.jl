@@ -3,37 +3,34 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     r::T2
     obj::T3
     wi::T4
-    fallback::T5
+    fb::T5
     function MeanRisk(opt::JuMPOptimiser,
                       r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                       obj::ObjectiveFunction, wi::Union{Nothing, <:AbstractVector{<:Real}},
-                      fallback::Union{Nothing, <:OptimisationEstimator})
+                      fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
         if isa(wi, AbstractVector)
             @argcheck(!isempty(wi))
         end
-        return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fallback)}(opt,
-                                                                                      r,
-                                                                                      obj,
-                                                                                      wi,
-                                                                                      fallback)
+        return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
+                                                                                wi, fb)
     end
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
                   r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(),
                   wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                  fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return MeanRisk(opt, r, obj, wi, fallback)
+                  fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return MeanRisk(opt, r, obj, wi, fb)
 end
 function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
-    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fallback = mr.fallback)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = mr.fb)
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, ::Val{false}, ::Val{false}, args...)
