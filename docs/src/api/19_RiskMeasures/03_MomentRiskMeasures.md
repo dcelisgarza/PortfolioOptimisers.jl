@@ -33,6 +33,6 @@ PortfolioOptimisers.calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <
                             w::AbstractVector, ::Any)
 PortfolioOptimisers.calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
                                 <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any, ::Any)
-PortfolioOptimisers.calc_moment_val(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
+PortfolioOptimisers.calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
                          X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
 ```
