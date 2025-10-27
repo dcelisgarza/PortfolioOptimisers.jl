@@ -114,6 +114,7 @@ function Base.show(io::IO,
     return nothing
 end
 =#
+#=
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
@@ -170,6 +171,71 @@ function Base.show(io::IO,
     end
     return nothing
 end
+=#
+macro define_pretty_show(T)
+    quote
+        function Base.show(io::IO, obj::$(esc(T)))
+            fields = propertynames(obj)
+            if isempty(fields)
+                return print(io, string(typeof(obj), "()"), '\n')
+            end
+            if get(io, :compact, false) || get(io, :multiline, false)
+                return print(io, string(typeof(obj), "{...}(...)"), '\n')
+            end
+            name = Base.typename(typeof(obj)).wrapper
+            print(io, name, '\n')
+            padding = maximum(map(length, map(string, fields))) + 2
+            for (i, field) in enumerate(fields)
+                if hasproperty(obj, field)
+                    val = getproperty(obj, field)
+                else
+                    continue
+                end
+                flag = has_pretty_show_method(val)
+                sym1 = ifelse(i == length(fields) &&
+                              (!flag || (flag && isempty(propertynames(val)))), '┴', '┼')
+                print(io, lpad(string(field), padding), " ")
+                if isnothing(val)
+                    print(io, "$(sym1) nothing", '\n')
+                elseif flag || (isa(val, AbstractVector) &&
+                                length(val) <= 6 &&
+                                all(has_pretty_show_method, val))
+                    ioalg = IOBuffer()
+                    show(ioalg, val)
+                    algstr = String(take!(ioalg))
+                    alglines = split(algstr, '\n')
+                    print(io, "$(sym1) ", alglines[1], '\n')
+                    for l in alglines[2:end]
+                        if isempty(l) || l == '\n'
+                            continue
+                        end
+                        sym2 = '│'
+                        print(io, lpad("$sym2 ", padding + 3), l, '\n')
+                    end
+                elseif isa(val, AbstractMatrix)
+                    print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
+                elseif isa(val, AbstractVector) && length(val) > 6
+                    print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
+                elseif isa(val, DataType)
+                    tval = typeof(val)
+                    valstr = Base.typename(tval).wrapper
+                    print(io, "$(sym1) $(tval): ", valstr, '\n')
+                else
+                    print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
+                end
+            end
+            return nothing
+        end
+    end
+end
+has_pretty_show_method(::Any) = false
+has_pretty_show_method(::JuMP.Model) = true
+function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                        <:AbstractResult, <:AbstractCovarianceEstimator})
+    return true
+end
+@define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                          <:AbstractCovarianceEstimator})
 function mul_cond_msg(conds::AbstractString...)
     N = isa(conds, Tuple) ? length(conds) : 1
     msg = "the following conditions must hold:\n"
