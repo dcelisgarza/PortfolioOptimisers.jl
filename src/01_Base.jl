@@ -180,7 +180,7 @@ macro define_pretty_show(T)
                 return print(io, string(typeof(obj), "()"), '\n')
             end
             if get(io, :compact, false) || get(io, :multiline, false)
-                return print(io, string(typeof(obj), "{...}(...)"), '\n')
+                return print(io, string(typeof(obj)), '\n')
             end
             name = Base.typename(typeof(obj)).wrapper
             print(io, name, '\n')
