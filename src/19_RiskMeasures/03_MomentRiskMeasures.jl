@@ -531,7 +531,7 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
@@ -653,7 +653,7 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
+\\mathrm{Semi-Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
 \\end{align}
 ```
 
@@ -671,7 +671,7 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
+\\mathrm{Semi-StandardDeviation}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
