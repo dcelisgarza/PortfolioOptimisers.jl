@@ -235,7 +235,7 @@ function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm
     return true
 end
 @define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                          <:AbstractCovarianceEstimator})
+                          <:AbstractCovarianceEstimator, <:Clustering.Hclust})
 function mul_cond_msg(conds::AbstractString...)
     N = isa(conds, Tuple) ? length(conds) : 1
     msg = "the following conditions must hold:\n"

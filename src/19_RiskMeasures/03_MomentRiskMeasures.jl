@@ -431,14 +431,13 @@ The first lower moment is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{FirstLowerMoment}(\\boldsymbol{R},\\, \\tau) &= \\mathbb{E}\\left[\\max \\circ \\left(\\tau - \\boldsymbol{R},\\, 0\\right)\\right]\\,.
+\\mathrm{FirstLowerMoment}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\max \\circ \\left(\\mathbb{E}\\left[\\boldsymbol{X}\\right] - \\boldsymbol{X},\\, 0\\right)\\right]\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
   - ``\\circ``: element-wise function application.
 
@@ -446,18 +445,17 @@ As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\mathrm{X}``: `T×N` return matrix.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 ## `MeanAbsoluteDeviation`
@@ -466,31 +464,30 @@ The mean absolute deviation is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{R}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right] \\right\\rvert\\right]
+\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right] \\right\\rvert\\right]
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\mathrm{X}``: `T×N` return matrix.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 ## `StandardisedLowOrderMoment`
@@ -517,13 +514,13 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{R}) = \\mathbb{E}\\left[\\left(\\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right]\\right)^2\\right] \\,.
+\\mathrm{Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 The standard deviation formulation is:
@@ -534,13 +531,13 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{R}) = \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right]\\right)^2\\right]} \\,.
+\\mathrm{Variance}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 #### `SquaredSOCRiskExpr`
@@ -549,22 +546,21 @@ Represents the variance using the square of a second order cone constrained vari
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\sigma``: standard deviation of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``K_{soc}``: second order cone.
   - ``\\odot``: element-wise (Hadamard) product.
@@ -575,22 +571,21 @@ Represents the variance using a sum of squares formulation via a rotated second 
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``t``: variance of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``K_{rsoc}``: rotated second order cone.
   - ``\\odot``: element-wise (Hadamard) product.
@@ -601,20 +596,20 @@ Represents the variance using the deviations vector dotted with itself.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} 
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``\\odot``: element-wise (Hadamard) product.
 
@@ -624,22 +619,22 @@ Represents the standard deviation using a second order cone constrained variable
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\sigma``: standard deviation of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``\\odot``: element-wise (Hadamard) product.
   - ``K_{soc}``: second order cone.
@@ -658,13 +653,13 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{R}) = \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right],\\,0\\right)^2\\right] \\,.
+\\mathrm{Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
   - ``\\circ``: element-wise function application.
 
@@ -676,13 +671,13 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{R}) = \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right],\\,0\\right)^2\\right]} \\,.
+\\mathrm{Variance}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
   - ``\\circ``: element-wise function application.
 
@@ -692,23 +687,23 @@ Represents the semi-variance using the square of a second order cone constrained
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\sigma``: semi-standard deviation of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``\\odot``: element-wise (Hadamard) product.
   - ``K_{soc}``: second order cone.
@@ -719,23 +714,23 @@ Represents the semi-variance using a sum of squares formulation via a rotated se
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``t``: semi-variance of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``K_{rsoc}``: rotated second order cone.
   - ``\\odot``: element-wise (Hadamard) product.
@@ -746,21 +741,21 @@ Represents the semi-variance using the deviations vector dotted with itself.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} 
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``\\odot``: element-wise (Hadamard) product.
 
@@ -770,23 +765,23 @@ Represents the semi-standard deviation using a second order cone constrained var
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{R} \\boldsymbol{x} - \\tau \\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{w}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\sigma``: semi-standard deviation of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
-  - ``\\boldsymbol{w}``: `T×1` vector of observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
   - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
   - ``\\odot``: element-wise (Hadamard) product.
   - ``K_{soc}``: second order cone.
@@ -909,11 +904,51 @@ The standardised formulations are:
 
   - [`StandardisedHighOrderMoment`](@ref), which uses a variance estimator and an unstandardised high-order moment algorithm.
 
-## Unstandardised high order moments
+## Unstandardised Central Moments
 
-They follow the formula:
+All unstandardised central moments have the following formula.
 
-formula here
+```math
+\\begin{align}
+\\mu_n &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]
+\\end{align}
+```
+
+## Standardised Central Moments
+
+All standardised central moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\left(\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]\\right)^{n/2}}
+\\end{align}
+```
+
+## Unstandardised Lower Moments
+
+All unstandardised lower moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]
+\\end{align}
+```
+
+## Standardised Lower Moments
+
+All standardised lower moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]}{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^2\\right]^{n/2}}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+  - ``\\circ``: element-wise function application.
 
 # Functor
 
@@ -921,6 +956,11 @@ formula here
                         fees::Union{Nothing, <:Fees} = nothing)
 
 Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
+
+## Details
+
+  - `r.alg` defines what low-order moment to compute.
+  - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
 
 # Examples
 
