@@ -7,7 +7,7 @@ struct SchurComplementHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6,
     gamma::T5
     retcode::T6
     w::T7
-    fallback::T8
+    fb::T8
 end
 abstract type SchurComplementAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
@@ -64,33 +64,31 @@ end
 struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisationEstimator
     opt::T1
     params::T2
-    fallback::T3
+    fb::T3
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::Union{<:SchurComplementParams,
                                                                  <:AbstractVector{<:SchurComplementParams}},
-                                                   fallback::Union{Nothing,
-                                                                   <:OptimisationEstimator})
+                                                   fb::Union{Nothing,
+                                                             <:OptimisationEstimator})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params))
         end
-        return new{typeof(opt), typeof(params), typeof(fallback)}(opt, params, fallback)
+        return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
 end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::Union{<:SchurComplementParams,
                                                              <:AbstractVector{<:SchurComplementParams}} = SchurComplementParams(),
-                                               fallback::Union{Nothing,
-                                                               <:OptimisationEstimator} = nothing)
-    return SchurComplementHierarchicalRiskParity(opt, params, fallback)
+                                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i::AbstractVector,
                   X::AbstractMatrix)
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_complement_params_view(sh.params, i, X)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = params,
-                                                 fallback = sh.fallback)
+    return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
 end
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     @argcheck(abs(n1 - n2) <= 1)

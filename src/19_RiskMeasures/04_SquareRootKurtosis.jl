@@ -64,8 +64,8 @@ function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:Real, <:Any, <
                                                   <:Any}, ::Any, ::Any)
     return r.mu
 end
-function calc_moment_val(r::SquareRootKurtosis, w::AbstractVector, X::AbstractMatrix,
-                         fees::Union{Nothing, <:Fees} = nothing)
+function calc_deviations_vec(r::SquareRootKurtosis, w::AbstractVector, X::AbstractMatrix,
+                             fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -74,7 +74,7 @@ function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full})(w::A
                                                                             X::AbstractMatrix,
                                                                             fees::Union{Nothing,
                                                                                         <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
@@ -82,7 +82,7 @@ function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi})(w::A
                                                                             X::AbstractMatrix,
                                                                             fees::Union{Nothing,
                                                                                         <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end

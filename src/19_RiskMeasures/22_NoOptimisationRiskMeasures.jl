@@ -84,8 +84,8 @@ function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Real},
                                      <:Skewness{<:Any, <:Any, <:Real}}, ::Any, ::Any)
     return r.mu
 end
-function calc_moment_val(r::Union{<:ThirdCentralMoment, <:Skewness}, w::AbstractVector,
-                         X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
+function calc_deviations_vec(r::Union{<:ThirdCentralMoment, <:Skewness}, w::AbstractVector,
+                             X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -101,7 +101,7 @@ function risk_measure_view(r::ThirdCentralMoment, i::AbstractVector, args...)
 end
 function (r::ThirdCentralMoment)(w::AbstractVector, X::AbstractMatrix,
                                  fees::Union{Nothing, <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 3
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
@@ -116,7 +116,7 @@ function risk_measure_view(r::Skewness, i::AbstractVector, args...)
 end
 function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)

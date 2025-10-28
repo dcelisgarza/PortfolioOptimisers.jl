@@ -32,29 +32,29 @@ Direct quadratic risk expression optimisation formulation for variance-like risk
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` co-moment matrix.
 
 # Scenario-based
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
-\\textrm{s.t.} &\\qquad \\boldsymbol{d} \\in \\mathcal{S}_{x}.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
+\\textrm{s.t.} &\\qquad \\boldsymbol{d} \\in \\mathcal{S}_{w}.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` deviations vector.
-  - ``\\mathcal{S}_{x}``: Scenario set for portfolio `x`.
+  - ``\\mathcal{S}_{w}``: Scenario set for portfolio `x`.
 
 # Related Types
 
@@ -146,27 +146,27 @@ Depending on the `alg` field, the variance risk measure is formulated using `JuM
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## `SquaredSOCRiskExpr`
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\sigma^2\\nonumber\\\\
-\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{x} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\sigma^2\\nonumber\\\\
+\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
   - ``\\mathbf{G}``: Suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
@@ -179,13 +179,13 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
+\\mathrm{Variance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## Arguments
@@ -202,13 +202,13 @@ julia> r = Variance(;
                              -0.06400 3.28564 1.84588;
                              0.84818 1.84588 2.16317])
 Variance
-  settings | RiskMeasureSettings
-           |   scale | Float64: 1.0
-           |      ub | nothing
-           |     rke | Bool: true
-     sigma | 3×3 Matrix{Float64}
-        rc | nothing
-       alg | SquaredSOCRiskExpr()
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+     sigma ┼ 3×3 Matrix{Float64}
+        rc ┼ nothing
+       alg ┴ SquaredSOCRiskExpr()
 
 julia> r(w)
 1.3421705804186579
@@ -315,14 +315,14 @@ Keyword arguments correspond to the fields above.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\sigma\\nonumber\\\\
-\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{x} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\sigma\\nonumber\\\\
+\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
   - ``\\mathbf{G}``: Suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
@@ -335,13 +335,13 @@ Computes the standard deviation risk of a portfolio with weights `w` using the c
 
 ```math
 \\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}}\\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\sqrt{\\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## Arguments
@@ -358,11 +358,11 @@ julia> r = StandardDeviation(;
                                       -0.06400 3.28564 1.84588;
                                       0.84818 1.84588 2.16317])
 StandardDeviation
-  settings | RiskMeasureSettings
-           |   scale | Float64: 1.0
-           |      ub | nothing
-           |     rke | Bool: true
-     sigma | 3×3 Matrix{Float64}
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+     sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
 1.1585208588621345
@@ -457,13 +457,13 @@ When using an uncertainty set on the variance, the optimisation problem becomes:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} &\\qquad \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
   - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
 
@@ -473,12 +473,12 @@ This problem can be reformulated depending on the type of uncertainty set used.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left(\\mathbf{A}_u \\mathbf{\\Sigma}_u\\right) - \\mathrm{Tr}\\left(\\mathbf{A}_l \\mathbf{\\Sigma}_l\\right)\\\\
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left(\\mathbf{A}_u \\mathbf{\\Sigma}_u\\right) - \\mathrm{Tr}\\left(\\mathbf{A}_l \\mathbf{\\Sigma}_l\\right)\\\\
 \\textrm{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
                & \\quad \\mathbf{A}_l \\geq 0\\\\
                & \\quad \\begin{bmatrix}
-                            \\mathbf{X} & \\boldsymbol{x}\\\\
-                            \\boldsymbol{x}^\\intercal & k
+                            \\mathbf{X} & \\boldsymbol{w}\\\\
+                            \\boldsymbol{w}^\\intercal & k
                         \\end{bmatrix} \\succeq 0 \\\\
                & \\quad \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{X}\\,.
 \\end{align}
@@ -486,7 +486,7 @@ This problem can be reformulated depending on the type of uncertainty set used.
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
 
   - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{X}``: `N×N` auxiliary symmetric matrices.
   - ``\\mathbf{\\Sigma}_l``: `N×N` lower bound of the covariance matrix.
@@ -501,10 +501,10 @@ Where:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{X} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{X} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
 \\textrm{s.t.} & \\quad \\begin{bmatrix}
-                            \\mathbf{X} & \\boldsymbol{x}\\\\
-                            \\boldsymbol{x}^\\intercal & k
+                            \\mathbf{X} & \\boldsymbol{w}\\\\
+                            \\boldsymbol{w}^\\intercal & k
                         \\end{bmatrix} \\succeq 0 \\\\
                & \\quad \\mathbf{E} \\succeq 0 \\\\
                & \\quad \\lVert \\mathbf{G} \\mathrm{vec}\\left( \\mathbf{X} + \\mathbf{E} \\right) \\rVert_{2} \\leq \\sigma \\\\
@@ -513,7 +513,7 @@ Where:
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
 
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
   - ``\\mathbf{X}``, ``\\mathbf{E}``: `N×N` auxiliary symmetric matrices.
@@ -536,13 +536,13 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 ```math
 \\begin{align}
-\\mathrm{UncertaintySetVariance}(\\boldsymbol{x},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{x}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{x}\\,.
+\\mathrm{UncertaintySetVariance}(\\boldsymbol{w},\\, \\mathbf{\\Sigma}) &= \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
 
 ## Arguments
@@ -559,35 +559,35 @@ julia> r = UncertaintySetVariance(;
                                            -0.06400 3.28564 1.84588;
                                            0.84818 1.84588 2.16317])
 UncertaintySetVariance
-  settings | RiskMeasureSettings
-           |   scale | Float64: 1.0
-           |      ub | nothing
-           |     rke | Bool: true
-       ucs | NormalUncertaintySet
-           |      pe | EmpiricalPrior
-           |         |        ce | PortfolioOptimisersCovariance
-           |         |           |   ce | Covariance
-           |         |           |      |    me | SimpleExpectedReturns
-           |         |           |      |       |   w | nothing
-           |         |           |      |    ce | GeneralCovariance
-           |         |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           |         |           |      |       |    w | nothing
-           |         |           |      |   alg | Full()
-           |         |           |   mp | DefaultMatrixProcessing
-           |         |           |      |       pdm | Posdef
-           |         |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-           |         |           |      |   denoise | nothing
-           |         |           |      |    detone | nothing
-           |         |           |      |       alg | nothing
-           |         |        me | SimpleExpectedReturns
-           |         |           |   w | nothing
-           |         |   horizon | nothing
-           |     alg | BoxUncertaintySetAlgorithm()
-           |   n_sim | Int64: 3000
-           |       q | Float64: 0.05
-           |     rng | Random.TaskLocalRNG: Random.TaskLocalRNG()
-           |    seed | nothing
-     sigma | 3×3 Matrix{Float64}
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+       ucs ┼ NormalUncertaintySet
+           │      pe ┼ EmpiricalPrior
+           │         │        ce ┼ PortfolioOptimisersCovariance
+           │         │           │   ce ┼ Covariance
+           │         │           │      │    me ┼ SimpleExpectedReturns
+           │         │           │      │       │   w ┴ nothing
+           │         │           │      │    ce ┼ GeneralCovariance
+           │         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │         │           │      │       │    w ┴ nothing
+           │         │           │      │   alg ┴ Full()
+           │         │           │   mp ┼ DefaultMatrixProcessing
+           │         │           │      │       pdm ┼ Posdef
+           │         │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+           │         │           │      │   denoise ┼ nothing
+           │         │           │      │    detone ┼ nothing
+           │         │           │      │       alg ┴ nothing
+           │         │        me ┼ SimpleExpectedReturns
+           │         │           │   w ┴ nothing
+           │         │   horizon ┴ nothing
+           │     alg ┼ BoxUncertaintySetAlgorithm()
+           │   n_sim ┼ Int64: 3000
+           │       q ┼ Float64: 0.05
+           │     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+           │    seed ┴ nothing
+     sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
 1.3421705804186579

@@ -34,13 +34,13 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ce = KendallCovariance()
+julia> KendallCovariance()
 KendallCovariance
-  ve | SimpleVariance
-     |          me | SimpleExpectedReturns
-     |             |   w | nothing
-     |           w | nothing
-     |   corrected | Bool: true
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
 ```
 
 # Related
@@ -153,13 +153,13 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ce = SpearmanCovariance()
+julia> SpearmanCovariance()
 SpearmanCovariance
-  ve | SimpleVariance
-     |          me | SimpleExpectedReturns
-     |             |   w | nothing
-     |           w | nothing
-     |   corrected | Bool: true
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
 ```
 
 # Related

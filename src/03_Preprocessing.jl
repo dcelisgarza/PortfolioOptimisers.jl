@@ -85,13 +85,13 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
 ReturnsResult
-    nx | Vector{String}: ["A", "B"]
-     X | 2×2 Matrix{Float64}
-    nf | nothing
-     F | nothing
-    ts | nothing
-    iv | nothing
-  ivpa | nothing
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
 ```
 
 # Related
@@ -271,15 +271,15 @@ julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103
 │ 2020-01-03 │ 104 │ 105 │
 └────────────┴─────┴─────┘
 
-julia> rr = prices_to_returns(X)
+julia> prices_to_returns(X)
 ReturnsResult
-    nx | Vector{String}: ["A", "B"]
-     X | 2×2 Matrix{Float64}
-    nf | nothing
-     F | nothing
-    ts | Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
-    iv | nothing
-  ivpa | nothing
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
+    iv ┼ nothing
+  ivpa ┴ nothing
 ```
 
 # Related

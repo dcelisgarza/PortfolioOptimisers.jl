@@ -12,13 +12,13 @@ struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10}
     retcode::T7
     sol::T8
     model::T9
-    attempts::T10
+    fb::T10
 end
-function opt_attempt_factory(res::NearOptimalCenteringOptimisation, attempts)
+function opt_attempt_factory(res::NearOptimalCenteringOptimisation, fb)
     return NearOptimalCenteringOptimisation(res.oe, res.pa, res.w_min_retcode,
                                             res.w_opt_retcode, res.w_max_retcode,
                                             res.noc_retcode, res.retcode, res.sol,
-                                            res.model, attempts)
+                                            res.model, fb)
 end
 function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
     return if sym == :w
@@ -41,7 +41,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     w_max_ini::T10
     ucs_flag::T11
     alg::T12
-    fallback::T13
+    fb::T13
     function NearOptimalCentering(opt::JuMPOptimiser,
                                   r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                                   obj::Union{Nothing, <:ObjectiveFunction},
@@ -53,7 +53,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                                   w_max::Union{Nothing, <:AbstractVector{<:Real}},
                                   w_max_ini::Union{Nothing, <:AbstractVector{<:Real}},
                                   ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
-                                  fallback::Union{Nothing, <:OptimisationEstimator})
+                                  fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
@@ -87,19 +87,16 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
                    typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
-                   typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fallback)}(opt,
-                                                                                       r,
-                                                                                       obj,
-                                                                                       bins,
-                                                                                       w_min,
-                                                                                       w_min_ini,
-                                                                                       w_opt,
-                                                                                       w_opt_ini,
-                                                                                       w_max,
-                                                                                       w_max_ini,
-                                                                                       ucs_flag,
-                                                                                       alg,
-                                                                                       fallback)
+                   typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fb)}(opt, r,
+                                                                                 obj, bins,
+                                                                                 w_min,
+                                                                                 w_min_ini,
+                                                                                 w_opt,
+                                                                                 w_opt_ini,
+                                                                                 w_max,
+                                                                                 w_max_ini,
+                                                                                 ucs_flag,
+                                                                                 alg, fb)
     end
 end
 function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
@@ -114,9 +111,9 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
-                              fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
+                              fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
-                                w_max, w_max_ini, ucs_flag, alg, fallback)
+                                w_max, w_max_ini, ucs_flag, alg, fb)
 end
 function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
@@ -131,8 +128,7 @@ function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatri
     return NearOptimalCentering(; alg = noc.alg, ucs_flag = noc.ucs_flag, r = r,
                                 obj = noc.obj, opt = opt, bins = noc.bins, w_min = w_min,
                                 w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
-                                w_max = w_max, w_max_ini = w_max_ini,
-                                fallback = noc.fallback)
+                                w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},

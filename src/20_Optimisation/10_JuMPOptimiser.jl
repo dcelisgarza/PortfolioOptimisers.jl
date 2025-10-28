@@ -33,10 +33,10 @@ struct JuMPOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     retcode::T3
     sol::T4
     model::T5
-    attempts::T6
+    fb::T6
 end
-function opt_attempt_factory(res::JuMPOptimisation, attempts)
-    return JuMPOptimisation(res.oe, res.pa, res.retcode, res.sol, res.model, attempts)
+function opt_attempt_factory(res::JuMPOptimisation, fb)
+    return JuMPOptimisation(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
 struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
@@ -47,11 +47,11 @@ struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
     retcode::T5
     sol::T6
     model::T7
-    attempts::T8
+    fb::T8
 end
-function opt_attempt_factory(res::JuMPOptimisationFactorRiskContribution, attempts)
+function opt_attempt_factory(res::JuMPOptimisationFactorRiskContribution, fb)
     return JuMPOptimisationFactorRiskContribution(res.oe, res.pa, res.rr, res.frc_plg,
-                                                  res.retcode, res.sol, res.model, attempts)
+                                                  res.retcode, res.sol, res.model, fb)
 end
 struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     oe::T1
@@ -60,16 +60,16 @@ struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6, T7} <: Optimisation
     retcode::T4
     sol::T5
     model::T6
-    attempts::T7
+    fb::T7
 end
-function opt_attempt_factory(res::JuMPOptimisationRiskBudgeting, attempts)
+function opt_attempt_factory(res::JuMPOptimisationRiskBudgeting, fb)
     return JuMPOptimisationRiskBudgeting(res.oe, res.pa, res.prb, res.retcode, res.sol,
-                                         res.model, attempts)
+                                         res.model, fb)
 end
 function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in (:oe, :pa, :retcode, :sol, :model, :attempts)
+    elseif sym in (:oe, :pa, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else
         getfield(r.pa, sym)
@@ -78,7 +78,7 @@ end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in (:oe, :pa, :frc_plg, :retcode, :sol, :model, :attempts)
+    elseif sym in (:oe, :pa, :frc_plg, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else
         getfield(r.pa, sym)
@@ -87,7 +87,7 @@ end
 function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
     return if sym == :w
         r.sol.w
-    elseif sym in (:oe, :pa, :prb, :retcode, :sol, :model, :attempts)
+    elseif sym in (:oe, :pa, :prb, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else
         getfield(r.pa, sym)

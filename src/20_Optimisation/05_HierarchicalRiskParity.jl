@@ -2,32 +2,30 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     opt::T1
     r::T2
     sce::T3
-    fallback::T4
+    fb::T4
     function HierarchicalRiskParity(opt::HierarchicalOptimiser,
                                     r::Union{<:OptimisationRiskMeasure,
                                              <:AbstractVector{<:OptimisationRiskMeasure}},
                                     sce::Scalariser,
-                                    fallback::Union{Nothing, <:OptimisationEstimator})
+                                    fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
-        return new{typeof(opt), typeof(r), typeof(sce), typeof(fallback)}(opt, r, sce,
-                                                                          fallback)
+        return new{typeof(opt), typeof(r), typeof(sce), typeof(fb)}(opt, r, sce, fb)
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
                                 sce::Scalariser = SumScalariser(),
-                                fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    return HierarchicalRiskParity(opt, r, sce, fallback)
+                                fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return HierarchicalRiskParity(opt, r, sce, fb)
 end
 function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
-    return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce,
-                                  fallback = hrp.fallback)
+    return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce, fb = hrp.fb)
 end
 function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
                                          lc::AbstractVector, rc::AbstractVector)

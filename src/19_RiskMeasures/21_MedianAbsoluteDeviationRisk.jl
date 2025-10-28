@@ -72,15 +72,15 @@ function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecScalar
                             w::AbstractVector, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
-function calc_moment_val(r::MedianAbsoluteDeviation, w::AbstractVector, X::AbstractMatrix,
-                         fees::Union{Nothing, <:Fees} = nothing)
+function calc_deviations_vec(r::MedianAbsoluteDeviation, w::AbstractVector,
+                             X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
 end
 function (r::MedianAbsoluteDeviation)(w::AbstractVector, X::AbstractMatrix,
                                       fees::Union{Nothing, <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     return mad(val; center = zero(eltype(X)), normalize = r.flag)
 end
 

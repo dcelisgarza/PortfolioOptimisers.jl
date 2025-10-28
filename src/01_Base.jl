@@ -65,15 +65,16 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
+#=
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
     fields = propertynames(ear)
     if isempty(fields)
-        return println(io, string(typeof(ear), "()"))
+        return print(io, string(typeof(ear), "()"),'\n')
     end
     name = Base.typename(typeof(ear)).wrapper
-    println(io, name)
+    print(io, name,'\n')
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
         if hasproperty(ear, field)
@@ -83,35 +84,159 @@ function Base.show(io::IO,
         end
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
-            println(io, "| nothing")
+            print(io, "| nothing",'\n')
         elseif isa(val, AbstractMatrix)
-            println(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))")
+            print(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))",'\n')
         elseif isa(val, AbstractVector) && length(val) > 6
-            println(io, "| $(length(val))-element $(typeof(val))")
+            print(io, "| $(length(val))-element $(typeof(val))",'\n')
         elseif isa(val,
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                          <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
             ioalg = IOBuffer()
-            show(ioalg, val)
+            print(ioalg, val,'\n')
             algstr = String(take!(ioalg))
             alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
+            print(io, "| ", alglines[1],'\n')
             for l in alglines[2:end]
                 if isempty(l) || l == '\n'
                     continue
                 end
-                println(io, lpad("| ", padding + 3), l)
+                print(io, lpad("| ", padding + 3), l,'\n')
             end
         elseif isa(val, DataType)
             tval = typeof(val)
             val = Base.typename(tval).wrapper
-            println(io, "| $(tval): ", val)
+            print(io, "| $(tval): ", val,'\n')
         else
-            println(io, "| $(typeof(val)): ", repr(val))
+            print(io, "| $(typeof(val)): ", repr(val),'\n')
         end
     end
     return nothing
 end
+=#
+#=
+function Base.show(io::IO,
+                   ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                              <:AbstractCovarianceEstimator})
+    fields = propertynames(ear)
+    if isempty(fields)
+        return print(io, string(typeof(ear), "()"), '\n')
+    end
+    if get(io, :compact, false)
+        return print(io, string(typeof(ear), "{...}(...)"), '\n')
+    end
+    custom_type = Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                        <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust}
+    name = Base.typename(typeof(ear)).wrapper
+    print(io, name, '\n')
+    padding = maximum(map(length, map(string, fields))) + 2
+    for (i, field) in enumerate(fields)
+        if hasproperty(ear, field)
+            val = getproperty(ear, field)
+        else
+            continue
+        end
+        flag = isa(val, custom_type)
+        sym1 = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
+                      '┴', '┼')#┴ ┼ └ ├
+        # sym1 = ifelse(i == length(fields), '┴', '┼')
+        print(io, lpad(string(field), padding), " ")
+        if isnothing(val)
+            print(io, "$(sym1) nothing", '\n')
+        elseif flag || isa(val, AbstractVector{<:custom_type}) && length(val) <= 6
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            print(io, "$(sym1) ", alglines[1], '\n')
+            for l in alglines[2:end]
+                if isempty(l) || l == '\n'
+                    continue
+                end
+                # sym2 = ifelse(i == length(fields), ' ', '│')
+                sym2 = '│'
+                print(io, lpad("$sym2 ", padding + 3), l, '\n')
+            end
+        elseif isa(val, AbstractMatrix)
+            print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
+        elseif isa(val, AbstractVector) && length(val) > 6
+            print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
+        elseif isa(val, DataType)
+            tval = typeof(val)
+            val = Base.typename(tval).wrapper
+            print(io, "$(sym1) $(tval): ", val, '\n')
+        else
+            print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
+        end
+    end
+    return nothing
+end
+=#
+macro define_pretty_show(T)
+    quote
+        function Base.show(io::IO, obj::$(esc(T)))
+            fields = propertynames(obj)
+            if isempty(fields)
+                return print(io, string(typeof(obj), "()"), '\n')
+            end
+            if get(io, :compact, false) || get(io, :multiline, false)
+                return print(io, string(typeof(obj)), '\n')
+            end
+            name = Base.typename(typeof(obj)).wrapper
+            print(io, name, '\n')
+            padding = maximum(map(length, map(string, fields))) + 2
+            for (i, field) in enumerate(fields)
+                if hasproperty(obj, field)
+                    val = getproperty(obj, field)
+                else
+                    continue
+                end
+                flag = has_pretty_show_method(val)
+                sym1 = ifelse(i == length(fields) &&
+                              (!flag || (flag && isempty(propertynames(val)))), '┴', '┼')
+                print(io, lpad(string(field), padding), " ")
+                if isnothing(val)
+                    print(io, "$(sym1) nothing", '\n')
+                elseif flag || (isa(val, AbstractVector) &&
+                                length(val) <= 6 &&
+                                all(has_pretty_show_method, val))
+                    ioalg = IOBuffer()
+                    show(ioalg, val)
+                    algstr = String(take!(ioalg))
+                    alglines = split(algstr, '\n')
+                    print(io, "$(sym1) ", alglines[1], '\n')
+                    for l in alglines[2:end]
+                        if isempty(l) || l == '\n'
+                            continue
+                        end
+                        sym2 = '│'
+                        print(io, lpad("$sym2 ", padding + 3), l, '\n')
+                    end
+                elseif isa(val, AbstractMatrix)
+                    print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
+                elseif isa(val, AbstractVector) && length(val) > 6
+                    print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
+                elseif isa(val, DataType)
+                    tval = typeof(val)
+                    valstr = Base.typename(tval).wrapper
+                    print(io, "$(sym1) $(tval): ", valstr, '\n')
+                else
+                    print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
+                end
+            end
+            return nothing
+        end
+    end
+end
+has_pretty_show_method(::Any) = false
+has_pretty_show_method(::JuMP.Model) = true
+has_pretty_show_method(::Clustering.Hclust) = true
+function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                        <:AbstractResult, <:AbstractCovarianceEstimator})
+    return true
+end
+@define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                          <:AbstractCovarianceEstimator})
 function mul_cond_msg(conds::AbstractString...)
     N = isa(conds, Tuple) ? length(conds) : 1
     msg = "the following conditions must hold:\n"

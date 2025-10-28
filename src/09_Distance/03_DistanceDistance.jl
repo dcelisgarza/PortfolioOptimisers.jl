@@ -44,11 +44,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DistanceDistance()
 DistanceDistance
-    dist | Distances.Euclidean: Distances.Euclidean(0.0)
-    args | Tuple{}: ()
-  kwargs | @NamedTuple{}: NamedTuple()
-   power | nothing
-     alg | SimpleDistance()
+    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+   power ┼ nothing
+     alg ┴ SimpleDistance()
 ```
 
 # Related

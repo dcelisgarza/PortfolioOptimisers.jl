@@ -26,11 +26,11 @@ Estimator for buy-in threshold portfolio constraints.
 ```jldoctest
 julia> BuyInThresholdEstimator(Dict("A" => 0.05, "B" => 0.1))
 BuyInThresholdEstimator
-  val | Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
+  val ┴ Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
 
 julia> BuyInThresholdEstimator(["A" => 0.05, "B" => 0.1])
 BuyInThresholdEstimator
-  val | Vector{Pair{String, Float64}}: ["A" => 0.05, "B" => 0.1]
+  val ┴ Vector{Pair{String, Float64}}: ["A" => 0.05, "B" => 0.1]
 ```
 
 # Related
@@ -84,11 +84,11 @@ Container for buy-in threshold portfolio constraints.
 ```jldoctest
 julia> BuyInThreshold(0.05)
 BuyInThreshold
-  val | Float64: 0.05
+  val ┴ Float64: 0.05
 
 julia> BuyInThreshold([0.05, 0.1, 0.0])
 BuyInThreshold
-  val | Vector{Float64}: [0.05, 0.1, 0.0]
+  val ┴ Vector{Float64}: [0.05, 0.1, 0.0]
 ```
 
 # Related
@@ -140,7 +140,7 @@ Propagate or pass through buy-in threshold portfolio constraints.
 ```jldoctest
 julia> threshold_constraints(BuyInThreshold(0.05))
 BuyInThreshold
-  val | Float64: 0.05
+  val ┴ Float64: 0.05
 
 julia> threshold_constraints(nothing)
 
@@ -188,7 +188,7 @@ julia> t = BuyInThresholdEstimator(Dict("A" => 0.05, "B" => 0.1));
 
 julia> threshold_constraints(t, sets)
 BuyInThreshold
-  val | Vector{Float64}: [0.05, 0.1, 0.0]
+  val ┴ Vector{Float64}: [0.05, 0.1, 0.0]
 ```
 
 # Related
@@ -228,7 +228,7 @@ julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
 
 julia> threshold_constraints(UniformlyDistributedBounds(), sets)
 BuyInThreshold
-  val | Float64: 0.3333333333333333
+  val ┴ Float64: 0.3333333333333333
 ```
 
 # Related

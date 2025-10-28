@@ -119,7 +119,7 @@ Computes the semi-variance of the returns below the target.
 ```jldoctest
 julia> SecondLowerMoment()
 SecondLowerMoment
-  alg | SquaredSOCRiskExpr()
+  alg ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
@@ -174,7 +174,7 @@ Computes the variance of the returns below the target.
 ```jldoctest
 julia> SecondCentralMoment()
 SecondCentralMoment
-  alg | SquaredSOCRiskExpr()
+  alg ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
@@ -220,12 +220,12 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedLowOrderMoment()
 StandardisedLowOrderMoment
-   ve | SimpleVariance
-      |          me | nothing
-      |           w | nothing
-      |   corrected | Bool: true
-  alg | SecondLowerMoment
-      |   alg | SquaredSOCRiskExpr()
+   ve ┼ SimpleVariance
+      │          me ┼ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  alg ┼ SecondLowerMoment
+      │   alg ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
@@ -347,11 +347,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> StandardisedHighOrderMoment()
 StandardisedHighOrderMoment
-   ve | SimpleVariance
-      |          me | nothing
-      |           w | nothing
-      |   corrected | Bool: true
-  alg | ThirdLowerMoment()
+   ve ┼ SimpleVariance
+      │          me ┼ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  alg ┴ ThirdLowerMoment()
 ```
 
 # Related
@@ -400,7 +400,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
   - `settings`: Risk measure configuration.
   - `w`: Optional vector of observation weights.
-  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
   - `alg`: Low-order moment risk measure algorithm.
 
 # Constructors
@@ -421,7 +421,7 @@ Keyword arguments correspond to the fields above.
 
   - If `w` is not `nothing`, `!isempty(w)`.
 
-# `JuMP` Formulations
+# Formulations
 
 Depending on the `alg` field, the risk measure is formulated using `JuMP` as follows:
 
@@ -431,32 +431,31 @@ The first lower moment is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{FirstLowerMoment}(\\boldsymbol{R},\\, \\tau) &= \\mathbb{E}\\left[\\max\\left(\\tau - \\boldsymbol{R},\\, 0\\right)\\right]\\,.
+\\mathrm{FirstLowerMoment}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\max \\circ \\left(\\mathbb{E}\\left[\\boldsymbol{X}\\right] - \\boldsymbol{X},\\, 0\\right)\\right]\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+  - ``\\circ``: element-wise function application.
 
 As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\mathrm{X}``: `T×N` return matrix.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 ## `MeanAbsoluteDeviation`
@@ -465,31 +464,30 @@ The mean absolute deviation is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{R}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{R} - \\mathbb{E}\\left[\\boldsymbol{R}\\right] \\right\\rvert\\right]
+\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right] \\right\\rvert\\right]
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{R}``: `T×1` vector of portfolio returns.
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{x},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\tau - \\mathrm{R} \\boldsymbol{x}\\\\
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
                &\\qquad \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{x}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations below the target.
-  - ``\\mathrm{R}``: `T×N` return matrix.
-  - ``\\tau``: minimum acceptable return.
+  - ``\\mathrm{X}``: `T×N` return matrix.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
 ## `StandardisedLowOrderMoment`
@@ -504,25 +502,289 @@ Both central and lower moments can be formulated as quadratic moments (variance 
 
 ### `SecondCentralMoment`
 
+Depending on the `alg` field, it can represent the variance (using different formulations in `JuMP`) or standard deviation.
+
+The variance formulations are:
+
+  - [`SquaredSOCRiskExpr`](@ref),
+  - [`RSOCRiskExpr`](@ref),
+  - [`QuadRiskExpr`](@ref).
+
+It is computed as:
+
+```math
+\\begin{align}
+\\mathrm{Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+
+The standard deviation formulation is:
+
+  - [`SOCRiskExpr`](@ref).
+
+It is computed as:
+
+```math
+\\begin{align}
+\\mathrm{StandardDeviation}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+
 #### `SquaredSOCRiskExpr`
+
+Represents the variance using the square of a second order cone constrained variable.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``K_{soc}``: second order cone.
+  - ``\\odot``: element-wise (Hadamard) product.
 
 #### `RSOCRiskExpr`
 
+Represents the variance using a sum of squares formulation via a rotated second order cone.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``t``: variance of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``K_{rsoc}``: rotated second order cone.
+  - ``\\odot``: element-wise (Hadamard) product.
+
 #### `QuadRiskExpr`
 
+Represents the variance using the deviations vector dotted with itself.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``\\odot``: element-wise (Hadamard) product.
+
 #### `SOCRiskExpr`
+
+Represents the standard deviation using a second order cone constrained variable.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``\\odot``: element-wise (Hadamard) product.
+  - ``K_{soc}``: second order cone.
 
 ### `SecondLowerMoment`
 
+Depending on the `alg` field, it can represent the semi-variance (using different formulations in `JuMP`) or semi-standard deviation.
+
+The semi-variance formulations are:
+
+  - [`SquaredSOCRiskExpr`](@ref),
+  - [`RSOCRiskExpr`](@ref),
+  - [`QuadRiskExpr`](@ref).
+
+It is computed as:
+
+```math
+\\begin{align}
+\\mathrm{Semi-Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+  - ``\\circ``: element-wise function application.
+
+The semi-standard deviation formulation is:
+
+  - [`SOCRiskExpr`](@ref).
+
+It is computed as:
+
+```math
+\\begin{align}
+\\mathrm{Semi-StandardDeviation}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+  - ``\\circ``: element-wise function application.
+
 #### `SquaredSOCRiskExpr`
+
+Represents the semi-variance using the square of a second order cone constrained variable.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: semi-standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``\\odot``: element-wise (Hadamard) product.
+  - ``K_{soc}``: second order cone.
 
 #### `RSOCRiskExpr`
 
+Represents the semi-variance using a sum of squares formulation via a rotated second order cone.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``t``: semi-variance of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``K_{rsoc}``: rotated second order cone.
+  - ``\\odot``: element-wise (Hadamard) product.
+
 #### `QuadRiskExpr`
+
+Represents the semi-variance using the deviations vector dotted with itself.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``\\odot``: element-wise (Hadamard) product.
 
 #### `SOCRiskExpr`
 
-### `JuMP` Formulations
+Represents the semi-standard deviation using a second order cone constrained variable.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: semi-standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T×N` return matrix.
+  - ``\\mu``: minimum acceptable return.
+  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
+  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
+  - ``\\odot``: element-wise (Hadamard) product.
+  - ``K_{soc}``: second order cone.
 
 # Functor
 
@@ -531,18 +793,23 @@ Both central and lower moments can be formulated as quadratic moments (variance 
 
 Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
+## Details
+
+  - `r.alg` defines what low-order moment to compute.
+  - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
+
 # Examples
 
 ```jldoctest
 julia> LowOrderMoment()
 LowOrderMoment
-  settings | RiskMeasureSettings
-           |   scale | Float64: 1.0
-           |      ub | nothing
-           |     rke | Bool: true
-         w | nothing
-        mu | nothing
-       alg | FirstLowerMoment()
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+         w ┼ nothing
+        mu ┼ nothing
+       alg ┴ FirstLowerMoment()
 ```
 
 # Related
@@ -554,6 +821,10 @@ LowOrderMoment
   - [`SecondLowerMoment`](@ref)
   - [`SecondCentralMoment`](@ref)
   - [`StandardisedLowOrderMoment`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`QuadRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
 """
 struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
@@ -619,6 +890,66 @@ Keyword arguments correspond to the fields above.
 
   - If `w` is not `nothing`, `!isempty(w)`.
 
+# Formulations
+
+Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower moment, or fourth central moment. Each can be standardised or unstandardised.
+
+The unstandardised formulations are:
+
+  - [`ThirdLowerMoment`](@ref),
+  - [`FourthLowerMoment`](@ref),
+  - [`FourthCentralMoment`](@ref).
+
+The standardised formulations are:
+
+  - [`StandardisedHighOrderMoment`](@ref), which uses a variance estimator and an unstandardised high-order moment algorithm.
+
+## Unstandardised Central Moments
+
+All unstandardised central moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]
+\\end{align}
+```
+
+## Standardised Central Moments
+
+All standardised central moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]^{n/2}}
+\\end{align}
+```
+
+## Unstandardised Lower Moments
+
+All unstandardised lower moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]
+\\end{align}
+```
+
+## Standardised Lower Moments
+
+All standardised lower moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]}{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^2\\right]^{n/2}}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
+  - ``\\circ``: element-wise function application.
+
 # Functor
 
     (r::HighOrderMoment)(w::AbstractVector, X::AbstractMatrix;
@@ -626,18 +957,23 @@ Keyword arguments correspond to the fields above.
 
 Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
+## Details
+
+  - `r.alg` defines what low-order moment to compute.
+  - The values of `r.mu` and `r.w` are optionally used to compute the moment target via [`calc_moment_target`](@ref), which is used in [`calc_deviations_vec`](@ref) to compute the deviation vector.
+
 # Examples
 
 ```jldoctest
 julia> HighOrderMoment()
 HighOrderMoment
-  settings | RiskMeasureSettings
-           |   scale | Float64: 1.0
-           |      ub | nothing
-           |     rke | Bool: true
-         w | nothing
-        mu | nothing
-       alg | ThirdLowerMoment()
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+         w ┼ nothing
+        mu ┼ nothing
+       alg ┴ ThirdLowerMoment()
 ```
 
 # Related
@@ -676,35 +1012,181 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
+"""
+    calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
+                               <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
+                       ::Any, x::AbstractVector)
+
+Compute the target value for moment calculations when neither a target value (`mu`) nor observation weights are provided in the risk measure.
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with both `w` and `mu` fields set to `nothing`.
+  - `_`: Unused argument (typically asset weights, ignored in this method).
+  - `x`: Returns vector.
+
+# Returns
+
+  - `target::eltype(x)`: The mean of the returns vector.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
                                     <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
                             ::Any, x::AbstractVector)
     return mean(x)
 end
+"""
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
+                                <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any}},
+                       ::Any, x::AbstractVector)
+
+Compute the target value for moment calculations when the risk measure provides an observation weights vector but no explicit target value (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `w` set to an observation weights vector and `mu` set to `nothing`.
+  - `_`: Unused argument (typically asset weights, ignored in this method).
+  - `x`: Returns vector.
+
+# Returns
+
+  - `target::eltype(x)`: The weighted mean of the returns vector, using the observation weights from `r.w`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing,
                                                       <:Any},
                                      <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing,
                                                        <:Any}}, ::Any, x::AbstractVector)
     return mean(x, r.w)
 end
+"""
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVector, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:AbstractVector, <:Any}},
+                       w::AbstractVector, ::Any)
+
+Compute the target value for moment calculations when the risk measure provides an explicit expected returns vector (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to an expected returns vector.
+  - `w`: Asset weights vector.
+  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+
+# Returns
+
+  - `target::eltype(w)`: The dot product of the asset weights and the expected returns vector.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVector,
                                                       <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:AbstractVector,
                                                        <:Any}}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
+"""
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
+                       w::AbstractVector, ::Any)
+
+Compute the target value for moment calculations when the risk measure provides a `VecScalar` as the expected returns (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to a `VecScalar` (an object with fields `v` for the expected returns vector and `s` for a scalar offset).
+  - `w`: Asset weights vector.
+  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+
+# Returns
+
+  - `target::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `dot(w, r.mu.v) + r.mu.s`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`dot`](https://docs.julialang.org/en/v1/base/math/#Base.dot)
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
                             w::AbstractVector, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
+"""
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any, ::Any)
+
+Compute the target value for moment calculations when the risk measure provides a scalar value for the expected returns (`mu`).
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure with `mu` set to a scalar value.
+  - `::Any`: Unused argument (typically asset weights, ignored in this method).
+  - `::Any`: Unused argument (typically the returns vector, ignored in this method).
+
+# Returns
+
+  - `target::Real`: The scalar value of `r.mu`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any,
                             ::Any)
     return r.mu
 end
-function calc_moment_val(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
-                         X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
+"""
+    calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::AbstractVector,
+                    X::AbstractMatrix; fees::Union{Nothing, <:Fees} = nothing)
+
+Compute the vector of deviations from the target value for moment-based risk measures.
+
+# Arguments
+
+  - `r`: A `LowOrderMoment` or `HighOrderMoment` risk measure specifying the moment calculation algorithm and target.
+  - `w`: Asset weights vector.
+  - `X`: Return matrix.
+  - `fees`: Optional fees object to adjust net returns.
+
+# Returns
+
+  - `val::AbstractVector`: The vector of deviations between net portfolio returns and the computed moment target.
+
+# Details
+
+  - Computes net portfolio returns using the provided weights, return matrix, and optional fees.
+  - Computes the target value for the moment calculation using [`calc_moment_target`](@ref).
+  - Returns the element-wise difference between net returns and the target value.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment},
+                             w::AbstractVector, X::AbstractMatrix,
+                             fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -713,8 +1195,15 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::Abstrac
                                                                       X::AbstractMatrix,
                                                                       fees::Union{Nothing,
                                                                                   <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
+end
+function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::AbstractVector,
+                                                                           X::AbstractMatrix,
+                                                                           fees::Union{Nothing,
+                                                                                       <:Fees} = nothing)
+    val = abs.(calc_deviations_vec(r, w, X, fees))
+    return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:StandardisedLowOrderMoment{<:Any,
@@ -722,7 +1211,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                                X::AbstractMatrix,
                                                                                                fees::Union{Nothing,
                                                                                                            <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
@@ -730,7 +1219,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                        X::AbstractMatrix,
                                                                                        fees::Union{Nothing,
                                                                                                    <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
@@ -739,7 +1228,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                                  X::AbstractMatrix,
                                                                                                  fees::Union{Nothing,
                                                                                                              <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
@@ -747,21 +1236,15 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                          X::AbstractMatrix,
                                                                                          fees::Union{Nothing,
                                                                                                      <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::AbstractVector,
-                                                                           X::AbstractMatrix,
-                                                                           fees::Union{Nothing,
-                                                                                       <:Fees} = nothing)
-    val = abs.(calc_moment_val(r, w, X, fees))
-    return isnothing(r.w) ? mean(val) : mean(val, r.w)
-end
+
 function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::AbstractVector,
                                                                        X::AbstractMatrix,
                                                                        fees::Union{Nothing,
                                                                                    <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 3
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
@@ -769,7 +1252,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthLowerMoment})(w::Abstr
                                                                         X::AbstractMatrix,
                                                                         fees::Union{Nothing,
                                                                                     <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
@@ -777,7 +1260,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthCentralMoment})(w::Abs
                                                                           X::AbstractMatrix,
                                                                           fees::Union{Nothing,
                                                                                       <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
@@ -786,7 +1269,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                         X::AbstractMatrix,
                                                                                         fees::Union{Nothing,
                                                                                                     <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? -mean(val) : -mean(val, r.w)
@@ -797,7 +1280,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                          X::AbstractMatrix,
                                                                                          fees::Union{Nothing,
                                                                                                      <:Fees} = nothing)
-    val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
@@ -808,7 +1291,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                            X::AbstractMatrix,
                                                                                            fees::Union{Nothing,
                                                                                                        <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
+    val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)

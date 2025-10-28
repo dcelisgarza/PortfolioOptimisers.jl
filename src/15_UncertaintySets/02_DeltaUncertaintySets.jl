@@ -30,26 +30,26 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DeltaUncertaintySet()
 DeltaUncertaintySet
-      pe | EmpiricalPrior
-         |        ce | PortfolioOptimisersCovariance
-         |           |   ce | Covariance
-         |           |      |    me | SimpleExpectedReturns
-         |           |      |       |   w | nothing
-         |           |      |    ce | GeneralCovariance
-         |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         |           |      |       |    w | nothing
-         |           |      |   alg | Full()
-         |           |   mp | DefaultMatrixProcessing
-         |           |      |       pdm | Posdef
-         |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-         |           |      |   denoise | nothing
-         |           |      |    detone | nothing
-         |           |      |       alg | nothing
-         |        me | SimpleExpectedReturns
-         |           |   w | nothing
-         |   horizon | nothing
-     dmu | Float64: 0.1
-  dsigma | Float64: 0.1
+      pe ┼ EmpiricalPrior
+         │        ce ┼ PortfolioOptimisersCovariance
+         │           │   ce ┼ Covariance
+         │           │      │    me ┼ SimpleExpectedReturns
+         │           │      │       │   w ┴ nothing
+         │           │      │    ce ┼ GeneralCovariance
+         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │    w ┴ nothing
+         │           │      │   alg ┴ Full()
+         │           │   mp ┼ DefaultMatrixProcessing
+         │           │      │       pdm ┼ Posdef
+         │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+         │           │      │   denoise ┼ nothing
+         │           │      │    detone ┼ nothing
+         │           │      │       alg ┴ nothing
+         │        me ┼ SimpleExpectedReturns
+         │           │   w ┴ nothing
+         │   horizon ┴ nothing
+     dmu ┼ Float64: 0.1
+  dsigma ┴ Float64: 0.1
 ```
 
 # Related

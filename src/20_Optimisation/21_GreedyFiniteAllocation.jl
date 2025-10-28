@@ -5,28 +5,26 @@ struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationR
     w::T4
     retcode::T5
     cash::T6
-    attempts::T7
+    fb::T7
 end
-function opt_attempt_factory(res::GreedyAllocationOptimisation, attempts)
+function opt_attempt_factory(res::GreedyAllocationOptimisation, fb)
     return GreedyAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
-                                        res.cash, attempts)
+                                        res.cash, fb)
 end
 struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
     kwargs::T3
-    fallback::T4
+    fb::T4
     function GreedyAllocation(unit::Real, args::Tuple, kwargs::NamedTuple,
-                              fallback::Union{Nothing,
-                                              <:FiniteAllocationOptimisationEstimator} = nothing)
-        return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fallback)}(unit, args,
-                                                                                 kwargs,
-                                                                                 fallback)
+                              fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = nothing)
+        return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,
+                                                                           kwargs, fb)
     end
 end
 function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;),
-                          fallback::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = nothing)
-    return GreedyAllocation(unit, args, kwargs, fallback)
+                          fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = nothing)
+    return GreedyAllocation(unit, args, kwargs, fb)
 end
 function roundmult(val::Real, prec::Real, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)

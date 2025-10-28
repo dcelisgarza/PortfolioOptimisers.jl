@@ -41,15 +41,15 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Coskewness()
 Coskewness
-   me | SimpleExpectedReturns
-      |   w | nothing
-   mp | DefaultMatrixProcessing
-      |       pdm | Posdef
-      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |   denoise | nothing
-      |    detone | nothing
-      |       alg | nothing
-  alg | Full()
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+   mp ┼ DefaultMatrixProcessing
+      │       pdm ┼ Posdef
+      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │   denoise ┼ nothing
+      │    detone ┼ nothing
+      │       alg ┴ nothing
+  alg ┴ Full()
 ```
 
 # Related

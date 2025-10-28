@@ -32,11 +32,11 @@ Positional and keyword arguments correspond to the fields above. The `level` is 
 ```jldoctest
 julia> ClusterNode(1)
 ClusterNode
-      id | Int64: 1
-    left | nothing
-   right | nothing
-  height | Float64: 0.0
-   level | Int64: 1
+      id ┼ Int64: 1
+    left ┼ nothing
+   right ┼ nothing
+  height ┼ Float64: 0.0
+   level ┴ Int64: 1
 ```
 
 # Related

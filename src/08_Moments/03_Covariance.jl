@@ -33,15 +33,15 @@ julia> using StatsBase
 
 julia> gwc = GeneralCovariance()
 GeneralCovariance
-  ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-   w | nothing
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+   w ┴ nothing
 
 julia> w = Weights([0.1, 0.2, 0.7]);
 
 julia> gwc = GeneralCovariance(; w = w)
 GeneralCovariance
-  ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-   w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
 ```
 
 # Related
@@ -163,14 +163,14 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> cov_est = Covariance()
+julia> Covariance()
 Covariance
-   me | SimpleExpectedReturns
-      |   w | nothing
-   ce | GeneralCovariance
-      |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      |    w | nothing
-  alg | Full()
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+   ce ┼ GeneralCovariance
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ nothing
+  alg ┴ Full()
 ```
 
 # Related

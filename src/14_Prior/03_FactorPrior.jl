@@ -33,42 +33,42 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> FactorPrior()
 FactorPrior
-   pe | EmpiricalPrior
-      |        ce | PortfolioOptimisersCovariance
-      |           |   ce | Covariance
-      |           |      |    me | SimpleExpectedReturns
-      |           |      |       |   w | nothing
-      |           |      |    ce | GeneralCovariance
-      |           |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      |           |      |       |    w | nothing
-      |           |      |   alg | Full()
-      |           |   mp | DefaultMatrixProcessing
-      |           |      |       pdm | Posdef
-      |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |           |      |   denoise | nothing
-      |           |      |    detone | nothing
-      |           |      |       alg | nothing
-      |        me | SimpleExpectedReturns
-      |           |   w | nothing
-      |   horizon | nothing
-   mp | DefaultMatrixProcessing
-      |       pdm | Posdef
-      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-      |   denoise | nothing
-      |    detone | nothing
-      |       alg | nothing
-   re | StepwiseRegression
-      |     crit | PValue
-      |          |   threshold | Float64: 0.05
-      |      alg | Forward()
-      |   target | LinearModel
-      |          |   kwargs | @NamedTuple{}: NamedTuple()
-   ve | SimpleVariance
-      |          me | SimpleExpectedReturns
-      |             |   w | nothing
-      |           w | nothing
-      |   corrected | Bool: true
-  rsd | Bool: true
+   pe ┼ EmpiricalPrior
+      │        ce ┼ PortfolioOptimisersCovariance
+      │           │   ce ┼ Covariance
+      │           │      │    me ┼ SimpleExpectedReturns
+      │           │      │       │   w ┴ nothing
+      │           │      │    ce ┼ GeneralCovariance
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
+      │           │      │   alg ┴ Full()
+      │           │   mp ┼ DefaultMatrixProcessing
+      │           │      │       pdm ┼ Posdef
+      │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      │   denoise ┼ nothing
+      │           │      │    detone ┼ nothing
+      │           │      │       alg ┴ nothing
+      │        me ┼ SimpleExpectedReturns
+      │           │   w ┴ nothing
+      │   horizon ┴ nothing
+   mp ┼ DefaultMatrixProcessing
+      │       pdm ┼ Posdef
+      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │   denoise ┼ nothing
+      │    detone ┼ nothing
+      │       alg ┴ nothing
+   re ┼ StepwiseRegression
+      │     crit ┼ PValue
+      │          │   threshold ┴ Float64: 0.05
+      │      alg ┼ Forward()
+      │   target ┼ LinearModel
+      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  rsd ┴ Bool: true
 ```
 
 # Related

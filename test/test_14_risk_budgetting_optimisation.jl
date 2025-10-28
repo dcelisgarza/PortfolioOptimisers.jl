@@ -223,7 +223,7 @@
                                                                       solver = Clarabel.Optimizer,
                                                                       settings = ["verbose" => false,
                                                                                   "max_iter" => 1])),
-                                     fallback = InverseVolatility(; pe = pr)))
+                                     fb = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin

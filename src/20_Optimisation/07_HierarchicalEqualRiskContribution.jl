@@ -6,7 +6,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
     scei::T4
     sceo::T5
     threads::T6
-    fallback::T7
+    fb::T7
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::Union{<:OptimisationRiskMeasure,
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
@@ -14,8 +14,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
                                                scei::Scalariser, sceo::Scalariser,
                                                threads::FLoops.Transducers.Executor,
-                                               fallback::Union{Nothing,
-                                                               <:OptimisationEstimator})
+                                               fb::Union{Nothing, <:OptimisationEstimator})
         if isa(ri, AbstractVector)
             @argcheck(!isempty(ri))
         end
@@ -23,8 +22,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
             @argcheck(!isempty(ro))
         end
         return new{typeof(opt), typeof(ri), typeof(ro), typeof(scei), typeof(sceo),
-                   typeof(threads), typeof(fallback)}(opt, ri, ro, scei, sceo, threads,
-                                                      fallback)
+                   typeof(threads), typeof(fb)}(opt, ri, ro, scei, sceo, threads, fb)
     end
 end
 function HierarchicalEqualRiskContribution(;
@@ -36,9 +34,8 @@ function HierarchicalEqualRiskContribution(;
                                            scei::Scalariser = SumScalariser(),
                                            sceo::Scalariser = scei,
                                            threads::FLoops.Transducers.Executor = ThreadedEx(),
-                                           fallback::Union{Nothing,
-                                                           <:OptimisationEstimator} = nothing)
-    return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fallback)
+                                           fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fb)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
                   X::AbstractMatrix)
@@ -54,7 +51,7 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
     opt = opt_view(hec.opt, i)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scei = hec.scei,
                                              sceo = hec.sceo, threads = hec.threads,
-                                             fallback = hec.fallback)
+                                             fb = hec.fb)
 end
 function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::AbstractVector,
                                  rkbo::AbstractVector, cl::AbstractVector,

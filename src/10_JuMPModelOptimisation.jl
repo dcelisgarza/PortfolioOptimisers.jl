@@ -50,11 +50,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Solver()
 Solver
-         name | String: ""
-       solver | nothing
-     settings | nothing
-    check_sol | @NamedTuple{}: NamedTuple()
-  add_bridges | Bool: true
+         name ┼ String: ""
+       solver ┼ nothing
+     settings ┼ nothing
+    check_sol ┼ @NamedTuple{}: NamedTuple()
+  add_bridges ┴ Bool: true
 ```
 
 # Related
@@ -95,7 +95,7 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
 
 # Fields
 
-  - `trials`: Dictionary of solver attempts and errors.
+  - `trials`: Dictionary of solver trials and errors.
   - `success`: Boolean indicating whether optimisation succeeded.
 
 # Constructor
@@ -109,8 +109,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> JuMPResult(; trials = Dict(:HiGHS => Dict(:optimize! => "error")), success = true)
 JuMPResult
-   trials | Dict{Symbol, Dict{Symbol, String}}: Dict(:HiGHS => Dict(:optimize! => "error"))
-  success | Bool: true
+   trials ┼ Dict{Symbol, Dict{Symbol, String}}: Dict(:HiGHS => Dict(:optimize! => "error"))
+  success ┴ Bool: true
 ```
 
 # Related

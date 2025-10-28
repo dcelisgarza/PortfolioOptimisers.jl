@@ -148,8 +148,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> VariationInfoDistance()
 VariationInfoDistance
-       bins | HacineGharbiRavier()
-  normalise | Bool: true
+       bins ┼ HacineGharbiRavier()
+  normalise ┴ Bool: true
 ```
 
 # Related

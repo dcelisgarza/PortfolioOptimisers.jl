@@ -30,13 +30,13 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ce = DistanceCovariance()
+julia> DistanceCovariance()
 DistanceCovariance
-     dist | Distances.Euclidean: Distances.Euclidean(0.0)
-     args | Tuple{}: ()
-   kwargs | @NamedTuple{}: NamedTuple()
-        w | nothing
-  threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+     dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+     args ┼ Tuple{}: ()
+   kwargs ┼ @NamedTuple{}: NamedTuple()
+        w ┼ nothing
+  threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -188,11 +188,11 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-     dist | Distances.Euclidean: Distances.Euclidean(0.0)
-     args | Tuple{}: ()
-   kwargs | @NamedTuple{}: NamedTuple()
-        w | nothing
-  threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+     dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+     args ┼ Tuple{}: ()
+   kwargs ┼ @NamedTuple{}: NamedTuple()
+        w ┼ nothing
+  threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
 julia> X = [1.0 2.0; 2.0 4.0; 3.0 6.0];
 
@@ -329,11 +329,11 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-     dist | Distances.Euclidean: Distances.Euclidean(0.0)
-     args | Tuple{}: ()
-   kwargs | @NamedTuple{}: NamedTuple()
-        w | nothing
-  threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+     dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+     args ┼ Tuple{}: ()
+   kwargs ┼ @NamedTuple{}: NamedTuple()
+        w ┼ nothing
+  threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
 julia> X = [1.0 2.0; 2.0 4.0; 3.0 6.0];
 

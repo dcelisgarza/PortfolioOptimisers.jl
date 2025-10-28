@@ -32,22 +32,22 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> EquilibriumExpectedReturns()
 EquilibriumExpectedReturns
-  ce | PortfolioOptimisersCovariance
-     |   ce | Covariance
-     |      |    me | SimpleExpectedReturns
-     |      |       |   w | nothing
-     |      |    ce | GeneralCovariance
-     |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     |      |       |    w | nothing
-     |      |   alg | Full()
-     |   mp | DefaultMatrixProcessing
-     |      |       pdm | Posdef
-     |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-     |      |   denoise | nothing
-     |      |    detone | nothing
-     |      |       alg | nothing
-   w | nothing
-   l | Int64: 1
+  ce ┼ PortfolioOptimisersCovariance
+     │   ce ┼ Covariance
+     │      │    me ┼ SimpleExpectedReturns
+     │      │       │   w ┴ nothing
+     │      │    ce ┼ GeneralCovariance
+     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │      │       │    w ┴ nothing
+     │      │   alg ┴ Full()
+     │   mp ┼ DefaultMatrixProcessing
+     │      │       pdm ┼ Posdef
+     │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+     │      │   denoise ┼ nothing
+     │      │    detone ┼ nothing
+     │      │       alg ┴ nothing
+   w ┼ nothing
+   l ┴ Int64: 1
 ```
 
 # Related

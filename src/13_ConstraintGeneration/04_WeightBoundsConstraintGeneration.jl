@@ -65,13 +65,13 @@ Container for lower and upper portfolio weight bounds.
 ```jldoctest
 julia> WeightBounds(0.0, 1.0)
 WeightBounds
-  lb | Float64: 0.0
-  ub | Float64: 1.0
+  lb ┼ Float64: 0.0
+  ub ┴ Float64: 1.0
 
 julia> WeightBounds([0.0, 0.1], [0.8, 1.0])
 WeightBounds
-  lb | Vector{Float64}: [0.0, 0.1]
-  ub | Vector{Float64}: [0.8, 1.0]
+  lb ┼ Vector{Float64}: [0.0, 0.1]
+  ub ┴ Vector{Float64}: [0.8, 1.0]
 ```
 
 # Related
@@ -174,19 +174,19 @@ Estimator for portfolio weight bounds constraints.
 ```jldoctest
 julia> WeightBoundsEstimator(; lb = 0.0, ub = 1.0)
 WeightBoundsEstimator
-  lb | Float64: 0.0
-  ub | Float64: 1.0
+  lb ┼ Float64: 0.0
+  ub ┴ Float64: 1.0
 
 julia> WeightBoundsEstimator(; lb = Dict("A" => 0.1, "B" => 0.2),
                              ub = Dict("A" => 0.8, "B" => 0.9))
 WeightBoundsEstimator
-  lb | Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  ub | Dict{String, Float64}: Dict("B" => 0.9, "A" => 0.8)
+  lb ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+  ub ┴ Dict{String, Float64}: Dict("B" => 0.9, "A" => 0.8)
 
 julia> WeightBoundsEstimator(; lb = UniformlyDistributedBounds(), ub = nothing)
 WeightBoundsEstimator
-  lb | UniformlyDistributedBounds()
-  ub | nothing
+  lb ┼ UniformlyDistributedBounds()
+  ub ┴ nothing
 ```
 
 # Related
@@ -379,8 +379,8 @@ julia> wb = WeightBoundsEstimator(; lb = Dict("A" => 0.1, "B" => 0.2), ub = 1.0)
 
 julia> weight_bounds_constraints(wb, sets)
 WeightBounds
-  lb | Vector{Float64}: [0.1, 0.2, 0.0]
-  ub | Float64: 1.0
+  lb ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  ub ┴ Float64: 1.0
 ```
 
 # Related
@@ -542,13 +542,13 @@ Propagate or expand portfolio weight bounds constraints from a `WeightBounds` ob
 ```jldoctest
 julia> weight_bounds_constraints(WeightBounds(0.0, 1.0); N = 3)
 WeightBounds
-  lb | StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(0.0, 0.0, 3)
-  ub | StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(1.0, 0.0, 3)
+  lb ┼ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(0.0, 0.0, 3)
+  ub ┴ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(1.0, 0.0, 3)
 
 julia> weight_bounds_constraints(WeightBounds([0.1, 0.2, 0.3], 1.0); N = 3)
 WeightBounds
-  lb | Vector{Float64}: [0.1, 0.2, 0.3]
-  ub | StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(1.0, 0.0, 3)
+  lb ┼ Vector{Float64}: [0.1, 0.2, 0.3]
+  ub ┴ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(1.0, 0.0, 3)
 ```
 
 # Related
@@ -588,8 +588,8 @@ Propagate asset-specific portfolio weight bounds constraints from a `WeightBound
 ```jldoctest
 julia> weight_bounds_constraints(WeightBounds([0.1, 0.2, 0.3], [0.8, 0.9, 1.0]))
 WeightBounds
-  lb | Vector{Float64}: [0.1, 0.2, 0.3]
-  ub | Vector{Float64}: [0.8, 0.9, 1.0]
+  lb ┼ Vector{Float64}: [0.1, 0.2, 0.3]
+  ub ┴ Vector{Float64}: [0.8, 0.9, 1.0]
 ```
 
 # Related
@@ -633,13 +633,13 @@ Generate unconstrained portfolio weight bounds when no bounds are specified.
 ```jldoctest
 julia> weight_bounds_constraints(nothing; N = 3)
 WeightBounds
-  lb | Vector{Float64}: [-Inf, -Inf, -Inf]
-  ub | Vector{Float64}: [Inf, Inf, Inf]
+  lb ┼ Vector{Float64}: [-Inf, -Inf, -Inf]
+  ub ┴ Vector{Float64}: [Inf, Inf, Inf]
 
 julia> weight_bounds_constraints(nothing; scalar = true)
 WeightBounds
-  lb | Float64: -Inf
-  ub | Float64: Inf
+  lb ┼ Float64: -Inf
+  ub ┴ Float64: Inf
 ```
 
 # Related

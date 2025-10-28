@@ -275,24 +275,24 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> ce = SmythBrobyCovariance()
+julia> SmythBrobyCovariance()
 SmythBrobyCovariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-         ve | SimpleVariance
-            |          me | SimpleExpectedReturns
-            |             |   w | nothing
-            |           w | nothing
-            |   corrected | Bool: true
-        pdm | Posdef
-            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-  threshold | Float64: 0.5
-         c1 | Float64: 0.5
-         c2 | Float64: 0.5
-         c3 | Int64: 4
-          n | Int64: 2
-        alg | SmythBrobyGerber1()
-    threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+         me ┼ SimpleExpectedReturns
+            │   w ┴ nothing
+         ve ┼ SimpleVariance
+            │          me ┼ SimpleExpectedReturns
+            │             │   w ┴ nothing
+            │           w ┼ nothing
+            │   corrected ┴ Bool: true
+        pdm ┼ Posdef
+            │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+  threshold ┼ Float64: 0.5
+         c1 ┼ Float64: 0.5
+         c2 ┼ Float64: 0.5
+         c3 ┼ Int64: 4
+          n ┼ Int64: 2
+        alg ┼ SmythBrobyGerber1()
+    threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related

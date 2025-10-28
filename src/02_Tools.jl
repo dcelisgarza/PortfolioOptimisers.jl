@@ -343,8 +343,8 @@ Arguments correspond to the fields above.
 ```jldoctest
 julia> VecScalar([1.0, 2.0, 3.0], 4.2)
 VecScalar
-  v | Vector{Float64}: [1.0, 2.0, 3.0]
-  s | Float64: 4.2
+  v ┼ Vector{Float64}: [1.0, 2.0, 3.0]
+  s ┴ Float64: 4.2
 ```
 
 # Related
