@@ -400,7 +400,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
   - `settings`: Risk measure configuration.
   - `w`: Optional vector of observation weights.
-  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
+  - `mu`: Optional target value, vector, or `VecScalar` for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
   - `alg`: Low-order moment risk measure algorithm.
 
 # Constructors
@@ -869,7 +869,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
   - `settings`: Risk measure configuration.
   - `w`: Optional vector of observation weights.
-  - `mu`: Optional target value or vector (or both) for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
+  - `mu`: Optional target value or vector `VecScalar` for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, if not given it is computed from the returns series.
   - `alg`: High-order moment risk measure algorithm.
 
 # Constructors

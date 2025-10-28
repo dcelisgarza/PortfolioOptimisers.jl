@@ -1,3 +1,90 @@
+"""
+    struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: RiskMeasure
+        settings::T1
+        w::T2
+        mu::T3
+        kt::T4
+        N::T5
+        alg::T6
+    end
+
+Represents the square root kurtosis risk measure in PortfolioOptimisers.jl.
+
+Computes portfolio risk as the square root of the fourth central moment (kurtosis) of the return distribution, optionally using custom weights, expected returns, and a kurtosis (fourth moment) matrix. This risk measure can be evaluated using either the full or semi (downside) deviations, depending on the algorithm provided.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `w`: Optional vector of observation weights.
+  - `mu`: Optional expected returns value, vector, or `VecScalar` for the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
+  - `kt`: Optional cokurtosis (fourth moment) matrix that overrides the prior `kt` when provided.
+  - `N`: Optional integer specifying the number of eigenvalues per asset to use from the cokurtosis matrix in an approximate formulation. If `nothing`, the exact formulation is used.
+  - `alg`: Moment algorithm specifying whether to use all or only downside deviations.
+
+# Constructors
+
+    SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                       w::Union{Nothing, <:AbstractWeights} = nothing,
+                       mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                       kt::Union{Nothing, <:AbstractMatrix} = nothing,
+                       N::Union{Nothing, <:Integer} = nothing,
+                       alg::AbstractMomentAlgorithm = Full())
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `mu` is not `nothing`:
+
+      + `::Real`: `isfinite(mu)`.
+      + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+  - If `kt` is not `nothing`:
+
+      + `!isempty(kt)` and `size(kt, 1) == size(kt, 2)`.
+
+      + If `mu` is not `nothing`:
+
+          * `::AbstractVector`: `length(mu)^2 == size(kt, 1)`.
+          * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
+  - If `N` is provided: must be positive.
+
+# `JuMP` Fromulations
+
+## Exact
+
+This formulation is used when `N` is `nothing`.
+
+## Approximate
+
+This formulation is used when `N` is an integer, the larger the value of `N`, the more accurate and expensive it becomes.
+
+# Examples
+
+```jldoctest
+julia> SquareRootKurtosis()
+SquareRootKurtosis
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+         w ┼ nothing
+        mu ┼ nothing
+        kt ┼ nothing
+         N ┼ nothing
+       alg ┴ Full()
+```
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`Full`](@ref)
+  - [`Semi`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
 struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: RiskMeasure
     settings::T1
     w::T2
@@ -26,7 +113,9 @@ struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: RiskMeasure
             assert_matrix_issquare(kt)
         end
         if mu_flag && kt_flag
-            @argcheck(length(mu)^2 == size(kt, 2))
+            @argcheck(length(mu)^2 == size(kt, 1))
+        elseif isa(mu, VecScalar) && kt_flag
+            @argcheck(length(mu.v)^2 == size(kt, 1))
         end
         if !isnothing(N)
             @argcheck(N > zero(N))
@@ -86,9 +175,7 @@ function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi})(w::A
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
-function factory(r::SquareRootKurtosis,
-                 pr::HighOrderPrior{<:LowOrderPrior, <:Any, <:Any, <:Any, <:Any}, args...;
-                 kwargs...)
+function factory(r::SquareRootKurtosis, pr::HighOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, pr.w)
     mu = nothing_scalar_array_factory(r.mu, pr.mu)
     kt = nothing_scalar_array_factory(r.kt, pr.kt)
