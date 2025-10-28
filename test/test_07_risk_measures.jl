@@ -145,7 +145,7 @@
         r3 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
         @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
         @test isapprox(expected_risk(r3, w, rd.X), expected_risk(r2, w, rd.X))
-        @test isapprox(expected_risk(SquareRootKurtosis(; alg = Semi()), w, rd.X),
+        @test isapprox(expected_risk(SquareRootKurtosis(; alg1 = Semi()), w, rd.X),
                        0.0002291596657404573)
         @test isapprox(expected_risk(SquareRootKurtosis(;), w, rd.X),
                        expected_risk(SquareRootKurtosis(; mu = pr.mu), w, rd.X))

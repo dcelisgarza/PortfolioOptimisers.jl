@@ -1,6 +1,14 @@
+function set_kurtosis_risk!(model::JuMP.Model,
+                            r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer,
+                                                  <:Any, <:SOCRiskExpr},
+                            opt::RiskJuMPOptimisationEstimator,
+                            sqrt_kurtosis_risk::AbstractJuMPScalar, key::Symbol)
+    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
+    return sqrt_kurtosis_risk
+end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer,
-                                                     <:Any},
+                                                     <:Any, <:Any},
                                opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
                                args...; kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
@@ -39,12 +47,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                   W)) ==
                                                                                               0
                                                                                           end)
-    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
-    return sqrt_kurtosis_risk
+    return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, key)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, Nothing,
-                                                     <:Any},
+                                                     <:Any, <:Any},
                                opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
                                args...; kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
@@ -60,8 +67,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                 [sc * sqrt_kurtosis_risk;
                                                  sc * sqrt_sigma_4 * zkurt] in
                                                 SecondOrderCone())
-    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
-    return sqrt_kurtosis_risk
+    return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, key)
 end
 function set_risk_constraints!(::JuMP.Model, ::Any, ::SquareRootKurtosis,
                                ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
