@@ -1,0 +1,125 @@
+{
+    "version": "v1.0.0",
+    "entity": {
+        "type": "individual",
+        "role": "owner",
+        "name": "Daniel Celis Garza",
+        "email": "daniel.celis.garza@gmail.com",
+        "phone": "",
+        "description": "Scientific computing researcher, develops a variety of open-source software.",
+        "webpageUrl": {
+            "url": "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
+            "wellKnown": ""
+        }
+    },
+    "projects": [
+        {
+            "guid": "portfolio-optimisers-jl",
+            "name": "PortfolioOptimisers.jl",
+            "description": "A comprehensive Julia package for portfolio optimization.",
+            "webpageUrl": {
+                "url": "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
+                "wellKnown": ""
+            },
+            "repositoryUrl": {
+                "url": "https://github.com/dcelisgarza/PortfolioOptimisers.jl",
+                "wellKnown": ""
+            },
+            "licenses": [
+                "spdx:MIT"
+            ],
+            "tags": [
+                "julia",
+                "portfolio-optimization",
+                "quantitative-finance",
+                "optimization",
+                "machine-learning",
+                "computational-finance",
+                "asset-management"
+            ]
+        }
+    ],
+    "funding": {
+        "channels": [
+            {
+                "guid": "github-sponsors",
+                "type": "payment-provider",
+                "address": "https://github.com/sponsors/dcelisgarza",
+                "description": "Payments up to $12,000 USD per month can be made via Github Sponsors."
+            },
+            {
+                "guid": "mybank",
+                "type": "bank",
+                "address": "",
+                "description": "UK bank, supports multiple currencies. Will accept direct bank transfers. Please e-mail me for details."
+            }
+        ],
+        "plans": [
+            {
+                "guid": "quarter-time-developer",
+                "status": "active",
+                "name": "Developer compensation (quarter-time)",
+                "description": "This will cover the cost of one developer working quarter-time on the projects.",
+                "amount": 1500,
+                "currency": "GBP",
+                "frequency": "monthly",
+                "channels": [
+                    "github-sponsors",
+                    "mybank"
+                ]
+            },
+            {
+                "guid": "half-time-developer",
+                "status": "active",
+                "name": "Developer compensation (half-time)",
+                "description": "This will cover the cost of one developer working half-time on the projects.",
+                "amount": 3000,
+                "currency": "GBP",
+                "frequency": "monthly",
+                "channels": [
+                    "github-sponsors",
+                    "mybank"
+                ]
+            },
+            {
+                "guid": "full-time-developer",
+                "status": "active",
+                "name": "Developer compensation (full-time)",
+                "description": "This will cover the cost of one developer working full-time on the projects.",
+                "amount": 6000,
+                "currency": "GBP",
+                "frequency": "monthly",
+                "channels": [
+                    "github-sponsors",
+                    "mybank"
+                ]
+            },
+            {
+                "guid": "over-time-developer",
+                "status": "active",
+                "name": "Developer compensation (over-time)",
+                "description": "This will cover the cost of one developer working over-time on the projects.",
+                "amount": 9000,
+                "currency": "GBP",
+                "frequency": "monthly",
+                "channels": [
+                    "github-sponsors",
+                    "mybank"
+                ]
+            },
+            {
+                "guid": "support-plan",
+                "status": "active",
+                "name": "Support plan",
+                "description": "Pay anything you wish/can to show your support for the projects.",
+                "amount": 0,
+                "currency": "GBP",
+                "frequency": "monthly",
+                "channels": [
+                    "github-sponsors",
+                    "mybank"
+                ]
+            }
+        ]
+    }
+}

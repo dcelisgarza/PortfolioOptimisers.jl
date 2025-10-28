@@ -230,12 +230,13 @@ macro define_pretty_show(T)
 end
 has_pretty_show_method(::Any) = false
 has_pretty_show_method(::JuMP.Model) = true
+has_pretty_show_method(::Clustering.Hclust) = true
 function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                         <:AbstractResult, <:AbstractCovarianceEstimator})
     return true
 end
 @define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                          <:AbstractCovarianceEstimator, <:Clustering.Hclust})
+                          <:AbstractCovarianceEstimator})
 function mul_cond_msg(conds::AbstractString...)
     N = isa(conds, Tuple) ? length(conds) : 1
     msg = "the following conditions must hold:\n"
