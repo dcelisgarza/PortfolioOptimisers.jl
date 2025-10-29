@@ -21,6 +21,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
   - `kt`: Optional cokurtosis (fourth moment) matrix that overrides the prior `kt` when provided.
   - `N`: Optional integer specifying the number of eigenvalues per asset to use from the cokurtosis matrix in an approximate formulation. If `nothing`, the exact formulation is used.
   - `alg1`: Moment algorithm specifying whether to use all or only downside deviations.
+  - `alg2`: Specifies the `JuMP` formulation used to encode the risk measure.
 
 # Constructors
 
