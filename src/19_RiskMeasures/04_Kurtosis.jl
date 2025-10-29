@@ -132,7 +132,7 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   kt::Union{Nothing, <:AbstractMatrix} = nothing,
                   N::Union{Nothing, <:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
-                  alg2::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr} = SOCRiskExpr())
+                  alg2::SecondMomentFormulation = SOCRiskExpr())
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
 end
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
