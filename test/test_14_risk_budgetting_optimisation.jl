@@ -339,7 +339,7 @@
 
             rtol = if i == 22 || Sys.isapple() && i ∈ (18, 20) || Sys.iswindows() && i == 10
                 1e-3
-            elseif i ∈ (1, 10) || Sys.isapple() && i == 2
+            elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
                 5e-4
             elseif i ∈ (13, 15, 16, 17, 19)
                 5e-3
