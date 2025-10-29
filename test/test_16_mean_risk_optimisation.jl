@@ -170,10 +170,13 @@
               UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
               LowOrderMoment(;
                              alg = StandardisedLowOrderMoment(;
-                                                              alg = SecondLowerMoment(;
-                                                                                      alg = SOCRiskExpr()))),
+                                                              alg = SecondMoment(;
+                                                                                 alg1 = Semi(),
+                                                                                 alg2 = SOCRiskExpr()))),
               LowOrderMoment(;
-                             alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
+                             alg = StandardisedLowOrderMoment(;
+                                                              alg = SecondMoment(;
+                                                                                 alg1 = Semi()))),
               LowOrderMoment(;
                              alg = StandardisedLowOrderMoment(;
                                                               alg = SecondMoment(;
@@ -1547,29 +1550,34 @@
         rs1 = [LowOrderMoment(; mu = 0),
                LowOrderMoment(; mu = 0, alg = MeanAbsoluteDeviation()),
                LowOrderMoment(; mu = 0,
-                              alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi()))),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(; alg = SecondMoment())),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
-                                                               alg = SecondLowerMoment(;
-                                                                                       alg = SOCRiskExpr()))),
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi(),
+                                                                                  alg2 = SOCRiskExpr()))),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondMoment(;
                                                                                   alg2 = SOCRiskExpr()))),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
-                                                               alg = SecondLowerMoment(;
-                                                                                       alg = RSOCRiskExpr()))),
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi(),
+                                                                                  alg2 = RSOCRiskExpr()))),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondMoment(;
                                                                                   alg2 = RSOCRiskExpr()))),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
-                                                               alg = SecondLowerMoment(;
-                                                                                       alg = QuadRiskExpr()))),
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi(),
+                                                                                  alg2 = QuadRiskExpr()))),
                LowOrderMoment(; mu = 0,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondMoment(;
@@ -1585,29 +1593,34 @@
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
                LowOrderMoment(; mu = 0, w = wp, alg = MeanAbsoluteDeviation()),
                LowOrderMoment(; mu = 0, w = wp,
-                              alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
+                              alg = StandardisedLowOrderMoment(;
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi()))),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(; alg = SecondMoment())),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
-                                                               alg = SecondLowerMoment(;
-                                                                                       alg = SOCRiskExpr()))),
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi(),
+                                                                                  alg2 = SOCRiskExpr()))),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondMoment(;
                                                                                   alg2 = SOCRiskExpr()))),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
-                                                               alg = SecondLowerMoment(;
-                                                                                       alg = RSOCRiskExpr()))),
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi(),
+                                                                                  alg2 = RSOCRiskExpr()))),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondMoment(;
                                                                                   alg2 = RSOCRiskExpr()))),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
-                                                               alg = SecondLowerMoment(;
-                                                                                       alg = QuadRiskExpr()))),
+                                                               alg = SecondMoment(;
+                                                                                  alg1 = Semi(),
+                                                                                  alg2 = QuadRiskExpr()))),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = StandardisedLowOrderMoment(;
                                                                alg = SecondMoment(;

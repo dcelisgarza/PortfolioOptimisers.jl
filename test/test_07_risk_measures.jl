@@ -155,18 +155,21 @@
                        expected_risk(Kurtosis(;), w, rd.X))
         @test isapprox(expected_risk(LowOrderMoment(;
                                                     alg = StandardisedLowOrderMoment(;
-                                                                                     alg = SecondLowerMoment(;
-                                                                                                             alg = SOCRiskExpr()))),
+                                                                                     alg = SecondMoment(;
+                                                                                                        alg1 = Semi(),
+                                                                                                        alg2 = SOCRiskExpr()))),
                                      w, rd.X), 0.009123864007588172)
         @test isapprox(expected_risk(LowOrderMoment(; mu = dot(w, pr.mu),
                                                     alg = StandardisedLowOrderMoment(;
-                                                                                     alg = SecondLowerMoment(;
-                                                                                                             alg = SOCRiskExpr()))),
+                                                                                     alg = SecondMoment(;
+                                                                                                        alg1 = Semi(),
+                                                                                                        alg2 = SOCRiskExpr()))),
                                      w, rd.X),
                        sqrt(expected_risk(LowOrderMoment(;
                                                          alg = StandardisedLowOrderMoment(;
-                                                                                          alg = SecondLowerMoment(;
-                                                                                                                  alg = QuadRiskExpr()))),
+                                                                                          alg = SecondMoment(;
+                                                                                                             alg1 = Semi(),
+                                                                                                             alg2 = QuadRiskExpr()))),
                                           w, rd.X)))
         @test isapprox(expected_risk(LowOrderMoment(;
                                                     alg = StandardisedLowOrderMoment(;

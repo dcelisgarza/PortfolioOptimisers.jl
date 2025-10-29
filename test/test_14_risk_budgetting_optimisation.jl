@@ -50,9 +50,13 @@
     rs = [StandardDeviation(), Variance(), LowOrderMoment(),
           LowOrderMoment(;
                          alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondLowerMoment(;
-                                                                                  alg = SOCRiskExpr()))),
-          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
+                                                          alg = SecondMoment(;
+                                                                             alg1 = Semi(),
+                                                                             alg2 = SOCRiskExpr()))),
+          LowOrderMoment(;
+                         alg = StandardisedLowOrderMoment(;
+                                                          alg = SecondMoment(;
+                                                                             alg1 = Semi()))),
           LowOrderMoment(;
                          alg = StandardisedLowOrderMoment(;
                                                           alg = SecondMoment(;
