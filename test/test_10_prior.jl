@@ -408,7 +408,7 @@
         r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
                            alg = StandardisedLowOrderMoment(;
                                                             ve = SimpleVariance(; w = pr.w),
-                                                            alg = SecondCentralMoment()))
+                                                            alg = SecondMoment()))
         @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
         @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
         @test isapprox(pr.w,
@@ -679,7 +679,7 @@
         r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
                            alg = StandardisedLowOrderMoment(;
                                                             ve = SimpleVariance(; w = pr.w),
-                                                            alg = SecondCentralMoment()))
+                                                            alg = SecondMoment()))
         @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
         @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
         @test isapprox(pr.w,

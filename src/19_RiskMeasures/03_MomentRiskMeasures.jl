@@ -193,6 +193,59 @@ end
 function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondCentralMoment(alg)
 end
+#########
+struct SecondMoment{T1, T2} <: UnstandardisedSecondMomentAlgorithm
+    alg1::T1
+    alg2::T2
+    function SecondMoment(alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation)
+        return new{typeof(alg1), typeof(alg2)}(alg1, alg2)
+    end
+end
+function SecondMoment(; alg1::AbstractMomentAlgorithm = Full(),
+                      alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
+    return SecondMoment(alg1, alg2)
+end
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:StandardisedLowOrderMoment{<:Any,
+                                                         <:SecondMoment{<:Semi,
+                                                                        <:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                          X::AbstractMatrix,
+                                                                                          fees::Union{Nothing,
+                                                                                                      <:Fees} = nothing)
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:StandardisedLowOrderMoment{<:Any,
+                                                         <:SecondMoment{<:Semi,
+                                                                        <:QuadraticSecondMomentFormulations}}})(w::AbstractVector,
+                                                                                                                X::AbstractMatrix,
+                                                                                                                fees::Union{Nothing,
+                                                                                                                            <:Fees} = nothing)
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:StandardisedLowOrderMoment{<:Any,
+                                                         <:SecondCentralMoment{<:Full,
+                                                                               <:SOCRiskExpr}}})(w::AbstractVector,
+                                                                                                 X::AbstractMatrix,
+                                                                                                 fees::Union{Nothing,
+                                                                                                             <:Fees} = nothing)
+    val = calc_deviations_vec(r, w, X, fees)
+    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:StandardisedLowOrderMoment{<:Any,
+                                                         <:SecondCentralMoment{<:Full,
+                                                                               <:QuadraticSecondMomentFormulations}}})(w::AbstractVector,
+                                                                                                                       X::AbstractMatrix,
+                                                                                                                       fees::Union{Nothing,
+                                                                                                                                   <:Fees} = nothing)
+    val = calc_deviations_vec(r, w, X, fees)
+    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+end
+#########
 """
     struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
         ve::T1
@@ -319,6 +372,55 @@ Computes portfolio risk using the fourth central moment (unstandardised kurtosis
   - [`HighOrderMoment`](@ref)
 """
 struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+###########
+struct FourthMoment{T1} <: UnstandardisedHighOrderMomentMeasureAlgorithm
+    alg::T1
+    function FourthMoment(alg::AbstractMomentAlgorithm)
+        return new{typeof(alg)}(alg)
+    end
+end
+function FourthMoment(; alg::AbstractMomentAlgorithm = Full())
+    return FourthMoment(alg)
+end
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(w::AbstractVector,
+                                                                           X::AbstractMatrix,
+                                                                           fees::Union{Nothing,
+                                                                                       <:Fees} = nothing)
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+    val .= val .^ 4
+    return isnothing(r.w) ? mean(val) : mean(val, r.w)
+end
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Full}})(w::AbstractVector,
+                                                                           X::AbstractMatrix,
+                                                                           fees::Union{Nothing,
+                                                                                       <:Fees} = nothing)
+    val = calc_deviations_vec(r, w, X, fees)
+    val .= val .^ 4
+    return isnothing(r.w) ? mean(val) : mean(val, r.w)
+end
+function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Semi}}})(w::AbstractVector,
+                                                                                            X::AbstractMatrix,
+                                                                                            fees::Union{Nothing,
+                                                                                                        <:Fees} = nothing)
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+    val .= val .^ 4
+    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return res / sigma^2
+end
+function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Full}}})(w::AbstractVector,
+                                                                                            X::AbstractMatrix,
+                                                                                            fees::Union{Nothing,
+                                                                                                        <:Fees} = nothing)
+    val = calc_deviations_vec(r, w, X, fees)
+    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+    val .= val .^ 4
+    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return res / sigma^2
+end
+###########
 """
     struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
         ve::T1
@@ -1241,7 +1343,6 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-
 function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::AbstractVector,
                                                                        X::AbstractMatrix,
                                                                        fees::Union{Nothing,
@@ -1314,6 +1415,7 @@ for rt in (LowOrderMoment, HighOrderMoment)
          end)
 end
 
-export FirstLowerMoment, SecondLowerMoment, SecondCentralMoment, MeanAbsoluteDeviation,
-       ThirdLowerMoment, FourthLowerMoment, FourthCentralMoment, StandardisedLowOrderMoment,
-       StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment
+export FirstLowerMoment, SecondLowerMoment, SecondCentralMoment, SecondMoment,
+       MeanAbsoluteDeviation, ThirdLowerMoment, FourthLowerMoment, FourthCentralMoment,
+       StandardisedLowOrderMoment, StandardisedHighOrderMoment, LowOrderMoment,
+       HighOrderMoment

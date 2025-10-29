@@ -55,9 +55,9 @@
           LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
           LowOrderMoment(;
                          alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondCentralMoment(;
-                                                                                    alg = SOCRiskExpr()))),
-          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondCentralMoment())),
+                                                          alg = SecondMoment(;
+                                                                             alg2 = SOCRiskExpr()))),
+          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondMoment())),
           LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
           ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
           EntropicValueatRiskRange(), RelativisticValueatRisk(),
