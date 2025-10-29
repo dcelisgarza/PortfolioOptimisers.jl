@@ -3,19 +3,15 @@
 ```@docs
 FirstLowerMoment
 MeanAbsoluteDeviation
-SecondLowerMoment
-SecondCentralMoment
-StandardisedLowOrderMoment
+SecondMoment
 LowOrderMoment
 ThirdLowerMoment
-FourthLowerMoment
-FourthCentralMoment
+FourthMoment
 StandardisedHighOrderMoment
 HighOrderMoment
 PortfolioOptimisers.MomentMeasureAlgorithm
 PortfolioOptimisers.LowOrderMomentMeasureAlgorithm
 PortfolioOptimisers.UnstandardisedLowOrderMomentMeasureAlgorithm
-PortfolioOptimisers.UnstandardisedSecondMomentAlgorithm
 PortfolioOptimisers.HighOrderMomentMeasureAlgorithm
 PortfolioOptimisers.UnstandardisedHighOrderMomentMeasureAlgorithm
 PortfolioOptimisers.calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},

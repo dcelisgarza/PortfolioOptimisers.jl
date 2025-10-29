@@ -406,9 +406,7 @@
         sigma_views = LinearConstraintEstimator(; val = "AAPL == 0.0007")
         pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views), rd)
         r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
-                           alg = StandardisedLowOrderMoment(;
-                                                            ve = SimpleVariance(; w = pr.w),
-                                                            alg = SecondMoment()))
+                           alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
         @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
         @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
         @test isapprox(pr.w,
@@ -672,9 +670,7 @@
         pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views, opt = opt),
                    rd)
         r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
-                           alg = StandardisedLowOrderMoment(;
-                                                            ve = SimpleVariance(; w = pr.w),
-                                                            alg = SecondMoment()))
+                           alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
         @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
         @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
         @test isapprox(pr.w,

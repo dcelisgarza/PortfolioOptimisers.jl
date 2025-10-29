@@ -21,7 +21,6 @@ Defines the interface for algorithms that compute portfolio risk using low-order
 # Related Types
 
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
-  - [`StandardisedLowOrderMoment`](@ref)
 """
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
@@ -35,7 +34,6 @@ Defines the interface for algorithms that compute portfolio risk using low-order
 
   - [`FirstLowerMoment`](@ref)
   - [`MeanAbsoluteDeviation`](@ref)
-  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
 """
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
@@ -70,197 +68,66 @@ Computes portfolio risk as the mean of the absolute deviations of the returns se
 """
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
-    abstract type UnstandardisedSecondMomentAlgorithm <: UnstandardisedLowOrderMomentMeasureAlgorithm end
-
-Abstract supertype for unstandardised second moment risk measure algorithms in PortfolioOptimisers.jl.
-
-Defines the interface for algorithms that compute portfolio risk using the second moment (such as variance or semi-variance) of the return distribution, without normalising by the variance. All concrete unstandardised second moment risk measure algorithms should subtype `UnstandardisedSecondMomentAlgorithm` to ensure consistency and composability within the risk measure framework.
-
-# Related Types
-
-  - [`SecondLowerMoment`](@ref)
-  - [`SecondCentralMoment`](@ref)
-"""
-abstract type UnstandardisedSecondMomentAlgorithm <:
-              UnstandardisedLowOrderMomentMeasureAlgorithm end
-"""
-    struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
-        alg::T1
-    end
-
-Represents the second lower moment risk measure algorithm in PortfolioOptimisers.jl.
-
-Computes portfolio risk using the second lower moment (semi-variance or semi-standard deviation), which quantifies downside risk by considering only deviations below a target value.
-
-# Fields
-
-  - `alg`: The second moment formulation algorithm used to compute the risk measure.
-
-# Constructors
-
-    SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
-
-Keyword arguments correspond to the fields above.
-
-# Formulations
-
-Depending on the `alg` field, this can represent either the semi-variance or semi-standard deviation.
-
-## `SOCRiskExpr`
-
-Computes the semi-standard deviation (square root of semi-variance) of the returns below the target.
-
-## `QuadRiskExpr`, `SquaredSOCRiskExpr`, `RSOCRiskExpr`
-
-Computes the semi-variance of the returns below the target.
-
-# Examples
-
-```jldoctest
-julia> SecondLowerMoment()
-SecondLowerMoment
-  alg ┴ SquaredSOCRiskExpr()
-```
-
-# Related
-
-  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
-  - [`SecondMomentFormulation`](@ref)
-  - [`SquaredSOCRiskExpr`](@ref)
-  - [`LowOrderMoment`](@ref)
-"""
-struct SecondLowerMoment{T1} <: UnstandardisedSecondMomentAlgorithm
-    alg::T1
-    function SecondLowerMoment(alg::SecondMomentFormulation)
-        return new{typeof(alg)}(alg)
-    end
-end
-function SecondLowerMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
-    return SecondLowerMoment(alg)
-end
-"""
-    struct SecondCentralMoment{T1} <: UnstandardisedSecondMomentAlgorithm
-        alg::T1
-    end
-
-Represents the second central moment risk measure algorithm in PortfolioOptimisers.jl.
-
-Computes portfolio risk using the second central moment (variance or standard deviation), which quantifies risk by considering all deviations from a target value.
-
-# Fields
-
-  - `alg`: The second moment formulation algorithm used to compute the risk measure.
-
-# Constructors
-
-    SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
-
-Keyword arguments correspond to the fields above.
-
-# Formulations
-
-Depending on the `alg` field, this can represent either the variance or standard deviation.
-
-## `SOCRiskExpr`
-
-Computes the standard deviation (square root of variance) of the returns below the target.
-
-## `QuadRiskExpr`, `SquaredSOCRiskExpr`, `RSOCRiskExpr`
-
-Computes the variance of the returns below the target.
-
-# Examples
-
-```jldoctest
-julia> SecondCentralMoment()
-SecondCentralMoment
-  alg ┴ SquaredSOCRiskExpr()
-```
-
-# Related
-
-  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
-  - [`SecondMomentFormulation`](@ref)
-  - [`SquaredSOCRiskExpr`](@ref)
-  - [`LowOrderMoment`](@ref)
-"""
-struct SecondCentralMoment{T1} <: UnstandardisedSecondMomentAlgorithm
-    alg::T1
-    function SecondCentralMoment(alg::SecondMomentFormulation)
-        return new{typeof(alg)}(alg)
-    end
-end
-function SecondCentralMoment(; alg::SecondMomentFormulation = SquaredSOCRiskExpr())
-    return SecondCentralMoment(alg)
-end
-#########
-struct SecondMoment{T1, T2} <: UnstandardisedSecondMomentAlgorithm
-    alg1::T1
-    alg2::T2
-    function SecondMoment(alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation)
-        return new{typeof(alg1), typeof(alg2)}(alg1, alg2)
-    end
-end
-function SecondMoment(; alg1::AbstractMomentAlgorithm = Full(),
-                      alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
-    return SecondMoment(alg1, alg2)
-end
-#########
-"""
-    struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
+    struct SecondMoment{T1, T2, T3} <: LowOrderMomentMeasureAlgorithm
         ve::T1
-        alg::T2
+        alg1::T2
+        alg2::T3
     end
 
-Represents a standardised low-order moment risk measure algorithm in PortfolioOptimisers.jl.
+Represents a second moment (variance or standard deviation) risk measure algorithm in PortfolioOptimisers.jl.
 
-Computes portfolio risk using a low-order moment algorithm, standardised by a variance estimator. This enables risk measures such as semi-standard deviation or standardised semi-variance, which normalise the risk by the portfolio variance.
+Computes portfolio risk using the second central (full) or lower (semi) moment of the return distribution, supporting both full and semi (downside) formulations. The specific formulation is determined by the `alg1` and `alg2` fields, enabling flexible representation of variance, semi-variance, standard deviation, or semi-standard deviation.
 
 # Fields
 
-  - `ve`: Variance estimator used for standardisation.
-  - `alg`: Unstandardised second moment algorithm used to compute the risk measure.
+  - `ve`: Variance estimator used to compute the second moment.
+  - `alg1`: Moment algorithm specifying whether to use all deviations or only downside deviations.
+  - `alg2`: Second moment formulation specifying the optimisation formulation.
 
 # Constructors
 
-    StandardisedLowOrderMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                               alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
+    SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+                 alg1::AbstractMomentAlgorithm = Full(),
+                 alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
 
 Keyword arguments correspond to the fields above.
 
 # Examples
 
 ```jldoctest
-julia> StandardisedLowOrderMoment()
-StandardisedLowOrderMoment
-   ve ┼ SimpleVariance
-      │          me ┼ nothing
-      │           w ┼ nothing
-      │   corrected ┴ Bool: true
-  alg ┼ SecondLowerMoment
-      │   alg ┴ SquaredSOCRiskExpr()
+julia> SecondMoment()
+SecondMoment
+    ve ┼ SimpleVariance
+       │          me ┼ nothing
+       │           w ┼ nothing
+       │   corrected ┴ Bool: true
+  alg1 ┼ Full()
+  alg2 ┴ SquaredSOCRiskExpr()
 ```
 
 # Related
 
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
-  - [`UnstandardisedSecondMomentAlgorithm`](@ref)
-  - [`SimpleVariance`](@ref)
-  - [`SecondLowerMoment`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`AbstractMomentAlgorithm`](@ref)
+  - [`SecondMomentFormulation`](@ref)
 """
-struct StandardisedLowOrderMoment{T1, T2} <: LowOrderMomentMeasureAlgorithm
+struct SecondMoment{T1, T2, T3} <: LowOrderMomentMeasureAlgorithm
     ve::T1
-    alg::T2
-    function StandardisedLowOrderMoment(ve::AbstractVarianceEstimator,
-                                        alg::UnstandardisedSecondMomentAlgorithm)
-        return new{typeof(ve), typeof(alg)}(ve, alg)
+    alg1::T2
+    alg2::T3
+    function SecondMoment(ve::AbstractVarianceEstimator, alg1::AbstractMomentAlgorithm,
+                          alg2::SecondMomentFormulation)
+        return new{typeof(ve), typeof(alg1), typeof(alg2)}(ve, alg1, alg2)
     end
 end
-function StandardisedLowOrderMoment(;
-                                    ve::AbstractVarianceEstimator = SimpleVariance(;
-                                                                                   me = nothing),
-                                    alg::UnstandardisedSecondMomentAlgorithm = SecondLowerMoment())
-    return StandardisedLowOrderMoment(ve, alg)
+function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+                      alg1::AbstractMomentAlgorithm = Full(),
+                      alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
+    return SecondMoment(ve, alg1, alg2)
+end
+function factory(alg::SecondMoment, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
     abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
@@ -285,8 +152,7 @@ Defines the interface for algorithms that compute portfolio risk using high-orde
 # Related Types
 
   - [`ThirdLowerMoment`](@ref)
-  - [`FourthLowerMoment`](@ref)
-  - [`FourthCentralMoment`](@ref)
+  - [`FourthMoment`](@ref)
 """
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
@@ -305,34 +171,37 @@ Computes portfolio risk using the third lower moment (unstandardised semi-skewne
 """
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 """
-    struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+    struct FourthMoment{T1} <: UnstandardisedHighOrderMomentMeasureAlgorithm
+        alg::T1
+    end
 
-Represents the unstandardised semi-kurtosis risk measure algorithm in PortfolioOptimisers.jl.
+Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk measure algorithm in PortfolioOptimisers.jl.
 
-Computes portfolio risk using the fourth lower moment (unstandardised semi-kurtosis), which quantifies downside tail risk by considering only the quartic deviations below a target value. This algorithm is unstandardised and operates directly on the return distribution.
+Computes portfolio risk using the fourth central (full) or lower (semi) moment of the return distribution, depending on the provided moment algorithm. This algorithm quantifies the "tailedness" of the return distribution without normalising by the variance.
+
+# Fields
+
+  - `alg`: Moment algorithm specifying whether to use all deviations or only downside deviations.
+
+# Constructors
+
+    FourthMoment(; alg::AbstractMomentAlgorithm = Full())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> FourthMoment()
+FourthMoment
+  alg ┴ Full()
+```
 
 # Related
 
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`HighOrderMomentMeasureAlgorithm`](@ref)
-  - [`HighOrderMoment`](@ref)
+  - [`AbstractMomentAlgorithm`](@ref)
 """
-struct FourthLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
-"""
-    struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
-
-Represents the unstandardised kurtosis risk measure algorithm in PortfolioOptimisers.jl.
-
-Computes portfolio risk using the fourth central moment (unstandardised kurtosis), which quantifies tail risk by considering all quartic deviations from a target value. This algorithm is unstandardised and operates directly on the return distribution.
-
-# Related
-
-  - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`HighOrderMomentMeasureAlgorithm`](@ref)
-  - [`HighOrderMoment`](@ref)
-"""
-struct FourthCentralMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
-###########
 struct FourthMoment{T1} <: UnstandardisedHighOrderMomentMeasureAlgorithm
     alg::T1
     function FourthMoment(alg::AbstractMomentAlgorithm)
@@ -342,7 +211,6 @@ end
 function FourthMoment(; alg::AbstractMomentAlgorithm = Full())
     return FourthMoment(alg)
 end
-###########
 """
     struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
         ve::T1
@@ -381,11 +249,8 @@ StandardisedHighOrderMoment
 # Related
 
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
-  - [`SimpleVariance`](@ref)
-  - [`ThirdLowerMoment`](@ref)
-  - [`FourthLowerMoment`](@ref)
-  - [`FourthCentralMoment`](@ref)
 """
 struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
     ve::T1
@@ -401,12 +266,9 @@ function StandardisedHighOrderMoment(;
                                      alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return StandardisedHighOrderMoment(ve, alg)
 end
-for alg in (StandardisedLowOrderMoment, StandardisedHighOrderMoment)
-    eval(quote
-             function factory(alg::$(alg), w::Union{Nothing, <:AbstractWeights} = nothing)
-                 return $(alg)(; ve = factory(alg.ve, w), alg = alg.alg)
-             end
-         end)
+function factory(alg::StandardisedHighOrderMoment,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """
     struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
@@ -514,9 +376,9 @@ Where:
   - ``\\mathrm{X}``: `T×N` return matrix.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
-## `StandardisedLowOrderMoment`
+## `SecondMoment`
 
-Depending on the `alg` field the risk measure can either compute the second central moment or second lower moment.
+Depending on the `alg1` field the risk measure can either compute the second central moment or second lower moment.
 
 !!! info
 
@@ -524,11 +386,9 @@ Depending on the `alg` field the risk measure can either compute the second cent
 
 Both central and lower moments can be formulated as quadratic moments (variance or semi-variance) or their square roots (standard deviation or semi-standard deviation). Regardless of whether they are central or lower moments, they can be formulated in a variety of ways.
 
-### `SecondCentralMoment`
+Depending on the `alg2` field, it can represent the variance (using different formulations in `JuMP`) or standard deviation.
 
-Depending on the `alg` field, it can represent the variance (using different formulations in `JuMP`) or standard deviation.
-
-The variance formulations are:
+The (semi-)variance formulations are:
 
   - [`SquaredSOCRiskExpr`](@ref),
   - [`RSOCRiskExpr`](@ref),
@@ -538,7 +398,8 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,.
+\\mathrm{Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,.
+\\mathrm{Semi-Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
 \\end{align}
 ```
 
@@ -547,7 +408,7 @@ Where:
   - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
 
-The standard deviation formulation is:
+The (semi-)standard deviation formulation is:
 
   - [`SOCRiskExpr`](@ref).
 
@@ -555,7 +416,8 @@ It is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{StandardDeviation}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
+\\mathrm{StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
+\\mathrm{Semi-StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
@@ -566,12 +428,26 @@ Where:
 
 #### `SquaredSOCRiskExpr`
 
-Represents the variance using the square of a second order cone constrained variable.
+Represents the (semi-)variance using the square of a second order cone constrained variable.
+
+The variance is formulated as.
 
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\end{align}
+```
+
+The semi-variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
                &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
@@ -591,12 +467,26 @@ Where:
 
 #### `RSOCRiskExpr`
 
-Represents the variance using a sum of squares formulation via a rotated second order cone.
+Represents the (semi-)variance using a sum of squares formulation via a rotated second order cone.
+
+The variance is formulated as.
 
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+\\end{align}
+```
+
+The semi-variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
+\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
                &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
 \\end{align}
@@ -616,12 +506,25 @@ Where:
 
 #### `QuadRiskExpr`
 
-Represents the variance using the deviations vector dotted with itself.
+Represents the (semi-)variance using the deviations vector dotted with itself.
+
+The variance is formulated as.
 
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
+\\end{align}
+```
+
+The semi-variance is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
                &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
 \\end{align}
 ```
@@ -639,12 +542,26 @@ Where:
 
 #### `SOCRiskExpr`
 
-Represents the standard deviation using a second order cone constrained variable.
+Represents the (semi-)standard deviation using a second order cone constrained variable.
+
+The standard deviation is formulated as.
 
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\end{align}
+```
+
+The semi-standard deviation is formulated as.
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
                &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
                &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
@@ -655,153 +572,6 @@ Where:
   - ``\\boldsymbol{w}``: `N×1` asset weights vector.
   - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
   - ``\\sigma``: standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T×N` return matrix.
-  - ``\\mu``: minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
-  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
-  - ``\\odot``: element-wise (Hadamard) product.
-  - ``K_{soc}``: second order cone.
-
-### `SecondLowerMoment`
-
-Depending on the `alg` field, it can represent the semi-variance (using different formulations in `JuMP`) or semi-standard deviation.
-
-The semi-variance formulations are:
-
-  - [`SquaredSOCRiskExpr`](@ref),
-  - [`RSOCRiskExpr`](@ref),
-  - [`QuadRiskExpr`](@ref).
-
-It is computed as:
-
-```math
-\\begin{align}
-\\mathrm{Semi-Variance}(\\boldsymbol{X}) = \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
-  - ``\\circ``: element-wise function application.
-
-The semi-standard deviation formulation is:
-
-  - [`SOCRiskExpr`](@ref).
-
-It is computed as:
-
-```math
-\\begin{align}
-\\mathrm{Semi-StandardDeviation}(\\boldsymbol{X}) = \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{X}``: `T×1` vector of portfolio returns.
-  - ``\\mathbb{E}[\\cdot]``: expected value operator, supports weighted averages.
-  - ``\\circ``: element-wise function application.
-
-#### `SquaredSOCRiskExpr`
-
-Represents the semi-variance using the square of a second order cone constrained variable.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: semi-standard deviation of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T×N` return matrix.
-  - ``\\mu``: minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
-  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
-  - ``\\odot``: element-wise (Hadamard) product.
-  - ``K_{soc}``: second order cone.
-
-#### `RSOCRiskExpr`
-
-Represents the semi-variance using a sum of squares formulation via a rotated second order cone.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
-  - ``t``: semi-variance of the portfolio returns.
-  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T×N` return matrix.
-  - ``\\mu``: minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
-  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
-  - ``K_{rsoc}``: rotated second order cone.
-  - ``\\odot``: element-wise (Hadamard) product.
-
-#### `QuadRiskExpr`
-
-Represents the semi-variance using the deviations vector dotted with itself.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
-  - ``\\mathrm{X}``: `T×N` return matrix.
-  - ``\\mu``: minimum acceptable return.
-  - ``\\boldsymbol{\\lambda}``: `T×1` vector of observation weights.
-  - ``f``: observation weights scaling factor, it is a function of the type of observation weights.
-  - ``\\odot``: element-wise (Hadamard) product.
-
-#### `SOCRiskExpr`
-
-Represents the semi-standard deviation using a second order cone constrained variable.
-
-```math
-\\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T×1` vector of auxiliary decision variables representing deviations from the target.
-  - ``\\sigma``: semi-standard deviation of the portfolio returns.
   - ``\\boldsymbol{d}_s``: `T×1` vector of scaled deviations according to observation weights.
   - ``\\mathrm{X}``: `T×N` return matrix.
   - ``\\mu``: minimum acceptable return.
@@ -842,9 +612,7 @@ LowOrderMoment
   - [`LowOrderMomentMeasureAlgorithm`](@ref)
   - [`FirstLowerMoment`](@ref)
   - [`MeanAbsoluteDeviation`](@ref)
-  - [`SecondLowerMoment`](@ref)
-  - [`SecondCentralMoment`](@ref)
-  - [`StandardisedLowOrderMoment`](@ref)
+  - [`SecondMoment`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
   - [`QuadRiskExpr`](@ref)
@@ -916,13 +684,12 @@ Keyword arguments correspond to the fields above.
 
 # Formulations
 
-Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower moment, or fourth central moment. Each can be standardised or unstandardised.
+Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower (semi) moment, or fourth central moment. Each can be standardised or unstandardised.
 
 The unstandardised formulations are:
 
   - [`ThirdLowerMoment`](@ref),
-  - [`FourthLowerMoment`](@ref),
-  - [`FourthCentralMoment`](@ref).
+  - [`FourthMoment`](@ref),
 
 The standardised formulations are:
 
@@ -1005,8 +772,7 @@ HighOrderMoment
   - [`RiskMeasureSettings`](@ref)
   - [`HighOrderMomentMeasureAlgorithm`](@ref)
   - [`ThirdLowerMoment`](@ref)
-  - [`FourthLowerMoment`](@ref)
-  - [`FourthCentralMoment`](@ref)
+  - [`FourthMoment`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
 """
 struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
@@ -1229,42 +995,6 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::Ab
     val = abs.(calc_deviations_vec(r, w, X, fees))
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondLowerMoment{<:SOCRiskExpr}}})(w::AbstractVector,
-                                                                                               X::AbstractMatrix,
-                                                                                               fees::Union{Nothing,
-                                                                                                           <:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondLowerMoment{<:QuadSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                                X::AbstractMatrix,
-                                                                                                                fees::Union{Nothing,
-                                                                                                                            <:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondCentralMoment{<:SOCRiskExpr}}})(w::AbstractVector,
-                                                                                                 X::AbstractMatrix,
-                                                                                                 fees::Union{Nothing,
-                                                                                                             <:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondCentralMoment{<:QuadSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                                  X::AbstractMatrix,
-                                                                                                                  fees::Union{Nothing,
-                                                                                                                              <:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::AbstractVector,
                                                                        X::AbstractMatrix,
                                                                        fees::Union{Nothing,
@@ -1272,22 +1002,6 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::Abstra
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 3
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
-end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthLowerMoment})(w::AbstractVector,
-                                                                        X::AbstractMatrix,
-                                                                        fees::Union{Nothing,
-                                                                                    <:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    val .= val .^ 4
-    return isnothing(r.w) ? mean(val) : mean(val, r.w)
-end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthCentralMoment})(w::AbstractVector,
-                                                                          X::AbstractMatrix,
-                                                                          fees::Union{Nothing,
-                                                                                      <:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    val .= val .^ 4
-    return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                              <:StandardisedHighOrderMoment{<:Any, <:ThirdLowerMoment}})(w::AbstractVector,
@@ -1300,66 +1014,35 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? -mean(val) : -mean(val, r.w)
     return res / (sigma * sqrt(sigma))
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:FourthLowerMoment}})(w::AbstractVector,
-                                                                                         X::AbstractMatrix,
-                                                                                         fees::Union{Nothing,
-                                                                                                     <:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-    val .= val .^ 4
-    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
-    return res / sigma^2
-end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:FourthCentralMoment}})(w::AbstractVector,
-                                                                                           X::AbstractMatrix,
-                                                                                           fees::Union{Nothing,
-                                                                                                       <:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-    val .= val .^ 4
-    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
-    return res / sigma^2
-end
-###########
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondMoment{<:Semi,
-                                                                        <:SOCRiskExpr}}})(w::AbstractVector,
-                                                                                          X::AbstractMatrix,
-                                                                                          fees::Union{Nothing,
-                                                                                                      <:Fees} = nothing)
+                            <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}})(w::AbstractVector,
+                                                                           X::AbstractMatrix,
+                                                                           fees::Union{Nothing,
+                                                                                       <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondMoment{<:Semi,
-                                                                        <:QuadSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                           X::AbstractMatrix,
-                                                                                                           fees::Union{Nothing,
-                                                                                                                       <:Fees} = nothing)
+                            <:SecondMoment{<:Any, <:Semi, <:QuadSecondMomentFormulations}})(w::AbstractVector,
+                                                                                            X::AbstractMatrix,
+                                                                                            fees::Union{Nothing,
+                                                                                                        <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondMoment{<:Full,
-                                                                        <:SOCRiskExpr}}})(w::AbstractVector,
-                                                                                          X::AbstractMatrix,
-                                                                                          fees::Union{Nothing,
-                                                                                                      <:Fees} = nothing)
+                            <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}})(w::AbstractVector,
+                                                                           X::AbstractMatrix,
+                                                                           fees::Union{Nothing,
+                                                                                       <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondMoment{<:Full,
-                                                                        <:QuadSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                           X::AbstractMatrix,
-                                                                                                           fees::Union{Nothing,
-                                                                                                                       <:Fees} = nothing)
+                            <:SecondMoment{<:Any, <:Full, <:QuadSecondMomentFormulations}})(w::AbstractVector,
+                                                                                            X::AbstractMatrix,
+                                                                                            fees::Union{Nothing,
+                                                                                                        <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -1417,7 +1100,5 @@ for rt in (LowOrderMoment, HighOrderMoment)
          end)
 end
 
-export FirstLowerMoment, SecondLowerMoment, SecondCentralMoment, SecondMoment,
-       MeanAbsoluteDeviation, ThirdLowerMoment, FourthMoment, FourthLowerMoment,
-       FourthCentralMoment, StandardisedLowOrderMoment, StandardisedHighOrderMoment,
-       LowOrderMoment, HighOrderMoment
+export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
+       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment

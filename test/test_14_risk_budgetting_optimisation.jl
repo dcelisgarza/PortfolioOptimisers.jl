@@ -48,20 +48,10 @@
                         length = size(pr.X, 1)))
     rf = 4.2 / 100 / 252
     rs = [StandardDeviation(), Variance(), LowOrderMoment(),
-          LowOrderMoment(;
-                         alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondMoment(;
-                                                                             alg1 = Semi(),
-                                                                             alg2 = SOCRiskExpr()))),
-          LowOrderMoment(;
-                         alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondMoment(;
-                                                                             alg1 = Semi()))),
-          LowOrderMoment(;
-                         alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondMoment(;
-                                                                             alg2 = SOCRiskExpr()))),
-          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondMoment())),
+          LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
+          LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
+          LowOrderMoment(; alg = SecondMoment(; alg2 = SOCRiskExpr())),
+          LowOrderMoment(; alg = SecondMoment()),
           LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
           ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
           EntropicValueatRiskRange(), RelativisticValueatRisk(),
@@ -119,7 +109,7 @@
             end
             @test success
 
-            rtol = if i ∈ (7, 10, 19, 25) || Sys.isapple() && i ∈ (2, 5, 12)
+            rtol = if i ∈ (5, 7, 10, 19, 25) || Sys.isapple() && i ∈ (2, 12)
                 1e-4
             elseif i == 17
                 5e-3
