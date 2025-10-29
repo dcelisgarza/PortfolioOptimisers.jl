@@ -52,7 +52,7 @@ Keyword arguments correspond to the fields above.
           * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
   - If `N` is provided: must be positive.
 
-# `JuMP` Fromulations
+# `JuMP` Formulations
 
 ## Exact
 

@@ -1080,7 +1080,6 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^2
 end
-###########
 for rt in (LowOrderMoment, HighOrderMoment)
     eval(quote
              function factory(r::$(rt), prior::AbstractPriorResult, args...; kwargs...)
