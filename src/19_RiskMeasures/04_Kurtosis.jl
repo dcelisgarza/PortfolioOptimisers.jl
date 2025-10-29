@@ -178,17 +178,15 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
-                      <:QuadraticSecondMomentFormulations})(w::AbstractVector,
-                                                            X::AbstractMatrix,
-                                                            fees::Union{Nothing, <:Fees} = nothing)
+                      <:QuadSecondMomentFormulations})(w::AbstractVector, X::AbstractMatrix,
+                                                       fees::Union{Nothing, <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
-                      <:QuadraticSecondMomentFormulations})(w::AbstractVector,
-                                                            X::AbstractMatrix,
-                                                            fees::Union{Nothing, <:Fees} = nothing)
+                      <:QuadSecondMomentFormulations})(w::AbstractVector, X::AbstractMatrix,
+                                                       fees::Union{Nothing, <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)

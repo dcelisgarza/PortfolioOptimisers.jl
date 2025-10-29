@@ -1240,10 +1240,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondLowerMoment{<:QuadraticSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                                     X::AbstractMatrix,
-                                                                                                                     fees::Union{Nothing,
-                                                                                                                                 <:Fees} = nothing)
+                                                         <:SecondLowerMoment{<:QuadSecondMomentFormulations}}})(w::AbstractVector,
+                                                                                                                X::AbstractMatrix,
+                                                                                                                fees::Union{Nothing,
+                                                                                                                            <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -1258,10 +1258,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:StandardisedLowOrderMoment{<:Any,
-                                                         <:SecondCentralMoment{<:QuadraticSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                                       X::AbstractMatrix,
-                                                                                                                       fees::Union{Nothing,
-                                                                                                                                   <:Fees} = nothing)
+                                                         <:SecondCentralMoment{<:QuadSecondMomentFormulations}}})(w::AbstractVector,
+                                                                                                                  X::AbstractMatrix,
+                                                                                                                  fees::Union{Nothing,
+                                                                                                                              <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -1336,10 +1336,10 @@ end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:StandardisedLowOrderMoment{<:Any,
                                                          <:SecondMoment{<:Semi,
-                                                                        <:QuadraticSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                                X::AbstractMatrix,
-                                                                                                                fees::Union{Nothing,
-                                                                                                                            <:Fees} = nothing)
+                                                                        <:QuadSecondMomentFormulations}}})(w::AbstractVector,
+                                                                                                           X::AbstractMatrix,
+                                                                                                           fees::Union{Nothing,
+                                                                                                                       <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -1356,10 +1356,10 @@ end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:StandardisedLowOrderMoment{<:Any,
                                                          <:SecondCentralMoment{<:Full,
-                                                                               <:QuadraticSecondMomentFormulations}}})(w::AbstractVector,
-                                                                                                                       X::AbstractMatrix,
-                                                                                                                       fees::Union{Nothing,
-                                                                                                                                   <:Fees} = nothing)
+                                                                               <:QuadSecondMomentFormulations}}})(w::AbstractVector,
+                                                                                                                  X::AbstractMatrix,
+                                                                                                                  fees::Union{Nothing,
+                                                                                                                              <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
