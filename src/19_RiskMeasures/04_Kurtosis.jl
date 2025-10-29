@@ -75,7 +75,8 @@ Kurtosis
         mu ┼ nothing
         kt ┼ nothing
          N ┼ nothing
-       alg1 ┴ Full()
+      alg1 ┼ Full()
+      alg2 ┴ SOCRiskExpr()
 ```
 
 # Related
@@ -98,8 +99,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     function Kurtosis(settings::RiskMeasureSettings, w::Union{Nothing, <:AbstractWeights},
                       mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar},
                       kt::Union{Nothing, <:AbstractMatrix}, N::Union{Nothing, <:Integer},
-                      alg1::AbstractMomentAlgorithm,
-                      alg2::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr})
+                      alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation)
         mu_flag = isa(mu, AbstractVector)
         kt_flag = isa(kt, AbstractMatrix)
         if mu_flag
@@ -178,19 +178,17 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
-                      <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector,
-                                                                      X::AbstractMatrix,
-                                                                      fees::Union{Nothing,
-                                                                                  <:Fees} = nothing)
+                      <:QuadraticSecondMomentFormulations})(w::AbstractVector,
+                                                            X::AbstractMatrix,
+                                                            fees::Union{Nothing, <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
-                      <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector,
-                                                                      X::AbstractMatrix,
-                                                                      fees::Union{Nothing,
-                                                                                  <:Fees} = nothing)
+                      <:QuadraticSecondMomentFormulations})(w::AbstractVector,
+                                                            X::AbstractMatrix,
+                                                            fees::Union{Nothing, <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)

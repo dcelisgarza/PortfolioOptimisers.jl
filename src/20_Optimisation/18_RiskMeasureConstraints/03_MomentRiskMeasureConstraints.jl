@@ -129,7 +129,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     second_lower_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_lower_moment, key,
-                                :tsecond_lower_moment_, :csecond_lower_moment_rsoc_,
+                                :tsecond_lower_moment_risk_, :csecond_lower_moment_rsoc_,
                                 sqrt_second_lower_moment)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
@@ -138,7 +138,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                            wi .*
                                                                                            second_lower_moment)
         set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_lower_moment, key,
-                                :tsecond_lower_moment_, :csecond_lower_moment_rsoc_,
+                                :tsecond_lower_moment_risk_, :csecond_lower_moment_rsoc_,
                                 sqrt_second_lower_moment)
     end
     model[Symbol(:csqrt_second_lower_moment_soc_, i)] = @constraint(model,
@@ -175,8 +175,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     second_central_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_central_moment, key,
-                                :tsecond_central_moment_, :csecond_central_moment_rsoc_,
-                                sqrt_second_central_moment)
+                                :tsecond_central_moment_risk_,
+                                :csecond_central_moment_rsoc_, sqrt_second_central_moment)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
         wi = sqrt.(wi)
@@ -184,8 +184,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                wi .*
                                                                                                second_central_moment)
         set_second_moment_risk!(model, r.alg.alg.alg, i, factor, second_central_moment, key,
-                                :tsecond_central_moment_, :csecond_central_moment_rsoc_,
-                                sqrt_second_central_moment)
+                                :tsecond_central_moment_risk_,
+                                :csecond_central_moment_rsoc_, sqrt_second_central_moment)
     end
     model[Symbol(:csqrt_second_central_moment_soc_, i)] = @constraint(model,
                                                                       [sc *

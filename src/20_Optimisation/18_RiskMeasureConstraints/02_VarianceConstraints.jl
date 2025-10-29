@@ -1,3 +1,10 @@
+function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
+    if !haskey(model, :G)
+        G = isnothing(pr.chol) ? cholesky(pr.sigma).U : pr.chol
+        @expression(model, G, G)
+    end
+    return model[:G]
+end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,

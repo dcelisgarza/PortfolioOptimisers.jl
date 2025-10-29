@@ -1,3 +1,10 @@
+function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
+    if !haskey(model, :GV)
+        G = cholesky(pr.V).U
+        @expression(model, GV, G)
+    end
+    return model[:GV]
+end
 function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:SOCRiskExpr},

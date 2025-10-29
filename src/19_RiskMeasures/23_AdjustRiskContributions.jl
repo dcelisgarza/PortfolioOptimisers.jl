@@ -41,8 +41,7 @@ const FourthPowerRiskMeasures = Union{<:HighOrderMoment{<:Any, <:Any, <:Any,
                                                         <:StandardisedHighOrderMoment{<:Any,
                                                                                       <:FourthCentralMoment}},
                                       <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                 <:Union{<:SquaredSOCRiskExpr,
-                                                         <:QuadRiskExpr}}}
+                                                 <:QuadraticSecondMomentFormulations}}
 const DrawdownRiskMeasures = Union{<:DrawdownatRisk, <:RelativeDrawdownatRisk,
                                    <:ConditionalDrawdownatRisk,
                                    <:RelativeConditionalDrawdownatRisk,
