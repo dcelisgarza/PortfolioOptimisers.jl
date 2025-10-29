@@ -172,13 +172,11 @@ r1 = factory(NegativeSkewness(;
                                                                                    sk_rk2),
                                                                         length = 5))), pr);
 r2 = factory(Kurtosis(;
-                                settings = RiskMeasureSettings(;
-                                                               ub = range(;
-                                                                          start = min(kt_rk1,
-                                                                                      kt_rk2),
-                                                                          stop = max(kt_rk1,
-                                                                                     kt_rk2),
-                                                                          length = 5))), pr);
+                      settings = RiskMeasureSettings(;
+                                                     ub = range(;
+                                                                start = min(kt_rk1, kt_rk2),
+                                                                stop = max(kt_rk1, kt_rk2),
+                                                                length = 5))), pr);
 nothing #hide
 ````
 

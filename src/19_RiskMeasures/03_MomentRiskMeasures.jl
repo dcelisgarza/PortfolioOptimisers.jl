@@ -1418,6 +1418,6 @@ for rt in (LowOrderMoment, HighOrderMoment)
 end
 
 export FirstLowerMoment, SecondLowerMoment, SecondCentralMoment, SecondMoment,
-       MeanAbsoluteDeviation, ThirdLowerMoment, FourthLowerMoment, FourthCentralMoment,
-       StandardisedLowOrderMoment, StandardisedHighOrderMoment, LowOrderMoment,
-       HighOrderMoment
+       MeanAbsoluteDeviation, ThirdLowerMoment, FourthMoment, FourthLowerMoment,
+       FourthCentralMoment, StandardisedLowOrderMoment, StandardisedHighOrderMoment,
+       LowOrderMoment, HighOrderMoment
