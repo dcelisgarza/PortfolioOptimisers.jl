@@ -97,11 +97,11 @@ pr = prior(pe, rd)
 #=
 In order to generate a pareto surface/hyper-surface, we need more dimensions than we've previously explored. We can do this by adding more risk measure sweeps (and taking their product) to generate a mesh. `PortfolioOptimisers` does this internally and generally, but we will limit ourselves to two risk measures. This will generate a 2D surface which we can visualise in 3D.
 
-We will use the square root `NegativeSkewness` and `SquareRootKurtosis`.
+We will use the square root `NegativeSkewness` and `Kurtosis`.
 =#
 
 r1 = NegativeSkewness()
-r2 = SquareRootKurtosis()
+r2 = Kurtosis()
 
 #=
 ## 4. Near optimal centering pareto surface
@@ -133,7 +133,7 @@ res1 = optimise(opt1)
 res2 = optimise(opt2)
 
 #=
-In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `SquareRootKurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
+In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `Kurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
 =#
 
 r1 = factory(r1, pr)
@@ -163,14 +163,12 @@ r1 = factory(NegativeSkewness(;
                                                                         stop = max(sk_rk1,
                                                                                    sk_rk2),
                                                                         length = 5))), pr);
-r2 = factory(SquareRootKurtosis(;
-                                settings = RiskMeasureSettings(;
-                                                               ub = range(;
-                                                                          start = min(kt_rk1,
-                                                                                      kt_rk2),
-                                                                          stop = max(kt_rk1,
-                                                                                     kt_rk2),
-                                                                          length = 5))), pr);
+r2 = factory(Kurtosis(;
+                      settings = RiskMeasureSettings(;
+                                                     ub = range(;
+                                                                start = min(kt_rk1, kt_rk2),
+                                                                stop = max(kt_rk1, kt_rk2),
+                                                                length = 5))), pr);
 #=
 Now we only need to maximise the return given both risk measures. Internally, the optimisation will generate the mesh as a product of the ranges in the order in which the risk measures were provided. This also works with the `MeanRisk` estimator, in fact, `NearOptimalCentering` uses it internally.
 

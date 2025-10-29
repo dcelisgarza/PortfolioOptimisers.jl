@@ -63,7 +63,7 @@
           EntropicValueatRiskRange(), RelativisticValueatRisk(),
           RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
           UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
-          RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2), SquareRootKurtosis(),
+          RelativisticDrawdownatRisk(), Kurtosis(; N = 2), Kurtosis(),
           OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
           OrderedWeightsArrayRange(), NegativeSkewness(),
           NegativeSkewness(; alg = SquaredSOCRiskExpr())]

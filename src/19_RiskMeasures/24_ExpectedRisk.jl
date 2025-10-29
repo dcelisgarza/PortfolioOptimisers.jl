@@ -42,18 +42,17 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
     return r(calc_net_returns(w, pr.X, fees))
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
-                                <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
-                                <:ThirdCentralMoment, <:Skewness,
-                                <:MedianAbsoluteDeviation}, w::AbstractVector{<:Real},
-                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+                                <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
+                                <:Skewness, <:MedianAbsoluteDeviation},
+                       w::AbstractVector{<:Real}, X::AbstractMatrix,
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
-                                <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
-                                <:ThirdCentralMoment, <:Skewness,
-                                <:MedianAbsoluteDeviation}, w::AbstractVector{<:Real},
-                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
-                       kwargs...)
+                                <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
+                                <:Skewness, <:MedianAbsoluteDeviation},
+                       w::AbstractVector{<:Real}, pr::AbstractPriorResult,
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, pr.X, fees)
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,

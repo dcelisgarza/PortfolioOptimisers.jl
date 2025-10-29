@@ -186,8 +186,8 @@
               EntropicValueatRisk(), EntropicValueatRiskRange(), RelativisticValueatRisk(),
               RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
               UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
-              RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2),
-              SquareRootKurtosis(), OrderedWeightsArray(; alg = ExactOrderedWeightsArray()),
+              RelativisticDrawdownatRisk(), Kurtosis(; N = 2), Kurtosis(),
+              OrderedWeightsArray(; alg = ExactOrderedWeightsArray()),
               OrderedWeightsArray(),
               OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
               OrderedWeightsArrayRange(), NegativeSkewness(),
@@ -250,8 +250,7 @@
                               opt = opt)
                 res = optimise(mr, rd)
                 rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
-                if !isa(r, SquareRootKurtosis) ||
-                   isa(r, SquareRootKurtosis) && isnothing(r.N)
+                if !isa(r, Kurtosis) || isa(r, Kurtosis) && isnothing(r.N)
                     tol = if i == 161
                         5e-10
                     elseif i == 203

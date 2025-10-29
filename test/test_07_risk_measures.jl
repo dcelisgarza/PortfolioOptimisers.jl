@@ -145,14 +145,14 @@
         r3 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
         @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
         @test isapprox(expected_risk(r3, w, rd.X), expected_risk(r2, w, rd.X))
-        @test isapprox(expected_risk(SquareRootKurtosis(; alg1 = Semi()), w, rd.X),
+        @test isapprox(expected_risk(Kurtosis(; alg1 = Semi()), w, rd.X),
                        0.0002291596657404573)
-        @test isapprox(expected_risk(SquareRootKurtosis(;), w, rd.X),
-                       expected_risk(SquareRootKurtosis(; mu = pr.mu), w, rd.X))
-        @test isapprox(expected_risk(SquareRootKurtosis(; mu = dot(w, pr.mu)), w, rd.X),
-                       expected_risk(SquareRootKurtosis(;), w, rd.X))
-        @test isapprox(expected_risk(SquareRootKurtosis(; w = wt), w, rd.X),
-                       expected_risk(SquareRootKurtosis(;), w, rd.X))
+        @test isapprox(expected_risk(Kurtosis(;), w, rd.X),
+                       expected_risk(Kurtosis(; mu = pr.mu), w, rd.X))
+        @test isapprox(expected_risk(Kurtosis(; mu = dot(w, pr.mu)), w, rd.X),
+                       expected_risk(Kurtosis(;), w, rd.X))
+        @test isapprox(expected_risk(Kurtosis(; w = wt), w, rd.X),
+                       expected_risk(Kurtosis(;), w, rd.X))
         @test isapprox(expected_risk(LowOrderMoment(;
                                                     alg = StandardisedLowOrderMoment(;
                                                                                      alg = SecondLowerMoment(;

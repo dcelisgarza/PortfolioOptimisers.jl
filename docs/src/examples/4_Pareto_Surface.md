@@ -104,11 +104,11 @@ pr = prior(pe, rd)
 
 In order to generate a pareto surface/hyper-surface, we need more dimensions than we've previously explored. We can do this by adding more risk measure sweeps (and taking their product) to generate a mesh. `PortfolioOptimisers` does this internally and generally, but we will limit ourselves to two risk measures. This will generate a 2D surface which we can visualise in 3D.
 
-We will use the square root `NegativeSkewness` and `SquareRootKurtosis`.
+We will use the square root `NegativeSkewness` and `Kurtosis`.
 
 ````@example 4_Pareto_Surface
 r1 = NegativeSkewness()
-r2 = SquareRootKurtosis()
+r2 = Kurtosis()
 ````
 
 ## 4. Near optimal centering pareto surface
@@ -140,7 +140,7 @@ res1 = optimise(opt1)
 res2 = optimise(opt2)
 ````
 
-In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `SquareRootKurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
+In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `Kurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
 
 ````@example 4_Pareto_Surface
 r1 = factory(r1, pr)
@@ -171,7 +171,7 @@ r1 = factory(NegativeSkewness(;
                                                                         stop = max(sk_rk1,
                                                                                    sk_rk2),
                                                                         length = 5))), pr);
-r2 = factory(SquareRootKurtosis(;
+r2 = factory(Kurtosis(;
                                 settings = RiskMeasureSettings(;
                                                                ub = range(;
                                                                           start = min(kt_rk1,

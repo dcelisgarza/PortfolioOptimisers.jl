@@ -1,17 +1,16 @@
 function set_kurtosis_risk!(model::JuMP.Model,
-                            r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer,
-                                                  <:Any, <:SOCRiskExpr},
-                            opt::RiskJuMPOptimisationEstimator,
+                            r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                        <:SOCRiskExpr}, opt::RiskJuMPOptimisationEstimator,
                             sqrt_kurtosis_risk::AbstractJuMPScalar, key::Symbol)
-    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
+    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings,
+                                    Symbol(:soc_, key))
     return sqrt_kurtosis_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer,
-                                                     <:Any, <:Any},
-                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
-                               args...; kwargs...)
-    key = Symbol(:sqrt_kurtosis_risk_, i)
+                               r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any,
+                                           <:Any}, opt::RiskJuMPOptimisationEstimator,
+                               pr::HighOrderPrior, args...; kwargs...)
+    key = Symbol(:kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
     kt = isnothing(r.kt) ? pr.kt : r.kt
@@ -50,11 +49,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, key)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, Nothing,
-                                                     <:Any, <:Any},
-                               opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
-                               args...; kwargs...)
-    key = Symbol(:sqrt_kurtosis_risk_, i)
+                               r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any,
+                                           <:Any}, opt::RiskJuMPOptimisationEstimator,
+                               pr::HighOrderPrior, args...; kwargs...)
+    key = Symbol(:kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
     kt = isnothing(r.kt) ? pr.kt : r.kt
@@ -69,8 +67,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                 SecondOrderCone())
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, key)
 end
-function set_risk_constraints!(::JuMP.Model, ::Any, ::SquareRootKurtosis,
+function set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis,
                                ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
                                pr::LowOrderPrior, args...; kwargs...)
-    throw(ArgumentError("SquareRootKurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
+    throw(ArgumentError("Kurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
 end

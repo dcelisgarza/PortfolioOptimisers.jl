@@ -1,5 +1,5 @@
 """
-    struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
+    struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
         settings::T1
         w::T2
         mu::T3
@@ -24,7 +24,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 
 # Constructors
 
-    SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+    Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                        w::Union{Nothing, <:AbstractWeights} = nothing,
                        mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
                        kt::Union{Nothing, <:AbstractMatrix} = nothing,
@@ -65,8 +65,8 @@ This formulation is used when `N` is an integer, the larger the value of `N`, th
 # Examples
 
 ```jldoctest
-julia> SquareRootKurtosis()
-SquareRootKurtosis
+julia> Kurtosis()
+Kurtosis
   settings ┼ RiskMeasureSettings
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
@@ -87,7 +87,7 @@ SquareRootKurtosis
   - [`HighOrderPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
+struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -95,14 +95,11 @@ struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     N::T5
     alg1::T6
     alg2::T7
-    function SquareRootKurtosis(settings::RiskMeasureSettings,
-                                w::Union{Nothing, <:AbstractWeights},
-                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
-                                          <:VecScalar},
-                                kt::Union{Nothing, <:AbstractMatrix},
-                                N::Union{Nothing, <:Integer}, alg1::AbstractMomentAlgorithm,
-                                alg2::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr,
-                                            <:SOCRiskExpr})
+    function Kurtosis(settings::RiskMeasureSettings, w::Union{Nothing, <:AbstractWeights},
+                      mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar},
+                      kt::Union{Nothing, <:AbstractMatrix}, N::Union{Nothing, <:Integer},
+                      alg1::AbstractMomentAlgorithm,
+                      alg2::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr})
         mu_flag = isa(mu, AbstractVector)
         kt_flag = isa(kt, AbstractMatrix)
         if mu_flag
@@ -129,94 +126,90 @@ struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
                    typeof(alg1), typeof(alg2)}(settings, w, mu, kt, N, alg1, alg2)
     end
 end
-function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                            w::Union{Nothing, <:AbstractWeights} = nothing,
-                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
-                                      <:VecScalar} = nothing,
-                            kt::Union{Nothing, <:AbstractMatrix} = nothing,
-                            N::Union{Nothing, <:Integer} = nothing,
-                            alg1::AbstractMomentAlgorithm = Full(),
-                            alg2::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr,
-                                        <:SOCRiskExpr} = SOCRiskExpr())
-    return SquareRootKurtosis(settings, w, mu, kt, N, alg1, alg2)
+function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                  w::Union{Nothing, <:AbstractWeights} = nothing,
+                  mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                  kt::Union{Nothing, <:AbstractMatrix} = nothing,
+                  N::Union{Nothing, <:Integer} = nothing,
+                  alg1::AbstractMomentAlgorithm = Full(),
+                  alg2::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr} = SOCRiskExpr())
+    return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
 end
-function calc_moment_target(::SquareRootKurtosis{<:Any, Nothing, Nothing, <:Any, <:Any,
-                                                 <:Any, <:Any}, ::Any, x::AbstractVector)
+function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
+                            ::Any, x::AbstractVector)
     return mean(x)
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:AbstractWeights, Nothing, <:Any,
-                                                  <:Any, <:Any, <:Any}, ::Any,
-                            x::AbstractVector)
+function calc_moment_target(r::Kurtosis{<:Any, <:AbstractWeights, Nothing, <:Any, <:Any,
+                                        <:Any, <:Any}, ::Any, x::AbstractVector)
     return mean(x, r.w)
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:AbstractVector, <:Any,
-                                                  <:Any, <:Any, <:Any}, w::AbstractVector,
-                            ::Any)
+function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:AbstractVector, <:Any, <:Any, <:Any,
+                                        <:Any}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:VecScalar, <:Any, <:Any,
-                                                  <:Any, <:Any}, w::AbstractVector, ::Any)
+function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, <:Any, <:Any, <:Any,
+                                        <:Any}, w::AbstractVector, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:Real, <:Any, <:Any, <:Any,
-                                                  <:Any}, ::Any, ::Any)
+function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Real, <:Any, <:Any, <:Any, <:Any},
+                            ::Any, ::Any)
     return r.mu
 end
-function calc_deviations_vec(r::SquareRootKurtosis, w::AbstractVector, X::AbstractMatrix,
+function calc_deviations_vec(r::Kurtosis, w::AbstractVector, X::AbstractMatrix,
                              fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
 end
-function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})(w::AbstractVector,
-                                                                                           X::AbstractMatrix,
-                                                                                           fees::Union{Nothing,
-                                                                                                       <:Fees} = nothing)
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})(w::AbstractVector,
+                                                                                 X::AbstractMatrix,
+                                                                                 fees::Union{Nothing,
+                                                                                             <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
-function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::AbstractVector,
-                                                                                           X::AbstractMatrix,
-                                                                                           fees::Union{Nothing,
-                                                                                                       <:Fees} = nothing)
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::AbstractVector,
+                                                                                 X::AbstractMatrix,
+                                                                                 fees::Union{Nothing,
+                                                                                             <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
-function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
-                                <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector,
-                                                                                X::AbstractMatrix,
-                                                                                fees::Union{Nothing,
-                                                                                            <:Fees} = nothing)
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
+                      <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector,
+                                                                      X::AbstractMatrix,
+                                                                      fees::Union{Nothing,
+                                                                                  <:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
-                                <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector,
-                                                                                X::AbstractMatrix,
-                                                                                fees::Union{Nothing,
-                                                                                            <:Fees} = nothing)
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
+                      <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector,
+                                                                      X::AbstractMatrix,
+                                                                      fees::Union{Nothing,
+                                                                                  <:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function factory(r::SquareRootKurtosis, pr::HighOrderPrior, args...; kwargs...)
+function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, pr.w)
     mu = nothing_scalar_array_factory(r.mu, pr.mu)
     kt = nothing_scalar_array_factory(r.kt, pr.kt)
-    return SquareRootKurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                              alg1 = r.alg1, alg2 = r.alg2)
+    return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
+                    alg1 = r.alg1, alg2 = r.alg2)
 end
-function factory(r::SquareRootKurtosis, pr::LowOrderPrior, args...; kwargs...)
+function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, pr.w)
     mu = nothing_scalar_array_factory(r.mu, pr.mu)
     kt = nothing_scalar_array_factory(r.kt, nothing)
-    return SquareRootKurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                              alg1 = r.alg1, alg2 = r.alg2)
+    return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
+                    alg1 = r.alg1, alg2 = r.alg2)
 end
-function risk_measure_view(r::SquareRootKurtosis, i::AbstractVector, args...)
+function risk_measure_view(r::Kurtosis, i::AbstractVector, args...)
     mu = r.mu
     kt = r.kt
     j = if isa(mu, AbstractVector)
@@ -231,8 +224,8 @@ function risk_measure_view(r::SquareRootKurtosis, i::AbstractVector, args...)
         kt = nothing_scalar_array_view(kt, idx)
     end
     mu = nothing_scalar_array_view(mu, i)
-    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
-                              alg1 = r.alg1, alg2 = r.alg2)
+    return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
+                    alg1 = r.alg1, alg2 = r.alg2)
 end
 
-export SquareRootKurtosis
+export Kurtosis
