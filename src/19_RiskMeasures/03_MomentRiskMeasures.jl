@@ -684,7 +684,7 @@ Keyword arguments correspond to the fields above.
 
 # Formulations
 
-Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower (semi) moment, or fourth central moment. Each can be standardised or unstandardised.
+Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower (semi) moment, or fourth central (full) moment. Each can be standardised or unstandardised.
 
 The unstandardised formulations are:
 
@@ -695,7 +695,7 @@ The standardised formulations are:
 
   - [`StandardisedHighOrderMoment`](@ref), which uses a variance estimator and an unstandardised high-order moment algorithm.
 
-## Unstandardised Central Moments
+## Unstandardised Moments
 
 All unstandardised central moments have the following formula.
 
@@ -705,18 +705,6 @@ All unstandardised central moments have the following formula.
 \\end{align}
 ```
 
-## Standardised Central Moments
-
-All standardised central moments have the following formula.
-
-```math
-\\begin{align}
-\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]^{n/2}}
-\\end{align}
-```
-
-## Unstandardised Lower Moments
-
 All unstandardised lower moments have the following formula.
 
 ```math
@@ -725,7 +713,15 @@ All unstandardised lower moments have the following formula.
 \\end{align}
 ```
 
-## Standardised Lower Moments
+## Standardised Moments
+
+All standardised central moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]^{n/2}}
+\\end{align}
+```
 
 All standardised lower moments have the following formula.
 
