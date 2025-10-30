@@ -249,9 +249,6 @@
         @test isapprox(expected_risk(BrownianDistanceVariance(), w, rd.X),
                        0.0005291680154419391)
 
-        r = MedianAbsoluteDeviation()
-        @test PortfolioOptimisers.nothing_scalar_array_view(r.mu, nothing) === r.mu
-        @test PortfolioOptimisers.risk_measure_view(r, [1, 5]).mu === r.mu
         @test isapprox(expected_risk(MedianAbsoluteDeviation(), w, rd.X),
                        0.011730101952145106)
         @test isapprox(expected_risk(MedianAbsoluteDeviation(; w = wt), w, rd.X),

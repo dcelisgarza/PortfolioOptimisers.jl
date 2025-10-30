@@ -244,7 +244,14 @@
                                                                 opto = HierarchicalRiskParity(;
                                                                                               opt = hopto)))),
                 NestedClustered(; cle = clr, opti = FactorRiskContribution(; opt = jopti),
-                                opto = FactorRiskContribution(; opt = jopto))]
+                                opto = FactorRiskContribution(; opt = jopto)),
+                NestedClustered(; cle = clr,
+                                opti = HierarchicalRiskParity(;
+                                                              r = MedianAbsoluteDeviation(),
+                                                              opt = hopti),
+                                opto = HierarchicalRiskParity(;
+                                                              r = MedianAbsoluteDeviation(),
+                                                              opt = hopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)

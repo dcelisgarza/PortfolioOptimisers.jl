@@ -414,14 +414,15 @@ end
 function nothing_scalar_array_view(x::AbstractVector, i)
     return view(x, i)
 end
-function nothing_scalar_array_view(x::AbstractVector{<:AbstractVector}, i)
+function nothing_scalar_array_view(x::VecScalar, i)
+    return VecScalar(; v = view(x.v, i), s = x.s)
+end
+function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}},
+                                   i)
     return [view(_x, i) for _x in x]
 end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
-end
-function nothing_scalar_array_view(x::VecScalar, i)
-    return VecScalar(; v = view(x.v, i), s = x.s)
 end
 """
     nothing_scalar_array_view_odd_order(x, i, j)
