@@ -60,6 +60,36 @@
             end
             @test success
         end
+        me0 = ShrunkExpectedReturns(;
+                                    ce = PortfolioOptimisersCovariance(;
+                                                                       ce = Covariance(;
+                                                                                       alg = Semi())),
+                                    alg = JamesStein(; target = VolatilityWeighted()))
+        me = PortfolioOptimisers.factory(me0, ew)
+        @test !(me.me === me0.me)
+        @test !(me.ce === me0.ce)
+        @test me.alg === me0.alg
+        @test me.me.w === ew
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+        @test me.ce.ce.alg === me0.ce.ce.alg
+
+        me0 = EquilibriumExpectedReturns(;
+                                         ce = PortfolioOptimisersCovariance(;
+                                                                            ce = Covariance(;
+                                                                                            alg = Semi())),
+                                         w = [1, 2])
+        me = PortfolioOptimisers.factory(me0, ew)
+        @test !(me.ce === me0.ce)
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+        @test me.w === me0.w
+        @test me.l == me0.l
+
+        me0 = ExcessExpectedReturns(; rf = 2)
+        me = PortfolioOptimisers.factory(me0, ew)
+        @test me.me.w === ew
+        @test me.rf == me0.rf
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -158,6 +188,7 @@
         @test ce.ce.threshold == ce0.ce.threshold
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
         @test ce.mp === ce0.mp
 
         ce0 = PortfolioOptimisersCovariance(;
@@ -170,6 +201,7 @@
         @test ce.ce.threshold == ce0.ce.threshold
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
         @test ce.ce.alg.me.w === ew
 
         ce0 = PortfolioOptimisersCovariance(;
@@ -181,6 +213,7 @@
         @test !(ce.ce.ve === ce0.ce.ve)
         @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
         @test ce.ce.me.w === ew
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.threshold == ce0.ce.threshold
@@ -205,15 +238,30 @@
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test ce.ce.alpha == ce0.ce.alpha
         @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
         @test ce.ce.threads === ce0.ce.threads
 
         ce0 = PortfolioOptimisersCovariance(; ce = KendallCovariance(;))
         ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
         @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
 
         ce0 = PortfolioOptimisersCovariance(; ce = SpearmanCovariance(;))
         ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
         @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = MutualInfoCovariance(; normalise = false,
+                                                                      bins = Knuth()))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+        @test ce.ce.bins === ce0.ce.bins
+        @test ce.ce.normalise === ce0.ce.normalise
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),

@@ -74,8 +74,9 @@ function EquilibriumExpectedReturns(;
                                     l::Real = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns, args...)
-    return ce
+function factory(ce::EquilibriumExpectedReturns,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """
     mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
