@@ -128,9 +128,6 @@ function Statistics.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1,
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return corkendall(X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return KendallCovariance(; ve = factory(ce.ve, w))
-end
 """
     struct SpearmanCovariance{T1} <: RankCovarianceEstimator
         ve::T1
@@ -247,8 +244,12 @@ function Statistics.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return corspearman(X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::SpearmanCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SpearmanCovariance(; ve = factory(ce.ve, w))
+for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
+    eval(quote
+             function factory(ce::$(ce), w::Union{Nothing, <:AbstractWeights} = nothing)
+                 return $(ce)(; ve = factory(ce.ve, w))
+             end
+         end)
 end
 
 export KendallCovariance, SpearmanCovariance
