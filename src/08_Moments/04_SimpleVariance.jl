@@ -66,7 +66,7 @@ struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     corrected::T3
     function SimpleVariance(me::Union{Nothing, <:AbstractExpectedReturnsEstimator},
                             w::Union{Nothing, <:AbstractWeights}, corrected::Bool)
-        if isa(me, AbstractWeights)
+        if isa(w, AbstractWeights)
             @argcheck(!isempty(w))
         end
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)

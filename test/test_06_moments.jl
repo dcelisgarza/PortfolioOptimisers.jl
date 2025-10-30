@@ -60,6 +60,36 @@
             end
             @test success
         end
+        me0 = ShrunkExpectedReturns(;
+                                    ce = PortfolioOptimisersCovariance(;
+                                                                       ce = Covariance(;
+                                                                                       alg = Semi())),
+                                    alg = JamesStein(; target = VolatilityWeighted()))
+        me = PortfolioOptimisers.factory(me0, ew)
+        @test !(me.me === me0.me)
+        @test !(me.ce === me0.ce)
+        @test me.alg === me0.alg
+        @test me.me.w === ew
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+        @test me.ce.ce.alg === me0.ce.ce.alg
+
+        me0 = EquilibriumExpectedReturns(;
+                                         ce = PortfolioOptimisersCovariance(;
+                                                                            ce = Covariance(;
+                                                                                            alg = Semi())),
+                                         w = [1, 2])
+        me = PortfolioOptimisers.factory(me0, ew)
+        @test !(me.ce === me0.ce)
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+        @test me.w === me0.w
+        @test me.l == me0.l
+
+        me0 = ExcessExpectedReturns(; rf = 2)
+        me = PortfolioOptimisers.factory(me0, ew)
+        @test me.me.w === ew
+        @test me.rf == me0.rf
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -129,8 +159,8 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
-            sigma = cov(cei, rd.X)
-            rho = cor(cei, rd.X)
+            sigma = cov(cei, rd.X'; dims = 2)
+            rho = cor(cei, rd.X'; dims = 2)
             @test isapprox(cov2cor(sigma), rho)
             success = isapprox(vec(sigma), df[!, i])
             if !success
@@ -144,6 +174,94 @@
                                                              mp = DefaultMatrixProcessing(;
                                                                                           alg = LoGo())),
                                rd.X)))
+        @test isapprox(var(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1),
+                       std(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1) .^
+                       2)
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = GerberCovariance(; alg = Gerber2(),
+                                                                  threshold = 0.1))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test ce.ce.pdm === ce0.ce.pdm
+        @test ce.ce.alg === ce0.ce.alg
+        @test ce.ce.threshold == ce0.ce.threshold
+        @test ce.mp === ce0.mp
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+        @test ce.mp === ce0.mp
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = GerberCovariance(;
+                                                                  alg = StandardisedGerber0(),
+                                                                  threshold = 0.2))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test ce.ce.pdm === ce0.ce.pdm
+        @test ce.ce.threshold == ce0.ce.threshold
+        @test ce.mp === ce0.mp
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+        @test ce.ce.alg.me.w === ew
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = SmythBrobyCovariance(; alg = SmythBroby2(),
+                                                                      threshold = 0.1,
+                                                                      c1 = 0.6, c2 = 0.2,
+                                                                      c3 = 2.2, n = 3))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test !(ce.ce.me === ce0.ce.me)
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+        @test ce.ce.me.w === ew
+        @test ce.ce.pdm === ce0.ce.pdm
+        @test ce.ce.threshold == ce0.ce.threshold
+        @test ce.ce.c1 == ce0.ce.c1
+        @test ce.ce.c2 == ce0.ce.c2
+        @test ce.ce.c3 == ce0.ce.c3
+        @test ce.ce.n == ce0.ce.n
+        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.alg === ce0.ce.alg
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = DistanceCovariance(; args = (3,),
+                                                                    kwargs = (; foo = 5)))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.dist === ce0.ce.dist
+        @test ce.ce.args === ce0.ce.args
+        @test ce.ce.kwargs === ce0.ce.kwargs
+        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.w === ew
+
+        ce0 = PortfolioOptimisersCovariance(; ce = LTDCovariance(; alpha = 0.4))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.alpha == ce0.ce.alpha
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+        @test ce.ce.threads === ce0.ce.threads
+
+        ce0 = PortfolioOptimisersCovariance(; ce = KendallCovariance(;))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+
+        ce0 = PortfolioOptimisersCovariance(; ce = SpearmanCovariance(;))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = MutualInfoCovariance(; normalise = false,
+                                                                      bins = Knuth()))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test !(ce.ce.ve === ce0.ce.ve)
+        @test ce.ce.ve.w === ew
+        @test ce.ce.ve.me.w === ew
+        @test ce.ce.bins === ce0.ce.bins
+        @test ce.ce.normalise === ce0.ce.normalise
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -212,8 +330,8 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/distance1.csv.gz"), DataFrame)
         ce = PortfolioOptimisersCovariance()
         for (i, (de, deg)) in enumerate(zip(des, desg))
-            d1 = distance(de, ce, rd.X)
-            dg1 = distance(deg, ce, rd.X)
+            d1 = distance(de, ce, rd.X'; dims = 2)
+            dg1 = distance(deg, ce, rd.X'; dims = 2)
             d2 = distance(de, cov(ce, rd.X), rd.X)
             dg2 = distance(deg, cov(ce, rd.X), rd.X)
             success = isapprox(vec(d1), df[!, i])
@@ -243,11 +361,11 @@
         deg = Distance(; power = 1, alg = CanonicalDistance())
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
-            r1, d1 = cor_and_dist(de, cei, rd.X)
-            d2 = cor_and_dist(deg, cei, rd.X)[2]
+            r1, d1 = cor_and_dist(de, cei, rd.X'; dims = 2)
+            d2 = cor_and_dist(deg, cei, rd.X'; dims = 2)[2]
             @test isapprox(d1, d2)
             @test isapprox(r1, cor(cei, rd.X))
-            d3 = distance(de, cei, rd.X)
+            d3 = distance(de, cei, rd.X'; dims = 2)
             d4 = if isa(ce, MutualInfoCovariance)
                 @test all(isapprox.((r1, d1), cor_and_dist(de, ce, rd.X)))
                 @test isapprox(d1, distance(de, ce, rd.X))

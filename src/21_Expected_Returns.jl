@@ -254,7 +254,7 @@ function factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwar
     rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
     return ReturnRiskMeasure(; rt = rt)
 end
-function factory(r::ReturnRiskMeasure, args...)
+function factory(r::ReturnRiskMeasure, args...; kwargs...)
     return r
 end
 """
