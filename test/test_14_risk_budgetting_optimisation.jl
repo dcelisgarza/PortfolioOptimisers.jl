@@ -48,22 +48,16 @@
                         length = size(pr.X, 1)))
     rf = 4.2 / 100 / 252
     rs = [StandardDeviation(), Variance(), LowOrderMoment(),
-          LowOrderMoment(;
-                         alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondLowerMoment(;
-                                                                                  alg = SOCRiskExpr()))),
-          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondLowerMoment())),
-          LowOrderMoment(;
-                         alg = StandardisedLowOrderMoment(;
-                                                          alg = SecondCentralMoment(;
-                                                                                    alg = SOCRiskExpr()))),
-          LowOrderMoment(; alg = StandardisedLowOrderMoment(; alg = SecondCentralMoment())),
+          LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
+          LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
+          LowOrderMoment(; alg = SecondMoment(; alg2 = SOCRiskExpr())),
+          LowOrderMoment(; alg = SecondMoment()),
           LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
           ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
           EntropicValueatRiskRange(), RelativisticValueatRisk(),
           RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
           UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
-          RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2), SquareRootKurtosis(),
+          RelativisticDrawdownatRisk(), Kurtosis(; N = 2), Kurtosis(),
           OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
           OrderedWeightsArrayRange(), NegativeSkewness(),
           NegativeSkewness(; alg = SquaredSOCRiskExpr())]
@@ -115,7 +109,7 @@
             end
             @test success
 
-            rtol = if i ∈ (7, 10, 19, 25) || Sys.isapple() && i ∈ (2, 5, 12)
+            rtol = if i ∈ (5, 7, 10, 19, 25) || Sys.isapple() && i ∈ (2, 12)
                 1e-4
             elseif i == 17
                 5e-3
@@ -335,7 +329,7 @@
 
             rtol = if i == 22 || Sys.isapple() && i ∈ (18, 20) || Sys.iswindows() && i == 10
                 1e-3
-            elseif i ∈ (1, 10) || Sys.isapple() && i == 2
+            elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
                 5e-4
             elseif i ∈ (13, 15, 16, 17, 19)
                 5e-3

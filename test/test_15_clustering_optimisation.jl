@@ -60,7 +60,7 @@
                length = size(pr.X, 2))
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
     rs = [EqualRiskMeasure(), Variance(), StandardDeviation(), UncertaintySetVariance(),
-          LowOrderMoment(), HighOrderMoment(), SquareRootKurtosis(), NegativeSkewness(),
+          LowOrderMoment(), HighOrderMoment(), Kurtosis(), NegativeSkewness(),
           ValueatRisk(), ValueatRiskRange(), ConditionalValueatRisk(),
           DistributionallyRobustConditionalValueatRisk(), ConditionalValueatRiskRange(),
           DistributionallyRobustConditionalValueatRiskRange(), EntropicValueatRisk(),

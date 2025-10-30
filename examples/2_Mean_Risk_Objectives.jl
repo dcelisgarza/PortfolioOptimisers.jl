@@ -49,10 +49,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 Here we encounter another consequence of the design philosophy of `PortfolioOptimisers`. An entire class of risk measures can be categorised and consistently implemented as `LowOrderMoment` risk measures with different internal algorithms. This corresponds to the semi-standard deviation.
 =#
 
-r = LowOrderMoment(;
-                   alg = StandardisedLowOrderMoment(;
-                                                    alg = SecondLowerMoment(;
-                                                                            alg = SOCRiskExpr())))
+r = LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr()))
 
 #=
 Since we will perform various optimisations on the same data, there's no need to redo work. Let's precompute the prior statistics using the `EmpiricalPrior` to avoid recomputing them every time we call the optimisation.

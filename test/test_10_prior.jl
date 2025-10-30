@@ -406,9 +406,7 @@
         sigma_views = LinearConstraintEstimator(; val = "AAPL == 0.0007")
         pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views), rd)
         r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
-                           alg = StandardisedLowOrderMoment(;
-                                                            ve = SimpleVariance(; w = pr.w),
-                                                            alg = SecondCentralMoment()))
+                           alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
         @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
         @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
         @test isapprox(pr.w,
@@ -459,7 +457,7 @@
         pr = prior(EntropyPoolingPrior(; sets = sets, kt_views = kt_views), rd)
         @test isapprox(HighOrderMoment(; w = pr.w,
                                        alg = StandardisedHighOrderMoment(;
-                                                                         alg = FourthCentralMoment(),
+                                                                         alg = FourthMoment(),
                                                                          ve = SimpleVariance(;
                                                                                              w = pr.w)))([1],
                                                                                                          reshape(pr.X[:,
@@ -479,8 +477,7 @@
         @test pr.mu[1] <= 1.5 * pr0.mu[1]
         @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
         @test abs(HighOrderMoment(; w = pr.w,
-                                  alg = StandardisedHighOrderMoment(;
-                                                                    alg = FourthCentralMoment(),
+                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                     ve = SimpleVariance(;
                                                                                         w = pr.w)))([1],
                                                                                                     reshape(pr.X[:,
@@ -488,12 +485,11 @@
                                                                                                             :,
                                                                                                             1)) -
                   HighOrderMoment(;
-                                  alg = StandardisedHighOrderMoment(;
-                                                                    alg = FourthCentralMoment()))([1],
-                                                                                                  reshape(pr.X[:,
-                                                                                                               1],
-                                                                                                          :,
-                                                                                                          1)) *
+                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                             reshape(pr.X[:,
+                                                                                                          1],
+                                                                                                     :,
+                                                                                                     1)) *
                   0.87) <= sqrt(eps())
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
@@ -592,21 +588,18 @@
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
         @test !isapprox(cov2cor(pr.sigma)[1, end], 0.35; rtol = 5e-4)
         @test HighOrderMoment(; w = pr.w,
-                              alg = StandardisedHighOrderMoment(;
-                                                                alg = FourthCentralMoment(),
+                              alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                 ve = SimpleVariance(;
                                                                                     w = pr.w)))([1],
                                                                                                 reshape(pr.X[:,
                                                                                                              1],
                                                                                                         :,
                                                                                                         1)) >=
-              HighOrderMoment(;
-                              alg = StandardisedHighOrderMoment(;
-                                                                alg = FourthCentralMoment()))([1],
-                                                                                              reshape(pr.X[:,
-                                                                                                           1],
-                                                                                                      :,
-                                                                                                      1)) *
+              HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                           reshape(pr.X[:,
+                                                                                                        1],
+                                                                                                   :,
+                                                                                                   1)) *
               0.3
         @test !isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                               reshape(pr.X[:,
@@ -677,9 +670,7 @@
         pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views, opt = opt),
                    rd)
         r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
-                           alg = StandardisedLowOrderMoment(;
-                                                            ve = SimpleVariance(; w = pr.w),
-                                                            alg = SecondCentralMoment()))
+                           alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
         @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
         @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
         @test isapprox(pr.w,
@@ -731,7 +722,7 @@
         pr = prior(EntropyPoolingPrior(; sets = sets, kt_views = kt_views, opt = opt), rd)
         @test isapprox(HighOrderMoment(; w = pr.w,
                                        alg = StandardisedHighOrderMoment(;
-                                                                         alg = FourthCentralMoment(),
+                                                                         alg = FourthMoment(),
                                                                          ve = SimpleVariance(;
                                                                                              w = pr.w)))([1],
                                                                                                          reshape(pr.X[:,
@@ -752,8 +743,7 @@
         @test pr.mu[1] <= 1.5 * pr0.mu[1]
         @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
         @test abs(HighOrderMoment(; w = pr.w,
-                                  alg = StandardisedHighOrderMoment(;
-                                                                    alg = FourthCentralMoment(),
+                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                     ve = SimpleVariance(;
                                                                                         w = pr.w)))([1],
                                                                                                     reshape(pr.X[:,
@@ -761,12 +751,11 @@
                                                                                                             :,
                                                                                                             1)) -
                   HighOrderMoment(;
-                                  alg = StandardisedHighOrderMoment(;
-                                                                    alg = FourthCentralMoment()))([1],
-                                                                                                  reshape(pr.X[:,
-                                                                                                               1],
-                                                                                                          :,
-                                                                                                          1)) *
+                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                             reshape(pr.X[:,
+                                                                                                          1],
+                                                                                                     :,
+                                                                                                     1)) *
                   0.87) <= sqrt(eps())
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
@@ -867,21 +856,18 @@
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
         @test !isapprox(cov2cor(pr.sigma)[1, end], 0.35; rtol = 5e-4)
         @test HighOrderMoment(; w = pr.w,
-                              alg = StandardisedHighOrderMoment(;
-                                                                alg = FourthCentralMoment(),
+                              alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                 ve = SimpleVariance(;
                                                                                     w = pr.w)))([1],
                                                                                                 reshape(pr.X[:,
                                                                                                              1],
                                                                                                         :,
                                                                                                         1)) >=
-              HighOrderMoment(;
-                              alg = StandardisedHighOrderMoment(;
-                                                                alg = FourthCentralMoment()))([1],
-                                                                                              reshape(pr.X[:,
-                                                                                                           1],
-                                                                                                      :,
-                                                                                                      1)) *
+              HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                           reshape(pr.X[:,
+                                                                                                        1],
+                                                                                                   :,
+                                                                                                   1)) *
               0.3
         @test !isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                               reshape(pr.X[:,

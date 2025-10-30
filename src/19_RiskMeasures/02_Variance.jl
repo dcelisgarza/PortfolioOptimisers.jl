@@ -104,6 +104,7 @@ Second-order cone risk expression optimisation formulation for applicable risk m
   - [`RSOCRiskExpr`](@ref)
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
+const QuadSecondMomentFormulations = Union{QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr}
 """
     struct Variance{T1, T2, T3, T4} <: RiskMeasure
         settings::T1
@@ -477,10 +478,10 @@ This problem can be reformulated depending on the type of uncertainty set used.
 \\textrm{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
                & \\quad \\mathbf{A}_l \\geq 0\\\\
                & \\quad \\begin{bmatrix}
-                            \\mathbf{X} & \\boldsymbol{w}\\\\
+                            \\mathbf{W} & \\boldsymbol{w}\\\\
                             \\boldsymbol{w}^\\intercal & k
                         \\end{bmatrix} \\succeq 0 \\\\
-               & \\quad \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{X}\\,.
+               & \\quad \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{W}\\,.
 \\end{align}
 ```
 
@@ -488,7 +489,7 @@ Where:
 
   - ``\\boldsymbol{w}``: `N×1` asset weights vector.
 
-  - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{X}``: `N×N` auxiliary symmetric matrices.
+  - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{W}``: `N×N` auxiliary symmetric matrices.
   - ``\\mathbf{\\Sigma}_l``: `N×N` lower bound of the covariance matrix.
   - ``\\mathbf{\\Sigma}_u``: `N×N` upper bound of the covariance matrix.
   - ``k``: Scalar variable/constant.
@@ -501,13 +502,13 @@ Where:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{X} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{W} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
 \\textrm{s.t.} & \\quad \\begin{bmatrix}
-                            \\mathbf{X} & \\boldsymbol{w}\\\\
+                            \\mathbf{W} & \\boldsymbol{w}\\\\
                             \\boldsymbol{w}^\\intercal & k
                         \\end{bmatrix} \\succeq 0 \\\\
                & \\quad \\mathbf{E} \\succeq 0 \\\\
-               & \\quad \\lVert \\mathbf{G} \\mathrm{vec}\\left( \\mathbf{X} + \\mathbf{E} \\right) \\rVert_{2} \\leq \\sigma \\\\
+               & \\quad \\lVert \\mathbf{G} \\mathrm{vec}\\left( \\mathbf{W} + \\mathbf{E} \\right) \\rVert_{2} \\leq \\sigma \\\\
 \\end{align}
 ```
 
@@ -516,7 +517,7 @@ Where:
   - ``\\boldsymbol{w}``: `N×1` asset weights vector.
 
   - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
-  - ``\\mathbf{X}``, ``\\mathbf{E}``: `N×N` auxiliary symmetric matrices.
+  - ``\\mathbf{W}``, ``\\mathbf{E}``: `N×N` auxiliary symmetric matrices.
   - ``k_{\\mathbf{\\Sigma}}``: Scalar constant defining the size of the uncertainty set.
   - ``\\sigma``: Variable representing the portfolio's variance of the variance.
   - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
