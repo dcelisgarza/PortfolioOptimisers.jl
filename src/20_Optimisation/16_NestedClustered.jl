@@ -65,6 +65,13 @@ function assert_external_optimiser(opt::JuMPOptimisationEstimator)
     assert_internal_optimiser(opt)
     return nothing
 end
+function assert_external_optimiser(opt::FactorRiskContribution)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.re, AbstractRegressionResult))
+    assert_internal_optimiser(opt)
+    return nothing
+end
 function assert_external_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
                                                                <:OptimisationResult}})
     assert_external_optimiser.(opt)

@@ -150,6 +150,7 @@
                                                  3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
                                  "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
     pr = prior(HighOrderPriorEstimator(), rd)
+    rr = regression(DimensionReductionRegression(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
@@ -251,7 +252,11 @@
                                                               opt = hopti),
                                 opto = HierarchicalRiskParity(;
                                                               r = MedianAbsoluteDeviation(),
-                                                              opt = hopto))]
+                                                              opt = hopto)),
+                NestedClustered(; cle = clr,
+                                opti = FactorRiskContribution(; re = rr, opt = jopti),
+                                opto = FactorRiskContribution(; opt = jopto))]
+
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
