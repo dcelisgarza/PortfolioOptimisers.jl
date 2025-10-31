@@ -286,6 +286,10 @@
         @test !(ce.ce.ve === ce0.ce.ve)
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
+        @test isapprox(cov(SpearmanCovariance(), rd.X),
+                       cov(SpearmanCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(SpearmanCovariance(), rd.X),
+                       cor(SpearmanCovariance(), rd.X'; dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = MutualInfoCovariance(; normalise = false,

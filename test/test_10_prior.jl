@@ -357,6 +357,37 @@
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  mu_views = mu_views), rd).w, rtol = 5e-6)
 
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC())),
+                                       sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC(),
+                                                                                          target = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC(),
+                                                                                target = GeneralisedLinearModel())),
+                                       sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC(),
+                                                                                          target = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
         mu_views = LinearConstraintEstimator(; val = "AAPL >= 0.0025")
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views), rd)
         @test pr.mu[1] >= 0.0025
@@ -619,6 +650,37 @@
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  mu_views = mu_views), rd).w, rtol = 1e-5)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC())),
+                                       sets = sets, opt = opt, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC(),
+                                                                                          target = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC(),
+                                                                                target = GeneralisedLinearModel())),
+                                       sets = sets, opt = opt, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC(),
+                                                                                          target = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL >= 0.0025")
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views, opt = opt), rd)
