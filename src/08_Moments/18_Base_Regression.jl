@@ -586,9 +586,6 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
     return regression(re, rd.X, rd.F)
 end
-function factory(re::AbstractRegressionResult, args...)
-    return re
-end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, AIC, AICC, BIC,
        RSquared, AdjustedRSquared

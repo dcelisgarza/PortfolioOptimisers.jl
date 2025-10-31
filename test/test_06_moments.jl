@@ -320,20 +320,20 @@
                StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
                DimensionReductionRegression(),
                DimensionReductionRegression(; retgt = GeneralisedLinearModel(;)),
-               DimensionReductionRegression(; drtgt = PPCA())]
+               DimensionReductionRegression(; drtgt = PPCA()),
+               StepwiseRegression(; crit = PValue(; threshold = 1e-15)),
+               StepwiseRegression(; crit = PValue(; threshold = 1e-15), alg = Backward())]
         df = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv.gz"), DataFrame)
         for (i, re) in pairs(res)
             rr = regression(re, rd)
             if i == 15
                 continue
             end
-            df[!, "$i"] = [rr.b; vec(rr.M)]
-            continue
             lt = [rr.b; vec(rr.M)]
-            success = isapprox(lt, df[!, i])
+            success = isapprox(lt, df[!, "$i"])
             if !success
                 println("Counter: $i")
-                find_tol(lt, df[!, i])
+                find_tol(lt, df[!, "$i"])
             end
             @test success
             res = rr.M === rr.L
