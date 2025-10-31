@@ -297,7 +297,7 @@
         skes = [Coskewness(; alg = Full()), Coskewness(; alg = Semi())]
         df = CSV.read(joinpath(@__DIR__, "./assets/coskewness.csv.gz"), DataFrame)
         for (i, ske) in pairs(skes)
-            sk, v = coskewness(ske, rd.X)
+            sk, v = coskewness(ske, rd.X'; dims = 2)
             success = isapprox([vec(sk); vec(v)], df[!, i])
             if !success
                 println("Counter: $i")
@@ -305,12 +305,17 @@
             end
             @test success
         end
+        @test (nothing, nothing) === coskewness(nothing)
+        sk0 = Coskewness(; alg = Semi())
+        sk = PortfolioOptimisers.factory(sk0, ew)
+        @test sk.me.w === ew
+        @test sk.alg === sk0.alg
     end
     @testset "Cokurtosis" begin
         ktes = [Cokurtosis(; alg = Full()), Cokurtosis(; alg = Semi())]
         df = CSV.read(joinpath(@__DIR__, "./assets/cokurtosis.csv.gz"), DataFrame)
         for (i, kte) in pairs(ktes)
-            kt = cokurtosis(kte, rd.X)
+            kt = cokurtosis(kte, rd.X'; dims = 2)
             success = isapprox(vec(kt), df[!, i])
             if !success
                 println("Counter: $i")
@@ -318,6 +323,11 @@
             end
             @test success
         end
+        @test isnothing(cokurtosis(nothing))
+        kt0 = Cokurtosis(; alg = Semi())
+        kt = PortfolioOptimisers.factory(kt0, ew)
+        @test kt.me.w === ew
+        @test kt.alg === kt0.alg
     end
     @testset "Distance" begin
         des = [Distance(; alg = SimpleAbsoluteDistance()),
