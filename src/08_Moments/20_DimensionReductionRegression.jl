@@ -273,7 +273,7 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     return x1, Vp
 end
 """
-    regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
+    regression(re::DimensionReductionRegression, y::AbstractVector, mu::AbstractVector,
                sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
 
 Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
@@ -282,7 +282,7 @@ This function fits a regression model (as specified by `retgt`) to the response 
 
 # Arguments
 
-  - `retgt`: Regression target type (e.g., `LinearModel()`).
+  - `re`: Dimension reduction regression.
   - `y`: Response vector.
   - `mu`: Mean vector of the original features.
   - `sigma`: Standard deviation vector of the original features.
@@ -303,15 +303,15 @@ This function fits a regression model (as specified by `retgt`) to the response 
 # Related
 
   - [`DimensionReductionRegression`](@ref)
-  - [`AbstractRegressionTarget`](@ref)
   - [`prep_dim_red_reg`](@ref)
 """
-function regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
+function regression(re::DimensionReductionRegression, y::AbstractVector, mu::AbstractVector,
                     sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
-    fit_result = fit(retgt, x1, y)
+    w = !haskey(re.drtgt.kwargs, :wts) ? nothing : re.drtgt.kwargs.wts
+    fit_result = fit(re.retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
-    beta0 = mean(y) - dot(beta, mu)
+    beta0 = isnothing(w) ? mean(y) : mean(y, w) - dot(beta, mu)
     pushfirst!(beta, beta0)
     return beta
 end
@@ -354,10 +354,10 @@ function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::Abst
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
     mu = mean(re.me, F; dims = 1)
-    sigma = vec(std(re.ve, F; mean = mu, dims = 1))
+    sigma = vec(std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)
-        rr[i, :] = regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
+        rr[i, :] = regression(re, view(X, :, i), mu, sigma, f1, Vp)
     end
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)
