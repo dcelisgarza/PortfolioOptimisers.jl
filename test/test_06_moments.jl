@@ -1,6 +1,6 @@
 @safetestset "Moments" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, CovarianceEstimation,
-          StableRNGs, StatsBase, LinearAlgebra, SparseArrays
+          StableRNGs, StatsBase, LinearAlgebra, SparseArrays, Distributions
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -116,8 +116,8 @@
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
-               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
-               GerberCovariance(; alg = Gerber0()),
+               DistanceCovariance(), DistanceCovariance(; w = ew),
+               LowerTailDependenceCovariance(), GerberCovariance(; alg = Gerber0()),
                GerberCovariance(; alg = Gerber0(),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
@@ -190,6 +190,16 @@
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
         @test ce.mp === ce0.mp
+        @test isapprox(cov(GerberCovariance(; alg = Gerber0()), rd.X),
+                       cov(GerberCovariance(; alg = Gerber0()), rd.X'; dims = 2))
+        @test isapprox(cov(GerberCovariance(; alg = StandardisedGerber0()), rd.X),
+                       cov(GerberCovariance(; alg = StandardisedGerber0()), rd.X';
+                           dims = 2))
+        @test isapprox(cor(GerberCovariance(; alg = Gerber0()), rd.X),
+                       cor(GerberCovariance(; alg = Gerber0()), rd.X'; dims = 2))
+        @test isapprox(cor(GerberCovariance(; alg = StandardisedGerber0()), rd.X),
+                       cor(GerberCovariance(; alg = StandardisedGerber0()), rd.X';
+                           dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(;
@@ -223,6 +233,16 @@
         @test ce.ce.n == ce0.ce.n
         @test ce.ce.threads === ce0.ce.threads
         @test ce.ce.alg === ce0.ce.alg
+        @test isapprox(cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
+                       cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
+        @test isapprox(cov(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X),
+                       cov(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X';
+                           dims = 2))
+        @test isapprox(cor(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
+                       cor(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
+        @test isapprox(cor(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X),
+                       cor(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X';
+                           dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = DistanceCovariance(; args = (3,),
@@ -233,19 +253,33 @@
         @test ce.ce.kwargs === ce0.ce.kwargs
         @test ce.ce.threads === ce0.ce.threads
         @test ce.ce.w === ew
+        @test isapprox(cov(DistanceCovariance(), rd.X),
+                       cov(DistanceCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(DistanceCovariance(), rd.X),
+                       cor(DistanceCovariance(), rd.X'; dims = 2))
 
-        ce0 = PortfolioOptimisersCovariance(; ce = LTDCovariance(; alpha = 0.4))
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = LowerTailDependenceCovariance(;
+                                                                               alpha = 0.4))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test ce.ce.alpha == ce0.ce.alpha
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
         @test ce.ce.threads === ce0.ce.threads
+        @test isapprox(cov(LowerTailDependenceCovariance(), rd.X),
+                       cov(LowerTailDependenceCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(LowerTailDependenceCovariance(), rd.X),
+                       cor(LowerTailDependenceCovariance(), rd.X'; dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(; ce = KendallCovariance(;))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
+        @test isapprox(cov(KendallCovariance(), rd.X),
+                       cov(KendallCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(KendallCovariance(), rd.X),
+                       cor(KendallCovariance(), rd.X'; dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(; ce = SpearmanCovariance(;))
         ce = PortfolioOptimisers.factory(ce0, ew)
@@ -262,6 +296,10 @@
         @test ce.ce.ve.me.w === ew
         @test ce.ce.bins === ce0.ce.bins
         @test ce.ce.normalise === ce0.ce.normalise
+        @test isapprox(cov(MutualInfoCovariance(), rd.X),
+                       cov(MutualInfoCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(MutualInfoCovariance(), rd.X),
+                       cor(MutualInfoCovariance(), rd.X'; dims = 2))
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -277,13 +315,16 @@
                StepwiseRegression(; alg = Backward(), crit = RSquared()),
                StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
                DimensionReductionRegression(),
+               DimensionReductionRegression(; retgt = GeneralisedLinearModel(;)),
                DimensionReductionRegression(; drtgt = PPCA())]
         df = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv.gz"), DataFrame)
         for (i, re) in pairs(res)
-            rr = regression(re, rd.X, rd.F)
-            if i == 14
+            rr = regression(re, rd)
+            if i == 15
                 continue
             end
+            df[!, "$i"] = [rr.b; vec(rr.M)]
+            continue
             lt = [rr.b; vec(rr.M)]
             success = isapprox(lt, df[!, i])
             if !success
@@ -291,6 +332,8 @@
                 find_tol(lt, df[!, i])
             end
             @test success
+            res = rr.M === rr.L
+            isa(re, StepwiseRegression) ? (@test res) : (@test !res)
         end
     end
     @testset "Coskewness" begin
@@ -364,8 +407,8 @@
     end
     @testset "Canonical Distance" begin
         ces = [Covariance(; alg = Full()), SpearmanCovariance(), KendallCovariance(),
-               MutualInfoCovariance(), DistanceCovariance(), LTDCovariance(),
-               GerberCovariance(), SmythBrobyCovariance()]
+               MutualInfoCovariance(), DistanceCovariance(),
+               LowerTailDependenceCovariance(), GerberCovariance(), SmythBrobyCovariance()]
         df = CSV.read(joinpath(@__DIR__, "./assets/CanonicalDistance.csv.gz"), DataFrame)
         de = Distance(; alg = CanonicalDistance())
         deg = Distance(; power = 1, alg = CanonicalDistance())
@@ -386,7 +429,7 @@
                          cov(ce, rd.X), rd.X)
             elseif isa(ce, DistanceCovariance)
                 distance(Distance(; alg = CorrelationDistance(;)), cov(cei, rd.X), rd.X)
-            elseif isa(ce, LTDCovariance)
+            elseif isa(ce, LowerTailDependenceCovariance)
                 distance(Distance(; alg = LogDistance()), cov(cei, rd.X), rd.X)
             else
                 distance(de, cov(cei, rd.X), rd.X)
@@ -403,7 +446,7 @@
             elseif isa(ce, DistanceCovariance)
                 distance(Distance(; power = 1, alg = CorrelationDistance(;)), cov(ce, rd.X),
                          rd.X)
-            elseif isa(ce, LTDCovariance)
+            elseif isa(ce, LowerTailDependenceCovariance)
                 distance(Distance(; power = 1, alg = LogDistance()), cov(ce, rd.X), rd.X)
             else
                 distance(deg, cov(ce, rd.X), rd.X)
@@ -441,7 +484,7 @@
             elseif isa(ce, DistanceCovariance)
                 distance(DistanceDistance(; alg = CorrelationDistance(;)), cov(cei, rd.X),
                          rd.X)
-            elseif isa(ce, LTDCovariance)
+            elseif isa(ce, LowerTailDependenceCovariance)
                 distance(DistanceDistance(; alg = LogDistance()), cov(cei, rd.X), rd.X)
             else
                 distance(de, cov(cei, rd.X), rd.X)
@@ -455,7 +498,7 @@
             elseif isa(ce, DistanceCovariance)
                 distance(DistanceDistance(; power = 1, alg = CorrelationDistance(;)),
                          cov(ce, rd.X), rd.X)
-            elseif isa(ce, LTDCovariance)
+            elseif isa(ce, LowerTailDependenceCovariance)
                 distance(DistanceDistance(; power = 1, alg = LogDistance()), cov(ce, rd.X),
                          rd.X)
             else
