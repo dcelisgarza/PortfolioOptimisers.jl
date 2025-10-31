@@ -191,9 +191,10 @@ end
 function factory(pe::FactorBlackLittermanPrior,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
-                                     re = pe.re, ve = factory(pe.ve, w), views = pe.views,
-                                     sets = pe.sets, views_conf = pe.views_conf, w = pe.w,
-                                     rf = pe.rf, l = pe.l, tau = pe.tau, rsd = pe.rsd)
+                                     re = factory(pe.re, w), ve = factory(pe.ve, w),
+                                     views = pe.views, sets = pe.sets,
+                                     views_conf = pe.views_conf, w = pe.w, rf = pe.rf,
+                                     l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     return if sym == :me

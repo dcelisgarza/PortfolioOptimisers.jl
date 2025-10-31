@@ -15,6 +15,9 @@ These types are used to specify the dimension reduction method when constructing
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
+function factory(drtgt::DimensionReductionTarget, args...)
+    return drtgt
+end
 """
     struct PCA{T1} <: DimensionReductionTarget
         kwargs::T1
@@ -223,6 +226,12 @@ function DimensionReductionRegression(;
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
+end
+function factory(re::DimensionReductionRegression,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
+                                        drtgt = factory(re.drtgt, w),
+                                        retgt = factory(re.retgt, w))
 end
 """
     prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)

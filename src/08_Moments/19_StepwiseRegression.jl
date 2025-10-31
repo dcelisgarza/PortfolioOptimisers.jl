@@ -130,6 +130,10 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             target::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, target)
 end
+function factory(re::StepwiseRegression, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return StepwiseRegression(; crit = re.crit, alg = re.alg,
+                              target = factory(re.target, w))
+end
 """
     add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
                                          included::AbstractVector, F::AbstractMatrix,

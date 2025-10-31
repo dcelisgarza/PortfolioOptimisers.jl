@@ -104,7 +104,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
     return FactorPrior(pe, mp, re, ve, rsd)
 end
 function factory(pe::FactorPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = pe.re,
+    return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorPrior, sym::Symbol)
