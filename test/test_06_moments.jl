@@ -412,7 +412,8 @@
     @testset "Canonical Distance" begin
         ces = [Covariance(; alg = Full()), SpearmanCovariance(), KendallCovariance(),
                MutualInfoCovariance(), DistanceCovariance(),
-               LowerTailDependenceCovariance(), GerberCovariance(), SmythBrobyCovariance()]
+               LowerTailDependenceCovariance(), GerberCovariance(), SmythBrobyCovariance(),
+               MutualInfoCovariance(; bins = 3)]
         df = CSV.read(joinpath(@__DIR__, "./assets/CanonicalDistance.csv.gz"), DataFrame)
         de = Distance(; alg = CanonicalDistance())
         deg = Distance(; power = 1, alg = CanonicalDistance())
@@ -478,7 +479,6 @@
             d2 = cor_and_dist(deg, cei, rd.X)[2]
             @test isapprox(d1, d2)
             @test isapprox(r1, cor(cei, rd.X))
-
             d3 = distance(de, cei, rd.X)
             d4 = if isa(ce, MutualInfoCovariance)
                 distance(DistanceDistance(;
