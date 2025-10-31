@@ -273,7 +273,7 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     return x1, Vp
 end
 """
-    regression(re::DimensionReductionRegression, y::AbstractVector, mu::AbstractVector,
+    _regression(re::DimensionReductionRegression, y::AbstractVector, mu::AbstractVector,
                sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
 
 Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
@@ -305,8 +305,9 @@ This function fits a regression model (as specified by `retgt`) to the response 
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
 """
-function regression(re::DimensionReductionRegression, y::AbstractVector, mu::AbstractVector,
-                    sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
+function _regression(re::DimensionReductionRegression, y::AbstractVector,
+                     mu::AbstractVector, sigma::AbstractVector, x1::AbstractMatrix,
+                     Vp::AbstractMatrix)
     w = !haskey(re.drtgt.kwargs, :wts) ? nothing : re.drtgt.kwargs.wts
     fit_result = fit(re.retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
@@ -357,7 +358,7 @@ function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::Abst
     sigma = vec(std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)
-        rr[i, :] = regression(re, view(X, :, i), mu, sigma, f1, Vp)
+        rr[i, :] = _regression(re, view(X, :, i), mu, sigma, f1, Vp)
     end
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)
