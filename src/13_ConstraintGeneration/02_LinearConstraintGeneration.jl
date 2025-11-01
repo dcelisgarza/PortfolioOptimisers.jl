@@ -237,7 +237,6 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
 end
-Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
 
 """
     struct AssetSets{T1, T2} <: AbstractEstimator

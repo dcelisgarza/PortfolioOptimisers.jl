@@ -1037,9 +1037,8 @@ function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
                                      <:AbstractClusteringResult},
                            cent::AbstractCentralityAlgorithm, X::AbstractMatrix;
                            dims::Int = 1, kwargs...)
-    P = phylogeny_matrix(ne, X; dims = dims, kwargs...).X
-    G = SimpleGraph(P)
-    return PhylogenyResult(; X = calc_centrality(cent, G))
+    P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
+    return centrality_vector(P, cent; dims = dims, kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -1159,11 +1158,31 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     return c
 end
 """
-    asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
+    asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
+                    kwargs...)
 
-Calls `asset_phylogeny` with the phylogeny matrix `X` from a `PhylogenyResult`.
+Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
+
+This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, ph)`, ignoring any additional arguments.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractMatrix}`: Phylogeny matrix result object.
+  - `w::AbstractVector`: Portfolio weights vector.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `score::Real`: Asset phylogeny score.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
+function asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
+                         kwargs...)
     return asset_phylogeny(w, ph.X)
 end
 """
@@ -1194,35 +1213,7 @@ This function computes the phylogeny matrix using the estimator and data, then c
 function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
                                     <:AbstractClusteringResult}, w::AbstractVector,
                          X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
-end
-"""
-    asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
-                    kwargs...)
-
-Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
-
-This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, ph)`, ignoring any additional arguments.
-
-# Arguments
-
-  - `ph::PhylogenyResult{<:AbstractMatrix}`: Phylogeny matrix result object.
-  - `w::AbstractVector`: Portfolio weights vector.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `score::Real`: Asset phylogeny score.
-
-# Related
-
-  - [`PhylogenyResult`](@ref)
-  - [`asset_phylogeny`](@ref)
-"""
-function asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
-                         kwargs...)
-    return asset_phylogeny(w, ph)
+    return asset_phylogeny(phylogeny_matrix(cle, X; dims = dims, kwargs...), w)
 end
 
 export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentrality,
