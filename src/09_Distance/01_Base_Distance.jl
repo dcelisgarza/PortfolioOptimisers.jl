@@ -183,7 +183,7 @@ Defines the canonical distance metric for a given covariance estimator. The resu
 | Covariance Estimator                                                               | Distance Metric                 |
 | ----------------------------------------------------------------------------------:|:------------------------------- |
 | [`MutualInfoCovariance`](@ref)                                                     | [`VariationInfoDistance`](@ref) |
-| [`LTDCovariance`](@ref)                                                            | [`LogDistance`](@ref)           |
+| [`LowerTailDependenceCovariance`](@ref)                                            | [`LogDistance`](@ref)           |
 | [`DistanceCovariance`](@ref)                                                       | [`CorrelationDistance`](@ref)   |
 | [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/) | [`SimpleDistance`](@ref)        |
 
@@ -196,7 +196,7 @@ When used with a covariance matrix directly, uses [`SimpleDistance`](@ref).
   - [`AbstractDistanceAlgorithm`](@ref)
   - [`AbstractDistanceEstimator`](@ref)
   - [`MutualInfoCovariance`](@ref)
-  - [`LTDCovariance`](@ref)
+  - [`LowerTailDependenceCovariance`](@ref)
   - [`DistanceCovariance`](@ref)
   - [`VariationInfoDistance`](@ref)
   - [`LogDistance`](@ref)

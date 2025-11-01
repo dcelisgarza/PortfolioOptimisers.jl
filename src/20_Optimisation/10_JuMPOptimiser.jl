@@ -78,7 +78,7 @@ end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in (:oe, :pa, :frc_plg, :retcode, :sol, :model, :fb)
+    elseif sym in (:oe, :pa, :rr, :frc_plg, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else
         getfield(r.pa, sym)

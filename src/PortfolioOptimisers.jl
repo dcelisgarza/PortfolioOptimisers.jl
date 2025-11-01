@@ -15,7 +15,7 @@ end PortfolioOptimisers
 
 # 136 files.
 src_files = String[]
-sizehint!(src_files, 136)
+sizehint!(src_files, 137)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files
         if file == "PortfolioOptimisers.jl"

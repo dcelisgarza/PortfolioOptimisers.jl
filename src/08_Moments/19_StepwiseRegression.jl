@@ -130,6 +130,10 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             target::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, target)
 end
+function factory(re::StepwiseRegression, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return StepwiseRegression(; crit = re.crit, alg = re.alg,
+                              target = factory(re.target, w))
+end
 """
     add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
                                          included::AbstractVector, F::AbstractMatrix,
@@ -167,11 +171,9 @@ function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
     end
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
-    indices = 1:N
-    excluded = setdiff(indices, included)
     best_pval = typemax(eltype(x))
     new_feature = 0
-    for i in excluded
+    for i in 1:N
         factors = [included; i]
         f1 = [ovec view(F, :, factors)]
         fri = fit(target, f1, x)
@@ -188,7 +190,7 @@ function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
     return nothing
 end
 """
-    regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
+    _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
                F::AbstractMatrix)
 
 Perform forward stepwise regression using a p-value criterion.
@@ -219,12 +221,12 @@ This method implements forward selection for stepwise regression, where variable
   - [`Forward`](@ref)
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
-function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
-                    F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
+                     F::AbstractMatrix)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     indices = 1:size(F, 2)
     included = Vector{eltype(indices)}(undef, 0)
-    pvals = Vector{promote_type(eltype(F), eltype(x))}(undef, 0)
+    pvals = nothing
     val = zero(promote_type(eltype(F), eltype(x)))
     while val <= re.crit.threshold
         excluded = setdiff(indices, included)
@@ -340,7 +342,7 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
     return threshold
 end
 """
-    regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
+    _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
                                               <:AbstractMaxValStepwiseRegressionCriteria},
                                       <:Forward}, x::AbstractVector, F::AbstractMatrix)
 
@@ -373,9 +375,10 @@ This method implements forward selection for stepwise regression, where variable
   - [`Forward`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
 """
-function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                   <:AbstractMaxValStepwiseRegressionCriteria},
-                                           <:Forward}, x::AbstractVector, F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
+                                                    <:AbstractMaxValStepwiseRegressionCriteria},
+                                            <:Forward}, x::AbstractVector,
+                     F::AbstractMatrix)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
@@ -383,7 +386,9 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
     threshold = regression_threshold(re.crit)
     included = Vector{eltype(indices)}(undef, 0)
     excluded = collect(indices)
-    value = Vector{promote_type(eltype(F), eltype(x))}(undef, N)
+    value = fill(ifelse(isa(re.crit, AbstractMinValStepwiseRegressionCriterion),
+                        typemax(promote_type(eltype(F), eltype(x))),
+                        typemin(promote_type(eltype(F), eltype(x)))), N)
     for _ in eachindex(x)
         ni = length(excluded)
         for i in excluded
@@ -392,9 +397,6 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
             f1 = [ovec view(F, :, factors)]
             fri = fit(re.target, f1, x)
             value[i] = criterion_func(fri)
-        end
-        if isempty(value)
-            break
         end
         threshold = get_forward_reg_incl_excl!(re.crit, value, excluded, included,
                                                threshold)
@@ -405,7 +407,7 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
     return included
 end
 """
-    regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
+    _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
                F::AbstractMatrix)
 
 Perform backward stepwise regression using a p-value criterion.
@@ -435,8 +437,8 @@ This method implements backward elimination for stepwise regression, where all v
   - [`Backward`](@ref)
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
-function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
-                    F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
+                     F::AbstractMatrix)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     fri = fit(re.target, [ovec F], x)
     included = 1:size(F, 2)
@@ -445,16 +447,15 @@ function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVec
     pvals = coeftable(fri).cols[4][2:end]
     val = maximum(pvals)
     while val > re.crit.threshold
-        factors = setdiff(indices, excluded)
-        included = factors
-        if isempty(factors)
+        included = setdiff(indices, excluded)
+        if isempty(included)
             break
         end
-        f1 = [ovec view(F, :, factors)]
+        f1 = [ovec view(F, :, included)]
         fri = fit(re.target, f1, x)
         pvals = coeftable(fri).cols[4][2:end]
         val, idx = findmax(pvals)
-        push!(excluded, factors[idx])
+        push!(excluded, included[idx])
     end
     add_best_feature_after_pval_failure!(re.target, included, F, x)
     return included
@@ -542,7 +543,7 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria,
     return threshold
 end
 """
-    regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
+    _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
                                               <:AbstractMaxValStepwiseRegressionCriteria},
                                       <:Backward}, x::AbstractVector, F::AbstractMatrix)
 
@@ -576,17 +577,19 @@ This method implements backward elimination for stepwise regression, where all v
   - [`Backward`](@ref)
   - [`get_backward_reg_incl!`](@ref)
 """
-function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                   <:AbstractMaxValStepwiseRegressionCriteria},
-                                           <:Backward}, x::AbstractVector,
-                    F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
+                                                    <:AbstractMaxValStepwiseRegressionCriteria},
+                                            <:Backward}, x::AbstractVector,
+                     F::AbstractMatrix)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
     fri = fit(re.target, [ovec F], x)
     criterion_func = regression_criterion_func(re.crit)
     threshold = criterion_func(fri)
-    value = Vector{promote_type(eltype(F), eltype(x))}(undef, N)
+    value = fill(ifelse(isa(re.crit, AbstractMinValStepwiseRegressionCriterion),
+                        typemax(promote_type(eltype(F), eltype(x))),
+                        typemin(promote_type(eltype(F), eltype(x)))), N)
     for _ in eachindex(x)
         ni = length(included)
         for (i, factor) in pairs(included)
@@ -599,9 +602,6 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
             end
             fri = fit(re.target, f1, x)
             value[factor] = criterion_func(fri)
-        end
-        if isempty(value)
-            break
         end
         threshold = get_backward_reg_incl!(re.crit, value, included, threshold)
         if ni == length(included)
@@ -649,14 +649,11 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
     ovec = range(one(eltype(F)), one(eltype(F)); length = N)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     for i in axes(rr, 1)
-        included = regression(re, view(X, :, i), F)
+        included = _regression(re, view(X, :, i), F)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
         fri = fit(re.target, x1, view(X, :, i))
         params = coef(fri)
         rr[i, 1] = params[1]
-        if isempty(included)
-            continue
-        end
         idx = [findfirst(x -> x == i, features) + 1 for i in included]
         rr[i, idx] = params[2:end]
     end

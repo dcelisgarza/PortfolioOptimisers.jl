@@ -162,8 +162,8 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
 end
 """
     distance(de::Distance{<:Any, <:LogDistance},
-             ce::Union{<:LTDCovariance,
-                       <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+             ce::Union{<:LowerTailDependenceCovariance,
+                       <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance, <:Any}},
              X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance estimator and data matrix.
@@ -187,16 +187,18 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
   - [`cor_and_dist`](@ref)
 """
 function distance(::Distance{Nothing, <:LogDistance},
-                  ce::Union{<:LTDCovariance,
-                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+                  ce::Union{<:LowerTailDependenceCovariance,
+                            <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
+                                                            <:Any}}, X::AbstractMatrix;
+                  dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
 function distance(de::Distance{<:Integer, <:LogDistance},
-                  ce::Union{<:LTDCovariance,
-                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+                  ce::Union{<:LowerTailDependenceCovariance,
+                            <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
+                                                            <:Any}}, X::AbstractMatrix;
+                  dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return -log.(rho)
 end
@@ -456,16 +458,18 @@ function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
     return rho, -log.(rho)
 end
 function cor_and_dist(::Distance{Nothing, <:LogDistance},
-                      ce::Union{<:LTDCovariance,
-                                <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+                      ce::Union{<:LowerTailDependenceCovariance,
+                                <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
+                                                                <:Any}}, X::AbstractMatrix;
+                      dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(rho)
 end
 function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
-                      ce::Union{<:LTDCovariance,
-                                <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+                      ce::Union{<:LowerTailDependenceCovariance,
+                                <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
+                                                                <:Any}}, X::AbstractMatrix;
+                      dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return rho, -log.(rho)
 end
@@ -517,9 +521,10 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                         ce, X; dims = dims, kwargs...)
 end
 function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
-                      ce::Union{<:LTDCovariance,
-                                <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+                      ce::Union{<:LowerTailDependenceCovariance,
+                                <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
+                                                                <:Any}}, X::AbstractMatrix;
+                      dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power, alg = LogDistance()), ce, X;
                         dims = dims, kwargs...)
 end
@@ -541,7 +546,7 @@ end
     distance(de::Distance{<:Any, <:CanonicalDistance},
              ce::Union{<:MutualInfoCovariance,
                        <:PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
-                       <:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any},
+                       <:LowerTailDependenceCovariance, <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance, <:Any},
                        <:DistanceCovariance,
                        <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
              X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -565,7 +570,7 @@ Compute the canonical distance matrix using the covariance estimator and data ma
   - [`Distance`](@ref)
   - [`CanonicalDistance`](@ref)
   - [`MutualInfoCovariance`](@ref)
-  - [`LTDCovariance`](@ref)
+  - [`LowerTailDependenceCovariance`](@ref)
   - [`DistanceCovariance`](@ref)
 """
 function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
@@ -584,9 +589,10 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
                     X; dims = dims, kwargs...)
 end
 function distance(de::Distance{<:Any, <:CanonicalDistance},
-                  ce::Union{<:LTDCovariance,
-                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+                  ce::Union{<:LowerTailDependenceCovariance,
+                            <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
+                                                            <:Any}}, X::AbstractMatrix;
+                  dims::Int = 1, kwargs...)
     return distance(Distance(; power = de.power, alg = LogDistance()), ce, X; dims = dims,
                     kwargs...)
 end

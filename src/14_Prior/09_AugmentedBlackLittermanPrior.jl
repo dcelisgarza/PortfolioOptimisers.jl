@@ -247,10 +247,11 @@ end
 function factory(pe::AugmentedBlackLittermanPrior,
                  w::Union{Nothing, <:AbstractVector} = nothing)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
-                                        f_pe = factory(pe.f_pe, w), mp = pe.mp, re = pe.re,
-                                        ve = factory(pe.ve, w), a_views = pe.a_views,
-                                        f_views = pe.f_views, a_sets = pe.a_sets,
-                                        f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
+                                        f_pe = factory(pe.f_pe, w), mp = pe.mp,
+                                        re = factory(pe.re, w), ve = factory(pe.ve, w),
+                                        a_views = pe.a_views, f_views = pe.f_views,
+                                        a_sets = pe.a_sets, f_sets = pe.f_sets,
+                                        a_views_conf = pe.a_views_conf,
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
 end

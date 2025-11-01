@@ -156,7 +156,7 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                                     <:BlackLittermanViews},
                                        sets::Union{Nothing, <:AssetSets},
                                        views_conf::Union{Nothing, <:Real, <:AbstractVector},
-                                       w::Union{Nothing, <:AbstractWeights}, rf::Real,
+                                       w::Union{Nothing, <:AbstractVector}, rf::Real,
                                        l::Union{Nothing, <:Real},
                                        tau::Union{Nothing, <:Real}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
@@ -182,7 +182,7 @@ function FactorBlackLittermanPrior(;
                                                 <:BlackLittermanViews},
                                    sets::Union{Nothing, <:AssetSets} = nothing,
                                    views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                                   w::Union{Nothing, <:AbstractWeights} = nothing,
+                                   w::Union{Nothing, <:AbstractVector} = nothing,
                                    rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
@@ -191,9 +191,10 @@ end
 function factory(pe::FactorBlackLittermanPrior,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
-                                     re = pe.re, ve = factory(pe.ve, w), views = pe.views,
-                                     sets = pe.sets, views_conf = pe.views_conf, w = pe.w,
-                                     rf = pe.rf, l = pe.l, tau = pe.tau, rsd = pe.rsd)
+                                     re = factory(pe.re, w), ve = factory(pe.ve, w),
+                                     views = pe.views, sets = pe.sets,
+                                     views_conf = pe.views_conf, w = pe.w, rf = pe.rf,
+                                     l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     return if sym == :me
