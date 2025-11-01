@@ -312,7 +312,8 @@ function _regression(re::DimensionReductionRegression, y::AbstractVector,
     fit_result = fit(re.retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
-    beta0 = isnothing(w) ? mean(y) : mean(y, w) - dot(beta, mu)
+    mean_y = isnothing(w) ? mean(y) : mean(y, w)
+    beta0 = mean_y - dot(beta, mu)
     pushfirst!(beta, beta0)
     return beta
 end
