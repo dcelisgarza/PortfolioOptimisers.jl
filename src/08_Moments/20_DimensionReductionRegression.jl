@@ -308,7 +308,7 @@ This function fits a regression model (as specified by `retgt`) to the response 
 function _regression(re::DimensionReductionRegression, y::AbstractVector,
                      mu::AbstractVector, sigma::AbstractVector, x1::AbstractMatrix,
                      Vp::AbstractMatrix)
-    mean_y = !haskey(re.retgt.kwargs, :wts) ? mean(y) : mean(y, w)
+    mean_y = !haskey(re.retgt.kwargs, :wts) ? mean(y) : mean(y, re.retgt.kwargs.wts)
     fit_result = fit(re.retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
