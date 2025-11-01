@@ -475,8 +475,8 @@
         deg = DistanceDistance(; power = 1, alg = CanonicalDistance())
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
-            r1, d1 = cor_and_dist(de, cei, rd.X)
-            d2 = cor_and_dist(deg, cei, rd.X)[2]
+            r1, d1 = cor_and_dist(de, cei, rd.X'; dims = 2)
+            d2 = cor_and_dist(deg, cei, rd.X'; dims = 2)[2]
             @test isapprox(d1, d2)
             @test isapprox(r1, cor(cei, rd.X))
             d3 = distance(de, cei, rd.X)
@@ -484,7 +484,7 @@
                 distance(DistanceDistance(;
                                           alg = VariationInfoDistance(; bins = ce.bins,
                                                                       normalise = ce.normalise)),
-                         cov(ce, rd.X), rd.X)
+                         cov(ce, rd.X'; dims = 2), rd.X)
             elseif isa(ce, DistanceCovariance)
                 distance(DistanceDistance(; alg = CorrelationDistance(;)), cov(cei, rd.X),
                          rd.X)
