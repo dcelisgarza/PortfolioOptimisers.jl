@@ -237,7 +237,6 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
 end
-
 """
     struct AssetSets{T1, T2} <: AbstractEstimator
         key::T1
@@ -263,7 +262,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`.
+  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`. This means their lengths will be congruent when used in the `opti` field of [`NestedClustered`](@ref).
   - `!isempty(dict)`.
   - `haskey(dict, key)`.
 
