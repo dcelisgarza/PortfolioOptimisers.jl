@@ -289,10 +289,10 @@ This function updates the `included` and `excluded` variable sets in forward ste
 function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
                                     value::AbstractVector, excluded::AbstractVector,
                                     included::AbstractVector, threshold::Real)
-    val, key = findmin(value)
-    idx = findfirst(x -> x == key, excluded)
+    val, idx = findmin(value)
     if val < threshold
-        push!(included, popat!(excluded, idx))
+        i = searchsortedfirst(excluded, idx)
+        push!(included, popat!(excluded, i))
         threshold = val
     end
     return threshold
@@ -333,10 +333,10 @@ This function updates the `included` and `excluded` variable sets in forward ste
 function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
                                     value::AbstractVector, excluded::AbstractVector,
                                     included::AbstractVector, threshold::Real)
-    val, key = findmax(value)
-    idx = findfirst(x -> x == key, excluded)
+    val, idx = findmax(value)
     if val > threshold
-        push!(included, popat!(excluded, idx))
+        i = searchsortedfirst(excluded, idx)
+        push!(included, popat!(excluded, i))
         threshold = val
     end
     return threshold
@@ -495,7 +495,7 @@ function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion,
                                 threshold::Real)
     val, idx = findmin(value)
     if val < threshold
-        i = findfirst(x -> x == idx, included)
+        i = searchsortedfirst(included, idx)
         popat!(included, i)
         threshold = val
     end
@@ -536,7 +536,7 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria,
                                 threshold::Real)
     val, idx = findmax(value)
     if val > threshold
-        i = findfirst(x -> x == idx, included)
+        i = searchsortedfirst(included, idx)
         popat!(included, i)
         threshold = val
     end
@@ -654,7 +654,7 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
         fri = fit(re.target, x1, view(X, :, i))
         params = coef(fri)
         rr[i, 1] = params[1]
-        idx = [findfirst(x -> x == i, features) + 1 for i in included]
+        idx = [searchsortedfirst(features, i) + 1 for i in included]
         rr[i, idx] = params[2:end]
     end
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))

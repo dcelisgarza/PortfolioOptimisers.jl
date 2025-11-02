@@ -90,7 +90,7 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)
         idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
-        searchsortedfirst(idx), searchsortedlast(idx)
+        findfirst(idx), findlast(idx)
     else
         1, length(X)
     end
