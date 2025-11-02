@@ -340,16 +340,33 @@
                                                                 opt = opti),
                                                 opto = MeanRisk(; opt = opto)), rd).w)
     end
+    @testset "Advanced use" begin
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = ConditionalValueatRisk(),
+                                                       opt = JuMPOptimiser(; pe = pr,
+                                                                           slv = mip_slv,
+                                                                           scard = [2, 1],
+                                                                           smtx = [AssetSetsMatrixEstimator(;
+                                                                                                            val = "nx_clusters1"),
+                                                                                   AssetSetsMatrixEstimator(;
+                                                                                                            val = "nx_clusters2")],
+                                                                           sets = sets)),
+                                       opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
+                       rd)
 
-    # res = optimise(NestedClustered(; cle = clr,
-    #                                opti = MeanRisk(; r = ConditionalValueatRisk(),
-    #                                                opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-    #                                                                    scard = [1, 1],
-    #                                                                    smtx = [AssetSetsMatrixEstimator(;
-    #                                                                                                     val = "nx_clusters1"),
-    #                                                                            AssetSetsMatrixEstimator(;
-    #                                                                                                     val = "nx_clusters2")],
-    #                                                                    sets = sets)),
-    #                                opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))), rd)
-    # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[1][i, :]]
+                             for i in axes(res.resi[1].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[2][i, :]]
+                             for i in axes(res.resi[1].smtx[2], 1)])) < 2
+
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]]
+                             for i in axes(res.resi[2].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]]
+                             for i in axes(res.resi[2].smtx[2], 1)])) < 2
+
+        @test sum(.!iszero.([res.resi[3].w[res.resi[3].smtx[1][i, :]]
+                             for i in axes(res.resi[3].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[3].w[res.resi[3].smtx[2][i, :]]
+                             for i in axes(res.resi[3].smtx[2], 1)])) < 2
+    end
 end
