@@ -744,9 +744,8 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     if isempty(idx_rm)
         return res
     end
-    if !non_prior
-        throw(ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
-    end
+    @argcheck(non_prior,
+              ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
     idx = setdiff(1:length(variables), idx_rm)
     variables_new = variables[idx]
     coeffs_new = coeffs[idx]
@@ -1016,18 +1015,17 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
-    if !isnothing(lcs.ineq) && !any(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
-       !isnothing(lcs.eq) && !any(x -> (iszero(x) || isone(x)), lcs.A_eq)
-        throw(ArgumentError("`var_view` only supports coefficients of 1.\n$var_views"))
-    end
-    if !isnothing(lcs.ineq) && any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
-       !isnothing(lcs.eq) && any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
-        throw(ArgumentError("Cannot mix multiple assets in a single `var_view`.\n$var_views"))
-    end
-    if !isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq) ||
-       !isnothing(lcs.ineq) && any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)
-        throw(ArgumentError("`var_view` cannot be negative.\n$var_views"))
-    end
+    @argcheck(!(!isnothing(lcs.ineq) && !any(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
+                !isnothing(lcs.eq) && !any(x -> (iszero(x) || isone(x)), lcs.A_eq)),
+              ArgumentError("`var_view` only supports coefficients of 1.\n$var_views"))
+    @argcheck(!(!isnothing(lcs.ineq) &&
+                any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
+                !isnothing(lcs.eq) && any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))),
+              ArgumentError("Cannot mix multiple assets in a single `var_view`.\n$var_views"))
+    @argcheck(!(!isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq) ||
+                !isnothing(lcs.ineq) &&
+                any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)),
+              ArgumentError("`var_view` cannot be negative.\n$var_views"))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
@@ -1038,9 +1036,8 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
             j = .!iszero.(A[i, :])
             #! Figure out a way to include pr.w, probably see how it's implemented in ValueatRisk.
             idx = findall(x -> x <= -abs(B[i]), view(pr.X, :, j))
-            if isempty(idx)
-                throw(ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(pr.X[:,j])). Please lower it or use a different prior with fatter tails."))
-            end
+            @argcheck(!isempty(idx),
+                      ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(pr.X[:,j])). Please lower it or use a different prior with fatter tails."))
             sign = ifelse(p == :eq || B[i] >= zero(eltype(B)), one(eltype(B)),
                           -one(eltype(B)))
             Ai = zeros(eltype(pr.X), 1, size(pr.X, 1))
@@ -1129,12 +1126,9 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     end
     result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
                             opt.kwargs...)
-    x = if Optim.converged(result)
-        # Compute posterior probabilities
-        Optim.minimizer(result)
-    else
-        throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    end
+    @argcheck(Optim.converged(result),
+              ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
+    x = Optim.minimizer(result)
     return pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
 end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
@@ -1185,12 +1179,9 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     end
     result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
                             opt.kwargs...)
-    x = if Optim.converged(result)
-        # Compute posterior probabilities
-        Optim.minimizer(result)
-    else
-        throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    end
+    @argcheck(Optim.converged(result),
+              ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
+    x = Optim.minimizer(result)
     return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 """
@@ -1269,11 +1260,9 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
         add_to_expression!(obj_expr, so * sc2 * tc)
     end
     @objective(model, Min, obj_expr)
-    return if optimise_JuMP_model!(model, slv).success
-        pweights(value.(x))
-    else
-        throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    end
+    @argcheck(optimise_JuMP_model!(model, slv).success,
+              ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
+    return pweights(value.(x))
 end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -1321,11 +1310,9 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     end
     @objective(model, Min, obj_expr - so * dot(x, log_p))
     # Solve the optimization problem
-    return if optimise_JuMP_model!(model, slv).success
-        pweights(value.(x))
-    else
-        throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    end
+    @argcheck(optimise_JuMP_model!(model, slv).success,
+              ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
+    return pweights(value.(x))
 end
 """
     ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
@@ -1452,12 +1439,10 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
     lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
     @argcheck(isnothing(lcs.ineq), "`cvar_view` can only have equality constraints.")
-    if any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
-        throw(ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
-    end
-    if any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq)
-        throw(ArgumentError("`cvar_view` cannot be negative."))
-    end
+    @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
+              ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
+    @argcheck(!any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq),
+              ArgumentError("`cvar_view` cannot be negative."))
     idx = dropdims(.!iszero.(sum(lcs.A_eq; dims = 1)); dims = 1)
     idx2 = .!iszero.(lcs.A_eq)
     B = lcs.B_eq ./ view(lcs.A_eq, idx2)
@@ -1500,22 +1485,20 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         end
         return wi, err
     end
-    return if N == 1
+    res = if N == 1
         try
-            res = find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)
-            func([res])[1]
+            [find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)]
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end
     else
         res = Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
                              d_opt.kwargs...)
-        if Optim.converged(res)
-            func(Optim.minimizer(res))[1]
-        else
-            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
-        end
+        @argcheck(Optim.converged(res),
+                  ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
+        Optim.minimizer(res)
     end
+    return func(res)[1]
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
@@ -1688,40 +1671,8 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
         if isnothing(m)
             non_prior = true
             n = match(corr_pattern, v)
-            if isnothing(n)
-                throw(ArgumentError("Correlation prior view $(v) must be of the form `(a, b)`."))
-            else
-                asset1 = n.captures[1]
-                asset2 = n.captures[2]
-                if startswith(asset1, "[") && endswith(asset1, "]")
-                    asset1 = split(n.captures[1][2:(end - 1)], ", ")
-                    asset2 = split(n.captures[2][2:(end - 1)], ", ")
-                    j = [findfirst(x -> x == a1, nx) for a1 in asset1]
-                    k = [findfirst(x -> x == a2, nx) for a2 in asset2]
-                else
-                    j = findfirst(x -> x == asset1, nx)
-                    k = findfirst(x -> x == asset2, nx)
-                    if isnothing(j)
-                        msg = "Asset $(asset1) not found in $nx."
-                        strict ? throw(ArgumentError(msg)) : @warn(msg)
-                    end
-                    if isnothing(k)
-                        msg = "Asset $(asset2) not found in $nx."
-                        strict ? throw(ArgumentError(msg)) : @warn(msg)
-                    end
-                    if isnothing(j) || isnothing(k)
-                        push!(idx_rm, i)
-                        continue
-                    end
-                end
-                push!(jk_idx, (j, k))
-            end
-            continue
-        end
-        n = match(prior_corr_pattern, v)
-        if isnothing(n)
-            throw(ArgumentError("Correlation prior view $(v) must be of the form `prior(a, b)`."))
-        else
+            @argcheck(!isnothing(n),
+                      ArgumentError("Correlation prior view $(v) must be of the form `(a, b)`."))
             asset1 = n.captures[1]
             asset2 = n.captures[2]
             if startswith(asset1, "[") && endswith(asset1, "]")
@@ -1745,16 +1696,43 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
                     continue
                 end
             end
-            rhs -= get_pr_value(pr, j, k) * c
-            push!(idx_rm, i)
+            push!(jk_idx, (j, k))
+            continue
         end
+        n = match(prior_corr_pattern, v)
+        @argcheck(!isnothing(n),
+                  ArgumentError("Correlation prior view $(v) must be of the form `prior(a, b)`."))
+        asset1 = n.captures[1]
+        asset2 = n.captures[2]
+        if startswith(asset1, "[") && endswith(asset1, "]")
+            asset1 = split(n.captures[1][2:(end - 1)], ", ")
+            asset2 = split(n.captures[2][2:(end - 1)], ", ")
+            j = [findfirst(x -> x == a1, nx) for a1 in asset1]
+            k = [findfirst(x -> x == a2, nx) for a2 in asset2]
+        else
+            j = findfirst(x -> x == asset1, nx)
+            k = findfirst(x -> x == asset2, nx)
+            if isnothing(j)
+                msg = "Asset $(asset1) not found in $nx."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+            end
+            if isnothing(k)
+                msg = "Asset $(asset2) not found in $nx."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+            end
+            if isnothing(j) || isnothing(k)
+                push!(idx_rm, i)
+                continue
+            end
+        end
+        rhs -= get_pr_value(pr, j, k) * c
+        push!(idx_rm, i)
     end
     if isempty(idx_rm)
         return RhoParsingResult(res.vars, res.coef, res.op, res.rhs, res.eqn, jk_idx)
     end
-    if !non_prior
-        throw(ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
-    end
+    @argcheck(non_prior,
+              ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
     idx = setdiff(1:length(variables), idx_rm)
     variables_new = variables[idx]
     coeffs_new = coeffs[idx]

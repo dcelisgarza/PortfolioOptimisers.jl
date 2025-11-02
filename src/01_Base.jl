@@ -299,5 +299,9 @@ function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
     return state > 1 ? nothing : (obj, state + 1)
 end
 Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
+function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                  <:AbstractResult}, i::Int)
+    return i == 1 ? obj : throw(BoundsError())
+end
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError

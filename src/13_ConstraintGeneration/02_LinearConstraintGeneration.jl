@@ -712,9 +712,8 @@ function _rethrow_parse_error(::Nothing, side = :lhs)
     return nothing
 end
 function _rethrow_parse_error(expr::Expr, side = :lhs)
-    if expr.head == :incomplete
-        throw(Meta.ParseError("$side is an incomplete expression.\n$expr"))
-    end
+    @argcheck(expr.head != :incomplete,
+              Meta.ParseError("$side is an incomplete expression.\n$expr"))
     return nothing
 end
 """
@@ -861,19 +860,16 @@ ParsingResult
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)
-    if occursin("++", eqn)
-        throw(Meta.ParseError("Invalid operator '++' detected in equation."))
-    end
+    @argcheck(!occursin("++", eqn),
+              Meta.ParseError("Invalid operator '++' detected in equation."))
     # 1. Identify the comparison operator
     op = findfirst(op -> occursin(op, eqn), ops1)
-    if isnothing(op)
-        error("Equation must contain a valid comparison operator $(join(ops1,", ")) .\n$(eqn)")
-    end
+    @argcheck(!isnothing(op),
+              Meta.ParseError("Equation must contain a valid comparison operator $(join(ops1,", ")) .\n$(eqn)"))
     opstr = ops1[op]
     parts = split(eqn, opstr)
-    if length(parts) != 2
-        error("Equation must have exactly one comparison operator.\n$(eqn)")
-    end
+    @argcheck(length(parts) == 2,
+              Meta.ParseError("Equation must have exactly one comparison operator.\n$(eqn)"))
     lhs, rhs = strip.(parts)
     # 2. Parse both sides into Julia expressions
     lexpr = Meta.parse(lhs)
@@ -882,12 +878,30 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     _rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
+function _has_invalid_plus(expr)
+    if !(isa(expr, Expr) && expr.head == :call)
+        return false
+    end
+    # Check for nested :+ calls (e.g., :(+(+(a, b), c))) or more than two arguments
+    if expr.args[1] == :++
+        # If any argument is itself a :+ call, that's suspicious (from "++")
+        return true
+    end
+    # Recurse into sub-expressions
+    return any(_has_invalid_plus(arg) for arg in expr.args[2:end] if isa(arg, Expr))
+end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)
-    # 1. Identify the comparison operator in the expression
-    if expr.head != :call || !(expr.args[1] in ops2[2:end])
-        error("Expression must be a valid comparison $(join(ops2,", ")) .\n$expr")
-    end
+    # Recursively check for invalid "++" pattern in the expression tree
+    @argcheck(!_has_invalid_plus(expr),
+              Meta.ParseError("Invalid operator pattern '++' detected in equation expression:\n$expr"))
+    # Ensure the expression is a call to a valid comparison operator
+    @argcheck(expr.head == :call,
+              Meta.ParseError("Expression must be a function call (comparison operator expected):\n$expr"))
+    # Count how many valid operators are present
+    op_count = count(op -> expr.args[1] == op, ops2[2:end])
+    @argcheck(op_count == 1,
+              Meta.ParseError("Expression must contain a valid comparison operator $(join(ops2[2:end], ", ")) .\n$expr"))
     opstr = string(expr.args[1])
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
@@ -964,12 +978,10 @@ ParsingResult
 """
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
                                  prior_flag::Bool = false, rho_flag::Bool = false)
-    if bl_flag && (rho_flag || prior_flag)
-        throw(ArgumentError("`bl_flag` can only be used if `prior_flag` and `rho_flag` are false."))
-    end
-    if rho_flag && !prior_flag
-        throw(ArgumentError("`rho_flag` can only be used if `prior_flag` is also true."))
-    end
+    @argcheck(!(bl_flag && (rho_flag || prior_flag)),
+              ArgumentError("`bl_flag` ($bl_flag) can only be used if `prior_flag` ($prior_flag) and `rho_flag` ($rho_flag) are false."))
+    @argcheck(!(rho_flag && !prior_flag),
+              ArgumentError("`rho_flag` ($rho_flag) can only be used if `prior_flag` ($prior_flag) is also true."))
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -992,12 +1004,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
-                if !(prior_flag && rho_flag)
-                    throw(ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
-                end
-                if isnothing(n)
-                    throw(ArgumentError("Correlation views can only be of the form `(a, b)`."))
-                end
+                @argcheck(prior_flag && rho_flag,
+                          ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
+                @argcheck(!isnothing(n),
+                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1014,9 +1024,8 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 push!(idx_rm, i)
             end
         else
-            if !prior_flag
-                throw(ArgumentError("`prior(a)` can only be used in entropy pooling."))
-            end
+            @argcheck(prior_flag,
+                      ArgumentError("`prior(a)` can only be used in entropy pooling."))
             n = match(corr_pattern, v)
             if isnothing(n) && !rho_flag
                 asset = get(sets.dict, v[7:(end - 1)], nothing)
@@ -1028,12 +1037,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
-                if !rho_flag
-                    throw(ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
-                end
-                if isnothing(n)
-                    throw(ArgumentError("Correlation views can only be of the form `(a, b)`."))
-                end
+                @argcheck(rho_flag,
+                          ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
+                @argcheck(!isnothing(n),
+                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)

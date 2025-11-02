@@ -18,8 +18,18 @@
     @test res.rhs == 1.0
     @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= 5/")
     @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/>= 5/5 ")
-    @test_throws ErrorException parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/ = 5/5 ")
+    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/ = 5/5 ")
     @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 ++ cbrt(3)^3*f >= 5/5 + d-69/3*c")
+    @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 ++
+                                                  cbrt(3)^3 * f >= 5 / 5 + d - 69 / 3 * c))
+    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= >= 5/5 + d-69/3*c")
+    @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 >=
+                                                  cbrt(3)^3 * f >=
+                                                  5 / 5 + d - 69 / 3 * c))
+    @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 +
+                                                  cbrt(3)^3 * f +
+                                                  5 / 5 +
+                                                  d - 69 / 3 * c))
     res = parse_equation("1/3*x/((2^z)*y)+5z==1-5")
     @test res.vars == ["z", "(0.3333333333333333x) / (2 ^ z * y)"]
     @test res.coef == [5.0, 1.0]
@@ -38,4 +48,10 @@
     @test res.op == "<="
     @test res.rhs == 2.0
     @test res.eqn == "-_1 * _3 + 1.1*y <= 2.0"
+    res = parse_equation("Inf*a<=Inf")
+    @test res.vars == ["a"]
+    @test res.coef == [Inf]
+    @test res.op == "<="
+    @test res.rhs == Inf
+    @test res.eqn == "Inf*a <= Inf"
 end
