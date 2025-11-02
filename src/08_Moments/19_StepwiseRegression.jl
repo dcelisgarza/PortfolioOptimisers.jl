@@ -178,7 +178,7 @@ function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
         f1 = [ovec view(F, :, factors)]
         fri = fit(target, f1, x)
         new_pvals = coeftable(fri).cols[4][2:end]
-        idx = findfirst(x -> x == i, factors)
+        idx = searchsortedfirst(factors, i)
         test_pval = new_pvals[idx]
         if best_pval > test_pval
             best_pval = test_pval

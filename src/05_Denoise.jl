@@ -413,7 +413,7 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
     vals, vecs = eigen(X)
     max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
                             kwargs = de.kwargs)[1]
-    num_factors = findlast(vals .<= max_val)
+    num_factors = searchsortedlast(vals, max_val)
     _denoise!(de.alg, X, vals, vecs, num_factors)
     posdef!(pdm, X)
     if iscov
