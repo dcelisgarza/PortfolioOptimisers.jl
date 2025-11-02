@@ -340,4 +340,16 @@
                                                                 opt = opti),
                                                 opto = MeanRisk(; opt = opto)), rd).w)
     end
+
+    # res = optimise(NestedClustered(; cle = clr,
+    #                                opti = MeanRisk(; r = ConditionalValueatRisk(),
+    #                                                opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+    #                                                                    scard = [1, 1],
+    #                                                                    smtx = [AssetSetsMatrixEstimator(;
+    #                                                                                                     val = "nx_clusters1"),
+    #                                                                            AssetSetsMatrixEstimator(;
+    #                                                                                                     val = "nx_clusters2")],
+    #                                                                    sets = sets)),
+    #                                opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))), rd)
+    # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
 end

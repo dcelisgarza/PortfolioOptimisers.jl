@@ -142,12 +142,11 @@
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],
-                                 "nx_clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
-                                                    2, 3, 3, 3, 3, 3, 3],
-                                 "nx_clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1,
-                                                    2, 3, 1, 2, 3, 1, 2],
-                                 "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
-                                 "c3" => rd.nx[3:3:end]))
+                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+                                                 3, 3, 3, 3, 3, 3],
+                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
+                                                 3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
+                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -1004,6 +1003,8 @@
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise(mre, rd)
         w = res.w
+        @test sum(.!iszero.([sum(w[res.smtx[1][i, :]]) for i in axes(res.smtx[1], 1)])) == 1
+        @test sum(.!iszero.([sum(w[res.smtx[2][i, :]]) for i in axes(res.smtx[2], 1)])) == 1
 
         i = 1
         dict = Dict{Tuple{Int, Int}, Int}()
