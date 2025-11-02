@@ -233,16 +233,14 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 """
 function _denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
                    vecs::AbstractMatrix, num_factors::Integer)
-    _vals = copy(vals)
-    _vals[1:num_factors] .= zero(eltype(X))
-    X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
+    vals[1:num_factors] .= zero(eltype(X))
+    X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
     return nothing
 end
 function _denoise!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
                    vecs::AbstractMatrix, num_factors::Integer)
-    _vals = copy(vals)
-    _vals[1:num_factors] .= sum(_vals[1:num_factors]) / num_factors
-    X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
+    vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
+    X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
     return nothing
 end
 function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
@@ -415,7 +413,7 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
     vals, vecs = eigen(X)
     max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
                             kwargs = de.kwargs)[1]
-    num_factors = findlast(vals .< max_val)
+    num_factors = findlast(vals .<= max_val)
     _denoise!(de.alg, X, vals, vecs, num_factors)
     posdef!(pdm, X)
     if iscov
