@@ -368,14 +368,19 @@ function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::R
                        arr::AbstractVector, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
-        if strict
-            throw(ArgumentError("$(key) is not in $(keys(sdict)).\n$(dict)"))
-        else
-            @warn("$(key) is not in $(keys(sdict)).\n$(dict)")
-        end
+        msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
+        strict ? throw(ArgumentError(msg)) : @warn(msg)
     else
         unique!(assets)
-        arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+        idx = [findfirst(x -> x == asset, nx) for asset in assets]
+        N1 = length(idx)
+        filter!(!isnothing, idx)
+        N2 = length(idx)
+        if N1 != N2
+            msg = "Some assets in group `$(key)` are not in the asset universe.\nAssets in group `$key`: $(assets)\nAssets in universe: $(nx).\n$(dict)"
+            strict ? throw(ArgumentError(msg)) : @warn(msg)
+        end
+        arr[idx] .= val
     end
     return nothing
 end

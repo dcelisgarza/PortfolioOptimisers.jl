@@ -211,12 +211,8 @@ function schur_complement_binary_search(objective::Function, lgamma::Real, hgamm
         end
     end
     msg = "Binary search did not converge within the specified tolerance: tol => $tol"
-    if strict
-        throw(ArgumentError(msg))
-    else
-        @warn(msg)
-        return w, lgamma
-    end
+    strict ? throw(ArgumentError(msg)) : @warn(msg)
+    return w, lgamma
 end
 function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector,
                                   wb::WeightBounds,
