@@ -522,5 +522,3 @@
         end
     end
 end
-
-rr = regression(res[12], rd)
