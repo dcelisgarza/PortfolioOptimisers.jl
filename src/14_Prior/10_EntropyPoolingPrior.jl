@@ -2103,6 +2103,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pweights(range(iT, iT; length = T))
     else
         @argcheck(length(pe.w) == T)
+        pe.w
     end
     fixed = falses(N, 2)
     epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
@@ -2228,7 +2229,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pweights(range(iT, iT; length = T))
     else
         @argcheck(length(pe.w) == T)
-        pweights(pe.w)
+        pe.w
     end
     epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
     # mu and VaR
