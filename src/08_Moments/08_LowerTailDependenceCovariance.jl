@@ -1,5 +1,5 @@
 """
-    struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
         ve::T1
         alpha::T2
         threads::T3
@@ -7,7 +7,7 @@
 
 Lower tail dependence covariance estimator.
 
-`LTDCovariance` implements a robust covariance estimator based on lower tail dependence, which measures the co-movement of asset returns in the lower quantiles (i.e., during joint drawdowns or adverse events). This estimator is particularly useful for capturing dependence structures relevant to risk management and stress scenarios.
+`LowerTailDependenceCovariance` implements a robust covariance estimator based on lower tail dependence, which measures the co-movement of asset returns in the lower quantiles (i.e., during joint drawdowns or adverse events). This estimator is particularly useful for capturing dependence structures relevant to risk management and stress scenarios.
 
 # Fields
 
@@ -17,7 +17,7 @@ Lower tail dependence covariance estimator.
 
 # Constructor
 
-    LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Real = 0.05,
+    LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Real = 0.05,
                   threads::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
@@ -29,8 +29,8 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> LTDCovariance()
-LTDCovariance
+julia> LowerTailDependenceCovariance()
+LowerTailDependenceCovariance
        ve ┼ SimpleVariance
           │          me ┼ SimpleExpectedReturns
           │             │   w ┴ nothing
@@ -47,23 +47,25 @@ LTDCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     alpha::T2
     threads::T3
-    function LTDCovariance(ve::AbstractVarianceEstimator, alpha::Real,
-                           threads::FLoops.Transducers.Executor)
+    function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Real,
+                                           threads::FLoops.Transducers.Executor)
         @argcheck(zero(alpha) < alpha < one(alpha))
         return new{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
     end
 end
-function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                       alpha::Real = 0.05,
-                       threads::FLoops.Transducers.Executor = ThreadedEx())
-    return LTDCovariance(ve, alpha, threads)
+function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                                       alpha::Real = 0.05,
+                                       threads::FLoops.Transducers.Executor = ThreadedEx())
+    return LowerTailDependenceCovariance(ve, alpha, threads)
 end
-function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
+function factory(ce::LowerTailDependenceCovariance,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
+                                         threads = ce.threads)
 end
 """
     lower_tail_dependence(X::AbstractMatrix; alpha::Real = 0.05,
@@ -91,7 +93,7 @@ The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
 
 # Related
 
-  - [`LTDCovariance`](@ref)
+  - [`LowerTailDependenceCovariance`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
 function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
@@ -117,9 +119,9 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
     return rho
 end
 """
-    cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
-Compute the lower tail dependence correlation matrix using a [`LTDCovariance`](@ref) estimator.
+Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
 This method computes the lower tail dependence (LTD) correlation matrix for the input data matrix `X` using the quantile level and parallel execution strategy specified in `ce`. The LTD correlation quantifies the probability that pairs of assets experience joint drawdowns or adverse events, as measured by their co-movement in the lower tail.
 
@@ -140,10 +142,11 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
 # Related
 
-  - [`LTDCovariance`](@ref)
+  - [`LowerTailDependenceCovariance`](@ref)
   - [`lower_tail_dependence`](@ref)
 """
-function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cor(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1,
+                        kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -151,9 +154,9 @@ function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
 """
-    cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
-Compute the lower tail dependence covariance matrix using a [`LTDCovariance`](@ref) estimator.
+Compute the lower tail dependence covariance matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
 This method computes the lower tail dependence (LTD) covariance matrix for the input data matrix `X` using the quantile level and parallel execution strategy specified in `ce`. The LTD covariance focuses on the co-movement of asset returns in the lower tail, making it robust to extreme events and particularly relevant for risk-sensitive applications.
 
@@ -174,10 +177,11 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 
 # Related
 
-  - [`LTDCovariance`](@ref)
+  - [`LowerTailDependenceCovariance`](@ref)
   - [`lower_tail_dependence`](@ref)
 """
-function Statistics.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cov(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1,
+                        kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -186,4 +190,4 @@ function Statistics.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     return lower_tail_dependence(X, ce.alpha, ce.threads) ⊙ (std_vec ⊗ std_vec)
 end
 
-export LTDCovariance
+export LowerTailDependenceCovariance

@@ -3,18 +3,20 @@ function validate_bounds(lb::Real, ub::Real)
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::Real)
-    @argcheck(!isempty(lb) && all(x -> x <= ub, lb))
+    @argcheck(!isempty(lb))
+    @argcheck(all(x -> x <= ub, lb))
     return nothing
 end
 function validate_bounds(lb::Real, ub::AbstractVector)
-    @argcheck(!isempty(ub) && all(x -> lb <= x, ub))
+    @argcheck(!isempty(ub))
+    @argcheck(all(x -> lb <= x, ub))
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::AbstractVector)
-    @argcheck(!isempty(lb) &&
-              !isempty(ub) &&
-              length(lb) == length(ub) &&
-              all(map((x, y) -> x <= y, lb, ub)))
+    @argcheck(!isempty(lb))
+    @argcheck(!isempty(ub))
+    @argcheck(length(lb) == length(ub))
+    @argcheck(all(map((x, y) -> x <= y, lb, ub)))
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ::Any)

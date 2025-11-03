@@ -5,8 +5,8 @@ Distance
 distance(::Distance{Nothing, <:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
 distance(::Distance{Nothing, <:LogDistance},
-                  ce::Union{<:LTDCovariance,
-                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                  ce::Union{<:LowerTailDependenceCovariance,
+                            <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance, <:Any}},
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
 distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
                   dims::Int = 1, kwargs...)

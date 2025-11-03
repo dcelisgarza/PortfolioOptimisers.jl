@@ -265,7 +265,7 @@ function phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator,
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """
-    centrality_vector(necte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
+    centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a centrality estimator and prior result.
 
@@ -273,7 +273,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 
 # Arguments
 
-  - `necte`: Centrality estimator.
+  - `cte`: Centrality estimator.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
 
@@ -287,8 +287,8 @@ Compute the centrality vector for a centrality estimator and prior result.
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(necte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
-    return centrality_vector(necte, pr.X; kwargs...)
+function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
+    return centrality_vector(cte, pr.X; kwargs...)
 end
 """
     centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
@@ -386,6 +386,46 @@ Compute the weighted average centrality for a centrality estimator.
 function average_centrality(cte::CentralityEstimator, w::AbstractVector,
                             pr::AbstractPriorResult; kwargs...)
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
+end
+"""
+    asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult},
+                    w::AbstractVector, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
+
+Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
+
+This function computes the phylogeny matrix from the asset returns in the prior result using the specified phylogeny estimator or clustering result, then evaluates the asset phylogeny score for the given portfolio weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation.
+
+# Arguments
+
+  - `cle`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
+  - `w`: Portfolio weights vector.
+  - `pr`: Prior result object containing asset returns.
+  - `dims`: Dimension along which to compute the phylogeny matrix.
+  - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
+
+# Returns
+
+  - `score::Real`: Asset phylogeny score.
+
+# Details
+
+  - Computes the phylogeny matrix from the asset returns in `pr` using `cle`.
+  - Evaluates the weighted sum of the phylogeny matrix using the weights `w`.
+  - Normalises the score by the sum of absolute weights.
+  - Returns a real-valued score quantifying the phylogenetic structure of the allocation.
+
+# Related
+
+  - [`phylogeny_matrix`](@ref)
+  - [`AbstractPhylogenyEstimator`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`asset_phylogeny`](@ref)
+"""
+function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
+                                    <:AbstractClusteringResult}, w::AbstractVector,
+                         pr::AbstractPriorResult; dims::Int = 1, kwargs...)
+    return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
 end
 """
     struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
@@ -501,7 +541,9 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                            f_mu::Union{Nothing, <:AbstractVector},
                            f_sigma::Union{Nothing, <:AbstractMatrix},
                            f_w::Union{Nothing, <:AbstractVector})
-        @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
+        @argcheck(!isempty(X))
+        @argcheck(!isempty(mu))
+        @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
         if !isnothing(w)
@@ -518,8 +560,11 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
         f_mu_flag = !isnothing(f_mu)
         f_sigma_flag = !isnothing(f_sigma)
         if loadings_flag || f_mu_flag || f_sigma_flag
-            @argcheck(loadings_flag && f_mu_flag && f_sigma_flag)
-            @argcheck(!isempty(f_mu) && !isempty(f_sigma))
+            @argcheck(loadings_flag)
+            @argcheck(f_mu_flag)
+            @argcheck(f_sigma_flag)
+            @argcheck(!isempty(f_mu))
+            @argcheck(!isempty(f_sigma))
             assert_matrix_issquare(f_sigma)
             @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
             @argcheck(size(rr.M, 1) == length(mu))
@@ -657,16 +702,22 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
         L2_flag = isa(L2, AbstractMatrix)
         S2_flag = isa(S2, AbstractMatrix)
         if kt_flag || L2_flag || S2_flag
-            @argcheck(kt_flag && L2_flag && S2_flag)
-            @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
+            @argcheck(kt_flag)
+            @argcheck(L2_flag)
+            @argcheck(S2_flag)
+            @argcheck(!isempty(kt))
+            @argcheck(!isempty(L2))
+            @argcheck(!isempty(S2))
             @argcheck(size(kt) == (N^2, N^2))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
         end
         sk_flag = isa(sk, AbstractMatrix)
         V_flag = isa(V, AbstractMatrix)
         if sk_flag || V_flag
-            @argcheck(sk_flag && V_flag)
-            @argcheck(!isempty(sk) && !isempty(V))
+            @argcheck(sk_flag)
+            @argcheck(V_flag)
+            @argcheck(!isempty(sk))
+            @argcheck(!isempty(V))
             @argcheck(size(V) == (N, N))
             @argcheck(size(sk) == (N, N^2))
         end

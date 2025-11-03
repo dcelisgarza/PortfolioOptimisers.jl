@@ -130,9 +130,9 @@ function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = 
         StatsBase.cov2cor!(X, s)
     end
     vals, vecs = eigen(X)
-    _vals = Diagonal(vals)[(end - n):end, (end - n):end]
-    _vecs = vecs[:, (end - n):end]
-    X .-= _vecs * _vals * transpose(_vecs)
+    vals = Diagonal(vals)[(end - n):end, (end - n):end]
+    vecs = vecs[:, (end - n):end]
+    X .-= vecs * vals * transpose(vecs)
     X .= cov2cor(X)
     posdef!(pdm, X)
     if iscov

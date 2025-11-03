@@ -189,7 +189,9 @@
         w = fill(inv(20), 20)
         wak = Float64[]
         for (i, ce) in enumerate(ces)
-            v1 = centrality_vector(CentralityEstimator(; cent = ce), pr.X).X
+            v1 = centrality_vector(CentralityEstimator(; cent = ce), pr)
+            @test v1 === centrality_vector(v1)
+            v1 = v1.X
             res = isapprox(v1, df1[!, i])
             if !res
                 println("Default centrality iteration: $i")
@@ -197,7 +199,7 @@
             end
             @test res
 
-            c = average_centrality(CentralityEstimator(; cent = ce), w, pr.X)
+            c = average_centrality(CentralityEstimator(; cent = ce), w, pr)
             res = isapprox(c, df2[i, 1])
             if !res
                 println("Average default centrality iteration: $i")
@@ -209,7 +211,9 @@
     @testset "Phylogeny matrix" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix1.csv.gz"), DataFrame)
         for i in 1:8
-            A = phylogeny_matrix(NetworkEstimator(; n = i), pr.X).X
+            A = phylogeny_matrix(NetworkEstimator(; n = i), pr)
+            @test A === phylogeny_matrix(A)
+            A = A.X
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on detault network estimator.")
@@ -221,7 +225,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
             A = phylogeny_matrix(NetworkEstimator(; n = i,
-                                                  alg = MaximumDistanceSimilarity()), pr.X).X
+                                                  alg = MaximumDistanceSimilarity()), pr).X
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on MaximumDistanceSimilarity.")
@@ -231,12 +235,12 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix3.csv.gz"), DataFrame)
-        A = phylogeny_matrix(ClusteringEstimator(), pr.X).X
+        A = phylogeny_matrix(ClusteringEstimator(), pr).X
         @test isapprox(vec(A), df[!, 1])
 
         w = fill(inv(20), 20)
-        @test isapprox(asset_phylogeny(NetworkEstimator(), w, pr.X), 0.09500000000000008)
-        @test isapprox(asset_phylogeny(ClusteringEstimator(), w, pr.X), 0.3350000000000003)
+        @test isapprox(asset_phylogeny(NetworkEstimator(), w, pr), 0.09500000000000008)
+        @test isapprox(asset_phylogeny(ClusteringEstimator(), w, pr), 0.3350000000000003)
 
         A1 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = KruskalTree()),
                                                 pr.X)

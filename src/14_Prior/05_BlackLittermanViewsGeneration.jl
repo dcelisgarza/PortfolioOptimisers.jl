@@ -41,7 +41,8 @@ struct BlackLittermanViews{T1, T2} <: AbstractResult
     P::T1
     Q::T2
     function BlackLittermanViews(P::AbstractMatrix, Q::AbstractVector)
-        @argcheck(!isempty(P) && !isempty(Q))
+        @argcheck(!isempty(P))
+        @argcheck(!isempty(Q))
         @argcheck(size(P, 1) == length(Q))
         return new{typeof(P), typeof(Q)}(P, Q)
     end

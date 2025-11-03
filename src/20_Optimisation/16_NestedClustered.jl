@@ -38,10 +38,13 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
                 isa(opt.opt.lcs, AbstractVector) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
-    @argcheck(!isa(opt.opt.cent, LinearConstraint))
+    @argcheck(!(isa(opt.opt.cent, LinearConstraint) ||
+                isa(opt.opt.cent, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.cent)))
     @argcheck(!isa(opt.opt.gcard, LinearConstraint))
-    @argcheck(!isa(opt.opt.sgcard, LinearConstraint))
-    # @argcheck(!isa(opt.opt.smtx, AbstractMatrix))
+    @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
+                isa(opt.opt.sgcard, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.sgcard)))
     @argcheck(!isa(opt.opt.plg, AbstractPhylogenyConstraintResult) ||
               isa(opt.opt.plg, AbstractVector) &&
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.plg))
@@ -62,6 +65,13 @@ end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    assert_internal_optimiser(opt)
+    return nothing
+end
+function assert_external_optimiser(opt::FactorRiskContribution)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.re, AbstractRegressionResult))
     assert_internal_optimiser(opt)
     return nothing
 end

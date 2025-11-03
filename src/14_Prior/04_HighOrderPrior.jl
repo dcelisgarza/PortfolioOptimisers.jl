@@ -39,14 +39,10 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 """
 function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
     mp, nq = size(A)
-
-    if !(mod(mp, p) == 0 && mod(nq, q) == 0)
-        throw(DimensionMismatch("size(A) = $(size(A)), must be integer multiples of (p, q) = ($p, $q)"))
-    end
-
+    @argcheck(mod(mp, p) == 0)
+    @argcheck(mod(nq, q) == 0)
     m = Int(mp / p)
     n = Int(nq / q)
-
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
     for j in 0:(n - 1)
         Aj = Matrix{eltype(A)}(undef, m, p * q)
@@ -56,7 +52,6 @@ function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
         end
         A_vec[(1 + (j * m)):((j + 1) * m), :] = Aj
     end
-
     return A_vec
 end
 # COV_EXCL_START

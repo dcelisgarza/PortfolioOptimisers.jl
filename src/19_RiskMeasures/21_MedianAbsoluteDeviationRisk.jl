@@ -12,7 +12,8 @@ struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
                                                <:VecScalar, <:MedianCenteringFunction},
                                      flag::Bool = true)
         if isa(mu, AbstractVector)
-            @argcheck(!isempty(mu) && all(isfinite, mu))
+            @argcheck(!isempty(mu))
+            @argcheck(all(isfinite, mu))
         elseif isa(mu, Real)
             @argcheck(isfinite(mu))
         end

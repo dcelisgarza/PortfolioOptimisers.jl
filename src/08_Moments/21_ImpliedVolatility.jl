@@ -27,7 +27,8 @@ struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     function ImpliedVolatility(ce::AbstractCovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, af::Real)
-        @argcheck(isfinite(af) && af > zero(af))
+        @argcheck(isfinite(af))
+        @argcheck(af > zero(af))
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end

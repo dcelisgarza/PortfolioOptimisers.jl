@@ -346,15 +346,75 @@
                                   "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
+    T = size(rd.X, 1)
+    iT = inv(T)
+    w = pweights(range(iT, iT; length = T))
     @testset "ExpEntropyPooling" begin
         pr0 = prior(EmpiricalPrior(), rd)
         jopt = JuMPEntropyPooling(; slv = slv)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
-        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views), rd)
+        pr = prior(EntropyPoolingPrior(; w = w, sets = sets, mu_views = mu_views), rd)
         @test isapprox(pr.mu[1], 0.002)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC())),
+                                       sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = DimensionReductionRegression(;
+                                                                                          retgt = GeneralisedLinearModel())),
+                                       sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = DimensionReductionRegression(;
+                                                                                                    retgt = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
+        pr = prior(EntropyPoolingPrior(; w = pweights(range(iT, iT; length = T)),
+                                       alg = H0_EntropyPooling(),
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC())),
+                                       sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+
+        pr = prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                                       pe = FactorPrior(;
+                                                        re = DimensionReductionRegression(;
+                                                                                          retgt = GeneralisedLinearModel())),
+                                       sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                                                 pe = FactorPrior(;
+                                                                  re = DimensionReductionRegression(;
+                                                                                                    retgt = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
                                                  mu_views = mu_views), rd).w, rtol = 5e-6)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL >= 0.0025")
@@ -614,11 +674,69 @@
         jopt = JuMPEntropyPooling(; alg = LogEntropyPooling(), slv = slv)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
-        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views, opt = opt), rd)
+        pr = prior(EntropyPoolingPrior(; w = pweights(range(iT, iT; length = T)),
+                                       sets = sets, mu_views = mu_views, opt = opt), rd)
         @test isapprox(pr.mu[1], 0.002)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  mu_views = mu_views), rd).w, rtol = 1e-5)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC())),
+                                       sets = sets, opt = opt, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-5)
+
+        pr = prior(EntropyPoolingPrior(;
+                                       pe = FactorPrior(;
+                                                        re = DimensionReductionRegression(;
+                                                                                          retgt = GeneralisedLinearModel())),
+                                       sets = sets, opt = opt, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(;
+                                                 pe = FactorPrior(;
+                                                                  re = DimensionReductionRegression(;
+                                                                                                    retgt = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-5)
+
+        pr = prior(EntropyPoolingPrior(; w = pweights(range(iT, iT; length = T)),
+                                       alg = H0_EntropyPooling(),
+                                       pe = FactorPrior(;
+                                                        re = StepwiseRegression(;
+                                                                                crit = BIC())),
+                                       sets = sets, opt = opt, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                                                 pe = FactorPrior(;
+                                                                  re = StepwiseRegression(;
+                                                                                          crit = BIC())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-5)
+
+        pr = prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                                       pe = FactorPrior(;
+                                                        re = DimensionReductionRegression(;
+                                                                                          retgt = GeneralisedLinearModel())),
+                                       sets = sets, opt = opt, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(; alg = H0_EntropyPooling(),
+                                                 pe = FactorPrior(;
+                                                                  re = DimensionReductionRegression(;
+                                                                                                    retgt = GeneralisedLinearModel())),
+                                                 sets = sets, opt = jopt,
+                                                 mu_views = mu_views), rd).w, rtol = 5e-5)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL >= 0.0025")
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views, opt = opt), rd)

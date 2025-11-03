@@ -42,8 +42,8 @@ struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
     function PartialLinearConstraint(A::AbstractMatrix, B::AbstractVector)
-        @argcheck(!isempty(A) && !isempty(B),
-                  DimensionMismatch("`A` and `B` must be non-empty:\nisempty(A) => $(isempty(A))\nisempty(B) => $(isempty(B))"))
+        @argcheck(!isempty(A))
+        @argcheck(!isempty(B))
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
@@ -74,7 +74,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `isnothing(ineq) ⊼ isnothing(eq)`, i.e. they cannot both be `nothing` at the same time.
+  - `!(isnothing(ineq) && isnothing(eq))`, i.e. they cannot both be `nothing` at the same time.
 
 # Examples
 
@@ -103,7 +103,7 @@ struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     eq::T2
     function LinearConstraint(ineq::Union{Nothing, <:PartialLinearConstraint},
                               eq::Union{Nothing, <:PartialLinearConstraint})
-        @argcheck(isnothing(ineq) ⊼ isnothing(eq),
+        @argcheck(!(isnothing(ineq) && isnothing(eq)),
                   AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
         return new{typeof(ineq), typeof(eq)}(ineq, eq)
     end
@@ -237,8 +237,6 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
 end
-Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
-
 """
     struct AssetSets{T1, T2} <: AbstractEstimator
         key::T1
@@ -264,7 +262,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`.
+  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`. This means their lengths will be congruent when used in the `opti` field of [`NestedClustered`](@ref).
   - `!isempty(dict)`.
   - `haskey(dict, key)`.
 
@@ -287,8 +285,8 @@ struct AssetSets{T1, T2} <: AbstractEstimator
     key::T1
     dict::T2
     function AssetSets(key::AbstractString, dict::AbstractDict{<:AbstractString, <:Any})
-        @argcheck(!isempty(dict) && haskey(dict, key),
-                  AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key = $key``, haskey(dict, key) = $(haskey(dict, key))"))
+        @argcheck(!isempty(dict))
+        @argcheck(haskey(dict, key))
         for k in keys(dict)
             if k == key
                 continue
@@ -370,14 +368,19 @@ function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::R
                        arr::AbstractVector, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
-        if strict
-            throw(ArgumentError("$(key) is not in $(keys(sdict)).\n$(dict)"))
-        else
-            @warn("$(key) is not in $(keys(sdict)).\n$(dict)")
-        end
+        msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
+        strict ? throw(ArgumentError(msg)) : @warn(msg)
     else
         unique!(assets)
-        arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+        idx = [findfirst(x -> x == asset, nx) for asset in assets]
+        N1 = length(idx)
+        filter!(!isnothing, idx)
+        N2 = length(idx)
+        if N1 != N2
+            msg = "Some assets in group `$(key)` are not in the asset universe.\nAssets in group `$key`: $(assets)\nAssets in universe: $(nx).\n$(dict)"
+            strict ? throw(ArgumentError(msg)) : @warn(msg)
+        end
+        arr[idx] .= val
     end
     return nothing
 end
@@ -709,9 +712,8 @@ function _rethrow_parse_error(::Nothing, side = :lhs)
     return nothing
 end
 function _rethrow_parse_error(expr::Expr, side = :lhs)
-    if expr.head == :incomplete
-        throw(Meta.ParseError("$side is an incomplete expression.\n$expr"))
-    end
+    @argcheck(expr.head != :incomplete,
+              Meta.ParseError("$side is an incomplete expression.\n$expr"))
     return nothing
 end
 """
@@ -858,19 +860,16 @@ ParsingResult
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)
-    if occursin("++", eqn)
-        throw(Meta.ParseError("Invalid operator '++' detected in equation."))
-    end
+    @argcheck(!occursin("++", eqn),
+              Meta.ParseError("Invalid operator '++' detected in equation."))
     # 1. Identify the comparison operator
     op = findfirst(op -> occursin(op, eqn), ops1)
-    if isnothing(op)
-        error("Equation must contain a valid comparison operator $(join(ops1,", ")) .\n$(eqn)")
-    end
+    @argcheck(!isnothing(op),
+              Meta.ParseError("Equation must contain a valid comparison operator $(join(ops1,", ")) .\n$(eqn)"))
     opstr = ops1[op]
     parts = split(eqn, opstr)
-    if length(parts) != 2
-        error("Equation must have exactly one comparison operator.\n$(eqn)")
-    end
+    @argcheck(length(parts) == 2,
+              Meta.ParseError("Equation must have exactly one comparison operator.\n$(eqn)"))
     lhs, rhs = strip.(parts)
     # 2. Parse both sides into Julia expressions
     lexpr = Meta.parse(lhs)
@@ -879,12 +878,30 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     _rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
+function _has_invalid_plus(expr)
+    if !(isa(expr, Expr) && expr.head == :call)
+        return false
+    end
+    # Check for nested :+ calls (e.g., :(+(+(a, b), c))) or more than two arguments
+    if expr.args[1] == :++
+        # If any argument is itself a :+ call, that's suspicious (from "++")
+        return true
+    end
+    # Recurse into sub-expressions
+    return any(_has_invalid_plus(arg) for arg in expr.args[2:end] if isa(arg, Expr))
+end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)
-    # 1. Identify the comparison operator in the expression
-    if expr.head != :call || !(expr.args[1] in ops2[2:end])
-        error("Expression must be a valid comparison $(join(ops2,", ")) .\n$expr")
-    end
+    # Recursively check for invalid "++" pattern in the expression tree
+    @argcheck(!_has_invalid_plus(expr),
+              Meta.ParseError("Invalid operator pattern '++' detected in equation expression:\n$expr"))
+    # Ensure the expression is a call to a valid comparison operator
+    @argcheck(expr.head == :call,
+              Meta.ParseError("Expression must be a function call (comparison operator expected):\n$expr"))
+    # Count how many valid operators are present
+    op_count = count(op -> expr.args[1] == op, ops2[2:end])
+    @argcheck(op_count == 1,
+              Meta.ParseError("Expression must contain a valid comparison operator $(join(ops2[2:end], ", ")) .\n$expr"))
     opstr = string(expr.args[1])
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
@@ -897,7 +914,7 @@ function parse_equation(eqn::AbstractVector{<:Union{<:AbstractString, Expr}};
 end
 """
     replace_group_by_assets(res::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
-                            sets::AssetSets; bl_flag::Bool = false, prior_flag::Bool = false,
+                            sets::AssetSets; bl_flag::Bool = false, ep_flag::Bool = false,
                             rho_flag::Bool = false)
 
 If `res` is a vector of [`ParsingResult`](@ref) objects, this function will be applied to each element of the vector.
@@ -911,19 +928,19 @@ This function takes a [`ParsingResult`](@ref) containing variable names (which m
   - `res`: A [`ParsingResult`](@ref) object containing variables and coefficients to be expanded.
   - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
   - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
-  - `prior_flag`: If `true`, enables expansion of `prior(...)` expressions for entropy pooling.
+  - `ep_flag`: If `true`, enables expansion of `prior(...)` expressions for entropy pooling.
   - `rho_flag`: If `true`, enables expansion of correlation views `(A, B)` for entropy pooling.
 
 # Validation
 
-    - `bl_flag` can only be `true` if both `prior_flag` and `rho_flag` are `false`.
-    - `rho_flag` can only be `true` if `prior_flag` is also `true`.
+    - `bl_flag` can only be `true` if both `ep_flag` and `rho_flag` are `false`.
+    - `rho_flag` can only be `true` if `ep_flag` is also `true`.
 
 # Details
 
   - Group names in `res.vars` are replaced by the corresponding asset names from `sets.dict`.
   - If `bl_flag` is `true`, coefficients for group references are divided equally among the assets in the group.
-  - If `prior_flag` is `true`, expands `prior(asset)` or `prior(group)` expressions for entropy pooling.
+  - If `ep_flag` is `true`, expands `prior(asset)` or `prior(group)` expressions for entropy pooling.
   - If `rho_flag` is `true`, expands correlation view expressions `(A, B)` or `prior(A, B)` for entropy pooling, mapping them to asset pairs.
   - If a variable or group is not found in `sets.dict`, it is skipped.
 
@@ -960,13 +977,11 @@ ParsingResult
   - [`parse_equation`](@ref)
 """
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
-                                 prior_flag::Bool = false, rho_flag::Bool = false)
-    if bl_flag && (rho_flag || prior_flag)
-        throw(ArgumentError("`bl_flag` can only be used if `prior_flag` and `rho_flag` are false."))
-    end
-    if rho_flag && !prior_flag
-        throw(ArgumentError("`rho_flag` can only be used if `prior_flag` is also true."))
-    end
+                                 ep_flag::Bool = false, rho_flag::Bool = false)
+    @argcheck(!(bl_flag && (rho_flag || ep_flag)),
+              ArgumentError("`bl_flag` ($bl_flag) can only be used if `ep_flag` ($ep_flag) and `rho_flag` ($rho_flag) are false."))
+    @argcheck(!(rho_flag && !ep_flag),
+              ArgumentError("`rho_flag` ($rho_flag) can only be used if `ep_flag` ($ep_flag) is also true."))
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -989,12 +1004,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
-                if !(prior_flag && rho_flag)
-                    throw(ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
-                end
-                if isnothing(n)
-                    throw(ArgumentError("Correlation views can only be of the form `(a, b)`."))
-                end
+                @argcheck(ep_flag && rho_flag,
+                          ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
+                @argcheck(!isnothing(n),
+                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1002,18 +1015,16 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @argcheck(!isnothing(asset1) &&
-                          !isnothing(asset2) &&
-                          length(asset1) == length(asset2),
-                          AssertionError("The following conditions must be met:\n`asset1` must not be `nothing` => !isnothing(asset1) = $(!isnothing(asset1))\n`asset2` must not be `nothing` => !isnothing(asset2) = $(!isnothing(asset2))\nlength(asset1) == length(asset2) => $(length(asset1)) == $(length(asset2))"))
+                @argcheck(!isnothing(asset1))
+                @argcheck(!isnothing(asset2))
+                @argcheck(length(asset1) == length(asset2))
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
                 push!(idx_rm, i)
             end
         else
-            if !prior_flag
-                throw(ArgumentError("`prior(a)` can only be used in entropy pooling."))
-            end
+            @argcheck(ep_flag,
+                      ArgumentError("`prior(a)` can only be used in entropy pooling."))
             n = match(corr_pattern, v)
             if isnothing(n) && !rho_flag
                 asset = get(sets.dict, v[7:(end - 1)], nothing)
@@ -1025,12 +1036,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
-                if !rho_flag
-                    throw(ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
-                end
-                if isnothing(n)
-                    throw(ArgumentError("Correlation views can only be of the form `(a, b)`."))
-                end
+                @argcheck(rho_flag,
+                          ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
+                @argcheck(!isnothing(n),
+                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1038,10 +1047,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @argcheck(!isnothing(asset1) &&
-                          !isnothing(asset2) &&
-                          length(asset1) == length(asset2),
-                          AssertionError("The following conditions must be met:\n`asset1` must not be `nothing` => !isnothing(asset1) = $(!isnothing(asset1))\n`asset2` must not be `nothing` => !isnothing(asset2) = $(!isnothing(asset2))\nlength(asset1) == length(asset2) => $(length(asset1)) == $(length(asset2))"))
+                @argcheck(!isnothing(asset1))
+                @argcheck(!isnothing(asset2))
+                @argcheck(length(asset1) == length(asset2))
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
@@ -1383,8 +1391,8 @@ RiskBudgetResult
 struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
     function RiskBudgetResult(val::AbstractVector{<:Real})
-        @argcheck(!isempty(val) && all(x -> x >= zero(x), val),
-                  AssertionError("`val` must be non-empty and all its entries must be non-negative:\n!isempty(val) => $(!isempty(val))\nall(x -> x >= zero(x), val) => $(all(x -> x >= zero(x), val))"))
+        @argcheck(!isempty(val))
+        @argcheck(all(x -> x >= zero(x), val))
         return new{typeof(val)}(val)
     end
 end
@@ -1608,7 +1616,7 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
 end
 function risk_budget_constraints(rb::AbstractVector{<:RiskBudgetEstimator}, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
-    return [risk_budget_constraints(_rb, sets; strict = strict) for _rb in rb]
+    return [risk_budget_constraints(rbi, sets; strict = strict) for rbi in rb]
 end
 """
     struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
@@ -1777,7 +1785,7 @@ Provides a uniform interface for processing multiple constraint estimators simul
 function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                                                         <:AssetSetsMatrixEstimator}},
                            sets::AssetSets)
-    return [asset_sets_matrix(_smtx, sets) for _smtx in smtx]
+    return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
 """
@@ -1791,7 +1799,7 @@ end
 function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                                                              <:AssetSetsMatrixEstimator}},
                                 i::AbstractVector; kwargs...)
-    return [asset_sets_matrix_view(_smtx, i; kwargs...) for _smtx in smtx]
+    return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
 end
 
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,

@@ -164,14 +164,13 @@ struct Turnover{T1, T2} <: AbstractResult
                       val::Union{<:Real, <:AbstractVector{<:Real}})
         @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
         if isa(val, AbstractVector)
-            @argcheck(!isempty(val) &&
-                      length(val) == length(w) &&
-                      any(isfinite, val) &&
-                      all(x -> x >= zero(x), val),
-                      AssertionError("The following conditions must hold:\n`val` must be non-empty => $(!isempty(val))\n`val` must have the same length as `w` => $(length(val) == length(w))\n`val` must be non-negative and finite => $(all(x -> isfinite(x) && x >= zero(x), val))"))
+            @argcheck(!isempty(val))
+            @argcheck(length(val) == length(w))
+            @argcheck(any(isfinite, val))
+            @argcheck(all(x -> x >= zero(x), val))
         else
-            @argcheck(isfinite(val) && val >= zero(eltype(val)),
-                      DomainError("`val` must be non-negative and finite:\nval => $val"))
+            @argcheck(isfinite(val))
+            @argcheck(val >= zero(eltype(val)))
         end
         return new{typeof(w), typeof(val)}(w, val)
     end
@@ -232,7 +231,7 @@ function turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
                                         <:AbstractVector{<:Union{<:TurnoverEstimator,
                                                                  <:Turnover}}},
                               sets::AssetSets; strict::Bool = false)
-    return [turnover_constraints(_tn, sets; strict = strict) for _tn in tn]
+    return [turnover_constraints(tni, sets; strict = strict) for tni in tn]
 end
 function turnover_view(::Nothing, ::Any)
     return nothing
@@ -247,7 +246,7 @@ function turnover_view(tn::Turnover, i::AbstractVector)
     return Turnover(; w = w, val = val)
 end
 function turnover_view(tn::AbstractVector{<:Turnover}, i::AbstractVector)
-    return [turnover_view(_tn, i) for _tn in tn]
+    return [turnover_view(tni, i) for tni in tn]
 end
 function factory(tn::Turnover, w::AbstractVector)
     return Turnover(; w = w, val = tn.val)

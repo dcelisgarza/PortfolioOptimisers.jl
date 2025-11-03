@@ -326,7 +326,8 @@ struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     lb::T1
     ub::T2
     function BoxUncertaintySet(lb::AbstractArray, ub::AbstractArray)
-        @argcheck(!isempty(lb) && !isempty(ub))
+        @argcheck(!isempty(lb))
+        @argcheck(!isempty(ub))
         @argcheck(size(lb) == size(ub))
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end

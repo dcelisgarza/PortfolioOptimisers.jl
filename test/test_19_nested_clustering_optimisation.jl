@@ -144,12 +144,14 @@
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],
-                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
-                                                 3, 3, 3, 3, 3, 3],
-                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
-                                                 3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
-                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
+                                 "nx_clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
+                                                    2, 3, 3, 3, 3, 3, 3],
+                                 "nx_clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1,
+                                                    2, 3, 1, 2, 3, 1, 2],
+                                 "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
+                                 "c3" => rd.nx[3:3:end]))
     pr = prior(HighOrderPriorEstimator(), rd)
+    rr = regression(DimensionReductionRegression(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
@@ -251,7 +253,11 @@
                                                               opt = hopti),
                                 opto = HierarchicalRiskParity(;
                                                               r = MedianAbsoluteDeviation(),
-                                                              opt = hopto))]
+                                                              opt = hopto)),
+                NestedClustered(; cle = clr,
+                                opti = FactorRiskContribution(; re = rr, opt = jopti),
+                                opto = FactorRiskContribution(; opt = jopto))]
+
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
@@ -333,5 +339,67 @@
                                                                 r = ConditionalDrawdownatRisk(),
                                                                 opt = opti),
                                                 opto = MeanRisk(; opt = opto)), rd).w)
+    end
+    @testset "Advanced use" begin
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = ConditionalValueatRisk(),
+                                                       opt = JuMPOptimiser(; pe = pr,
+                                                                           slv = mip_slv,
+                                                                           scard = [2, 1],
+                                                                           smtx = [AssetSetsMatrixEstimator(;
+                                                                                                            val = "nx_clusters1"),
+                                                                                   AssetSetsMatrixEstimator(;
+                                                                                                            val = "nx_clusters2")],
+                                                                           sets = sets)),
+                                       opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
+                       rd)
+
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[1][i, :]] for i in axes(res.resi[1].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[2][i, :]] for i in axes(res.resi[1].smtx[2], 1)])) < 2
+
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]] for i in axes(res.resi[2].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]] for i in axes(res.resi[2].smtx[2], 1)])) < 2
+
+        @test sum(.!iszero.([res.resi[3].w[res.resi[3].smtx[1][i, :]] for i in axes(res.resi[3].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[3].w[res.resi[3].smtx[2][i, :]] for i in axes(res.resi[3].smtx[2], 1)])) < 2
+
+        opt = NestedClustered(; cle = clr,
+                              opti = MeanRisk(; r = ConditionalValueatRisk(),
+                                              opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                                                                  lt = BuyInThresholdEstimator(;
+                                                                                               val = ["WMT" => 0.2,
+                                                                                                      "group2" => 0.48]),
+                                                                  sets = sets)),
+                              opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
+        res = optimise(opt, rd)
+        clusters = cutree(clr.clustering; k = clr.k)
+
+        group2 = sets.dict["group2"]
+        for i in 1:(clr.k)
+            nx = rd.nx[findall(x -> x == i, clusters)]
+            idx = findfirst(x -> x == "WMT", nx)
+            if !isnothing(idx)
+                @test isapprox(res.resi[i].w[idx], 0.2; rtol = 1e-6)
+            end
+            idx = [findfirst(x -> x == i, nx) for i in group2]
+            filter!(!isnothing, idx)
+            if !isempty(idx)
+                for w in res.resi[i].w[idx]
+                    if abs(w) > sqrt(eps(w))
+                        @test w > 0.48 - sqrt(eps(w))
+                    end
+                end
+            end
+        end
+
+        opt = NestedClustered(; cle = clr,
+                              opti = MeanRisk(; r = ConditionalValueatRisk(),
+                                              opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                                                                  lt = threshold_constraints(BuyInThresholdEstimator(;
+                                                                                                                     val = ["WMT" => 0.2,
+                                                                                                                            "group2" => 0.48]),
+                                                                                             sets))),
+                              opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
+        @test isapprox(res.w, optimise(opt, rd).w)
     end
 end

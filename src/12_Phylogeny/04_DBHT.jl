@@ -142,8 +142,8 @@ struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
     function GeneralExponentialSimilarity(coef::Real, power::Real)
-        @argcheck(coef >= zero(coef) && power >= zero(power),
-                  AssertionError("The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power"))
+        @argcheck(coef >= zero(coef))
+        @argcheck(power >= zero(power))
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
@@ -283,8 +283,8 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 """
 function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     N = size(W, 1)
-    @argcheck(N >= 9 && all(x -> x >= zero(x), W),
-              AssertionError("The following conditions must hold:\nN >= 9 => N = $N\nAll entries in `W` must be non-negative"))
+    @argcheck(N >= 9)
+    @argcheck(all(x -> x >= zero(x), W))
     A = spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
@@ -1585,8 +1585,9 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
                branchorder::Symbol = :optimal, root::DBHTRootMethod = UniqueRoot())
-    @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D),
-              DimensionMismatch("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))"))
+    @argcheck(!isempty(S))
+    @argcheck(!isempty(D))
+    @argcheck(size(S) == size(D))
     Rpm = PMFG_T2s(S)[1]
     Apm = copy(Rpm)
     Apm[Apm .!= 0] = D[Apm .!= 0]
@@ -1768,8 +1769,10 @@ struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     k::T4
     function DBHTClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
                             D::AbstractMatrix, k::Integer)
-        @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
-                  AssertionError("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k"))
+        @argcheck(!isempty(S))
+        @argcheck(!isempty(D))
+        @argcheck(size(S) == size(D))
+        @argcheck(k >= one(k))
         return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
     end
 end

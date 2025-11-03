@@ -78,7 +78,7 @@ end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in (:oe, :pa, :frc_plg, :retcode, :sol, :model, :fb)
+    elseif sym in (:oe, :pa, :rr, :frc_plg, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else
         getfield(r.pa, sym)
@@ -94,13 +94,14 @@ function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
     end
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)
-    @argcheck(isfinite(val) && val > zero(val))
+    @argcheck(isfinite(val))
+    @argcheck(val > zero(val))
     return nothing
 end
 function assert_finite_nonnegative_real_or_vec(val::AbstractVector{<:Real})
-    @argcheck(any(isfinite, val) &&
-              any(x -> x > zero(x), val) &&
-              all(x -> x >= zero(x), val))
+    @argcheck(any(isfinite, val))
+    @argcheck(any(x -> x > zero(x), val))
+    @argcheck(all(x -> x >= zero(x), val))
     return nothing
 end
 #=
@@ -247,22 +248,26 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isnothing(sbgt))
         end
         if isa(sbgt, Real)
-            @argcheck(isfinite(sbgt) && sbgt >= 0)
+            @argcheck(isfinite(sbgt))
+            @argcheck(sbgt >= 0)
         end
         if isa(cent, AbstractVector)
             @argcheck(!isempty(cent))
         end
         if !isnothing(card)
-            @argcheck(isfinite(card) && card > 0)
+            @argcheck(isfinite(card))
+            @argcheck(card > 0)
         end
         if isa(scard, Integer)
-            @argcheck(isfinite(scard) && scard > 0)
+            @argcheck(isfinite(scard))
+            @argcheck(scard > 0)
             @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
             @argcheck(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
             @argcheck(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
         elseif isa(scard, AbstractVector)
             @argcheck(!isempty(scard))
-            @argcheck(all(isfinite, scard) && all(x -> x > 0, scard))
+            @argcheck(all(isfinite, scard))
+            @argcheck(all(x -> x > 0, scard))
             @argcheck(isa(smtx, AbstractVector))
             @argcheck(length(scard) == length(smtx))
             if isa(slt, AbstractVector)

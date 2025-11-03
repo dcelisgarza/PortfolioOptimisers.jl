@@ -628,7 +628,8 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
                                       <:VecScalar}, alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
-            @argcheck(!isempty(mu) && all(isfinite, mu))
+            @argcheck(!isempty(mu))
+            @argcheck(all(isfinite, mu))
         elseif isa(mu, Real)
             @argcheck(isfinite(mu))
         end
@@ -781,7 +782,8 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
                              mu::Union{Nothing, <:Real, <:AbstractVector{<:Real},
                                        <:VecScalar}, alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, AbstractVector)
-            @argcheck(!isempty(mu) && all(isfinite, mu))
+            @argcheck(!isempty(mu))
+            @argcheck(all(isfinite, mu))
         elseif isa(mu, Real)
             @argcheck(isfinite(mu))
         end
