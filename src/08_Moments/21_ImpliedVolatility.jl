@@ -27,7 +27,8 @@ struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     function ImpliedVolatility(ce::AbstractCovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, af::Real)
-        @argcheck(isfinite(af) && af > zero(af))
+        @argcheck(isfinite(af))
+        @argcheck(af > zero(af))
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
@@ -74,10 +75,10 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
                                X::AbstractMatrix, ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
-    @argcheck(chunk > 2)
+    @check(chunk > 2)
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
-    @argcheck(size(rv) == size(iv))
+    @check(size(rv) == size(iv))
     T2 = size(iv, 1)
     rv = log.(rv)
     iv = log.(iv)

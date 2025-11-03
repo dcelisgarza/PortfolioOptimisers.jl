@@ -396,8 +396,9 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     alpha::T2
     epsilon::T3
     function Pagerank(n::Integer, alpha::Real, epsilon::Real)
-        @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
-                  DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
+        @argcheck(n > 0)
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(epsilon > zero(epsilon))
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end
 end

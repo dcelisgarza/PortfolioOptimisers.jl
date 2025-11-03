@@ -13,8 +13,8 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
         sk_flag = isnothing(sk)
         V_flag = isnothing(V)
         if sk_flag || V_flag
-            @argcheck(sk_flag && V_flag,
-                      "If either sk or V, is nothing, both must be nothing.")
+            @argcheck(sk_flag)
+            @argcheck(V_flag)
         else
             @argcheck(!isempty(sk))
             @argcheck(!isempty(V))

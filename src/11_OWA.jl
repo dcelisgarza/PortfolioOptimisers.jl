@@ -187,14 +187,10 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
                   DomainError(max_phi,
                               range_msg("`max_phi`", zero(max_phi), one(max_phi), max_phi,
                                         false, false) * "."))
-        @argcheck(isfinite(sc) && sc > zero(sc),
-                  AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`sc`"),
-                                                              comp_msg("`sc`", "0", :gt,
-                                                                       sc)]))))
-        @argcheck(isfinite(so) && so > zero(so),
-                  AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`so`"),
-                                                              comp_msg("`so`", "0", :gt,
-                                                                       so)]))))
+        @argcheck(isfinite(sc))
+        @argcheck(sc > zero(sc))
+        @argcheck(isfinite(so))
+        @argcheck(so > zero(so))
         return new{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
                                                                                       max_phi,
                                                                                       sc,
@@ -547,8 +543,8 @@ This function approximates the tail Gini risk measure by integrating over a rang
   - [`owa_wcvar`](@ref)
 """
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
-    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
-              AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
+    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha))
+    @argcheck(a_sim > zero(a_sim))
     alphas = range(alpha_i, alpha; length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)

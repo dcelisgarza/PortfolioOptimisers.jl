@@ -5,7 +5,8 @@ struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     alg::T4
     function RiskTrackingError(tracking::WeightsTracking, r::AbstractBaseRiskMeasure,
                                err::Real, alg::VariableTracking)
-        @argcheck(isfinite(err) && err >= zero(err))
+        @argcheck(isfinite(err))
+        @argcheck(err >= zero(err))
         r = no_bounds_no_risk_expr_risk_measure(r)
         return new{typeof(tracking), typeof(r), typeof(err), typeof(alg)}(tracking, r, err,
                                                                           alg)

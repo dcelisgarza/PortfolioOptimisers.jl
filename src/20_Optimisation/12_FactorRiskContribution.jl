@@ -28,8 +28,6 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
         if isa(wi, AbstractVector)
             @argcheck(!isempty(wi))
         end
-        # @argcheck(!isa(opt.plg,
-        #                Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
         return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(plg),
                    typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj, plg,
                                                                        sets, wi, flag, fb)

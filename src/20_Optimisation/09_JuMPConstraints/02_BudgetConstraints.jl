@@ -10,7 +10,7 @@ struct BudgetRange{T1, T2} <: BudgetEstimator
     function BudgetRange(lb::Union{Nothing, <:Real}, ub::Union{Nothing, <:Real})
         lb_flag = isnothing(lb)
         ub_flag = isnothing(ub)
-        @argcheck(lb_flag ⊼ ub_flag)
+        @argcheck(!(lb_flag && ub_flag))
         if !lb_flag
             @argcheck(isfinite(lb))
         end
@@ -46,22 +46,26 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
                          un::Union{<:Real, <:AbstractVector{<:Real}})
         @argcheck(!isempty(w))
         if isa(vp, AbstractVector)
-            @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
+            @argcheck(!isempty(vp))
+            @argcheck(all(x -> x >= zero(x), vp))
         else
             @argcheck(vp >= zero(vp))
         end
         if isa(vn, AbstractVector)
-            @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
+            @argcheck(!isempty(vn))
+            @argcheck(all(x -> x >= zero(x), vn))
         else
             @argcheck(vn >= zero(vn))
         end
         if isa(up, AbstractVector)
-            @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
+            @argcheck(!isempty(up))
+            @argcheck(all(x -> x >= zero(x), up))
         else
             @argcheck(up >= zero(up))
         end
         if isa(un, AbstractVector)
-            @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
+            @argcheck(!isempty(un))
+            @argcheck(all(x -> x >= zero(x), un))
         else
             @argcheck(un >= zero(un))
         end
@@ -104,22 +108,26 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
                                 un::Union{<:Real, <:AbstractVector{<:Real}}, beta::Real)
         @argcheck(!isempty(w))
         if isa(vp, AbstractVector)
-            @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
+            @argcheck(!isempty(vp))
+            @argcheck(all(x -> x >= zero(x), vp))
         else
             @argcheck(vp >= zero(vp))
         end
         if isa(vn, AbstractVector)
-            @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
+            @argcheck(!isempty(vn))
+            @argcheck(all(x -> x >= zero(x), vn))
         else
             @argcheck(vn >= zero(vn))
         end
         if isa(up, AbstractVector)
-            @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
+            @argcheck(!isempty(up))
+            @argcheck(all(x -> x >= zero(x), up))
         else
             @argcheck(up >= zero(up))
         end
         if isa(un, AbstractVector)
-            @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
+            @argcheck(!isempty(un))
+            @argcheck(all(x -> x >= zero(x), un))
         else
             @argcheck(un >= zero(un))
         end

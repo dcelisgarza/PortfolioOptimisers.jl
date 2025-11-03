@@ -136,7 +136,8 @@ struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     flag::T3
     function Frontier(N::Integer, factor::Real, flag::Bool)
         @argcheck(N > zero(N))
-        @argcheck(isfinite(factor) && factor > zero(factor))
+        @argcheck(isfinite(factor))
+        @argcheck(factor > zero(factor))
         return new{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
     end
 end

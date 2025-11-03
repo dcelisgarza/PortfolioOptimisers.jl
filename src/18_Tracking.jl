@@ -463,8 +463,8 @@ struct TrackingError{T1, T2, T3} <: AbstractTracking
     alg::T3
     function TrackingError(tracking::AbstractTrackingAlgorithm, err::Real,
                            alg::NormTracking)
-        @argcheck(isfinite(err) && err >= zero(err),
-                  DomainError("`err` must be finite and non-negative:\nerr => $err"))
+        @argcheck(isfinite(err))
+        @argcheck(err >= zero(err))
         return new{typeof(tracking), typeof(err), typeof(alg)}(tracking, err, alg)
     end
 end

@@ -104,7 +104,8 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
         mu_flag = isa(mu, AbstractVector)
         kt_flag = isa(kt, AbstractMatrix)
         if mu_flag
-            @argcheck(!isempty(mu) && all(isfinite, mu))
+            @argcheck(!isempty(mu))
+            @argcheck(all(isfinite, mu))
         elseif isa(mu, Real)
             @argcheck(isfinite(mu))
         end

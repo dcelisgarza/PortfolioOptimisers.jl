@@ -541,7 +541,9 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                            f_mu::Union{Nothing, <:AbstractVector},
                            f_sigma::Union{Nothing, <:AbstractMatrix},
                            f_w::Union{Nothing, <:AbstractVector})
-        @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
+        @argcheck(!isempty(X))
+        @argcheck(!isempty(mu))
+        @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
         if !isnothing(w)
@@ -558,8 +560,11 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
         f_mu_flag = !isnothing(f_mu)
         f_sigma_flag = !isnothing(f_sigma)
         if loadings_flag || f_mu_flag || f_sigma_flag
-            @argcheck(loadings_flag && f_mu_flag && f_sigma_flag)
-            @argcheck(!isempty(f_mu) && !isempty(f_sigma))
+            @argcheck(loadings_flag)
+            @argcheck(f_mu_flag)
+            @argcheck(f_sigma_flag)
+            @argcheck(!isempty(f_mu))
+            @argcheck(!isempty(f_sigma))
             assert_matrix_issquare(f_sigma)
             @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
             @argcheck(size(rr.M, 1) == length(mu))
@@ -697,16 +702,22 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
         L2_flag = isa(L2, AbstractMatrix)
         S2_flag = isa(S2, AbstractMatrix)
         if kt_flag || L2_flag || S2_flag
-            @argcheck(kt_flag && L2_flag && S2_flag)
-            @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
+            @argcheck(kt_flag)
+            @argcheck(L2_flag)
+            @argcheck(S2_flag)
+            @argcheck(!isempty(kt))
+            @argcheck(!isempty(L2))
+            @argcheck(!isempty(S2))
             @argcheck(size(kt) == (N^2, N^2))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
         end
         sk_flag = isa(sk, AbstractMatrix)
         V_flag = isa(V, AbstractMatrix)
         if sk_flag || V_flag
-            @argcheck(sk_flag && V_flag)
-            @argcheck(!isempty(sk) && !isempty(V))
+            @argcheck(sk_flag)
+            @argcheck(V_flag)
+            @argcheck(!isempty(sk))
+            @argcheck(!isempty(V))
             @argcheck(size(V) == (N, N))
             @argcheck(size(sk) == (N, N^2))
         end

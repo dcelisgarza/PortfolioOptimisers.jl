@@ -249,7 +249,8 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
             @argcheck(p > zero(p))
         end
         if isa(w, AbstractVector)
-            @argcheck(!isempty(w) && length(w) == length(pes))
+            @argcheck(!isempty(w))
+            @argcheck(length(w) == length(pes))
             @argcheck(all(x -> zero(x) <= x <= one(x), w),
                       DomainError(w,
                                   range_msg("all entries of `w`", zero(w), one(w), nothing,

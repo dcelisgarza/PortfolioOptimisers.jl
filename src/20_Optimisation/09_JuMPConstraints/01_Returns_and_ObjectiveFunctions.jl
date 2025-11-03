@@ -13,7 +13,8 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
         if isa(lb, Real)
             @argcheck(isfinite(lb))
         elseif isa(lb, AbstractVector)
-            @argcheck(!isempty(lb) && all(isfinite, lb))
+            @argcheck(!isempty(lb))
+            @argcheck(all(isfinite, lb))
         end
         return new{typeof(ucs), typeof(lb)}(ucs, lb)
     end
@@ -44,7 +45,8 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
         if isa(lb, Real)
             @argcheck(isfinite(lb))
         elseif isa(lb, AbstractVector)
-            @argcheck(!isempty(lb) && all(isfinite, lb))
+            @argcheck(!isempty(lb))
+            @argcheck(all(isfinite, lb))
         end
         return new{typeof(w), typeof(lb)}(w, lb)
     end

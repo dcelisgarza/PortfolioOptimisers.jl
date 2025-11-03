@@ -39,8 +39,8 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 """
 function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
     mp, nq = size(A)
-    @argcheck(mod(mp, p) == 0 && mod(nq, q) == 0,
-              DimensionMismatch("size(A) = $(size(A)), must be integer multiples of (p, q) = ($p, $q)"))
+    @argcheck(mod(mp, p) == 0)
+    @argcheck(mod(nq, q) == 0)
     m = Int(mp / p)
     n = Int(nq / q)
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
