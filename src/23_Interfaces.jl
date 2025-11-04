@@ -17,7 +17,7 @@
                          factor_risk_contribution = ("factor risk contribution" => a::Arguments -> factor_risk_contribution(a.args...;
                                                                                                                             rd = a.rd,
                                                                                                                             a.kwargs...) isa
-                                                                                                   AbstractVector),
+                                                                                                   NumVec),
                          optimise = ("optimise" => a::Arguments -> optimise(a.opt, a.rd;
                                                                             a.kwargs...) isa
                                                                    OptimisationResult),

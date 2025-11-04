@@ -85,9 +85,9 @@ function Base.show(io::IO,
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
             print(io, "| nothing",'\n')
-        elseif isa(val, AbstractMatrix)
+        elseif isa(val, NumMatrix)
             print(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))",'\n')
-        elseif isa(val, AbstractVector) && length(val) > 6
+        elseif isa(val, NumVec) && length(val) > 6
             print(io, "| $(length(val))-element $(typeof(val))",'\n')
         elseif isa(val,
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
@@ -157,9 +157,9 @@ function Base.show(io::IO,
                 sym2 = '│'
                 print(io, lpad("$sym2 ", padding + 3), l, '\n')
             end
-        elseif isa(val, AbstractMatrix)
+        elseif isa(val, NumMatrix)
             print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
-        elseif isa(val, AbstractVector) && length(val) > 6
+        elseif isa(val, NumVec) && length(val) > 6
             print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
         elseif isa(val, DataType)
             tval = typeof(val)
@@ -303,5 +303,11 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError())
 end
+const NumVec = AbstractVector{<:Number}
+const IntVec = AbstractVector{<:Integer}
+const NumMat = AbstractMatrix{<:Number}
+const EstValType = Union{<:Pair{<:AbstractString, <:Number},
+                         <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
+                         <:AbstractDict{<:AbstractString, <:Number}}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError

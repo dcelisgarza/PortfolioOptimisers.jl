@@ -7,7 +7,7 @@ end
 function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return MaximumDrawdown(settings)
 end
-function (::MaximumDrawdown)(x::AbstractVector)
+function (::MaximumDrawdown)(x::NumVec)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
@@ -34,7 +34,7 @@ function RelativeMaximumDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
     return RelativeMaximumDrawdown(settings)
 end
-function (::RelativeMaximumDrawdown)(x::AbstractVector)
+function (::RelativeMaximumDrawdown)(x::NumVec)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))

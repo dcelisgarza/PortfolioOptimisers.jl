@@ -4,7 +4,7 @@ end
 function set_l2_regularisation!(args...)
     return nothing
 end
-function set_l1_regularisation!(model::JuMP.Model, l1_val::Real)
+function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
     w = model[:w]
     sc = model[:sc]
     @variable(model, t_l1)
@@ -13,7 +13,7 @@ function set_l1_regularisation!(model::JuMP.Model, l1_val::Real)
     add_to_objective_penalty!(model, l1)
     return nothing
 end
-function set_l2_regularisation!(model::JuMP.Model, l2_val::Real)
+function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
     w = model[:w]
     sc = model[:sc]
     @variable(model, t_l2)

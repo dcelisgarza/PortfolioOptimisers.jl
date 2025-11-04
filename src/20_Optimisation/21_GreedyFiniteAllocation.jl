@@ -16,20 +16,20 @@ struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     args::T2
     kwargs::T3
     fb::T4
-    function GreedyAllocation(unit::Real, args::Tuple, kwargs::NamedTuple,
+    function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
                               fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = nothing)
         return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,
                                                                            kwargs, fb)
     end
 end
-function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;),
+function GreedyAllocation(; unit::Number = 1, args::Tuple = (), kwargs::NamedTuple = (;),
                           fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = nothing)
     return GreedyAllocation(unit, args, kwargs, fb)
 end
-function roundmult(val::Real, prec::Real, args...; kwargs...)
+function roundmult(val::Number, prec::Number, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)
 end
-function finite_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
+function finite_sub_allocation!(w::NumVec, p::NumVec, cash::Number, bgt::Number,
                                 ga::GreedyAllocation, args...)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
@@ -94,8 +94,8 @@ function finite_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
-function _optimise(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
-                   cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+function _optimise(ga::GreedyAllocation, w::NumVec, p::NumVec, cash::Number = 1e6,
+                   T::Union{Nothing, <:Number} = nothing,
                    fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     @argcheck(!isempty(w))
     @argcheck(!isempty(p))
@@ -121,8 +121,8 @@ function _optimise(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
                                         view(res, :, 3), OptimisationSuccess(nothing),
                                         lcash, nothing)
 end
-function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::AbstractVector,
-                  p::AbstractVector, cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::NumVec, p::NumVec,
+                  cash::Number = 1e6, T::Union{Nothing, <:Number} = nothing,
                   fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return _optimise(ga, w, p, cash, T, fees; kwargs...)
 end

@@ -10,7 +10,7 @@ function AssetRiskBudgeting(;
                             rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing)
     return AssetRiskBudgeting(rkb)
 end
-function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i::AbstractVector)
+function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i::NumVec)
     return AssetRiskBudgeting(; rkb = risk_budget_view(r.rkb, i))
 end
 struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
@@ -29,7 +29,7 @@ function FactorRiskBudgeting(;
                              flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, flag)
 end
-function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i::AbstractVector)
+function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i::NumVec)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, flag = r.flag)
 end
@@ -41,13 +41,12 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     fb::T5
     function RiskBudgeting(opt::JuMPOptimiser,
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                           rba::RiskBudgetingAlgorithm,
-                           wi::Union{Nothing, <:AbstractVector{<:Real}},
+                           rba::RiskBudgetingAlgorithm, wi::Union{Nothing, <:NumVec},
                            fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, AbstractVector)
+        if isa(r, NumVec)
             @argcheck(!isempty(r))
         end
-        if isa(wi, AbstractVector)
+        if isa(wi, NumVec)
             @argcheck(!isempty(wi))
         end
         if isa(rba.rkb, RiskBudgetEstimator)
@@ -60,11 +59,11 @@ end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                        r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                       wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                       wi::Union{Nothing, <:NumVec} = nothing,
                        fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
-function opt_view(rb::RiskBudgeting, i::AbstractVector, X::AbstractMatrix)
+function opt_view(rb::RiskBudgeting, i::NumVec, X::NumMat)
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)

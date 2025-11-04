@@ -60,7 +60,7 @@ function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return KendallCovariance(ve)
 end
 """
-    cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(::KendallCovariance, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the Kendall's tau rank correlation matrix using a [`KendallCovariance`](@ref) estimator.
 
@@ -75,7 +75,7 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
 
 # Validation
 
@@ -86,7 +86,7 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
   - [`KendallCovariance`](@ref)
   - [`corkendall`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corkendall)
 """
-function Statistics.cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cor(::KendallCovariance, X::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -94,7 +94,7 @@ function Statistics.cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, k
     return corkendall(X)
 end
 """
-    cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::KendallCovariance, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the Kendall's tau rank covariance matrix using a [`KendallCovariance`](@ref) estimator.
 
@@ -109,7 +109,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of Kendall's tau rank covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of Kendall's tau rank covariances.
 
 # Validation
 
@@ -120,7 +120,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
   - [`KendallCovariance`](@ref)
   - [`corkendall`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corkendall)
 """
-function Statistics.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cov(ce::KendallCovariance, X::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -176,7 +176,7 @@ function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return SpearmanCovariance(ve)
 end
 """
-    cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(::SpearmanCovariance, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the Spearman's rho rank correlation matrix using a [`SpearmanCovariance`](@ref) estimator.
 
@@ -191,7 +191,7 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
 
 # Validation
 
@@ -202,7 +202,7 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
   - [`SpearmanCovariance`](@ref)
   - [`corspearman`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corspearman)
 """
-function Statistics.cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cor(::SpearmanCovariance, X::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -210,7 +210,7 @@ function Statistics.cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, 
     return corspearman(X)
 end
 """
-    cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::SpearmanCovariance, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the Spearman's rho rank covariance matrix using a [`SpearmanCovariance`](@ref) estimator.
 
@@ -225,7 +225,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of Spearman's rho rank covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of Spearman's rho rank covariances.
 
 # Validation
 
@@ -236,7 +236,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
   - [`SpearmanCovariance`](@ref)
   - [`corspearman`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corspearman)
 """
-function Statistics.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cov(ce::SpearmanCovariance, X::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

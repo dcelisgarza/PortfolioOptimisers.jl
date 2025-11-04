@@ -28,7 +28,7 @@ function InverseVolatility(;
                            fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return InverseVolatility(pe, fb)
 end
-function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
+function opt_view(opt::InverseVolatility, i::NumVec, args...)
     pe = prior_view(opt.pe, i)
     return InverseVolatility(; pe = pe, fb = opt.fb)
 end

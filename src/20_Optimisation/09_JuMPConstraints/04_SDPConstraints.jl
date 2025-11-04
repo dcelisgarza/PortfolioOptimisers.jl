@@ -29,7 +29,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model,
                                                     <:AbstractPhylogenyConstraintResult,
                                                     <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
-         isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
+         isa(plgs, NumVec) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
     sc = model[:sc]
@@ -55,7 +55,7 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
                                                         <:AbstractPhylogenyConstraintResult,
                                                         <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
-         isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
+         isa(plgs, NumVec) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
     sc = model[:sc]

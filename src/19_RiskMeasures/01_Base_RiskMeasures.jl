@@ -107,7 +107,7 @@ Creates a `Frontier` with the specified number of points, scaling factor, and fl
 
 Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
 
-    PortfolioOptimisers._Frontier(; N::Integer = 20, factor::Real, flag::Bool)
+    PortfolioOptimisers._Frontier(; N::Integer = 20, factor::Number, flag::Bool)
 
 Keyword arguments correspond to the fields above.
 
@@ -134,7 +134,7 @@ struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     N::T1
     factor::T2
     flag::T3
-    function Frontier(N::Integer, factor::Real, flag::Bool)
+    function Frontier(N::Integer, factor::Number, flag::Bool)
         @argcheck(N > zero(N))
         @argcheck(isfinite(factor))
         @argcheck(factor > zero(factor))
@@ -144,7 +144,7 @@ end
 function Frontier(; N::Integer = 20)
     return Frontier(N, 1, true)
 end
-function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
+function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
     return Frontier(N, factor, flag)
 end
 """
@@ -165,8 +165,8 @@ Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures 
 
 # Constructors
 
-    RiskMeasureSettings(; scale::Real = 1.0,
-                        ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing,
+    RiskMeasureSettings(; scale::Number = 1.0,
+                        ub::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing,
                         rke::Bool = true)
 
 Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, and risk evaluation flag.
@@ -197,16 +197,16 @@ struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
-    function RiskMeasureSettings(scale::Real,
-                                 ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier},
+    function RiskMeasureSettings(scale::Number,
+                                 ub::Union{Nothing, <:Number, <:NumVec, <:Frontier},
                                  rke::Bool)
         assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end
 end
-function RiskMeasureSettings(; scale::Real = 1.0,
-                             ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing,
+function RiskMeasureSettings(; scale::Number = 1.0,
+                             ub::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing,
                              rke::Bool = true)
     return RiskMeasureSettings(scale, ub, rke)
 end
@@ -249,12 +249,12 @@ HierarchicalRiskMeasureSettings
 """
 struct HierarchicalRiskMeasureSettings{T1} <: AbstractRiskMeasureSettings
     scale::T1
-    function HierarchicalRiskMeasureSettings(scale::Real)
+    function HierarchicalRiskMeasureSettings(scale::Number)
         @argcheck(isfinite(scale))
         return new{typeof(scale)}(scale)
     end
 end
-function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
+function HierarchicalRiskMeasureSettings(; scale::Number = 1.0)
     return HierarchicalRiskMeasureSettings(scale)
 end
 function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
@@ -266,8 +266,8 @@ end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
-function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::AbstractVector,
-                           X::AbstractMatrix)
+function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::NumVec,
+                           X::NumMat)
     return [risk_measure_view(r, i, X) for r in rs]
 end
 """
@@ -373,7 +373,7 @@ Where:
 
 # Constructors
 
-    LogSumExpScalariser(; gamma::Real = 1.0)
+    LogSumExpScalariser(; gamma::Number = 1.0)
 
 Keyword arguments correspond to the fields above.
 
@@ -399,20 +399,20 @@ LogSumExpScalariser
 """
 struct LogSumExpScalariser{T1} <: Scalariser
     gamma::T1
-    function LogSumExpScalariser(gamma::Real)
+    function LogSumExpScalariser(gamma::Number)
         @argcheck(gamma > zero(gamma))
         return new{typeof(gamma)}(gamma)
     end
 end
-function LogSumExpScalariser(; gamma::Real = 1.0)
+function LogSumExpScalariser(; gamma::Number = 1.0)
     return LogSumExpScalariser(gamma)
 end
 """
     nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray, <:VecScalar},
+    nothing_scalar_array_factory(risk_variable::Union{<:Number, <:AbstractArray, <:VecScalar},
                                  ::Any)
     nothing_scalar_array_factory(risk_variable::Nothing,
-                                 prior_variable::Union{<:Real, <:AbstractArray, <:VecScalar})
+                                 prior_variable::Union{<:Number, <:AbstractArray, <:VecScalar})
 
 Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
@@ -430,35 +430,35 @@ Utility to select a non-nothing value when provided by a risk measure, or fall b
 function nothing_scalar_array_factory(::Nothing, ::Nothing)
     return nothing
 end
-function nothing_scalar_array_factory(risk_variable::Union{<:Real, <:AbstractArray,
+function nothing_scalar_array_factory(risk_variable::Union{<:Number, <:AbstractArray,
                                                            <:VecScalar}, ::Any)
     return risk_variable
 end
 function nothing_scalar_array_factory(::Nothing,
-                                      prior_variable::Union{<:Real, <:AbstractArray,
+                                      prior_variable::Union{<:Number, <:AbstractArray,
                                                             <:VecScalar})
     return prior_variable
 end
-function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::AbstractVector)
+function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::NumVec)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
-function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Real,
+function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Number,
                                                                      <:AbstractArray},
-                                                ::Any, i::AbstractVector)
+                                                ::Any, i::NumVec)
     return nothing_scalar_array_view(risk_variable, i)
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::AbstractArray,
-                                                i::AbstractVector)
+                                                i::NumVec)
     return nothing_scalar_array_view(prior_variable, i)
 end
-function risk_measure_nothing_scalar_array_view(risk_variable::Union{Nothing, <:Real},
-                                                ::AbstractVector)
+function risk_measure_nothing_scalar_array_view(risk_variable::Union{Nothing, <:Number},
+                                                ::NumVec)
     return risk_variable
 end
-function solver_factory(risk_solvers::Union{<:Solver, <:AbstractVector{<:Solver}}, ::Any)
+function solver_factory(risk_solvers::Union{<:Solver, <:SlvVec}, ::Any)
     return risk_solvers
 end
-function solver_factory(::Nothing, slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+function solver_factory(::Nothing, slv::Union{<:Solver, <:SlvVec})
     return slv
 end
 function solver_factory(::Nothing, ::Nothing)

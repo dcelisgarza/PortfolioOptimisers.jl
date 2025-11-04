@@ -326,7 +326,7 @@ function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
 end
 """
     average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
-                       cent::AbstractCentralityAlgorithm, w::AbstractVector,
+                       cent::AbstractCentralityAlgorithm, w::NumVec,
                        pr::AbstractPriorResult; kwargs...)
 
 Compute the weighted average centrality for a network or phylogeny result.
@@ -343,7 +343,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 
 # Returns
 
-  - `ac::Real`: Weighted average centrality.
+  - `ac::Number`: Weighted average centrality.
 
 # Related
 
@@ -354,12 +354,12 @@ Compute the weighted average centrality for a network or phylogeny result.
 """
 function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
                                       <:AbstractPhylogenyResult},
-                            cent::AbstractCentralityAlgorithm, w::AbstractVector,
+                            cent::AbstractCentralityAlgorithm, w::NumVec,
                             pr::AbstractPriorResult; kwargs...)
     return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
 """
-    average_centrality(cte::CentralityEstimator, w::AbstractVector, pr::AbstractPriorResult;
+    average_centrality(cte::CentralityEstimator, w::NumVec, pr::AbstractPriorResult;
                        kwargs...)
 
 Compute the weighted average centrality for a centrality estimator.
@@ -375,7 +375,7 @@ Compute the weighted average centrality for a centrality estimator.
 
 # Returns
 
-  - `ac::Real`: Weighted average centrality.
+  - `ac::Number`: Weighted average centrality.
 
 # Related
 
@@ -383,13 +383,13 @@ Compute the weighted average centrality for a centrality estimator.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(cte::CentralityEstimator, w::AbstractVector,
-                            pr::AbstractPriorResult; kwargs...)
+function average_centrality(cte::CentralityEstimator, w::NumVec, pr::AbstractPriorResult;
+                            kwargs...)
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
 end
 """
     asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult},
-                    w::AbstractVector, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
+                    w::NumVec, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
 
@@ -405,7 +405,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 
 # Returns
 
-  - `score::Real`: Asset phylogeny score.
+  - `score::Number`: Asset phylogeny score.
 
 # Details
 
@@ -423,7 +423,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`asset_phylogeny`](@ref)
 """
 function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
-                                    <:AbstractClusteringResult}, w::AbstractVector,
+                                    <:AbstractClusteringResult}, w::NumVec,
                          pr::AbstractPriorResult; dims::Int = 1, kwargs...)
     return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
 end
@@ -465,16 +465,16 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                  chol::Union{Nothing, <:AbstractMatrix} = nothing,
+    LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
+                  chol::Union{Nothing, <:NumMat} = nothing,
                   w::Union{Nothing, <:AbstractWeights} = nothing,
-                  ens::Union{Nothing, <:Real} = nothing,
-                  kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                  ow::Union{Nothing, <:AbstractVector} = nothing,
+                  ens::Union{Nothing, <:Number} = nothing,
+                  kld::Union{Nothing, <:Number, <:NumVec} = nothing,
+                  ow::Union{Nothing, <:NumVec} = nothing,
                   rr::Union{Nothing, <:Regression} = nothing,
-                  f_mu::Union{Nothing, <:AbstractVector} = nothing,
-                  f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                  f_w::Union{Nothing, <:AbstractVector} = nothing)
+                  f_mu::Union{Nothing, <:NumVec} = nothing,
+                  f_sigma::Union{Nothing, <:NumMat} = nothing,
+                  f_w::Union{Nothing, <:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -484,7 +484,7 @@ Keyword arguments correspond to the fields above.
   - `size(sigma, 1) == size(sigma, 2)`.
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
   - If `w` is provided, `!isempty(w)` and `length(w) == size(X, 1)`.
-  - If `kld` is an `AbstractVector`, `!isempty(kld)`.
+  - If `kld` is an `NumVec`, `!isempty(kld)`.
   - If `ow` is provided, `!isempty(ow)`.
   - If any of `rr`, `f_mu`, or `f_sigma` are provided, all must be provided and non-empty, `size(rr.M, 2) == length(f_mu) == size(f_sigma, 1)`, and `size(rr.M, 1) == length(mu)`.
   - If `f_sigma` is provided, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
@@ -531,16 +531,14 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_mu::T10
     f_sigma::T11
     f_w::T12
-    function LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                           chol::Union{Nothing, <:AbstractMatrix},
+    function LowOrderPrior(X::NumMat, mu::NumVec, sigma::NumMat,
+                           chol::Union{Nothing, <:NumMat},
                            w::Union{Nothing, <:AbstractWeights},
-                           ens::Union{Nothing, <:Real},
-                           kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                           ow::Union{Nothing, <:AbstractVector},
-                           rr::Union{Nothing, <:Regression},
-                           f_mu::Union{Nothing, <:AbstractVector},
-                           f_sigma::Union{Nothing, <:AbstractMatrix},
-                           f_w::Union{Nothing, <:AbstractVector})
+                           ens::Union{Nothing, <:Number},
+                           kld::Union{Nothing, <:Number, <:NumVec},
+                           ow::Union{Nothing, <:NumVec}, rr::Union{Nothing, <:Regression},
+                           f_mu::Union{Nothing, <:NumVec},
+                           f_sigma::Union{Nothing, <:NumMat}, f_w::Union{Nothing, <:NumVec})
         @argcheck(!isempty(X))
         @argcheck(!isempty(mu))
         @argcheck(!isempty(sigma))
@@ -550,7 +548,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
             @argcheck(!isempty(w))
             @argcheck(length(w) == size(X, 1))
         end
-        if isa(kld, AbstractVector)
+        if isa(kld, NumVec)
             @argcheck(!isempty(kld))
         end
         if !isnothing(ow)
@@ -583,19 +581,19 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                                                  f_mu, f_sigma, f_w)
     end
 end
-function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                       chol::Union{Nothing, <:AbstractMatrix} = nothing,
+function LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
+                       chol::Union{Nothing, <:NumMat} = nothing,
                        w::Union{Nothing, <:AbstractWeights} = nothing,
-                       ens::Union{Nothing, <:Real} = nothing,
-                       kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       ow::Union{Nothing, <:AbstractVector} = nothing,
+                       ens::Union{Nothing, <:Number} = nothing,
+                       kld::Union{Nothing, <:Number, <:NumVec} = nothing,
+                       ow::Union{Nothing, <:NumVec} = nothing,
                        rr::Union{Nothing, <:Regression} = nothing,
-                       f_mu::Union{Nothing, <:AbstractVector} = nothing,
-                       f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                       f_w::Union{Nothing, <:AbstractVector} = nothing)
+                       f_mu::Union{Nothing, <:NumVec} = nothing,
+                       f_sigma::Union{Nothing, <:NumMat} = nothing,
+                       f_w::Union{Nothing, <:NumVec} = nothing)
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
-function prior_view(pr::LowOrderPrior, i::AbstractVector)
+function prior_view(pr::LowOrderPrior, i::NumVec)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
@@ -629,11 +627,11 @@ Container type for high order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix} = nothing,
-                   L2::Union{Nothing, <:AbstractMatrix} = nothing,
-                   S2::Union{Nothing, <:AbstractMatrix} = nothing,
-                   sk::Union{Nothing, <:AbstractMatrix} = nothing,
-                   V::Union{Nothing, <:AbstractMatrix} = nothing,
+    HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:NumMat} = nothing,
+                   L2::Union{Nothing, <:NumMat} = nothing,
+                   S2::Union{Nothing, <:NumMat} = nothing,
+                   sk::Union{Nothing, <:NumMat} = nothing,
+                   V::Union{Nothing, <:NumMat} = nothing,
                    skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
@@ -691,16 +689,14 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     sk::T5
     V::T6
     skmp::T7
-    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
-                            L2::Union{Nothing, <:AbstractMatrix},
-                            S2::Union{Nothing, <:AbstractMatrix},
-                            sk::Union{Nothing, <:AbstractMatrix},
-                            V::Union{Nothing, <:AbstractMatrix},
+    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:NumMat},
+                            L2::Union{Nothing, <:NumMat}, S2::Union{Nothing, <:NumMat},
+                            sk::Union{Nothing, <:NumMat}, V::Union{Nothing, <:NumMat},
                             skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
         N = length(pr.mu)
-        kt_flag = isa(kt, AbstractMatrix)
-        L2_flag = isa(L2, AbstractMatrix)
-        S2_flag = isa(S2, AbstractMatrix)
+        kt_flag = isa(kt, NumMat)
+        L2_flag = isa(L2, NumMat)
+        S2_flag = isa(S2, NumMat)
         if kt_flag || L2_flag || S2_flag
             @argcheck(kt_flag)
             @argcheck(L2_flag)
@@ -711,8 +707,8 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
             @argcheck(size(kt) == (N^2, N^2))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
         end
-        sk_flag = isa(sk, AbstractMatrix)
-        V_flag = isa(V, AbstractMatrix)
+        sk_flag = isa(sk, NumMat)
+        V_flag = isa(V, NumMat)
         if sk_flag || V_flag
             @argcheck(sk_flag)
             @argcheck(V_flag)
@@ -725,12 +721,11 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
                    typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
     end
 end
-function HighOrderPrior(; pr::AbstractPriorResult,
-                        kt::Union{Nothing, <:AbstractMatrix} = nothing,
-                        L2::Union{Nothing, <:AbstractMatrix} = nothing,
-                        S2::Union{Nothing, <:AbstractMatrix} = nothing,
-                        sk::Union{Nothing, <:AbstractMatrix} = nothing,
-                        V::Union{Nothing, <:AbstractMatrix} = nothing,
+function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:NumMat} = nothing,
+                        L2::Union{Nothing, <:NumMat} = nothing,
+                        S2::Union{Nothing, <:NumMat} = nothing,
+                        sk::Union{Nothing, <:NumMat} = nothing,
+                        V::Union{Nothing, <:NumMat} = nothing,
                         skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end

@@ -3,12 +3,12 @@ struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedPenalisedRelaxedRiskBudgeting{T1} <: RelaxedRiskBudgetingAlgorithm
     p::T1
-    function RegularisedPenalisedRelaxedRiskBudgeting(p::Real)
+    function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
         @argcheck(isfinite(p) && p > zero(p))
         return new{typeof(p)}(p)
     end
 end
-function RegularisedPenalisedRelaxedRiskBudgeting(; p::Real = 1.0)
+function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
 struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
@@ -18,10 +18,10 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     alg::T4
     fb::T5
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
-                                  wi::Union{Nothing, <:AbstractVector{<:Real}},
+                                  wi::Union{Nothing, <:NumVec},
                                   alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(wi, AbstractVector)
+        if isa(wi, NumVec)
             @argcheck(!isempty(wi))
         end
         if isa(rba.rkb, RiskBudgetEstimator)
@@ -34,12 +34,12 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                              wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              wi::Union{Nothing, <:NumVec} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
-function opt_view(rrb::RelaxedRiskBudgeting, i::AbstractVector, X::AbstractMatrix)
+function opt_view(rrb::RelaxedRiskBudgeting, i::NumVec, X::NumMat)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rba = risk_budgeting_algorithm_view(rrb.rba, i)
@@ -49,7 +49,7 @@ end
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model,
                                                      w::AbstractVector{<:AbstractJuMPScalar},
-                                                     sigma::AbstractMatrix)
+                                                     sigma::NumMat)
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
@@ -59,7 +59,7 @@ end
 function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model,
                                                      w::AbstractVector{<:AbstractJuMPScalar},
-                                                     sigma::AbstractMatrix)
+                                                     sigma::NumMat)
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
@@ -77,7 +77,7 @@ end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model,
                                                      w::AbstractVector{<:AbstractJuMPScalar},
-                                                     sigma::AbstractMatrix)
+                                                     sigma::NumMat)
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
@@ -99,7 +99,7 @@ end
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   rrb::RelaxedRiskBudgeting,
                                                   w::AbstractVector{<:AbstractJuMPScalar},
-                                                  sigma::AbstractMatrix)
+                                                  sigma::NumMat)
     N = length(w)
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val

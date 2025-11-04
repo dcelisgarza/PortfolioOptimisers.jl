@@ -19,7 +19,7 @@ Container type for equilibrium expected returns estimators.
 
     EquilibriumExpectedReturns(;
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               w::Union{Nothing, <:AbstractVector} = nothing, l::Real = 1)
+                               w::Union{Nothing, <:NumVec} = nothing, l::Number = 1)
 
 Keyword arguments correspond to the fields above.
 
@@ -61,15 +61,14 @@ struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEs
     w::T2
     l::T3
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
-                                        w::Union{Nothing, <:AbstractVector}, l::Real)
+                                        w::Union{Nothing, <:NumVec}, l::Number)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
     end
 end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                    w::Union{Nothing, <:AbstractVector} = nothing,
-                                    l::Real = 1)
+                                    w::Union{Nothing, <:NumVec} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
 function factory(ce::EquilibriumExpectedReturns,
@@ -77,7 +76,7 @@ function factory(ce::EquilibriumExpectedReturns,
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """
-    mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    mean(me::EquilibriumExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
@@ -98,7 +97,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
   - [`EquilibriumExpectedReturns`](@ref)
 """
-function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1,
+function Statistics.mean(me::EquilibriumExpectedReturns, X::NumMat; dims::Int = 1,
                          kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))

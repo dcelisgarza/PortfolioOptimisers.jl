@@ -81,7 +81,7 @@ function assert_internal_optimiser(opt::Stacking)
     end
     return nothing
 end
-function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
+function opt_view(st::Stacking, i::NumVec, X::NumMat)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = prior_view(st.pe, i)
     wb = weight_bounds_view(st.wb, i)
@@ -103,7 +103,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         res = optimise(opt, rd; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
-        @argcheck(!isa(res.retcode, AbstractVector))
+        @argcheck(!isa(res.retcode, NumVec))
         wi[:, i] = res.w
         resi[i] = res
     end

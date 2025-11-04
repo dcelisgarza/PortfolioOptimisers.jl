@@ -335,12 +335,10 @@ end
 function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
     return BoxUncertaintySet(lb, ub)
 end
-function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractVector, <:AbstractVector},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::BoxUncertaintySet{<:NumVec, <:NumVec}, i::NumVec)
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
 end
-function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractMatrix, <:AbstractMatrix},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::BoxUncertaintySet{<:NumMat, <:NumMat}, i::NumVec)
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 """
@@ -415,10 +413,10 @@ Algorithm for computing the scaling parameter `k` for ellipse uncertainty sets u
 """
 struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
-    k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix, sigma_X::AbstractMatrix)
-    k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
-    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
-    k_ucs(type::Real, args...)
+    k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::NumMat, sigma_X::NumMat)
+    k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::AbstractArray, args...)
+    k_ucs(type::Number, args...)
 
 Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio optimisation.
 
@@ -429,11 +427,11 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
   - `X`: Data matrix (returns).
   - `sigma_X`: Covariance matrix.
   - `args...`: Additional arguments.
-  - `type`: Real value for direct scaling.
+  - `type`: Number value for direct scaling.
 
 # Returns
 
-  - `k::Real`: Scaling parameter.
+  - `k::Number`: Scaling parameter.
 
 # Details
 
@@ -442,7 +440,7 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
       + Normal: `1 - q`'th quantile of the Mahalanobis distances.
       + General: formula `sqrt((1 - q) / q)`.
       + Chi-squared: `1 - q`'th quantile of the chi-squared distribution.
-      + Real: returns the provided value directly.
+      + Number: returns the provided value directly.
 
   - Supports multiple dispatch for extensibility.
 
@@ -453,18 +451,17 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`EllipseUncertaintySetAlgorithm`](@ref)
 """
-function k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix,
-               sigma_X::AbstractMatrix)
+function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::NumMat, sigma_X::NumMat)
     k_mus = diag(X * (sigma_X \ transpose(X)))
     return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
-function k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
+function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
+function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::AbstractArray, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
-function k_ucs(type::Real, args...)
+function k_ucs(type::Number, args...)
     return type
 end
 """
@@ -484,7 +481,7 @@ Ellipse uncertainty sets model uncertainty by specifying an ellipsoidal region f
 # Constructor
 
     EllipseUncertaintySetAlgorithm(;
-                                   method::Union{<:AbstractUncertaintyKAlgorithm, <:Real} = ChiSqKUncertaintyAlgorithm(),
+                                   method::Union{<:AbstractUncertaintyKAlgorithm, <:Number} = ChiSqKUncertaintyAlgorithm(),
                                    diagonal::Bool = true)
 
   - `method`: Sets the scaling algorithm or value for the ellipse.
@@ -510,13 +507,13 @@ struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
     function EllipseUncertaintySetAlgorithm(method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                          <:Real}, diagonal::Bool)
+                                                          <:Number}, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
     end
 end
 function EllipseUncertaintySetAlgorithm(;
                                         method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                      <:Real} = ChiSqKUncertaintyAlgorithm(),
+                                                      <:Number} = ChiSqKUncertaintyAlgorithm(),
                                         diagonal::Bool = true)
     return EllipseUncertaintySetAlgorithm(method, diagonal)
 end
@@ -577,7 +574,7 @@ Stores a covariance matrix, a scaling parameter, and a class identifier for the 
 
 # Constructor
 
-    EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
+    EllipseUncertaintySet(; sigma::NumMat, k::Number,
                           class::AbstractEllipseUncertaintySetResultClass)
 
 Keyword arguments correspond to the fields above.
@@ -609,7 +606,7 @@ struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
-    function EllipseUncertaintySet(sigma::AbstractMatrix, k::Real,
+    function EllipseUncertaintySet(sigma::NumMat, k::Number,
                                    class::AbstractEllipseUncertaintySetResultClass)
         @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma, :sigma)
@@ -617,20 +614,18 @@ struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
         return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
     end
 end
-function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
+function EllipseUncertaintySet(; sigma::NumMat, k::Number,
                                class::AbstractEllipseUncertaintySetResultClass)
     return EllipseUncertaintySet(sigma, k, class)
 end
-function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,
-                                                  <:SigmaEllipseUncertaintySet},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::EllipseUncertaintySet{<:NumMat, <:Any,
+                                                  <:SigmaEllipseUncertaintySet}, i::NumVec)
     i = fourth_moment_index_factory(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
     return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                  class = risk_ucs.class)
 end
-function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,
-                                                  <:MuEllipseUncertaintySet},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::EllipseUncertaintySet{<:NumMat, <:Any,
+                                                  <:MuEllipseUncertaintySet}, i::NumVec)
     return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                  class = risk_ucs.class)
 end

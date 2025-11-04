@@ -26,7 +26,7 @@ function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)
     if isa(opt.r, Variance)
         @argcheck(!isa(opt.r.rc, LinearConstraint),
                   "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
-    elseif isa(opt.r, AbstractVector) && any(x -> isa(x, Variance), opt.r)
+    elseif isa(opt.r, NumVec) && any(x -> isa(x, Variance), opt.r)
         idx = findall(x -> isa(x, Variance), opt.r)
         @argcheck(!any(x -> isa(x.rc, LinearConstraint), view(opt.r, idx)),
                   "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
@@ -36,17 +36,16 @@ end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_rc_variance(opt)
     @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
-                isa(opt.opt.lcs, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
+                isa(opt.opt.lcs, NumVec) && any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
     @argcheck(!(isa(opt.opt.cent, LinearConstraint) ||
-                isa(opt.opt.cent, AbstractVector) &&
+                isa(opt.opt.cent, NumVec) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.cent)))
     @argcheck(!isa(opt.opt.gcard, LinearConstraint))
     @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
-                isa(opt.opt.sgcard, AbstractVector) &&
+                isa(opt.opt.sgcard, NumVec) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.sgcard)))
     @argcheck(!isa(opt.opt.plg, AbstractPhylogenyConstraintResult) ||
-              isa(opt.opt.plg, AbstractVector) &&
+              isa(opt.opt.plg, NumVec) &&
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.plg))
     return nothing
 end
@@ -147,7 +146,7 @@ function assert_external_optimiser(opt::NestedClustered)
     end
     return nothing
 end
-function opt_view(nco::NestedClustered, i::AbstractVector, X::AbstractMatrix)
+function opt_view(nco::NestedClustered, i::NumVec, X::NumMat)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
@@ -163,7 +162,7 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
                                      sets::Union{Nothing, <:AssetSets},
                                      cwf::WeightFinaliser, strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
-                                     res::OptimisationResult, w::AbstractVector;
+                                     res::OptimisationResult, w::NumVec;
                                      datatype::DataType = Float64)
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
                                    datatype = datatype)
@@ -207,7 +206,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
             res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
                            str_names = str_names, save = save, kwargs...)
             #! Support efficient frontier?
-            @argcheck(!isa(res.retcode, AbstractVector))
+            @argcheck(!isa(res.retcode, NumVec))
             wi[cl, i] = res.w
             resi[i] = res
         end

@@ -20,12 +20,12 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
                                                <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                        <:AbstractPhylogenyConstraintResult}},
                                     sets::Union{Nothing, <:AssetSets},
-                                    wi::Union{Nothing, <:AbstractVector{<:Real}},
-                                    flag::Bool, fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, AbstractVector)
+                                    wi::Union{Nothing, <:NumVec}, flag::Bool,
+                                    fb::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, NumVec)
             @argcheck(!isempty(r))
         end
-        if isa(wi, AbstractVector)
+        if isa(wi, NumVec)
             @argcheck(!isempty(wi))
         end
         return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(plg),
@@ -42,12 +42,11 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                            <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                    <:AbstractPhylogenyConstraintResult}} = nothing,
                                 sets::Union{Nothing, <:AssetSets} = nothing,
-                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                flag::Bool = true,
+                                wi::Union{Nothing, <:NumVec} = nothing, flag::Bool = true,
                                 fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fb)
 end
-function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)
+function opt_view(frc::FactorRiskContribution, i::NumVec, X::NumMat)
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
@@ -60,7 +59,7 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:Regression,
                                                              <:AbstractRegressionEstimator},
                                                    rd::ReturnsResult, flag::Bool,
-                                                   wi::Union{Nothing, AbstractVector})
+                                                   wi::Union{Nothing, NumVec})
     rr = regression(re, rd.X, rd.F)
     Bt = transpose(rr.L)
     b1 = pinv(Bt)

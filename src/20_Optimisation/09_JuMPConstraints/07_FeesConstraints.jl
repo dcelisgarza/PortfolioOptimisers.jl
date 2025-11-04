@@ -35,13 +35,13 @@ end
 function set_short_non_fixed_fees!(args...)
     return nothing
 end
-function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Real, <:AbstractVector})
+function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Number, <:NumVec})
     lw = model[:lw]
     @expression(model, fl, dot_scalar(fl, lw))
     add_to_fees!(model, fl)
     return nothing
 end
-function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real, <:AbstractVector})
+function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Number, <:NumVec})
     if !haskey(model, :sw)
         return nothing
     end

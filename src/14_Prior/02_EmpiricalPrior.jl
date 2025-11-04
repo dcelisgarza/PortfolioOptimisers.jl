@@ -19,7 +19,7 @@ Empirical prior estimator for asset returns.
 
     EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                   horizon::Union{Nothing, <:Real} = nothing)
+                   horizon::Union{Nothing, <:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -66,7 +66,7 @@ struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
     horizon::T3
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator,
-                            horizon::Union{Nothing, <:Real})
+                            horizon::Union{Nothing, <:Number})
         if !isnothing(horizon)
             @argcheck(horizon > 0)
         end
@@ -76,7 +76,7 @@ end
 function EmpiricalPrior(;
                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                        horizon::Union{Nothing, <:Real} = nothing)
+                        horizon::Union{Nothing, <:Number} = nothing)
     return EmpiricalPrior(ce, me, horizon)
 end
 function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -84,7 +84,7 @@ function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = noth
                           horizon = pe.horizon)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...; dims::Int = 1,
+    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::NumMat, args...; dims::Int = 1,
           kwargs...)
 
 Compute empirical prior moments for asset returns (no horizon adjustment).
@@ -113,8 +113,8 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...;
-               dims::Int = 1, kwargs...)
+function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::NumMat, args...; dims::Int = 1,
+               kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -124,7 +124,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, arg
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...; dims::Int = 1,
+    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::NumMat, args...; dims::Int = 1,
           kwargs...)
 
 Compute empirical prior moments for asset returns with investment horizon adjustment.
@@ -153,7 +153,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...;
+function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::NumMat, args...;
                dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

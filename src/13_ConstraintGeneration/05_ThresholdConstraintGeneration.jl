@@ -13,9 +13,7 @@ Estimator for buy-in threshold portfolio constraints.
 
 # Constructor
 
-    BuyInThresholdEstimator(;
-                            val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}})
+    BuyInThresholdEstimator(; val::EstValType)
 
 ## Validation
 
@@ -41,21 +39,14 @@ BuyInThresholdEstimator
 """
 struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
     val::T1
-    function BuyInThresholdEstimator(val::Union{<:AbstractDict,
-                                                <:Pair{<:AbstractString, <:Real},
-                                                <:AbstractVector{<:Pair{<:AbstractString,
-                                                                        <:Real}}})
+    function BuyInThresholdEstimator(val::EstValType)
         if isa(val, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(val))
         end
         return new{typeof(val)}(val)
     end
 end
-function BuyInThresholdEstimator(;
-                                 val::Union{<:AbstractDict,
-                                            <:Pair{<:AbstractString, <:Real},
-                                            <:AbstractVector{<:Pair{<:AbstractString,
-                                                                    <:Real}}})
+function BuyInThresholdEstimator(; val::EstValType)
     return BuyInThresholdEstimator(val)
 end
 """
@@ -73,7 +64,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Constructor
 
-    BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
+    BuyInThreshold(; val::Union{<:Number, <:NumVec})
 
 ## Validation
 
@@ -99,23 +90,22 @@ BuyInThreshold
 """
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
-    function BuyInThreshold(val::Union{<:Real, <:AbstractVector{<:Real}})
+    function BuyInThreshold(val::Union{<:Number, <:NumVec})
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
+function BuyInThreshold(; val::Union{<:Number, <:NumVec})
     return BuyInThreshold(val)
 end
 function threshold_view(t::Union{Nothing, <:BuyInThresholdEstimator}, ::Any)
     return t
 end
-function threshold_view(t::BuyInThreshold, i::AbstractVector)
+function threshold_view(t::BuyInThreshold, i::NumVec)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
 end
 function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
-                                                  <:BuyInThresholdEstimator}},
-                        i::AbstractVector)
+                                                  <:BuyInThresholdEstimator}}, i::NumVec)
     return [threshold_view(ti, i) for ti in t]
 end
 """

@@ -102,26 +102,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
-function compute_value_at_risk_z(dist::Normal, alpha::Real)
+function compute_value_at_risk_z(dist::Normal, alpha::Number)
     return cquantile(dist, alpha)
 end
-function compute_value_at_risk_z(dist::TDist, alpha::Real)
+function compute_value_at_risk_z(dist::TDist, alpha::Number)
     d = dof(dist)
     @argcheck(d > 2)
     return cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_z(::Laplace, alpha::Real)
+function compute_value_at_risk_z(::Laplace, alpha::Number)
     return -log(2 * alpha) / sqrt(2)
 end
-function compute_value_at_risk_cz(dist::Normal, alpha::Real)
+function compute_value_at_risk_cz(dist::Normal, alpha::Number)
     return quantile(dist, alpha)
 end
-function compute_value_at_risk_cz(dist::TDist, alpha::Real)
+function compute_value_at_risk_cz(dist::TDist, alpha::Number)
     d = dof(dist)
     @argcheck(d > 2)
     return quantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_cz(::Laplace, alpha::Real)
+function compute_value_at_risk_cz(::Laplace, alpha::Number)
     return -log(2 * (one(alpha) - alpha)) / sqrt(2)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,

@@ -16,8 +16,8 @@ struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
     tol::T2
     iter::T3
     strict::T4
-    function MonotonicSchurComplement(N::Integer, tol::Real, iter::Union{Nothing, Integer},
-                                      strict::Bool)
+    function MonotonicSchurComplement(N::Integer, tol::Number,
+                                      iter::Union{Nothing, Integer}, strict::Bool)
         @argcheck(N > 0)
         @argcheck(tol > 0)
         if !isnothing(iter)
@@ -27,7 +27,7 @@ struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
                                                                          strict)
     end
 end
-function MonotonicSchurComplement(; N::Integer = 10, tol::Real = 1e-4,
+function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
                                   iter::Union{Nothing, Integer} = nothing,
                                   strict::Bool = false)
     return MonotonicSchurComplement(N, tol, iter, strict)
@@ -38,7 +38,7 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     pdm::T3
     alg::T4
     flag::T5
-    function SchurComplementParams(r::Union{<:StandardDeviation, <:Variance}, gamma::Real,
+    function SchurComplementParams(r::Union{<:StandardDeviation, <:Variance}, gamma::Number,
                                    pdm::Union{Nothing, <:Posdef},
                                    alg::SchurComplementAlgorithm, flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma))
@@ -50,13 +50,13 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     end
 end
 function SchurComplementParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                               gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef} = Posdef(),
+                               gamma::Number = 0.5,
+                               pdm::Union{Nothing, <:Posdef} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)
 end
-function schur_complement_params_view(sp::SchurComplementParams, i::AbstractVector,
-                                      X::AbstractMatrix)
+function schur_complement_params_view(sp::SchurComplementParams, i::NumVec, X::NumMat)
     r = risk_measure_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
@@ -70,7 +70,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
                                                                  <:AbstractVector{<:SchurComplementParams}},
                                                    fb::Union{Nothing,
                                                              <:OptimisationEstimator})
-        if isa(params, AbstractVector)
+        if isa(params, NumVec)
             @argcheck(!isempty(params))
         end
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
@@ -83,8 +83,7 @@ function SchurComplementHierarchicalRiskParity(;
                                                fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
-function opt_view(sh::SchurComplementHierarchicalRiskParity, i::AbstractVector,
-                  X::AbstractMatrix)
+function opt_view(sh::SchurComplementHierarchicalRiskParity, i::NumVec, X::NumMat)
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_complement_params_view(sh.params, i, X)
@@ -108,8 +107,7 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     end
     return m
 end
-function schur_augmentation(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix,
-                            gamma::Real)
+function schur_augmentation(A::NumMat, B::NumMat, C::NumMat, gamma::Number)
     Na = size(A, 1)
     Nc = size(C, 1)
     if iszero(gamma) || isone(Na) || isone(Nc)
@@ -121,22 +119,21 @@ function schur_augmentation(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMat
     A_aug = r \ A_aug
     return (A_aug + transpose(A_aug)) / 2
 end
-function naive_portfolio_risk(::Variance, sigma::AbstractMatrix)
+function naive_portfolio_risk(::Variance, sigma::NumMat)
     w = inv.(diag(sigma))
     w ./= sum(w)
     return dot(w, sigma, w)
 end
-function naive_portfolio_risk(::StandardDeviation, sigma::AbstractMatrix)
+function naive_portfolio_risk(::StandardDeviation, sigma::NumMat)
     w = inv.(diag(sigma))
     w ./= sum(w)
     return sqrt(dot(w, sigma, w))
 end
-function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector,
-                                  wb::WeightBounds,
+function schur_complement_weights(pr::AbstractPriorResult, items::NumVec, wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:NonMonotonicSchurComplement,
                                                                 <:Any},
-                                  gamma::Union{Nothing, <:Real} = nothing)
+                                  gamma::Union{Nothing, <:Number} = nothing)
     r = factory(params.r, pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
@@ -186,8 +183,8 @@ function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector
     end
     return w, gamma
 end
-function schur_complement_binary_search(objective::Function, lgamma::Real, hgamma::Real,
-                                        lrisk::Real, tol::Real = 1e-4,
+function schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number,
+                                        lrisk::Number, tol::Number = 1e-4,
                                         iter::Union{Nothing, <:Integer} = nothing,
                                         strict::Bool = false)
     w = nothing
@@ -214,8 +211,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Real, hgamm
     strict ? throw(ArgumentError(msg)) : @warn(msg)
     return w, lgamma
 end
-function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector,
-                                  wb::WeightBounds,
+function schur_complement_weights(pr::AbstractPriorResult, items::NumVec, wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:MonotonicSchurComplement,
                                                                 <:Any})
@@ -229,7 +225,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector
     end
     nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                       alg = NonMonotonicSchurComplement(), flag = false)
-    function objective(x::Real)
+    function objective(x::Number)
         w = schur_complement_weights(pr, items, wb, nm_params, x)[1]
         risk = isnothing(w) ? typemax(eltype(pr.X)) : dot(w, r.sigma, w)
         return w, risk

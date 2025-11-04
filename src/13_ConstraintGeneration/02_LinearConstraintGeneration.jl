@@ -10,12 +10,12 @@ Container for a set of linear constraints (either equality or inequality) in the
 
 # Fields
 
-  - `A`: Coefficient matrix of the linear constraints (typically `AbstractMatrix`).
-  - `B`: Right-hand side vector of the linear constraints (typically `AbstractVector`).
+  - `A`: Coefficient matrix of the linear constraints.
+  - `B`: Right-hand side vector of the linear constraints.
 
 # Constructor
 
-    PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
+    PartialLinearConstraint(; A::NumMat, B::NumVec)
 
 Keyword arguments correspond to the fields above.
 
@@ -41,13 +41,13 @@ PartialLinearConstraint
 struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
-    function PartialLinearConstraint(A::AbstractMatrix, B::AbstractVector)
+    function PartialLinearConstraint(A::NumMat, B::NumVec)
         @argcheck(!isempty(A), IsEmptyError)
         @argcheck(!isempty(B), IsEmptyError)
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
-function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
+function PartialLinearConstraint(; A::NumMat, B::NumVec)
     return PartialLinearConstraint(A, B)
 end
 """
@@ -171,9 +171,8 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     op::T3
     rhs::T4
     eqn::T5
-    function ParsingResult(vars::AbstractVector{<:AbstractString},
-                           coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
-                           eqn::AbstractString)
+    function ParsingResult(vars::AbstractVector{<:AbstractString}, coef::NumVec,
+                           op::AbstractString, rhs::Number, eqn::AbstractString)
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
                                                                                      coef,
@@ -224,12 +223,10 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     rhs::T4
     eqn::T5
     ij::T6
-    function RhoParsingResult(vars::AbstractVector{<:AbstractString},
-                              coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
-                              eqn::AbstractString,
+    function RhoParsingResult(vars::AbstractVector{<:AbstractString}, coef::NumVec,
+                              op::AbstractString, rhs::Number, eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                                         <:Tuple{<:AbstractVector{<:Integer},
-                                                                 <:AbstractVector{<:Integer}}}})
+                                                         <:Tuple{<:IntVec, <:IntVec}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
@@ -299,7 +296,7 @@ function AssetSets(; key::AbstractString = "nx",
                    dict::AbstractDict{<:AbstractString, <:Any})
     return AssetSets(key, dict)
 end
-function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
+function nothing_asset_sets_view(sets::AssetSets, i::NumVec)
     key = sets.key
     dict = typeof(sets.dict)()
     dict[key] = view(sets.dict[key], i)
@@ -326,10 +323,8 @@ function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """
-    group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
-                  dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                              <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                  arr::AbstractVector, strict::Bool)
+    group_to_val!(nx::NumVec, sdict::AbstractDict, key::Any, val::Number,
+                  dict::EstValType, arr::NumVec, strict::Bool)
 
 Set values in a vector for all assets belonging to a specified group.
 
@@ -359,10 +354,8 @@ Set values in a vector for all assets belonging to a specified group.
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
-function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
-                       dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                       arr::AbstractVector, strict::Bool)
+function group_to_val!(nx::NumVec, sdict::AbstractDict, key::Any, val::Number,
+                       dict::EstValType, arr::NumVec, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
         msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
@@ -382,9 +375,7 @@ function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::R
     return nothing
 end
 """
-    estimator_to_val(dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                 <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                     sets::AssetSets; val::Real = 0.0, strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::AssetSets; val::Number = 0.0, strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -413,7 +404,7 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Returns
 
-  - `arr::Vector{<:Real}`: Value array.
+  - `arr::Vector{<:Number}`: Value array.
 
 # Related
 
@@ -421,9 +412,9 @@ The function creates the vector and sets the values for assets or groups as spec
   - [`AssetSets`](@ref)
   - [`estimator_to_val`](@ref)
 """
-function estimator_to_val(dict::Union{<:AbstractDict,
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                          sets::AssetSets, val::Real = 0.0; strict::Bool = false)
+function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number},
+                                      <:AbstractVector{<:Pair{<:AbstractString, <:Number}}},
+                          sets::AssetSets, val::Number = 0.0; strict::Bool = false)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
     for (key, val) in dict
@@ -435,8 +426,8 @@ function estimator_to_val(dict::Union{<:AbstractDict,
     end
     return arr
 end
-function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real = 0.0;
-                          strict::Bool = false)
+function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSets,
+                          val::Number = 0.0; strict::Bool = false)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
     key, val = dict
@@ -448,7 +439,7 @@ function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real 
     return arr
 end
 """
-    estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...; kwargs...)
+    estimator_to_val(val::Union{Nothing, <:Number, <:NumVec}, args...; kwargs...)
 
 Fallback no-op for value mapping in asset/group estimators.
 
@@ -462,7 +453,7 @@ This method returns the input value `val` as-is, without modification or mapping
 
 # Returns
 
-  - `val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}`: The input `val`, unchanged.
+  - `val::Union{Nothing, <:Number, <:NumVec}`: The input `val`, unchanged.
 
 # Related
 
@@ -470,8 +461,7 @@ This method returns the input value `val` as-is, without modification or mapping
   - [`group_to_val!`](@ref)
   - [`AssetSets`](@ref)
 """
-function estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
-                          kwargs...)
+function estimator_to_val(val::Union{Nothing, <:Number, <:NumVec}, args...; kwargs...)
     return val
 end
 """
@@ -489,7 +479,7 @@ Recursively evaluate numeric functions and constants in a Julia expression.
 
   - `expr`:
 
-      + `Real`: it is returned as-is.
+      + `Number`: it is returned as-is.
       + `:Inf`: returns `Inf`.
       + `Expr`: representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
       + Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
@@ -1108,7 +1098,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
                                 sets::AssetSets; datatype::DataType = Float64,
                                 strict::Bool = false)
-    if isa(lcs, AbstractVector)
+    if isa(lcs, NumVec)
         @argcheck(!isempty(lcs), IsEmptyError(non_empty_msg("lcs") * "."))
     end
     A_ineq = Vector{datatype}(undef, 0)
@@ -1358,11 +1348,11 @@ Container for the result of a risk budget constraint.
 
 # Fields
 
-  - `val`: Vector of risk budget allocations (typically `AbstractVector{<:Real}`).
+  - `val`: Vector of risk budget allocations (typically `NumVec`).
 
 # Constructor
 
-    RiskBudgetResult(; val::AbstractVector{<:Real})
+    RiskBudgetResult(; val::NumVec)
 
 Keyword arguments correspond to the fields above.
 
@@ -1387,19 +1377,19 @@ RiskBudgetResult
 """
 struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
-    function RiskBudgetResult(val::AbstractVector{<:Real})
+    function RiskBudgetResult(val::NumVec)
         @argcheck(!isempty(val))
         @argcheck(all(x -> zero(x) <= x, val))
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetResult(; val::AbstractVector{<:Real})
+function RiskBudgetResult(; val::NumVec)
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)
     return nothing
 end
-function risk_budget_view(rb::RiskBudgetResult, i::AbstractVector)
+function risk_budget_view(rb::RiskBudgetResult, i::NumVec)
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudgetResult(; val = val)
 end
@@ -1418,9 +1408,7 @@ Container for a risk budget allocation mapping or vector.
 
 # Constructor
 
-    RiskBudgetEstimator(;
-                        val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}}})
+    RiskBudgetEstimator(; val::EstValType)
 
 Keyword arguments correspond to the fields above.
 
@@ -1448,25 +1436,19 @@ RiskBudgetEstimator
 """
 struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
     val::T1
-    function RiskBudgetEstimator(val::Union{<:AbstractDict,
-                                            <:Pair{<:AbstractString, <:Real},
-                                            <:AbstractVector{<:Pair{<:AbstractString,
-                                                                    <:Real}}})
+    function RiskBudgetEstimator(val::EstValType)
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetEstimator(;
-                             val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                        <:AbstractVector{<:Union{<:Pair{<:AbstractString,
-                                                                        <:Real}}}})
+function RiskBudgetEstimator(; val::EstValType)
     return RiskBudgetEstimator(val)
 end
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
 end
 """
-    risk_budget_constraints(::Nothing, args...; N::Real, datatype::DataType = Float64,
+    risk_budget_constraints(::Nothing, args...; N::Number, datatype::DataType = Float64,
                             kwargs...)
 
 No-op fallback for risk budget constraint generation.
@@ -1477,7 +1459,7 @@ This method returns a uniform risk budget allocation when no explicit risk budge
 
   - `::Nothing`: Indicates that no risk budget is provided.
   - `args...`: Additional positional arguments (ignored).
-  - `N::Real`: Number of assets (required).
+  - `N::Number`: Number of assets (required).
   - `datatype::DataType`: Numeric type for the risk budget vector.
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -1498,7 +1480,7 @@ RiskBudgetResult
   - [`RiskBudgetResult`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(::Nothing, args...; N::Real, kwargs...)
+function risk_budget_constraints(::Nothing, args...; N::Number, kwargs...)
     iN = inv(N)
     return RiskBudgetResult(; val = range(iN, iN; length = N))
 end
@@ -1536,11 +1518,8 @@ function risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
     return rb
 end
 """
-    risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Real},
-                                      <:Pair{<:AbstractString, <:Real},
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                            sets::AssetSets; N::Real = length(sets.dict[sets.key]),
-                            strict::Bool = false)
+    risk_budget_constraints(rb::EstValType, sets::AssetSets;
+                            N::Number = length(sets.dict[sets.key]), strict::Bool = false)
 
 Generate a risk budget allocation from asset/group mappings and asset sets.
 
@@ -1581,11 +1560,8 @@ RiskBudgetResult
   - [`estimator_to_val`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Real},
-                                           <:Pair{<:AbstractString, <:Real},
-                                           <:AbstractVector{<:Pair{<:AbstractString,
-                                                                   <:Real}}},
-                                 sets::AssetSets; N::Real = length(sets.dict[sets.key]),
+function risk_budget_constraints(rb::EstValType, sets::AssetSets;
+                                 N::Number = length(sets.dict[sets.key]),
                                  strict::Bool = false)
     val = estimator_to_val(rb, sets, inv(N); strict = strict)
     return RiskBudgetResult(; val = val / sum(val))
@@ -1730,15 +1706,15 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     return transpose(A)
 end
 """
-    asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
+    asset_sets_matrix(smtx::Union{Nothing, <:NumMat}, args...)
 
 No-op fallback for asset set membership matrix construction.
 
-This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `AbstractMatrix` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
+This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `NumMat` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
 
 # Arguments
 
-  - `smtx`: An existing asset set membership matrix (`AbstractMatrix`) or `nothing`.
+  - `smtx`: An existing asset set membership matrix (`NumMat`) or `nothing`.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns
@@ -1751,7 +1727,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
+function asset_sets_matrix(smtx::Union{Nothing, <:NumMat}, args...)
     return smtx
 end
 """
@@ -1771,7 +1747,7 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
-    asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
+    asset_sets_matrix(smtx::AbstractVector{<:Union{<:NumMat,
                                                    <:AssetSetsMatrixEstimator}},
                       sets::AssetSets)
 
@@ -1779,21 +1755,21 @@ Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
+function asset_sets_matrix(smtx::AbstractVector{<:Union{<:NumMat,
                                                         <:AssetSetsMatrixEstimator}},
                            sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
 """
-function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
+function asset_sets_matrix_view(smtx::NumMat, i::AbstractVector; kwargs...)
     return view(smtx, :, i)
 end
 function asset_sets_matrix_view(smtx::Union{Nothing, AssetSetsMatrixEstimator}, ::Any;
                                 kwargs...)
     return smtx
 end
-function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:AbstractMatrix,
+function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:NumMat,
                                                              <:AssetSetsMatrixEstimator}},
                                 i::AbstractVector; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]

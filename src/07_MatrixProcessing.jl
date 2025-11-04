@@ -145,8 +145,8 @@ function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
-                       X::AbstractMatrix, args...; kwargs...)
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::NumMat,
+                       X::NumMat, args...; kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
 
 In-place processing of a covariance or correlation matrix.
@@ -232,8 +232,8 @@ julia> sigma
 function matrix_processing!(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                            X::AbstractMatrix, args...; kwargs...)
+function matrix_processing!(mp::DefaultMatrixProcessing, sigma::NumMat, X::NumMat, args...;
+                            kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
     denoise!(mp.denoise, sigma, T / N, mp.pdm)
@@ -242,8 +242,8 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     return nothing
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
-                      X::AbstractMatrix, args...; kwargs...)
+    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::NumMat,
+                      X::NumMat, args...; kwargs...)
     matrix_processing(::Nothing, args...; kwargs...)
 
 Out-of-place version of [`matrix_processing!`](@ref).
@@ -260,8 +260,8 @@ Out-of-place version of [`matrix_processing!`](@ref).
 function matrix_processing(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                           X::AbstractMatrix, args...; kwargs...)
+function matrix_processing(mp::DefaultMatrixProcessing, sigma::NumMat, X::NumMat, args...;
+                           kwargs...)
     sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)
     return sigma

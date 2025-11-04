@@ -1,4 +1,4 @@
-function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
+function set_owa_constraints!(model::JuMP.Model, X::NumMat)
     if haskey(model, :owa)
         return model[:owa]
     end

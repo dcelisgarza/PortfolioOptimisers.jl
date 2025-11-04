@@ -139,8 +139,8 @@ NOCTracking()
 """
 struct NOCTracking <: NormTracking end
 """
-    norm_tracking(f::SOCTracking, a, b; N::Union{Nothing, <:Real} = nothing)
-    norm_tracking(::NOCTracking, a, b; N::Union{Nothing, <:Real} = nothing)
+    norm_tracking(f::SOCTracking, a, b; N::Union{Nothing, <:Number} = nothing)
+    norm_tracking(::NOCTracking, a, b; N::Union{Nothing, <:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
@@ -155,7 +155,7 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Returns
 
-  - `err::Real`: Norm-based tracking error.
+  - `err::Number`: Norm-based tracking error.
 
 # Details
 
@@ -178,11 +178,11 @@ julia> PortfolioOptimisers.norm_tracking(NOCTracking(), [0.5, 0.5], [0.6, 0.4], 
   - [`NOCTracking`](@ref)
   - [`NormTracking`](@ref)
 """
-function norm_tracking(f::SOCTracking, a, b, N::Union{Nothing, <:Real} = nothing)
+function norm_tracking(f::SOCTracking, a, b, N::Union{Nothing, <:Number} = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
     return norm(a - b, 2) / factor
 end
-function norm_tracking(::NOCTracking, a, b, N::Union{Nothing, <:Real} = nothing)
+function norm_tracking(::NOCTracking, a, b, N::Union{Nothing, <:Number} = nothing)
     factor = isnothing(N) ? 1 : N
     return norm(a - b, 1) / factor
 end
@@ -232,7 +232,7 @@ Asset weights-based tracking algorithm.
 
 # Constructor
 
-    WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::AbstractVector{<:Real})
+    WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::NumVec)
 
 ## Validation
 
@@ -258,25 +258,24 @@ WeightsTracking
 struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
-    function WeightsTracking(fees::Union{Nothing, <:Fees}, w::AbstractVector{<:Real})
+    function WeightsTracking(fees::Union{Nothing, <:Fees}, w::NumVec)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w)}(fees, w)
     end
 end
-function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
-                         w::AbstractVector{<:Real})
+function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::NumVec)
     return WeightsTracking(fees, w)
 end
-function factory(tracking::WeightsTracking, w::AbstractVector)
+function factory(tracking::WeightsTracking, w::NumVec)
     return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
 end
-function tracking_view(tracking::WeightsTracking, i::AbstractVector)
+function tracking_view(tracking::WeightsTracking, i::NumVec)
     fees = fees_view(tracking.fees, i)
     w = view(tracking.w, i)
     return WeightsTracking(; fees = fees, w = w)
 end
 """
-    tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
+    tracking_benchmark(tracking::WeightsTracking, X::NumMat)
 
 Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
@@ -289,7 +288,7 @@ Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
 # Returns
 
-  - `Vector{<:Real}`: Net benchmark portfolio returns.
+  - `Vector{<:Number}`: Net benchmark portfolio returns.
 
 # Details
 
@@ -315,7 +314,7 @@ julia> PortfolioOptimisers.tracking_benchmark(tracking, X)
   - [`calc_net_returns`](@ref)
   - [`tracking_benchmark`](@ref)
 """
-function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
+function tracking_benchmark(tracking::WeightsTracking, X::NumMat)
     return calc_net_returns(tracking.w, X, tracking.fees)
 end
 """
@@ -333,7 +332,7 @@ Returns-based tracking algorithm.
 
 # Constructor
 
-    ReturnsTracking(; w::AbstractVector{<:Real})
+    ReturnsTracking(; w::NumVec)
 
 ## Validation
 
@@ -356,12 +355,12 @@ ReturnsTracking
 """
 struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
-    function ReturnsTracking(w::AbstractVector{<:Real})
+    function ReturnsTracking(w::NumVec)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function ReturnsTracking(; w::AbstractVector{<:Real})
+function ReturnsTracking(; w::NumVec)
     return ReturnsTracking(w)
 end
 function tracking_view(tracking::ReturnsTracking, ::Any)
@@ -381,7 +380,7 @@ Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 # Returns
 
-  - `Vector{<:Real}`: Benchmark portfolio returns.
+  - `Vector{<:Number}`: Benchmark portfolio returns.
 
 # Examples
 
@@ -426,7 +425,7 @@ Tracking error result type.
 
 # Constructor
 
-    TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
+    TrackingError(; tracking::AbstractTrackingAlgorithm, err::Number = 0.0,
                   alg::NormTracking = SOCTracking())
 
 ## Validation
@@ -461,24 +460,24 @@ struct TrackingError{T1, T2, T3} <: AbstractTracking
     tracking::T1
     err::T2
     alg::T3
-    function TrackingError(tracking::AbstractTrackingAlgorithm, err::Real,
+    function TrackingError(tracking::AbstractTrackingAlgorithm, err::Number,
                            alg::NormTracking)
         assert_nonempty_nonneg_finite_val(err, :err)
         return new{typeof(tracking), typeof(err), typeof(alg)}(tracking, err, alg)
     end
 end
-function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
+function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormTracking = SOCTracking())
     return TrackingError(tracking, err, alg)
 end
-function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
+function tracking_view(tracking::TrackingError, i::NumVec, args...)
     return TrackingError(; tracking = tracking_view(tracking.tracking, i),
                          err = tracking.err, alg = tracking.alg)
 end
 function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
     return [tracking_view(t, args...) for t in tracking]
 end
-function factory(tracking::TrackingError, w::AbstractVector)
+function factory(tracking::TrackingError, w::NumVec)
     return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,
                          alg = tracking.alg)
 end

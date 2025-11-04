@@ -22,7 +22,7 @@ function opt_attempt_factory(res::NearOptimalCenteringOptimisation, fb)
 end
 function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
     return if sym == :w
-        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
+        !isa(r.sol, NumVec) ? r.sol.w : getproperty.(r.sol, :w)
     else
         getfield(r, sym)
     end
@@ -45,16 +45,16 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     function NearOptimalCentering(opt::JuMPOptimiser,
                                   r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                                   obj::Union{Nothing, <:ObjectiveFunction},
-                                  bins::Union{Nothing, <:Real},
-                                  w_min::Union{Nothing, <:AbstractVector{<:Real}},
-                                  w_min_ini::Union{Nothing, <:AbstractVector{<:Real}},
-                                  w_opt::Union{Nothing, <:AbstractVector},
-                                  w_opt_ini::Union{Nothing, <:AbstractVector},
-                                  w_max::Union{Nothing, <:AbstractVector{<:Real}},
-                                  w_max_ini::Union{Nothing, <:AbstractVector{<:Real}},
-                                  ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
+                                  bins::Union{Nothing, <:Number},
+                                  w_min::Union{Nothing, <:NumVec},
+                                  w_min_ini::Union{Nothing, <:NumVec},
+                                  w_opt::Union{Nothing, <:NumVec},
+                                  w_opt_ini::Union{Nothing, <:NumVec},
+                                  w_max::Union{Nothing, <:NumVec},
+                                  w_max_ini::Union{Nothing, <:NumVec}, ucs_flag::Bool,
+                                  alg::NearOptimalCenteringAlgorithm,
                                   fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, AbstractVector)
+        if isa(r, NumVec)
             @argcheck(!isempty(r))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
                 @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
@@ -64,25 +64,25 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                 @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
         end
-        if isa(w_min, AbstractVector)
+        if isa(w_min, NumVec)
             @argcheck(!isempty(w_min))
         end
-        if isa(w_min_ini, AbstractVector)
+        if isa(w_min_ini, NumVec)
             @argcheck(!isempty(w_min_ini))
         end
-        if isa(w_opt, AbstractVector)
+        if isa(w_opt, NumVec)
             @argcheck(!isempty(w_opt))
         end
-        if isa(w_opt_ini, AbstractVector)
+        if isa(w_opt_ini, NumVec)
             @argcheck(!isempty(w_opt_ini))
         end
-        if isa(w_max, AbstractVector)
+        if isa(w_max, NumVec)
             @argcheck(!isempty(w_max))
         end
-        if isa(w_max_ini, AbstractVector)
+        if isa(w_max_ini, NumVec)
             @argcheck(!isempty(w_max_ini))
         end
-        if isa(bins, Real)
+        if isa(bins, Number)
             @argcheck(isfinite(bins) && bins > 0)
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
@@ -102,20 +102,20 @@ end
 function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                               obj::Union{Nothing, <:ObjectiveFunction} = MinimumRisk(),
-                              bins::Union{Nothing, <:Real} = nothing,
-                              w_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                              w_min_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                              w_opt::Union{Nothing, <:AbstractVector} = nothing,
-                              w_opt_ini::Union{Nothing, <:AbstractVector} = nothing,
-                              w_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                              w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              bins::Union{Nothing, <:Number} = nothing,
+                              w_min::Union{Nothing, <:NumVec} = nothing,
+                              w_min_ini::Union{Nothing, <:NumVec} = nothing,
+                              w_opt::Union{Nothing, <:NumVec} = nothing,
+                              w_opt_ini::Union{Nothing, <:NumVec} = nothing,
+                              w_max::Union{Nothing, <:NumVec} = nothing,
+                              w_max_ini::Union{Nothing, <:NumVec} = nothing,
                               ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
-function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
+function opt_view(noc::NearOptimalCentering, i::NumVec, X::NumMat)
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = opt_view(noc.opt, i, X)
     r = risk_measure_view(noc.r, i, X)
@@ -132,9 +132,8 @@ function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatri
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
-                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                                      w_min::AbstractVector, w_opt::AbstractVector,
-                                      w_max::AbstractVector)
+                                      slv::Union{<:Solver, <:SlvVec}, w_min::NumVec,
+                                      w_opt::NumVec, w_max::NumVec)
     X = pr.X
     r = factory(r, pr, slv)
     scale = r.settings.scale
@@ -145,14 +144,15 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
 end
 function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                                      w_min::AbstractVector, w_opt::AbstractVector,
-                                      w_max::AbstractVector)
+                                      slv::Union{<:Solver, <:SlvVec},
+                                      w_min::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_max::Union{<:NumVec, <:AbstractVector{<:NumVec}})
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
     risk_min = zero(datatype)
-    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
+    flag = !isa(w_opt, AbstractVector{<:NumVec})
     risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
     risk_max = zero(datatype)
     for r in rs
@@ -166,14 +166,15 @@ end
 function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
                                       rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                                      w_min::AbstractVector, w_opt::AbstractVector,
-                                      w_max::AbstractVector)
+                                      slv::Union{<:Solver, <:SlvVec},
+                                      w_min::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_max::Union{<:NumVec, <:AbstractVector{<:NumVec}})
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
     risk_min = zero(datatype)
-    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
+    flag = !isa(w_opt, AbstractVector{<:NumVec})
     risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
     risk_max = zero(datatype)
     gamma = scalarisation.gamma
@@ -192,15 +193,15 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
 end
 function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}},
-                                      w_min::AbstractVector, w_opt::AbstractVector,
-                                      w_max::AbstractVector)
+                                      slv::Union{Nothing, <:Solver, <:SlvVec},
+                                      w_min::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_max::Union{<:NumVec, <:AbstractVector{<:NumVec}})
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
     risk_min = typemin(datatype)
-    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
+    flag = !isa(w_opt, AbstractVector{<:NumVec})
     risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
     risk_max = typemin(datatype)
     for r in rs
@@ -299,7 +300,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
                             w_min_retcode, w_opt_retcode, w_max_retcode)
 end
-function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt::Real,
+function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Number, rt::Number,
                                                  wb::WeightBounds)
     w = model[:w]
     sc = model[:sc]
@@ -328,7 +329,7 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt
     return obj_expr
 end
 function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
-                                              model::JuMP.Model, rk::Real, rt::Real,
+                                              model::JuMP.Model, rk::Number, rt::Number,
                                               opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
@@ -336,7 +337,7 @@ function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCenterin
     return nothing
 end
 function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
-                                              model::JuMP.Model, rk::Real, rt::Real,
+                                              model::JuMP.Model, rk::Number, rt::Number,
                                               opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
@@ -368,16 +369,16 @@ function unregister_noc_variables!(model::JuMP.Model)
     unregister(model, :obj_expr)
     return nothing
 end
-function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Real,
-                    rt_opt::Real, opt::BaseJuMPOptimisationEstimator, args...)
+function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number,
+                    rt_opt::Number, opt::BaseJuMPOptimisationEstimator, args...)
     set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
     return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:UnconstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
-                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator)
+                    model::JuMP.Model, rk_opts::NumVec, rt_opts::NumVec,
+                    opt::BaseJuMPOptimisationEstimator)
     retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
     sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
     for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
@@ -389,15 +390,15 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
-function compute_ret_lbs(lbs::Frontier, rt_min::Real, rt_max::Real)
+function compute_ret_lbs(lbs::Frontier, rt_min::Number, rt_max::Number)
     return range(rt_min, rt_max; length = lbs.N)
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
-                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator,
-                    rt_min::Real, rt_max::Real, ::Any, ::Any, ::Val{true}, ::Val{false})
+                    model::JuMP.Model, rk_opts::NumVec, rt_opts::NumVec,
+                    opt::BaseJuMPOptimisationEstimator, rt_min::Number, rt_max::Number,
+                    ::Any, ::Any, ::Val{true}, ::Val{false})
     lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max)
     sc = model[:sc]
     ret_expr = model[:ret]
@@ -418,13 +419,13 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
-function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector, <:Any,
+function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:NumVec, <:Any, <:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any, <:Any,
+                                                         <:Any, <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                               risk_frontier::AbstractVector, w_min::AbstractVector,
-                               w_max::AbstractVector, idx::AbstractVector)
+                               risk_frontier::NumVec, w_min::NumVec, w_max::NumVec,
+                               idx::NumVec)
     risk_frontier = copy(risk_frontier)
     r = factory(view(noc.r, idx), pr, noc.opt.slv)
     for (i, ri) in zip(idx, r)
@@ -438,8 +439,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
                                                          <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                               risk_frontier::AbstractVector, w_min::AbstractVector,
-                               w_max::AbstractVector, args...)
+                               risk_frontier::NumVec, w_min::NumVec, w_max::NumVec, args...)
     risk_frontier = copy(risk_frontier)
     r = factory(noc.r, pr, noc.opt.slv)
     return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
@@ -450,11 +450,11 @@ function compute_risk_ubs(model::JuMP.Model,
                                                     <:Any,
                                                     <:ConstrainedNearOptimalCentering},
                           pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                          w_min::AbstractVector, w_max::AbstractVector)
+                          w_min::NumVec, w_max::NumVec)
     risk_frontier = model[:risk_frontier]
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)
-        if !isa(rkf.second[2], AbstractVector)
+        if !isa(rkf.second[2], NumVec)
             push!(idx, i)
         end
     end
@@ -466,10 +466,9 @@ end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
-                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator,
-                    ::Any, ::Any, w_min::AbstractVector, w_max::AbstractVector,
-                    ::Val{false}, ::Val{true})
+                    model::JuMP.Model, rk_opts::NumVec, rt_opts::NumVec,
+                    opt::BaseJuMPOptimisationEstimator, ::Any, ::Any, w_min::NumVec,
+                    w_max::NumVec, ::Val{false}, ::Val{true})
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max)
     itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
              Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
@@ -500,17 +499,15 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
     if isa(w_min_retcode, OptimisationFailure)
         msg *= "w_min failed.\n"
     end
-    if !isa(w_opt_retcode, AbstractVector) && isa(w_opt_retcode, OptimisationFailure) ||
-       isa(w_opt_retcode, AbstractVector) &&
-       any(x -> isa(x, OptimisationFailure), w_opt_retcode)
+    if !isa(w_opt_retcode, NumVec) && isa(w_opt_retcode, OptimisationFailure) ||
+       isa(w_opt_retcode, NumVec) && any(x -> isa(x, OptimisationFailure), w_opt_retcode)
         msg *= "w_opt failed.\n"
     end
     if isa(w_max_retcode, OptimisationFailure)
         msg *= "w_max failed.\n"
     end
-    if !isa(noc_retcode, AbstractVector) && isa(noc_retcode, OptimisationFailure) ||
-       isa(noc_retcode, AbstractVector) &&
-       any(x -> isa(x, OptimisationFailure), noc_retcode)
+    if !isa(noc_retcode, NumVec) && isa(noc_retcode, OptimisationFailure) ||
+       isa(noc_retcode, NumVec) && any(x -> isa(x, OptimisationFailure), noc_retcode)
         msg *= "noc_opt failed."
     end
     return if isempty(msg)

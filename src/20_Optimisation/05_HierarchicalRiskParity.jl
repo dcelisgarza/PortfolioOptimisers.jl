@@ -8,7 +8,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
                                              <:AbstractVector{<:OptimisationRiskMeasure}},
                                     sce::Scalariser,
                                     fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, AbstractVector)
+        if isa(r, NumVec)
             @argcheck(!isempty(r))
         end
         return new{typeof(opt), typeof(r), typeof(sce), typeof(fb)}(opt, r, sce, fb)
@@ -21,14 +21,14 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                 fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return HierarchicalRiskParity(opt, r, sce, fb)
 end
-function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
+function opt_view(hrp::HierarchicalRiskParity, i::NumVec, X::NumMat)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce, fb = hrp.fb)
 end
-function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
-                                         lc::AbstractVector, rc::AbstractVector)
+function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::NumVec,
+                                         lc::NumVec, rc::NumVec)
     lb = wb.lb
     ub = wb.ub
     wlc = w[lc[1]]
@@ -81,10 +81,10 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
     return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
-function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVector,
-                             rku::AbstractVector, lc::AbstractVector, rc::AbstractVector,
-                             rs::AbstractVector{<:OptimisationRiskMeasure},
-                             X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
+                             lc::NumVec, rc::NumVec,
+                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     for r in rs
@@ -99,10 +99,10 @@ function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVe
     end
     return lrisk, rrisk
 end
-function hrp_scalarised_risk(::MaxScalariser, wu::AbstractMatrix, wk::AbstractVector,
-                             rku::AbstractVector, lc::AbstractVector, rc::AbstractVector,
-                             rs::AbstractVector{<:OptimisationRiskMeasure},
-                             X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
+                             lc::NumVec, rc::NumVec,
+                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     trisk = typemin(eltype(X))
@@ -124,11 +124,10 @@ function hrp_scalarised_risk(::MaxScalariser, wu::AbstractMatrix, wk::AbstractVe
     end
     return lrisk, rrisk
 end
-function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
-                             wk::AbstractVector, rku::AbstractVector, lc::AbstractVector,
-                             rc::AbstractVector,
-                             rs::AbstractVector{<:OptimisationRiskMeasure},
-                             X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
+                             lc::NumVec, rc::NumVec,
+                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             fees::Union{Nothing, <:Fees})
     lrisk = Vector{eltype(X)}(undef, length(rs))
     rrisk = Vector{eltype(X)}(undef, length(rs))
     for (i, r) in enumerate(rs)

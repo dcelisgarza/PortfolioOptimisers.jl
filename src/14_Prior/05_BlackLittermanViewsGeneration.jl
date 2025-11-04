@@ -15,7 +15,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Constructor
 
-    BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
+    BlackLittermanViews(; P::NumMat, Q::NumVec)
 
 Keyword arguments correspond to the fields above.
 
@@ -40,14 +40,14 @@ BlackLittermanViews
 struct BlackLittermanViews{T1, T2} <: AbstractResult
     P::T1
     Q::T2
-    function BlackLittermanViews(P::AbstractMatrix, Q::AbstractVector)
+    function BlackLittermanViews(P::NumMat, Q::NumVec)
         @argcheck(!isempty(P))
         @argcheck(!isempty(Q))
         @argcheck(size(P, 1) == length(Q))
         return new{typeof(P), typeof(Q)}(P, Q)
     end
 end
-function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
+function BlackLittermanViews(; P::NumMat, Q::NumVec)
     return BlackLittermanViews(P, Q)
 end
 """
@@ -100,7 +100,7 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
                                               <:AbstractVector{<:ParsingResult}},
                                    sets::AssetSets; datatype::DataType = Float64,
                                    strict::Bool = false)
-    if isa(lcs, AbstractVector)
+    if isa(lcs, NumVec)
         @argcheck(!isempty(lcs))
     end
     P = Vector{datatype}(undef, 0)
@@ -202,7 +202,7 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
 end
 """
     assert_bl_views_conf(::Nothing, args...)
-    assert_bl_views_conf(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+    assert_bl_views_conf(views_conf::Union{Nothing, <:Number, <:NumVec},
                          views::Union{<:AbstractString, Expr,
                                       <:AbstractVector{<:Union{<:AbstractString, Expr}},
                                       <:LinearConstraintEstimator, <:BlackLittermanViews})
@@ -225,8 +225,8 @@ Validate Black-Litterman view confidence specification.
   - `views_conf`:
 
       + `::Nothing`, no-op.
-      + `::Real`, `0 < views_conf < 1`.
-      + `::AbstractVector{<:Real}`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
+      + `::Number`, `0 < views_conf < 1`.
+      + `::NumVec`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
 
   - `views`:
 
@@ -242,16 +242,16 @@ Validate Black-Litterman view confidence specification.
 function assert_bl_views_conf(::Nothing, args...)
     return nothing
 end
-function assert_bl_views_conf(views_conf::Real,
+function assert_bl_views_conf(views_conf::Number,
                               ::Union{<:AbstractString, Expr,
                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}})
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
+function assert_bl_views_conf(views_conf::NumVec,
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    if isa(val, AbstractVector)
+    if isa(val, NumVec)
         @argcheck(length(val) == length(views_conf))
     else
         @argcheck(length(views_conf) == 1)
@@ -259,11 +259,11 @@ function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
+function assert_bl_views_conf(views_conf::Union{<:Number, <:NumVec},
                               views::LinearConstraintEstimator)
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
+function assert_bl_views_conf(views_conf::Union{<:Number, <:NumVec},
                               views::BlackLittermanViews)
     return @argcheck(length(views_conf) == length(views.Q))
 end

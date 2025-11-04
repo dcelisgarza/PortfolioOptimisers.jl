@@ -26,8 +26,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                              <:AbstractPriorResult},
                                    cle::Union{<:ClusteringEstimator,
                                               <:AbstractClusteringResult},
-                                   slv::Union{Nothing, <:Solver,
-                                              <:AbstractVector{<:Solver}},
+                                   slv::Union{Nothing, <:Solver, <:SlvVec},
                                    fees::Union{Nothing, <:FeesEstimator, <:Fees},
                                    wb::Union{Nothing, <:WeightBoundsEstimator,
                                              <:WeightBounds},
@@ -45,7 +44,7 @@ function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
-                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
+                               slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
                                fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
                                wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
                                sets::Union{Nothing, <:AssetSets} = nothing,
@@ -53,7 +52,7 @@ function HierarchicalOptimiser(;
                                strict::Bool = false)
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
 end
-function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
+function opt_view(hco::HierarchicalOptimiser, i::NumVec)
     pe = prior_view(hco.pe, i)
     fees = fees_view(hco.fees, i)
     wb = weight_bounds_view(hco.wb, i)
@@ -61,7 +60,7 @@ function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, fees = fees, slv = hco.slv,
                                  wb = wb, cwf = hco.cwf, sets = sets, strict = hco.strict)
 end
-function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
+function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
                                 fees::Union{Nothing, <:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
@@ -72,9 +71,8 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
     end
     return rk
 end
-function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
-                                 r::OptimisationRiskMeasure, X::AbstractMatrix,
-                                 fees::Union{Nothing, <:Fees} = nothing)
+function unitary_expected_risks!(wk::NumVec, rk::NumVec, r::OptimisationRiskMeasure,
+                                 X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
     for i in eachindex(wk)
         wk[i] = one(eltype(X))

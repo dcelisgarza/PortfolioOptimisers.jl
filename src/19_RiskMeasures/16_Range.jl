@@ -7,7 +7,7 @@ end
 function Range(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return Range(settings)
 end
-function (::Range)(x::AbstractVector)
+function (::Range)(x::NumVec)
     lb, ub = extrema(x)
     return ub - lb
 end

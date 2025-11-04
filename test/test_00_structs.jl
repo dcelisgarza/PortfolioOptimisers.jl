@@ -184,7 +184,12 @@
         @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => -1))
         @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => Inf))
 
-        @test_throws DomainError TurnoverEstimator(; w = [1], val = val = "a" => 1,
+        @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
+                                                    val = Dict{String, Real}())
+        @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
+                                                    val = Pair{String, Real}[])
+
+        @test_throws DomainError TurnoverEstimator(; w = [1], val =  val = "a" => 1 ,
                                                    default = -eps())
 
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
@@ -196,5 +201,15 @@
         @test te.w === w
         @test te.val == Dict("A" => 0.1, "B" => 0.2)
         @test te.default == 0.2
+
+        @test_throws IsEmptyError Turnover(; w = Float64[], val = 0)
+
+        @test_throws DomainError Turnover(; w = Float64[Inf], val = 0)
+        @test_throws DomainError Turnover(; w = [1], val = Inf)
+        @test_throws DomainError Turnover(; w = [1], val = [Inf])
+        @test_throws DomainError Turnover(; w = [1], val = -1)
+        @test_throws DomainError Turnover(; w = [1], val = [-1])
+
+        @test_throws DimensionMismatch Turnover(; w = [1], val = [1, 2])
     end
 end

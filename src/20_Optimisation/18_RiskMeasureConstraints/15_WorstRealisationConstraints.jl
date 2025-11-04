@@ -1,4 +1,4 @@
-function set_wr_risk_expression!(model::JuMP.Model, X::AbstractMatrix)
+function set_wr_risk_expression!(model::JuMP.Model, X::NumMat)
     if haskey(model, :wr_risk)
         return model[:wr_risk]
     end

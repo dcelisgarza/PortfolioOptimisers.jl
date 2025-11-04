@@ -73,15 +73,15 @@ end
 # https://discourse.julialang.org/t/solver-attributes-and-set-optimizer-with-parametricoptinterface-jl-and-jump-jl/129935/8?u=dcelisgarza
 function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                               r_expr::AbstractJuMPScalar,
-                               ub::Union{<:AbstractVector, <:Frontier}, key)
+                               r_expr::AbstractJuMPScalar, ub::Union{<:NumVec, <:Frontier},
+                               key)
     bound_key = Symbol(key, :_ub)
     if !haskey(model, :risk_frontier)
         risk_frontier = @expression(model, risk_frontier,
                                     Pair{Symbol,
                                          Tuple{<:AbstractJuMPScalar,
-                                               <:Union{<:AbstractVector, <:Frontier}}}[bound_key => (r_expr,
-                                                                                                     ub)])
+                                               <:Union{<:NumVec, <:Frontier}}}[bound_key => (r_expr,
+                                                                                             ub)])
     else
         risk_frontier = model[:risk_frontier]
         push!(risk_frontier, bound_key => (r_expr, ub))
@@ -90,14 +90,14 @@ function set_risk_upper_bound!(model::JuMP.Model,
 end
 function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                               r_expr::AbstractJuMPScalar, ub::Real, key)
+                               r_expr::AbstractJuMPScalar, ub::Number, key)
     k = model[:k]
     sc = model[:sc]
     bound_key = Symbol(key, :_ub)
     model[bound_key] = @constraint(model, sc * (r_expr - ub * k) <= 0)
     return nothing
 end
-function set_risk_expression!(model::JuMP.Model, r_expr::AbstractJuMPScalar, scale::Real,
+function set_risk_expression!(model::JuMP.Model, r_expr::AbstractJuMPScalar, scale::Number,
                               rke::Bool)
     if !rke
         return nothing
@@ -117,7 +117,7 @@ function set_risk_bounds_and_expression!(model::JuMP.Model,
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
-function set_drawdown_constraints!(model::JuMP.Model, X::AbstractMatrix)
+function set_drawdown_constraints!(model::JuMP.Model, X::NumMat)
     if haskey(model, :dd)
         return model[:dd]
     end

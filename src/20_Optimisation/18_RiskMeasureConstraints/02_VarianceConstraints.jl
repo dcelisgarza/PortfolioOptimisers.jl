@@ -8,9 +8,9 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,
-                                                  ub::Union{Nothing, <:Real,
-                                                            <:AbstractVector, <:Frontier},
-                                                  key::Symbol, r_expr::AbstractJuMPScalar,
+                                                  ub::Union{Nothing, <:Number, <:NumVec,
+                                                            <:Frontier}, key::Symbol,
+                                                  r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
@@ -52,7 +52,7 @@ function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
     return if rc_flag ||
               haskey(model, :rc_variance) ||
               isa(plg, SemiDefinitePhylogeny) ||
-              isa(plg, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plg)
+              isa(plg, NumVec) && any(x -> isa(x, SemiDefinitePhylogeny), plg)
         true
     else
         false
@@ -111,10 +111,10 @@ end
 function variance_risk_bounds_val(flag::Bool, ub::Frontier)
     return _Frontier(; N = ub.N, factor = 1, flag = flag)
 end
-function variance_risk_bounds_val(flag::Bool, ub::AbstractVector)
+function variance_risk_bounds_val(flag::Bool, ub::NumVec)
     return flag ? ub : sqrt.(ub)
 end
-function variance_risk_bounds_val(flag::Bool, ub::Real)
+function variance_risk_bounds_val(flag::Bool, ub::Number)
     return flag ? ub : sqrt(ub)
 end
 function variance_risk_bounds_val(::Any, ::Nothing)
@@ -178,7 +178,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
-                               ::Any, b1::AbstractMatrix, args...; kwargs...)
+                               ::Any, b1::NumMat, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -218,7 +218,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     return ucs_variance_risk, key
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
-                                sigma::AbstractMatrix)
+                                sigma::NumMat)
     sc = model[:sc]
     if !haskey(model, :E)
         W = model[:W]
