@@ -34,12 +34,12 @@ function add_custom_constraint!(args...; kwargs...)
 end
 struct JuMPOptimisationSolution{T1} <: OptimisationModelResult
     w::T1
-    function JuMPOptimisationSolution(w::AbstractArray)
+    function JuMPOptimisationSolution(w::NumArr)
         @argcheck(!isempty(w))
         return new{typeof(w)}(w)
     end
 end
-function JuMPOptimisationSolution(; w::AbstractArray)
+function JuMPOptimisationSolution(; w::NumArr)
     return JuMPOptimisationSolution(w)
 end
 function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)

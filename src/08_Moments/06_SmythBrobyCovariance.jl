@@ -431,7 +431,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBroby0, <:Any}, X::NumMat,
-               mean_vec::AbstractArray, std_vec::AbstractArray)
+               mean_vec::NumArr, std_vec::NumArr)
 
 Implements the original Smyth-Broby covariance/correlation algorithm (unstandardised variant).
 
@@ -468,7 +468,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBroby0, <:Any}, X::NumMat,
-                    mean_vec::AbstractArray, std_vec::AbstractArray)
+                    mean_vec::NumArr, std_vec::NumArr)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -616,7 +616,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBroby1, <:Any}, X::NumMat,
-                    mean_vec::AbstractArray, std_vec::AbstractArray)
+                    mean_vec::NumArr, std_vec::NumArr)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -737,7 +737,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBroby2, <:Any}, X::NumMat,
-               mean_vec::AbstractArray, std_vec::AbstractArray)
+               mean_vec::NumArr, std_vec::NumArr)
 
 Implements the second variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -775,7 +775,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBroby2, <:Any}, X::NumMat,
-                    mean_vec::AbstractArray, std_vec::AbstractArray)
+                    mean_vec::NumArr, std_vec::NumArr)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -884,7 +884,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBrobyGerber0, <:Any}, X::NumMat,
-               mean_vec::AbstractArray, std_vec::AbstractArray)
+               mean_vec::NumArr, std_vec::NumArr)
 
 Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -921,7 +921,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBrobyGerber0, <:Any},
-                    X::NumMat, mean_vec::AbstractArray, std_vec::AbstractArray)
+                    X::NumMat, mean_vec::NumArr, std_vec::NumArr)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -1048,7 +1048,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBrobyGerber1, <:Any}, X::NumMat,
-               mean_vec::AbstractArray, std_vec::AbstractArray)
+               mean_vec::NumArr, std_vec::NumArr)
 
 Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -1085,7 +1085,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBrobyGerber1, <:Any},
-                    X::NumMat, mean_vec::AbstractArray, std_vec::AbstractArray)
+                    X::NumMat, mean_vec::NumArr, std_vec::NumArr)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -1225,7 +1225,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBrobyGerber2, <:Any}, X::NumMat,
-               mean_vec::AbstractArray, std_vec::AbstractArray)
+               mean_vec::NumArr, std_vec::NumArr)
 
 Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -1263,7 +1263,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBrobyGerber2, <:Any},
-                    X::NumMat, mean_vec::AbstractArray, std_vec::AbstractArray)
+                    X::NumMat, mean_vec::NumArr, std_vec::NumArr)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold

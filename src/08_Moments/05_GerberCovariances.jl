@@ -314,7 +314,7 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
 end
 """
     gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat,
-           std_vec::AbstractArray)
+           std_vec::NumArr)
 
 Implements the original Gerber correlation algorithm.
 
@@ -350,7 +350,7 @@ The algorithm proceeds as follows:
   - [`posdef!`](@ref)
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat,
-                std_vec::AbstractArray)
+                std_vec::NumArr)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -418,7 +418,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}
 end
 """
     gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat,
-           std_vec::AbstractArray)
+           std_vec::NumArr)
 
 Implements the first variant of the Gerber correlation algorithm.
 
@@ -449,7 +449,7 @@ The algorithm proceeds as follows:
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat,
-                std_vec::AbstractArray)
+                std_vec::NumArr)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -520,7 +520,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}
 end
 """
     gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat,
-           std_vec::AbstractArray)
+           std_vec::NumArr)
 
 Implements the second variant of the Gerber correlation algorithm.
 
@@ -557,7 +557,7 @@ The algorithm proceeds as follows:
   - [`posdef!`](@ref)
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat,
-                std_vec::AbstractArray)
+                std_vec::NumArr)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -655,9 +655,9 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 # Related
 
   - [`GerberCovariance`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat, std_vec::AbstractArray)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat, std_vec::AbstractArray)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat, std_vec::AbstractArray)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat, std_vec::NumArr)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat, std_vec::NumArr)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat, std_vec::NumArr)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::NumMat)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::NumMat)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::NumMat)`](@ref)
@@ -716,9 +716,9 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 # Related
 
   - [`GerberCovariance`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat, std_vec::AbstractArray)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat, std_vec::AbstractArray)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat, std_vec::AbstractArray)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat, std_vec::NumArr)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat, std_vec::NumArr)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat, std_vec::NumArr)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::NumMat)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::NumMat)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::NumMat)`](@ref)

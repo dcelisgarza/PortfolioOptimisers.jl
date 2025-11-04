@@ -297,7 +297,7 @@ Stores lower and upper bounds for the uncertain quantity, such as expected retur
 
 # Constructor
 
-    BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
+    BoxUncertaintySet(; lb::NumArr, ub::NumArr)
 
 Keyword arguments correspond to the fields above.
 
@@ -325,14 +325,14 @@ BoxUncertaintySet
 struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     lb::T1
     ub::T2
-    function BoxUncertaintySet(lb::Union{<:NumVec, <:NumMat}, ub::Union{<:NumVec, <:NumMat})
+    function BoxUncertaintySet(lb::NumArr, ub::NumArr)
         @argcheck(!isempty(lb))
         @argcheck(!isempty(ub))
         @argcheck(size(lb) == size(ub))
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function BoxUncertaintySet(; lb::Union{<:NumVec, <:NumMat}, ub::Union{<:NumVec, <:NumMat})
+function BoxUncertaintySet(; lb::NumArr, ub::NumArr)
     return BoxUncertaintySet(lb, ub)
 end
 function ucs_view(risk_ucs::BoxUncertaintySet{<:NumVec, <:NumVec}, i::NumVec)
@@ -415,7 +415,7 @@ struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
     k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::NumMat, sigma_X::NumMat)
     k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::AbstractArray, args...)
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::NumArr, args...)
     k_ucs(type::Number, args...)
 
 Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio optimisation.
@@ -458,7 +458,7 @@ end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::AbstractArray, args...)
+function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::NumArr, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
 function k_ucs(type::Number, args...)

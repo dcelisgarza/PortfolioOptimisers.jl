@@ -1105,7 +1105,7 @@ function calc_net_asset_returns(w::NumVec, X::NumMat, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 """
-    cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
+    cumulative_returns(X::NumArr; compound::Bool = false, dims::Int = 1)
 
 Compute simple or compounded cumulative returns along a specified dimension.
 
@@ -1119,7 +1119,7 @@ Compute simple or compounded cumulative returns along a specified dimension.
 
 # Returns
 
-  - `ret::AbstractArray{<:Number}`: Array of cumulative returns, same shape as `X`.
+  - `ret::NumArr`: Array of cumulative returns, same shape as `X`.
 
 # Examples
 
@@ -1141,7 +1141,7 @@ julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
 
   - [`drawdowns`](@ref)
 """
-function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
+function cumulative_returns(X::NumArr; compound::Bool = false, dims::Int = 1)
     return if compound
         cumprod(one(eltype(X)) .+ X; dims = dims)
     else
@@ -1149,7 +1149,7 @@ function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int 
     end
 end
 """
-    drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false, dims::Int = 1)
+    drawdowns(X::NumArr; cX::Bool = false, compound::Bool = false, dims::Int = 1)
 
 Compute simple or compounded drawdowns along a specified dimension.
 
@@ -1164,7 +1164,7 @@ Compute simple or compounded drawdowns along a specified dimension.
 
 # Returns
 
-  - `dd::AbstractArray{<:Number}`: Array of drawdowns, same shape as `X`.
+  - `dd::NumArr`: Array of drawdowns, same shape as `X`.
 
 # Examples
 
@@ -1186,8 +1186,7 @@ julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
 
   - [`cumulative_returns`](@ref)
 """
-function drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false,
-                   dims::Int = 1)
+function drawdowns(X::NumArr; cX::Bool = false, compound::Bool = false, dims::Int = 1)
     cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
     if compound
         return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))

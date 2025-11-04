@@ -66,7 +66,7 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
 # Returns
 
-  - `mu::AbstractArray`: Excess expected returns vector.
+  - `mu::NumArr`: Excess expected returns vector.
 
 # Related
 

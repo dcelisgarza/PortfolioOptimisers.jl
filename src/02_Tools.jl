@@ -231,7 +231,7 @@ function brinson_attribution(X::TimeArray, w::NumVec, wb::NumVec, asset_classes:
     return df
 end
 """
-    ⊗(A::AbstractArray, B::AbstractArray)
+    ⊗(A::NumArr, B::NumArr)
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
@@ -244,7 +244,7 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
  6  8
 ```
 """
-⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
+⊗(A::NumArr, B::NumArr) = reshape(kron(B, A), (length(A), length(B)))
 
 """
     ⊙(A, B)
@@ -273,9 +273,9 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 6
 ```
 """
-⊙(A::AbstractArray, B::AbstractArray) = A .* B
-⊙(A::AbstractArray, B) = A * B
-⊙(A, B::AbstractArray) = A * B
+⊙(A::NumArr, B::NumArr) = A .* B
+⊙(A::NumArr, B) = A * B
+⊙(A, B::NumArr) = A * B
 ⊙(A, B) = A * B
 
 """
@@ -305,9 +305,9 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 4.0
 ```
 """
-⊘(A::AbstractArray, B::AbstractArray) = A ./ B
-⊘(A::AbstractArray, B) = A / B
-⊘(A, B::AbstractArray) = A ./ B
+⊘(A::NumArr, B::NumArr) = A ./ B
+⊘(A::NumArr, B) = A / B
+⊘(A, B::NumArr) = A ./ B
 ⊘(A, B) = A / B
 
 """
@@ -337,9 +337,9 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 5
 ```
 """
-⊕(A::AbstractArray, B::AbstractArray) = A .+ B
-⊕(A::AbstractArray, B) = A .+ B
-⊕(A, B::AbstractArray) = A .+ B
+⊕(A::NumArr, B::NumArr) = A .+ B
+⊕(A::NumArr, B) = A .+ B
+⊕(A, B::NumArr) = A .+ B
 ⊕(A, B) = A + B
 
 """
@@ -369,9 +369,9 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 6
 ```
 """
-⊖(A::AbstractArray, B::AbstractArray) = A - B
-⊖(A::AbstractArray, B) = A .- B
-⊖(A, B::AbstractArray) = A .- B
+⊖(A::NumArr, B::NumArr) = A - B
+⊖(A::NumArr, B) = A .- B
+⊖(A, B::NumArr) = A .- B
 ⊖(A, B) = A - B
 
 """
@@ -476,7 +476,7 @@ Utility for safely viewing or indexing into possibly `nothing`, scalar, or array
       + `Number`: returns `x`.
       + `NumVec`: returns `view(x, i)`.
       + `AbstractVector{<:AbstractVector}`: returns `[view(xi, i) for xi in x]`.
-      + `AbstractArray`: returns `view(x, i, i)`.
+      + `NumArr`: returns `view(x, i, i)`.
 
 # Arguments
 
@@ -522,7 +522,7 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <
                                    i)
     return [view(xi, i) for xi in x]
 end
-function nothing_scalar_array_view(x::AbstractArray, i)
+function nothing_scalar_array_view(x::NumArr, i)
     return view(x, i, i)
 end
 """
@@ -555,7 +555,7 @@ julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
+function nothing_scalar_array_view_odd_order(x::NumArr, i, j)
     return view(x, i, j)
 end
 """
@@ -695,9 +695,9 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} =
     return ctarr
 end
 """
-    concrete_typed_array(A::AbstractArray)
+    concrete_typed_array(A::NumArr)
 
-Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
+Convert an `NumArr` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 
 This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
 
@@ -721,7 +721,7 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
  3
 ```
 """
-function concrete_typed_array(A::AbstractArray)
+function concrete_typed_array(A::NumArr)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 function factory(::Nothing, args...; kwargs...)

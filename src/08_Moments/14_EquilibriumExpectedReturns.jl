@@ -91,7 +91,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
 # Returns
 
-  - `mu::AbstractArray`: Equilibrium expected returns vector.
+  - `mu::NumArr`: Equilibrium expected returns vector.
 
 # Related
 
