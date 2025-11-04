@@ -120,8 +120,8 @@ function detone!(::Nothing, args...)
 end
 function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     n = ce.n
-    @argcheck(one(n) <= n <= size(X, 2),
-              DomainError("1 <= n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
+    @argcheck(zero(n) < n <= size(X, 2),
+              DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
     s = diag(X)
     iscov = any(!isone, s)

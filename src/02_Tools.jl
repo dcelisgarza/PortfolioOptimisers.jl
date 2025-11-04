@@ -453,7 +453,7 @@ VecScalar
 struct VecScalar{T1, T2} <: AbstractResult
     v::T1
     s::T2
-    function VecScalar(v::AbstractVector, s::Real)
+    function VecScalar(v::AbstractVector{<:Real}, s::Real)
         @argcheck(!isempty(v),
                   IsEmptyError("!isempty(v) must hold. Got\n!isempty($v) => $(isempty(v))."))
         @argcheck(all(isfinite, v),
@@ -463,7 +463,7 @@ struct VecScalar{T1, T2} <: AbstractResult
         return new{typeof(v), typeof(s)}(v, s)
     end
 end
-function VecScalar(; v::AbstractVector, s::Real)
+function VecScalar(; v::AbstractVector{<:Real}, s::Real)
     return VecScalar(v, s)
 end
 """
