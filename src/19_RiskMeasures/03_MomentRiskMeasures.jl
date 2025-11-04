@@ -633,7 +633,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
@@ -787,7 +787,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,

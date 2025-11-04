@@ -68,7 +68,7 @@ function opt_attempt_factory(res::JuMPOptimisationRiskBudgeting, fb)
 end
 function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
     return if sym == :w
-        !isa(r.sol, NumVec) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
+        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
     elseif sym in (:oe, :pa, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else
@@ -77,7 +77,7 @@ function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
 end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
     return if sym == :w
-        !isa(r.sol, NumVec) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
+        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
     elseif sym in (:oe, :pa, :rr, :frc_plg, :retcode, :sol, :model, :fb)
         getfield(r, sym)
     else

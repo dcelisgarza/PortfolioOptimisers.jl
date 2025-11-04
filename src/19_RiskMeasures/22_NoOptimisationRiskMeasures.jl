@@ -1,7 +1,7 @@
 struct MeanReturn{T1} <: NoOptimisationRiskMeasure
     w::T1
     function MeanReturn(w::Union{Nothing, <:AbstractWeights})
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return MeanReturn(w)
@@ -25,7 +25,7 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     mu::T2
     function ThirdCentralMoment(w::Union{Nothing, <:AbstractWeights},
                                 mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar})
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         if isa(mu, NumVec)
@@ -44,7 +44,7 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     mu::T3
     function Skewness(ve::AbstractVarianceEstimator, w::Union{Nothing, <:AbstractWeights},
                       mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar})
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         if isa(mu, NumVec)

@@ -89,7 +89,7 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
@@ -135,7 +135,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
         @argcheck(zero(kappa_a) < kappa_a < one(kappa_a))
         @argcheck(zero(beta) < beta < one(beta))
         @argcheck(zero(kappa_b) < kappa_b < one(kappa_b))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa_a),

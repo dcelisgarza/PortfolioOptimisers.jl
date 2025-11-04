@@ -22,7 +22,7 @@ function opt_attempt_factory(res::NearOptimalCenteringOptimisation, fb)
 end
 function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
     return if sym == :w
-        !isa(r.sol, NumVec) ? r.sol.w : getproperty.(r.sol, :w)
+        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
     else
         getfield(r, sym)
     end

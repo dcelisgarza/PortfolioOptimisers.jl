@@ -5,7 +5,7 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Union{Nothing, <:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
@@ -32,7 +32,7 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
                                                           w::Union{Nothing,
                                                                    <:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
@@ -94,7 +94,7 @@ struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
                                          beta::Number, w::Union{Nothing, <:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
@@ -131,7 +131,7 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
                                                                         <:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),

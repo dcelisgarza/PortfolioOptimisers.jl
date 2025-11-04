@@ -323,7 +323,7 @@ function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """
-    group_to_val!(nx::NumVec, sdict::AbstractDict, key::Any, val::Number,
+    group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Number,
                   dict::EstValType, arr::NumVec, strict::Bool)
 
 Set values in a vector for all assets belonging to a specified group.
@@ -354,8 +354,8 @@ Set values in a vector for all assets belonging to a specified group.
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
-function group_to_val!(nx::NumVec, sdict::AbstractDict, key::Any, val::Number,
-                       dict::EstValType, arr::NumVec, strict::Bool)
+function group_to_val!(nx::AbstractVector{<:String}, sdict::AbstractDict, key::Any,
+                       val::Number, dict::EstValType, arr::NumVec, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
         msg = "$(key) is not in $(keys(sdict)).\n$(dict)"

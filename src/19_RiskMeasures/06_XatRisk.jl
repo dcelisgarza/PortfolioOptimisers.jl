@@ -49,7 +49,7 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Union{Nothing, <:AbstractWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
@@ -89,7 +89,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
                               alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
