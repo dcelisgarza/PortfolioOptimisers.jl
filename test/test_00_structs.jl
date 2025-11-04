@@ -1,5 +1,5 @@
 @safetestset "Struct tests" begin
-    using Test, PortfolioOptimisers, AverageShiftedHistograms
+    using Test, PortfolioOptimisers, AverageShiftedHistograms, Dates
     @testset "VecScalar" begin
         @test_throws IsEmptyError VecScalar(; v = Float64[], s = 1)
         @test_throws DomainError VecScalar(; v = [1.0, Inf, 3.0], s = 1)
@@ -13,25 +13,25 @@
         F = rand(3, 2)
         iv = rand(3, 4)
         ivpa = rand(4)
-        nx = 1:4
-        nf = 1:2
-        ts = 1:3
+        nx = string.(1:4)
+        nf = string.(1:2)
+        ts = Date(2020, 1, 1) .+ Day.(0:2)
         @test_throws IsNothingError ReturnsResult(; nx = nothing, X = X)
         @test_throws IsNothingError ReturnsResult(; nx = nx)
-        @test_throws IsEmptyError ReturnsResult(; nx = [], X = X)
+        @test_throws IsEmptyError ReturnsResult(; nx = String[], X = X)
         @test_throws IsEmptyError ReturnsResult(; nx = nx, X = Matrix{Float64}(undef, 0, 0))
         @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = rand(3, 5))
 
         @test_throws IsNothingError ReturnsResult(; nf = nothing, F = F)
         @test_throws IsNothingError ReturnsResult(; nf = nf)
-        @test_throws IsEmptyError ReturnsResult(; nf = [], F = F)
+        @test_throws IsEmptyError ReturnsResult(; nf = String[], F = F)
         @test_throws IsEmptyError ReturnsResult(; nf = nf, F = Matrix{Float64}(undef, 0, 0))
         @test_throws DimensionMismatch ReturnsResult(; nf = nf, F = rand(3, 5))
 
         @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = X, nf = nf,
                                                      F = rand(4, 2))
 
-        @test_throws IsEmptyError ReturnsResult(; ts = [])
+        @test_throws IsEmptyError ReturnsResult(; ts = Date[])
         @test_throws IsNothingError ReturnsResult(; ts = ts)
         @test_throws DimensionMismatch ReturnsResult(; ts = ts, nx = nx, X = rand(2, 4))
         @test_throws DimensionMismatch ReturnsResult(; ts = ts, nf = nf, F = rand(2, 2))
@@ -111,8 +111,8 @@
         @test dt.n == 5
     end
     @testset "Solver" begin
-        @test_throws IsEmptyError Solver(; settings = Dict())
-        @test_throws IsEmptyError Solver(; settings = Pair[])
+        @test_throws IsEmptyError Solver(; settings = Dict{String, Any}())
+        @test_throws IsEmptyError Solver(; settings = Pair{String, Any}[])
 
         s = Solver()
         @test s.name == ""
@@ -121,11 +121,11 @@
         @test s.check_sol == NamedTuple{}()
         @test s.add_bridges == true
 
-        s = Solver(; name = "MySolver", solver = :X, settings = Dict(:param => 1),
+        s = Solver(; name = "MySolver", solver = :X, settings = Dict("param" => 1),
                    check_sol = (foo = 2,), add_bridges = false)
         @test s.name == "MySolver"
         @test s.solver == :X
-        @test s.settings == Dict(:param => 1)
+        @test s.settings == Dict("param" => 1)
         @test s.check_sol == (foo = 2,)
         @test s.add_bridges == false
     end
@@ -169,5 +169,32 @@
         @test owj.sc == 2.0
         @test owj.so == 3.0
         @test owj.alg == MinimumSumSquares()
+    end
+    @testset "Turnover" begin
+        w = rand(3)
+        @test_throws IsEmptyError TurnoverEstimator(; w = Float64[], val = "a" => 1)
+        @test_throws DomainError TurnoverEstimator(; w = Float64[Inf], val = "a" => 1)
+
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = "a" => -1)
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = "a" => Inf)
+
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = ["a" => -1])
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = ["a" => Inf])
+
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => -1))
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => Inf))
+
+        @test_throws DomainError TurnoverEstimator(; w = [1], val = val = "a" => 1,
+                                                   default = -eps())
+
+        te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
+        @test te.w === w
+        @test te.val == Dict("A" => 0.1, "B" => 0.2)
+        @test te.default == 0.0
+
+        te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), default = 0.2)
+        @test te.w === w
+        @test te.val == Dict("A" => 0.1, "B" => 0.2)
+        @test te.default == 0.2
     end
 end

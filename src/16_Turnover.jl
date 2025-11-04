@@ -18,7 +18,8 @@ Estimator for turnover portfolio constraints.
 # Constructor
 
     TurnoverEstimator(; w::AbstractVector{<:Real},
-                      val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                      val::Union{<:AbstractDict{<:AbstractString, <:Real},
+                                 <:Pair{<:AbstractString, <:Real},
                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                       default::Real = 0.0)
 
@@ -48,17 +49,19 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     val::T2
     default::T3
     function TurnoverEstimator(w::AbstractVector{<:Real},
-                               val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                               val::Union{<:AbstractDict{<:AbstractString, <:Real},
+                                          <:Pair{<:AbstractString, <:Real},
                                           <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                                default::Real)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
-        @argcheck(zero(default) <= default)
+        @argcheck(zero(default) <= default, DomainError)
         return new{typeof(w), typeof(val), typeof(default)}(w, val, default)
     end
 end
 function TurnoverEstimator(; w::AbstractVector{<:Real},
-                           val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                           val::Union{<:AbstractDict{<:AbstractString, <:Real},
+                                      <:Pair{<:AbstractString, <:Real},
                                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                            default::Real = 0.0)
     return TurnoverEstimator(w, val, default)

@@ -74,12 +74,12 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                  X::Union{Nothing, <:AbstractMatrix} = nothing,
-                  nf::Union{Nothing, <:AbstractVector} = nothing,
-                  F::Union{Nothing, <:AbstractMatrix} = nothing,
-                  ts::Union{Nothing, <:AbstractVector} = nothing,
-                  iv::Union{Nothing, <:AbstractMatrix} = nothing,
+    ReturnsResult(; nx::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
+                  X::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
+                  nf::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
+                  F::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
+                  ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
+                  iv::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
                   ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -119,11 +119,11 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
-    function ReturnsResult(nx::Union{Nothing, <:AbstractVector},
+    function ReturnsResult(nx::Union{Nothing, <:AbstractVector{<:AbstractString}},
                            X::Union{Nothing, <:AbstractMatrix{<:Real}},
-                           nf::Union{Nothing, <:AbstractVector},
+                           nf::Union{Nothing, <:AbstractVector{<:AbstractString}},
                            F::Union{Nothing, <:AbstractMatrix{<:Real}},
-                           ts::Union{Nothing, <:AbstractVector},
+                           ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}},
                            iv::Union{Nothing, <:AbstractMatrix{<:Real}},
                            ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
@@ -154,11 +154,11 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
-function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
+function ReturnsResult(; nx::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
                        X::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
-                       nf::Union{Nothing, <:AbstractVector} = nothing,
+                       nf::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
                        F::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
-                       ts::Union{Nothing, <:AbstractVector} = nothing,
+                       ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
                        iv::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
                        ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
