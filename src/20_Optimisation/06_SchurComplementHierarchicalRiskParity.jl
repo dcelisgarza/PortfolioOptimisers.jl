@@ -129,7 +129,8 @@ function naive_portfolio_risk(::StandardDeviation, sigma::NumMat)
     w ./= sum(w)
     return sqrt(dot(w, sigma, w))
 end
-function schur_complement_weights(pr::AbstractPriorResult, items::NumVec, wb::WeightBounds,
+function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector{<:IntVec},
+                                  wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:NonMonotonicSchurComplement,
                                                                 <:Any},
@@ -211,7 +212,8 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
     strict ? throw(ArgumentError(msg)) : @warn(msg)
     return w, lgamma
 end
-function schur_complement_weights(pr::AbstractPriorResult, items::NumVec, wb::WeightBounds,
+function schur_complement_weights(pr::AbstractPriorResult, items::AbstractVector{<:IntVec},
+                                  wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:MonotonicSchurComplement,
                                                                 <:Any})

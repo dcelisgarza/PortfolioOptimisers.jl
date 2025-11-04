@@ -214,7 +214,7 @@ end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -246,7 +246,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -278,7 +278,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
         ro = ri
@@ -309,7 +309,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
         ro = ri
@@ -338,7 +338,7 @@ end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -361,7 +361,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -385,7 +385,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
@@ -410,7 +410,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::NumVec)
+                   pr::AbstractPriorResult, cls::AbstractVector{<:IntVec})
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
