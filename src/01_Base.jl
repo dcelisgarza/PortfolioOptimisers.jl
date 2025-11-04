@@ -303,9 +303,9 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError())
 end
-const NumVec = AbstractVector{<:Number}
+const NumVec = AbstractVector{<:Number, <:AbstractJuMPScalar}
 const IntVec = AbstractVector{<:Integer}
-const NumMat = AbstractMatrix{<:Number}
+const NumMat = AbstractMatrix{<:Number, <:AbstractJuMPScalar}
 const EstValType = Union{<:Pair{<:AbstractString, <:Number},
                          <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
                          <:AbstractDict{<:AbstractString, <:Number}}
