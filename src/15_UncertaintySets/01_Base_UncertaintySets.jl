@@ -612,7 +612,7 @@ struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
     function EllipseUncertaintySet(sigma::AbstractMatrix, k::Real,
                                    class::AbstractEllipseUncertaintySetResultClass)
         @argcheck(!isempty(sigma))
-        assert_matrix_issquare(sigma)
+        assert_matrix_issquare(sigma, :sigma)
         @argcheck(k > zero(k))
         return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
     end

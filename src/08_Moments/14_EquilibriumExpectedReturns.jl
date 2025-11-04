@@ -62,9 +62,7 @@ struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEs
     l::T3
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
                                         w::Union{Nothing, <:AbstractVector}, l::Real)
-        if isa(w, AbstractVector)
-            @argcheck(!isempty(w))
-        end
+        assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
     end
 end

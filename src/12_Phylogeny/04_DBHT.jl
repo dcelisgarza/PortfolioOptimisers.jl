@@ -142,8 +142,8 @@ struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
     function GeneralExponentialSimilarity(coef::Real, power::Real)
-        @argcheck(coef >= zero(coef))
-        @argcheck(power >= zero(power))
+        @argcheck(zero(coef) <= coef, DomainError)
+        @argcheck(zero(power) <= power, DomainError)
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
@@ -283,8 +283,9 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 """
 function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     N = size(W, 1)
-    @argcheck(N >= 9)
-    @argcheck(all(x -> x >= zero(x), W))
+    @argcheck(9 <= N, DimensionMismatch("9 <= size(W, 1) must hold. Got\nsize(W, 1) => $N"))
+    @argcheck(all(x -> zero(x) <= x, W),
+              DomainError("all(x -> x >= 0, W) must hold. Got\nall(x -> x >= 0, W) => $(all(x -> zero(x) <= x, W))."))
     A = spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
@@ -1585,9 +1586,9 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
                branchorder::Symbol = :optimal, root::DBHTRootMethod = UniqueRoot())
-    @argcheck(!isempty(S))
-    @argcheck(!isempty(D))
-    @argcheck(size(S) == size(D))
+    @argcheck(!isempty(S), IsEmptyError)
+    @argcheck(!isempty(D), IsEmptyError)
+    @argcheck(size(S) == size(D), DimensionMismatch)
     Rpm = PMFG_T2s(S)[1]
     Apm = copy(Rpm)
     Apm[Apm .!= 0] = D[Apm .!= 0]
@@ -1769,10 +1770,10 @@ struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     k::T4
     function DBHTClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
                             D::AbstractMatrix, k::Integer)
-        @argcheck(!isempty(S))
-        @argcheck(!isempty(D))
-        @argcheck(size(S) == size(D))
-        @argcheck(k >= one(k))
+        @argcheck(!isempty(S), IsEmptyError)
+        @argcheck(!isempty(D), IsEmptyError)
+        @argcheck(size(S) == size(D), DimensionMismatch)
+        @argcheck(one(k) <= k, DomainError)
         return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
     end
 end
@@ -1916,8 +1917,7 @@ function LoGo_dist_assert(::Union{<:Distance{<:Any, <:VariationInfoDistance},
                                   <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
                                                      <:Any, <:Any}}, sigma::AbstractMatrix,
                           X::AbstractMatrix)
-    @argcheck(size(sigma, 1) == size(X, 2),
-              DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
+    @argcheck(size(sigma, 1) == size(X, 2), DimensionMismatch)
     return nothing
 end
 """
@@ -1979,7 +1979,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 """
 function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1, kwargs...)
-    assert_matrix_issquare(sigma)
+    assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
     iscov = any(!isone, s)

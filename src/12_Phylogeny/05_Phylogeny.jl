@@ -47,7 +47,7 @@ PhylogenyResult
 struct PhylogenyResult{T} <: AbstractPhylogenyResult
     X::T
     function PhylogenyResult(X::Union{<:AbstractMatrix, <:AbstractVector})
-        @argcheck(!isempty(X))
+        @argcheck(!isempty(X), IsEmptyError)
         if isa(X, AbstractMatrix)
             @argcheck(issymmetric(X))
             @argcheck(all(iszero, diag(X)))
@@ -286,7 +286,7 @@ struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kind::T1
     kwargs::T2
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
-        @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
+        @argcheck(kind in 0:2)
         return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
     end
 end
@@ -396,9 +396,10 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     alpha::T2
     epsilon::T3
     function Pagerank(n::Integer, alpha::Real, epsilon::Real)
-        @argcheck(n > 0)
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(epsilon > zero(epsilon))
+        @argcheck(0 < n, DomainError)
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+        @argcheck(zero(epsilon) < epsilon, DomainError)
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end
 end

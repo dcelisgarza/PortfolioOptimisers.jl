@@ -113,7 +113,7 @@ function posdef!(pdm::Posdef, X::AbstractMatrix)
     if isposdef(X)
         return nothing
     end
-    assert_matrix_issquare(X)
+    assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
     if iscov

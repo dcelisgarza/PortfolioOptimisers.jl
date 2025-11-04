@@ -279,7 +279,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 
 ## Validation
 
-  - `B` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
       + `AbstractVector`: it is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
 
@@ -329,7 +329,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
                                                  <:AbstractClusteringResult},
                                        B::Union{<:Integer, <:AbstractVector{<:Integer}},
                                        scale::Real)
-        assert_nonneg_finite_val(B)
+        assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, AbstractVector)
             validate_length_integer_phylogeny_constraint_B(pe, B)
         end
@@ -372,7 +372,7 @@ Container for the result of integer phylogeny-based constraint generation.
 
   - `issymmetric(A)` and `all(iszero, diag(A))`.
 
-  - `B` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
       + `AbstractVector`: `size(unique(A + I; dims = 1), 1) == length(B)`.
 
@@ -401,7 +401,7 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
         @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
-        assert_nonneg_finite_val(B)
+        assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, AbstractVector)
             @argcheck(size(A, 1) == length(B))
         end

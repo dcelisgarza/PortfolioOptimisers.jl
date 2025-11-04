@@ -30,9 +30,7 @@ Keyword arguments correspond to the fields above.
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
     function SimpleExpectedReturns(w::Union{Nothing, <:AbstractWeights})
-        if isa(w, AbstractWeights)
-            @argcheck(!isempty(w))
-        end
+        assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end

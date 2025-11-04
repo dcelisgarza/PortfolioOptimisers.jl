@@ -8,7 +8,7 @@ struct ImpliedVolatilityRegression{T1, T2,
     re::T3
     function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Real,
                                          re::AbstractRegressionTarget)
-        @argcheck(ws > 2)
+        @argcheck(2 < ws, DomainError)
         return new{typeof(ve), typeof(ws), typeof(re)}(ve, ws, re)
     end
 end
@@ -27,8 +27,7 @@ struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     function ImpliedVolatility(ce::AbstractCovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, af::Real)
-        @argcheck(isfinite(af))
-        @argcheck(af > zero(af))
+        @argcheck(zero(af) < af, DomainError)
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
@@ -75,10 +74,10 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
                                X::AbstractMatrix, ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
-    @argcheck(chunk > 2)
+    @argcheck(2 < chunk, DomainError)
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
-    @argcheck(size(rv) == size(iv))
+    @argcheck(size(rv) == size(iv), DimensionMismatch)
     T2 = size(iv, 1)
     rv = log.(rv)
     iv = log.(iv)

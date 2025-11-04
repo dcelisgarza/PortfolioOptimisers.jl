@@ -42,8 +42,8 @@ struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
     function PartialLinearConstraint(A::AbstractMatrix, B::AbstractVector)
-        @argcheck(!isempty(A))
-        @argcheck(!isempty(B))
+        @argcheck(!isempty(A), IsEmptyError)
+        @argcheck(!isempty(B), IsEmptyError)
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
@@ -104,7 +104,7 @@ struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     function LinearConstraint(ineq::Union{Nothing, <:PartialLinearConstraint},
                               eq::Union{Nothing, <:PartialLinearConstraint})
         @argcheck(!(isnothing(ineq) && isnothing(eq)),
-                  AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
+                  IsNothingError("ineq and eq cannot both be nothing. Got\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
         return new{typeof(ineq), typeof(eq)}(ineq, eq)
     end
 end
@@ -174,8 +174,7 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     function ParsingResult(vars::AbstractVector{<:AbstractString},
                            coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
                            eqn::AbstractString)
-        @argcheck(length(vars) == length(coef),
-                  DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
+        @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
                                                                                      coef,
                                                                                      op,
@@ -231,8 +230,7 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
                                                          <:Tuple{<:AbstractVector{<:Integer},
                                                                  <:AbstractVector{<:Integer}}}})
-        @argcheck(length(vars) == length(coef),
-                  DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
+        @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
@@ -285,14 +283,13 @@ struct AssetSets{T1, T2} <: AbstractEstimator
     key::T1
     dict::T2
     function AssetSets(key::AbstractString, dict::AbstractDict{<:AbstractString, <:Any})
-        @argcheck(!isempty(dict))
-        @argcheck(haskey(dict, key))
+        @argcheck(!isempty(dict), IsEmptyError)
+        @argcheck(haskey(dict, key), KeyError)
         for k in keys(dict)
             if k == key
                 continue
             elseif startswith(k, key)
-                @argcheck(length(dict[k]) == length(dict[key]),
-                          DimensionMismatch("$k starts with $key, so length(dict[$k]) => $(length(dict[k])), must be equal to length(dict[$key]) => $(length(dict[key]))"))
+                @argcheck(length(dict[k]) == length(dict[key]), DimensionMismatch)
             end
         end
         return new{typeof(key), typeof(dict)}(key, dict)
@@ -979,9 +976,9 @@ ParsingResult
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
                                  ep_flag::Bool = false, rho_flag::Bool = false)
     @argcheck(!(bl_flag && (rho_flag || ep_flag)),
-              ArgumentError("`bl_flag` ($bl_flag) can only be used if `ep_flag` ($ep_flag) and `rho_flag` ($rho_flag) are false."))
+              ArgumentError("bl_flag can only be true if ep_flag and rho_flag are false. Got\nbl_flag => $(bl_flag)\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
     @argcheck(!(rho_flag && !ep_flag),
-              ArgumentError("`rho_flag` ($rho_flag) can only be used if `ep_flag` ($ep_flag) is also true."))
+              ArgumentError("rho_flag can only be true if ep_flag is also true. Got\nrho_flag => $rho_flag\nep_flag => $ep_flag"))
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -1005,9 +1002,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 push!(idx_rm, i)
             else
                 @argcheck(ep_flag && rho_flag,
-                          ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
+                          ArgumentError("The pattern '(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
                 @argcheck(!isnothing(n),
-                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
+                          ArgumentError("Correlation views can only be of the form '(a, b)'. Got\nv => $v"))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1015,16 +1012,16 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @argcheck(!isnothing(asset1))
-                @argcheck(!isnothing(asset2))
-                @argcheck(length(asset1) == length(asset2))
+                @argcheck(!isnothing(asset1), IsNothingError)
+                @argcheck(!isnothing(asset2), IsNothingError)
+                @argcheck(length(asset1) == length(asset2), DimensionMismatch)
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
                 push!(idx_rm, i)
             end
         else
             @argcheck(ep_flag,
-                      ArgumentError("`prior(a)` can only be used in entropy pooling."))
+                      ArgumentError("The pattern 'prior(a)' can only be used in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)."))
             n = match(corr_pattern, v)
             if isnothing(n) && !rho_flag
                 asset = get(sets.dict, v[7:(end - 1)], nothing)
@@ -1037,9 +1034,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 push!(idx_rm, i)
             else
                 @argcheck(rho_flag,
-                          ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
+                          ArgumentError("The pattern 'prior(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
                 @argcheck(!isnothing(n),
-                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
+                          ArgumentError("Correlation views prior can only be of the form 'prior(a, b)'. Got\nv => $v"))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1047,9 +1044,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @argcheck(!isnothing(asset1))
-                @argcheck(!isnothing(asset2))
-                @argcheck(length(asset1) == length(asset2))
+                @argcheck(!isnothing(asset1), IsNothingError)
+                @argcheck(!isnothing(asset2), IsNothingError)
+                @argcheck(length(asset1) == length(asset2), DimensionMismatch)
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
@@ -1372,7 +1369,7 @@ Keyword arguments correspond to the fields above.
 ## Validation
 
   - `!isempty(val)`.
-  - `all(x -> x >= zero(x), val)`.
+  - `all(x -> zero(x) <= x, val)`.
 
 # Examples
 
@@ -1392,7 +1389,7 @@ struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
     function RiskBudgetResult(val::AbstractVector{<:Real})
         @argcheck(!isempty(val))
-        @argcheck(all(x -> x >= zero(x), val))
+        @argcheck(all(x -> zero(x) <= x, val))
         return new{typeof(val)}(val)
     end
 end
@@ -1429,7 +1426,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -1455,7 +1452,7 @@ struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
                                             <:Pair{<:AbstractString, <:Real},
                                             <:AbstractVector{<:Pair{<:AbstractString,
                                                                     <:Real}}})
-        assert_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end

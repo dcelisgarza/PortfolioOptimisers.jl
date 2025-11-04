@@ -110,7 +110,7 @@ SOCTracking
 struct SOCTracking{T1} <: NormTracking
     ddof::T1
     function SOCTracking(ddof::Integer)
-        @argcheck(ddof > 0, DomainError("`ddof` must be greater than 0:\nddof => $ddof"))
+        @argcheck(zero(ddof) < ddof, DomainError)
         return new{typeof(ddof)}(ddof)
     end
 end
@@ -259,7 +259,7 @@ struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
     function WeightsTracking(fees::Union{Nothing, <:Fees}, w::AbstractVector{<:Real})
-        @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
+        assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w)}(fees, w)
     end
 end
@@ -357,7 +357,7 @@ ReturnsTracking
 struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
     function ReturnsTracking(w::AbstractVector{<:Real})
-        @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
+        assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
@@ -463,8 +463,7 @@ struct TrackingError{T1, T2, T3} <: AbstractTracking
     alg::T3
     function TrackingError(tracking::AbstractTrackingAlgorithm, err::Real,
                            alg::NormTracking)
-        @argcheck(isfinite(err))
-        @argcheck(err >= zero(err))
+        assert_nonempty_nonneg_finite_val(err, :err)
         return new{typeof(tracking), typeof(err), typeof(alg)}(tracking, err, alg)
     end
 end

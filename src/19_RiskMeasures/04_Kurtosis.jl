@@ -114,7 +114,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
         end
         if kt_flag
             @argcheck(!isempty(kt))
-            assert_matrix_issquare(kt)
+            assert_matrix_issquare(kt, :kt)
         end
         if mu_flag && kt_flag
             @argcheck(length(mu)^2 == size(kt, 1))

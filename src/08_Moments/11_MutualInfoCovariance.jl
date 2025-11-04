@@ -53,7 +53,7 @@ struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     function MutualInfoCovariance(ve::AbstractVarianceEstimator,
                                   bins::Union{<:AbstractBins, <:Integer}, normalise::Bool)
         if isa(bins, Integer)
-            @argcheck(bins > zero(bins))
+            @argcheck(zero(bins) < bins)
         end
         return new{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins, normalise)
     end

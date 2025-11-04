@@ -237,7 +237,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
                       alg::VarianceFormulation)
         if isa(sigma, AbstractMatrix)
             @argcheck(!isempty(sigma))
-            assert_matrix_issquare(sigma)
+            assert_matrix_issquare(sigma, :sigma)
         end
         return new{typeof(settings), typeof(sigma), typeof(rc), typeof(alg)}(settings,
                                                                              sigma, rc, alg)
@@ -382,7 +382,7 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
                                sigma::Union{Nothing, <:AbstractMatrix})
         if isa(sigma, AbstractMatrix)
             @argcheck(!isempty(sigma))
-            assert_matrix_issquare(sigma)
+            assert_matrix_issquare(sigma, :sigma)
         end
         return new{typeof(settings), typeof(sigma)}(settings, sigma)
     end

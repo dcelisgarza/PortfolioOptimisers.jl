@@ -544,7 +544,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
         @argcheck(!isempty(X))
         @argcheck(!isempty(mu))
         @argcheck(!isempty(sigma))
-        assert_matrix_issquare(sigma)
+        assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -565,7 +565,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
             @argcheck(f_sigma_flag)
             @argcheck(!isempty(f_mu))
             @argcheck(!isempty(f_sigma))
-            assert_matrix_issquare(f_sigma)
+            assert_matrix_issquare(f_sigma, :f_sigma)
             @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
             @argcheck(size(rr.M, 1) == length(mu))
         end

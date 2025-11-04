@@ -301,7 +301,8 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     function GerberCovariance(ve::StatsBase.CovarianceEstimator,
                               pdm::Union{Nothing, <:Posdef}, threshold::Real,
                               alg::GerberCovarianceAlgorithm)
-        @argcheck(zero(threshold) < threshold < one(threshold))
+        @argcheck(zero(threshold) < threshold < one(threshold),
+                  DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         return new{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve, pdm,
                                                                             threshold, alg)
     end

@@ -36,7 +36,7 @@ Estimator for portfolio transaction fees constraints.
 
 ## Validation
 
-  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonneg_finite_val`](@ref).
+  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -85,10 +85,10 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
                                      <:Pair{<:AbstractString, <:Real},
                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                            kwargs::NamedTuple = (; atol = 1e-8))
-        assert_nonneg_finite_val(l)
-        assert_nonneg_finite_val(s)
-        assert_nonneg_finite_val(fl)
-        assert_nonneg_finite_val(fs)
+        assert_nonempty_nonneg_finite_val(l, :l)
+        assert_nonempty_nonneg_finite_val(s, :s)
+        assert_nonempty_nonneg_finite_val(fl, :fl)
+        assert_nonempty_nonneg_finite_val(fs, :fs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
@@ -197,7 +197,7 @@ Container for portfolio transaction fee constraints.
 
 ## Validation
 
-  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonneg_finite_val`](@ref).
+  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -238,10 +238,10 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
                   fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                   fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                   kwargs::NamedTuple = (; atol = 1e-8))
-        assert_nonneg_finite_val(l)
-        assert_nonneg_finite_val(s)
-        assert_nonneg_finite_val(fl)
-        assert_nonneg_finite_val(fs)
+        assert_nonempty_nonneg_finite_val(l, :l)
+        assert_nonempty_nonneg_finite_val(s, :s)
+        assert_nonempty_nonneg_finite_val(fl, :fl)
+        assert_nonempty_nonneg_finite_val(fs, :fs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end

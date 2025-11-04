@@ -447,13 +447,13 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     b::T3
     function Regression(M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix},
                         b::Union{Nothing, <:AbstractVector})
-        @argcheck(!isempty(M))
+        @argcheck(!isempty(M), IsEmptyError)
         if isa(b, AbstractVector)
-            @argcheck(!isempty(b))
-            @argcheck(length(b) == size(M, 1))
+            @argcheck(!isempty(b), IsEmptyError)
+            @argcheck(length(b) == size(M, 1), DimensionMismatch)
         end
         if !isnothing(L)
-            @argcheck(size(L, 1) == size(M, 1))
+            @argcheck(size(L, 1) == size(M, 1), DimensionMismatch)
         end
         return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
     end

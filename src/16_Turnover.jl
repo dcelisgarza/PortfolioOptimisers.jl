@@ -25,7 +25,7 @@ Estimator for turnover portfolio constraints.
 ## Validation
 
   - `!isempty(w)`.
-  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -51,9 +51,9 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
                                val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
                                           <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                                default::Real)
-        @argcheck(!isempty(w))
-        assert_nonneg_finite_val(val)
-        @argcheck(default >= zero(default))
+        assert_nonempty_finite_val(w, :w)
+        assert_nonempty_nonneg_finite_val(val)
+        @argcheck(zero(default) <= default)
         return new{typeof(w), typeof(val), typeof(default)}(w, val, default)
     end
 end
@@ -162,15 +162,10 @@ struct Turnover{T1, T2} <: AbstractResult
     val::T2
     function Turnover(w::AbstractVector{<:Real},
                       val::Union{<:Real, <:AbstractVector{<:Real}})
-        @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
+        assert_nonempty_finite_val(w, :w)
+        assert_nonempty_nonneg_finite_val(val)
         if isa(val, AbstractVector)
-            @argcheck(!isempty(val))
             @argcheck(length(val) == length(w))
-            @argcheck(any(isfinite, val))
-            @argcheck(all(x -> x >= zero(x), val))
-        else
-            @argcheck(isfinite(val))
-            @argcheck(val >= zero(eltype(val)))
         end
         return new{typeof(w), typeof(val)}(w, val)
     end

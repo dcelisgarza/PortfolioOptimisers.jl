@@ -174,7 +174,7 @@ Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, 
 ## Validation
 
   - `isfinite(scale)`.
-  - `ub` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `ub` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -200,7 +200,7 @@ struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     function RiskMeasureSettings(scale::Real,
                                  ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier},
                                  rke::Bool)
-        assert_nonneg_finite_val(ub)
+        assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end

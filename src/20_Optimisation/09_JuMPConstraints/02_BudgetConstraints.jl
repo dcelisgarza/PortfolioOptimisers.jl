@@ -47,25 +47,25 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
         @argcheck(!isempty(w))
         if isa(vp, AbstractVector)
             @argcheck(!isempty(vp))
-            @argcheck(all(x -> x >= zero(x), vp))
+            @argcheck(all(x -> zero(x) <= x, vp))
         else
             @argcheck(vp >= zero(vp))
         end
         if isa(vn, AbstractVector)
             @argcheck(!isempty(vn))
-            @argcheck(all(x -> x >= zero(x), vn))
+            @argcheck(all(x -> zero(x) <= x, vn))
         else
             @argcheck(vn >= zero(vn))
         end
         if isa(up, AbstractVector)
             @argcheck(!isempty(up))
-            @argcheck(all(x -> x >= zero(x), up))
+            @argcheck(all(x -> zero(x) <= x, up))
         else
             @argcheck(up >= zero(up))
         end
         if isa(un, AbstractVector)
             @argcheck(!isempty(un))
-            @argcheck(all(x -> x >= zero(x), un))
+            @argcheck(all(x -> zero(x) <= x, un))
         else
             @argcheck(un >= zero(un))
         end
@@ -109,25 +109,25 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
         @argcheck(!isempty(w))
         if isa(vp, AbstractVector)
             @argcheck(!isempty(vp))
-            @argcheck(all(x -> x >= zero(x), vp))
+            @argcheck(all(x -> zero(x) <= x, vp))
         else
             @argcheck(vp >= zero(vp))
         end
         if isa(vn, AbstractVector)
             @argcheck(!isempty(vn))
-            @argcheck(all(x -> x >= zero(x), vn))
+            @argcheck(all(x -> zero(x) <= x, vn))
         else
             @argcheck(vn >= zero(vn))
         end
         if isa(up, AbstractVector)
             @argcheck(!isempty(up))
-            @argcheck(all(x -> x >= zero(x), up))
+            @argcheck(all(x -> zero(x) <= x, up))
         else
             @argcheck(up >= zero(up))
         end
         if isa(un, AbstractVector)
             @argcheck(!isempty(un))
-            @argcheck(all(x -> x >= zero(x), un))
+            @argcheck(all(x -> zero(x) <= x, un))
         else
             @argcheck(un >= zero(un))
         end

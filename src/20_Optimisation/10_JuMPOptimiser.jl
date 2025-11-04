@@ -101,7 +101,7 @@ end
 function assert_finite_nonnegative_real_or_vec(val::AbstractVector{<:Real})
     @argcheck(any(isfinite, val))
     @argcheck(any(x -> x > zero(x), val))
-    @argcheck(all(x -> x >= zero(x), val))
+    @argcheck(all(x -> zero(x) <= x, val))
     return nothing
 end
 #=

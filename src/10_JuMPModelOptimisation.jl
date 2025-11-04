@@ -72,7 +72,7 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
                                     <:AbstractVector{<:Pair}}, check_sol::NamedTuple,
                     add_bridges::Bool)
         if isa(settings, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(settings), IsEmptyError(non_empty_msg("`settings`") * "."))
+            @argcheck(!isempty(settings), IsEmptyError)
         end
         return new{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                    typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)

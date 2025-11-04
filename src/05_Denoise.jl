@@ -105,9 +105,7 @@ struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
     alpha::T1
     function ShrunkDenoise(alpha::Real)
         @argcheck(zero(alpha) <= alpha <= one(alpha),
-                  DomainError(alpha,
-                              range_msg("`alpha`", zero(alpha), one(alpha), nothing, true,
-                                        true) * "."))
+                  DomainError("0 <= alpha <= 1 must hold. Got\nalpha => $alpha"))
         return new{typeof(alpha)}(alpha)
     end
 end
@@ -186,8 +184,8 @@ struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     n::T6
     function Denoise(alg::AbstractDenoiseAlgorithm, args::Tuple, kwargs::NamedTuple, kernel,
                      m::Integer, n::Integer)
-        @argcheck(m > 1, DomainError(m, comp_msg("`m`", 1, :gt, m) * "."))
-        @argcheck(n > 1, DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
+        @argcheck(1 < m, DomainError)
+        @argcheck(1 < n, DomainError)
         return new{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
                    typeof(n)}(alg, args, kwargs, kernel, m, n)
     end
@@ -403,7 +401,7 @@ function denoise!(::Nothing, args...)
 end
 function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
                   pdm::Union{Nothing, <:Posdef} = Posdef())
-    assert_matrix_issquare(X)
+    assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
     if iscov

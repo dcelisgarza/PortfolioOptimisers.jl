@@ -67,7 +67,7 @@ struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
                               power::Union{Nothing, <:Integer},
                               alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
-            @argcheck(power >= one(power))
+            @argcheck(one(power) <= power, DomainError)
         end
         return new{typeof(dist), typeof(args), typeof(kwargs), typeof(power), typeof(alg)}(dist,
                                                                                            args,

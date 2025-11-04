@@ -56,9 +56,7 @@ struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
     w::T2
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
                                w::Union{Nothing, <:AbstractWeights})
-        if isa(w, AbstractWeights)
-            @argcheck(!isempty(w))
-        end
+        assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
     end
 end

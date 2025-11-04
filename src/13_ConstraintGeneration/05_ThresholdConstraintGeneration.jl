@@ -77,7 +77,7 @@ Container for buy-in threshold portfolio constraints.
 
 ## Validation
 
-  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -100,7 +100,7 @@ BuyInThreshold
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
     function BuyInThreshold(val::Union{<:Real, <:AbstractVector{<:Real}})
-        assert_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end

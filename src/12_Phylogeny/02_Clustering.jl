@@ -106,10 +106,10 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     k::T4
     function HierarchicalClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
                                     D::AbstractMatrix, k::Integer)
-        @argcheck(!isempty(S))
-        @argcheck(!isempty(D))
-        @argcheck(size(S) == size(D))
-        @argcheck(k >= one(k))
+        @argcheck(!isempty(S), IsEmptyError)
+        @argcheck(!isempty(D), IsEmptyError)
+        @argcheck(size(S) == size(D), DimensionMismatch)
+        @argcheck(one(k) <= k, DomainError)
         return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
     end
 end
@@ -245,12 +245,10 @@ struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
                                    alg::Union{<:Integer,
                                               <:AbstractOptimalNumberClustersAlgorithm})
         if !isnothing(max_k)
-            @argcheck(max_k >= one(max_k),
-                      DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
+            @argcheck(one(max_k) <= max_k, DomainError)
         end
         if isa(alg, Integer)
-            @argcheck(alg >= one(alg),
-                      DomainError("`alg` must be greater than or equal to 1:\nalg => $alg"))
+            @argcheck(one(alg) <= alg, DomainError)
         end
         return new{typeof(max_k), typeof(alg)}(max_k, alg)
     end

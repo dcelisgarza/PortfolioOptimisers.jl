@@ -59,7 +59,7 @@ struct Distance{T1, T2} <: AbstractDistanceEstimator
     alg::T2
     function Distance(power::Union{Nothing, <:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
-            @argcheck(power >= one(power))
+            @argcheck(one(power) <= power, DomainError)
         end
         return new{typeof(power), typeof(alg)}(power, alg)
     end
@@ -121,25 +121,25 @@ function distance(::Distance{Nothing, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    return sqrt.(clamp!((one(eltype(X)) .- (all(x -> x >= zero(x), rho) ? rho : abs.(rho))),
+    return sqrt.(clamp!((one(eltype(X)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho))),
                         zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function distance(::Distance{Nothing, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    return -log.(all(x -> x >= zero(x), rho) ? rho : abs.(rho))
+    return -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return -log.(rho)
 end
 function distance(::Distance{Nothing, <:CorrelationDistance},
@@ -323,7 +323,7 @@ function distance(::Distance{Nothing, <:SimpleAbsoluteDistance}, rho::AbstractMa
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
     end
-    return sqrt.(clamp!(one(eltype(rho)) .- (all(x -> x >= zero(x), rho) ? rho : abs.(rho)),
+    return sqrt.(clamp!(one(eltype(rho)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)),
                         zero(eltype(rho)), one(eltype(rho))))
 end
 function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::AbstractMatrix,
@@ -335,7 +335,7 @@ function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::Abstra
         rho = StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .-
-                        (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power,
+                        (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power,
                         zero(eltype(rho)), one(eltype(rho))))
 end
 function distance(::Distance{Nothing, <:LogDistance}, rho::AbstractMatrix, args...;
@@ -346,7 +346,7 @@ function distance(::Distance{Nothing, <:LogDistance}, rho::AbstractMatrix, args.
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
     end
-    return -log.(all(x -> x >= zero(x), rho) ? rho : abs.(rho))
+    return -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
@@ -356,11 +356,11 @@ function distance(de::Distance{<:Integer, <:LogDistance}, rho::AbstractMatrix, a
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
     end
-    return -log.((all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power)
+    return -log.((all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power)
 end
 function distance(::Distance{Nothing, <:CorrelationDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
-    assert_matrix_issquare(rho)
+    assert_matrix_issquare(rho, :rho)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov
@@ -371,7 +371,7 @@ function distance(::Distance{Nothing, <:CorrelationDistance}, rho::AbstractMatri
 end
 function distance(de::Distance{<:Integer, <:CorrelationDistance}, rho::AbstractMatrix,
                   args...; kwargs...)
-    assert_matrix_issquare(rho)
+    assert_matrix_issquare(rho, :rho)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov
@@ -435,26 +435,26 @@ function cor_and_dist(::Distance{Nothing, <:SimpleAbsoluteDistance},
                       kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho,
-           sqrt.(clamp!((one(eltype(X)) .- (all(x -> x >= zero(x), rho) ? rho : abs.(rho))),
+           sqrt.(clamp!((one(eltype(X)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho))),
                         zero(eltype(X)), one(eltype(X))))
 end
 function cor_and_dist(de::Distance{<:Integer, <:SimpleAbsoluteDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return rho, sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    return rho, -log.(all(x -> x >= zero(x), rho) ? rho : abs.(rho))
+    return rho, -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
-    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
+    rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return rho, -log.(rho)
 end
 function cor_and_dist(::Distance{Nothing, <:LogDistance},

@@ -336,16 +336,13 @@ struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                                   c2::Real, c3::Real, n::Real,
                                   alg::SmythBrobyCovarianceAlgorithm,
                                   threads::FLoops.Transducers.Executor)
-        @argcheck(zero(threshold) < threshold < one(threshold))
+        @argcheck(zero(threshold) < threshold < one(threshold),
+                  DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         @argcheck(zero(c1) < c1 <= one(c1),
-                  DomainError(c1,
-                              range_msg("`c1`", zero(c1), one(c1), nothing, true, true) *
-                              "."))
+                  DomainError("0 < c1 <= 1 must hold. Got\nc1 => $c1"))
         @argcheck(zero(c2) < c2 <= one(c2),
-                  DomainError(c2,
-                              range_msg("`c2`", zero(c2), one(c2), nothing, false, true) *
-                              "."))
-        @argcheck(c3 > c2)
+                  DomainError("0 < c2 <= 1 must hold. Got\nc2 => $c2"))
+        @argcheck(c2 < c3, DomainError)
         return new{typeof(me), typeof(ve), typeof(pdm), typeof(threshold), typeof(c1),
                    typeof(c2), typeof(c3), typeof(n), typeof(alg), typeof(threads)}(me, ve,
                                                                                     pdm,

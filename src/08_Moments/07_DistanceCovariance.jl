@@ -107,8 +107,8 @@ This function calculates the distance correlation between `v1` and `v2` using th
 """
 function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)
-    @argcheck(N > 1)
-    @argcheck(N == length(v2))
+    @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
+    @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
     a, b = if isnothing(ce.w)
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
@@ -251,8 +251,8 @@ This function calculates the distance covariance between `v1` and `v2` using the
 """
 function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)
-    @argcheck(N > 1)
-    @argcheck(N == length(v2))
+    @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
+    @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
     a, b = if isnothing(ce.w)
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),

@@ -19,7 +19,7 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
             @argcheck(!isempty(sk))
             @argcheck(!isempty(V))
             @argcheck(size(sk, 1)^2 == size(sk, 2))
-            assert_matrix_issquare(V)
+            assert_matrix_issquare(V, :V)
         end
         return new{typeof(settings), typeof(mp), typeof(sk), typeof(V), typeof(alg)}(settings,
                                                                                      mp, sk,

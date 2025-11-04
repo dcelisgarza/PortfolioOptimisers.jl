@@ -37,7 +37,8 @@ PValue
 struct PValue{T1} <: AbstractStepwiseRegressionCriterion
     threshold::T1
     function PValue(threshold::Real)
-        @argcheck(zero(threshold) < threshold < one(threshold))
+        @argcheck(zero(threshold) < threshold < one(threshold),
+                  DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         return new{typeof(threshold)}(threshold)
     end
 end

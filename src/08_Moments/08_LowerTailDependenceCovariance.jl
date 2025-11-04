@@ -53,7 +53,8 @@ struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     threads::T3
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Real,
                                            threads::FLoops.Transducers.Executor)
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
         return new{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
     end
 end

@@ -49,7 +49,7 @@ Detone
 struct Detone{T1} <: AbstractDetoneEstimator
     n::T1
     function Detone(n::Integer)
-        @argcheck(n > zero(n), DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
+        @argcheck(zero(n) < n, DomainError)
         return new{typeof(n)}(n)
     end
 end
@@ -121,7 +121,7 @@ end
 function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     n = ce.n
     @argcheck(one(n) <= n <= size(X, 2),
-              DomainError(n, range_msg("`n`", one(n), size(X, 2), n, true, true) * "."))
+              DomainError("1 <= n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
     s = diag(X)
     iscov = any(!isone, s)

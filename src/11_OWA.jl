@@ -104,8 +104,7 @@ NormalisedConstantRelativeRiskAversion
 struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
     g::T1
     function NormalisedConstantRelativeRiskAversion(g::Real)
-        @argcheck(zero(g) < g < one(g),
-                  DomainError(g, range_msg("`g`", zero(g), one(g), g, false, false) * "."))
+        @argcheck(zero(g) < g < one(g), DomainError("0 < g < 1 must hold. Got\ng => $g"))
         return new{typeof(g)}(g)
     end
 end
@@ -181,16 +180,14 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     function OWAJuMP(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, max_phi::Real,
                      sc::Real, so::Real, alg::AbstractOrderedWeightsArrayAlgorithm)
         if isa(slv, AbstractVector)
-            @argcheck(!isempty(slv), IsEmptyError(non_empty_msg("`slv`") * "."))
+            @argcheck(!isempty(slv), IsEmptyError)
         end
         @argcheck(zero(max_phi) < max_phi < one(max_phi),
-                  DomainError(max_phi,
-                              range_msg("`max_phi`", zero(max_phi), one(max_phi), max_phi,
-                                        false, false) * "."))
-        @argcheck(isfinite(sc))
-        @argcheck(sc > zero(sc))
-        @argcheck(isfinite(so))
-        @argcheck(so > zero(so))
+                  DomainError("0 < max_phi < 1 must hold. Got\nmax_phi => $max_phi"))
+        @argcheck(isfinite(sc), DomainError)
+        @argcheck(zero(sc) < sc, DomainError)
+        @argcheck(isfinite(so), DomainError)
+        @argcheck(zero(so) < so, DomainError)
         return new{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
                                                                                       max_phi,
                                                                                       sc,
@@ -477,9 +474,7 @@ Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Ris
 """
 function owa_cvar(T::Integer, alpha::Real = 0.05)
     @argcheck(zero(alpha) < alpha < one(alpha),
-              DomainError(alpha,
-                          range_msg("`alpha`", zero(alpha), one(alpha), alpha, false,
-                                    false) * "."))
+              DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -one(alpha) / (T * alpha)
@@ -543,8 +538,9 @@ This function approximates the tail Gini risk measure by integrating over a rang
   - [`owa_wcvar`](@ref)
 """
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
-    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha))
-    @argcheck(a_sim > zero(a_sim))
+    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha),
+              DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+    @argcheck(zero(a_sim) < a_sim, DomainError)
     alphas = range(alpha_i, alpha; length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
@@ -768,7 +764,7 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
 """
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
-    @argcheck(k >= 2, DomainError("`k` must be at least 2:\nk => $k"))
+    @argcheck(2 <= k, DomainError)
     rg = 2:k
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
     for i in rg
