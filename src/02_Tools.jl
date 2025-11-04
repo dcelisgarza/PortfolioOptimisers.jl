@@ -43,45 +43,45 @@ Checks that the provided value (scalar, vector, dictionary, or pair) contains on
 """
 function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))."))
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))."))
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
     @argcheck(all(x -> zero(x) <= x, values(val)),
-              DomainError("all(x -> x >= 0, values($val_sym)) must hold. Got\nall(x -> x >= 0, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))."))
+              DomainError("all(x -> 0 <= x, values($val_sym)) must hold. Got\nall(x -> 0 <= x, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))"))
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(val::AbstractVector{<:Pair},
                                            val_sym::Symbol = :val)
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))."))
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))."))
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
     @argcheck(all(x -> zero(x[2]) <= x[2], val),
-              DomainError("all(x -> x[2] >= 0, $val_sym) must hold. Got\nall(x -> x[2] >= 0, $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))."))
+              DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::AbstractVector{<:Real},
+function assert_nonempty_nonneg_finite_val(val::Union{<:AbstractVector{<:Real},
+                                                      <:AbstractMatrix{<:Real}},
                                            val_sym::Symbol = :val)
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))."))
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))."))
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
     @argcheck(all(x -> zero(x) <= x, val),
-              DomainError("all(x -> x >= 0, $val_sym) must hold. Got\nall(x -> x >= 0, $val_sym) => $(all(x -> zero(x) <= x, val))."))
+              DomainError("all(x -> 0 <= x, $val_sym) must hold. Got\nall(x -> 0 <= x, $val_sym) => $(all(x -> zero(x) <= x, val))"))
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Symbol = :val)
     @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))."))
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
     @argcheck(zero(val[2]) <= val[2],
-              DomainError("$(val[2]) >= 0 must hold. Got\n$(val[2]) => $(val[2])."))
+              DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(val::Real, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))."))
-    @argcheck(zero(val) <= val,
-              DomainError("$(val) >= 0 must hold. Got\n$(val) => $(val)."))
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+    @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(args...)
@@ -89,36 +89,84 @@ function assert_nonempty_nonneg_finite_val(args...)
 end
 function assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))."))
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))."))
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
     return nothing
 end
 function assert_nonempty_finite_val(val::AbstractVector{<:Pair}, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))."))
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))."))
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::AbstractVector{<:Real}, val_sym::Symbol = :val)
+function assert_nonempty_finite_val(val::Union{<:AbstractVector{<:Real},
+                                               <:AbstractMatrix{<:Real}},
+                                    val_sym::Symbol = :val)
     @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))."))
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))."))
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
     return nothing
 end
 function assert_nonempty_finite_val(val::Pair, val_sym::Symbol = :val)
     @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))."))
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
     return nothing
 end
 function assert_nonempty_finite_val(val::Real, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))."))
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     return nothing
 end
 function assert_nonempty_finite_val(args...)
+    return nothing
+end
+function assert_nonempty_geq0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, values(val)),
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
+    @argcheck(all(x -> zero(x) < x, values(val)),
+              DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
+    return nothing
+end
+function assert_nonempty_geq0_finite_val(val::AbstractVector{<:Pair},
+                                         val_sym::Symbol = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, getindex.(val, 2)),
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    @argcheck(all(x -> zero(x[2]) < x[2], val),
+              DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
+    return nothing
+end
+function assert_nonempty_geq0_finite_val(val::Union{<:AbstractVector{<:Real},
+                                                    <:AbstractMatrix{<:Real}},
+                                         val_sym::Symbol = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, val),
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
+    @argcheck(all(x -> zero(x) < x, val),
+              DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
+    return nothing
+end
+function assert_nonempty_geq0_finite_val(val::Pair, val_sym::Symbol = :val)
+    @argcheck(isfinite(val[2]),
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+    @argcheck(zero(val[2]) < val[2],
+              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
+    return nothing
+end
+function assert_nonempty_geq0_finite_val(val::Real, val_sym::Symbol = :val)
+    @argcheck(isfinite(val),
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
+    return nothing
+end
+function assert_nonempty_geq0_finite_val(args...)
     return nothing
 end
 """

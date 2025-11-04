@@ -120,14 +120,12 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     iv::T6
     ivpa::T7
     function ReturnsResult(nx::Union{Nothing, <:AbstractVector},
-                           X::Union{Nothing, <:AbstractMatrix},
+                           X::Union{Nothing, <:AbstractMatrix{<:Real}},
                            nf::Union{Nothing, <:AbstractVector},
-                           F::Union{Nothing, <:AbstractMatrix},
+                           F::Union{Nothing, <:AbstractMatrix{<:Real}},
                            ts::Union{Nothing, <:AbstractVector},
-                           iv::Union{Nothing, <:AbstractMatrix},
-                           ivpa::Union{Nothing, <:Real, <:AbstractVector})
-        @argcheck(!(isnothing(X) && isnothing(F)),
-                  IsNothingError("at least one of `X` or `F` must be provided. Got\n!isnothing(X) => $(isnothing(X))\n!isnothing(F) => $(isnothing(F))"))
+                           iv::Union{Nothing, <:AbstractMatrix{<:Real}},
+                           ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
@@ -135,6 +133,8 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
         end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
+            @argcheck(!(isnothing(X) && isnothing(F)),
+                      IsNothingError("at least one of `X` or `F` must be provided. Got\n!isnothing(X) => $(isnothing(X))\n!isnothing(F) => $(isnothing(F))"))
             if !isnothing(X)
                 @argcheck(length(ts) == size(X, 1), DimensionMismatch)
             end
@@ -143,24 +143,24 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
             end
         end
         if !isnothing(iv)
+            assert_nonempty_nonneg_finite_val(iv, :iv)
+            assert_nonempty_geq0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
             if isa(ivpa, AbstractVector)
                 @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
             end
-            assert_nonempty_nonneg_finite_val(iv, :iv)
-            assert_nonempty_nonneg_finite_val(ivpa, :ivpa)
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts), typeof(iv),
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                       X::Union{Nothing, <:AbstractMatrix} = nothing,
+                       X::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
                        nf::Union{Nothing, <:AbstractVector} = nothing,
-                       F::Union{Nothing, <:AbstractMatrix} = nothing,
+                       F::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
                        ts::Union{Nothing, <:AbstractVector} = nothing,
-                       iv::Union{Nothing, <:AbstractMatrix} = nothing,
-                       ivpa::Union{Nothing, <:Real, <:AbstractVector} = nothing)
+                       iv::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
+                       ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i::AbstractVector)
