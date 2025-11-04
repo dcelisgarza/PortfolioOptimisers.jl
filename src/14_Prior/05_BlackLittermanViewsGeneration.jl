@@ -251,7 +251,7 @@ end
 function assert_bl_views_conf(views_conf::NumVec,
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    if isa(val, NumVec)
+    if isa(val, AbstractVector)
         @argcheck(length(val) == length(views_conf))
     else
         @argcheck(length(views_conf) == 1)
