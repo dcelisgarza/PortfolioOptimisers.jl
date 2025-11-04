@@ -22,6 +22,12 @@
         @test_throws IsEmptyError ReturnsResult(; nx = nx, X = Matrix{Float64}(undef, 0, 0))
         @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = rand(3, 5))
 
+        @test_throws IsNothingError ReturnsResult(; nf = nothing, F = F)
+        @test_throws IsNothingError ReturnsResult(; nf = nf)
+        @test_throws IsEmptyError ReturnsResult(; nf = [], F = F)
+        @test_throws IsEmptyError ReturnsResult(; nf = nf, F = Matrix{Float64}(undef, 0, 0))
+        @test_throws DimensionMismatch ReturnsResult(; nf = nf, F = rand(3, 5))
+
         @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = X, nf = nf,
                                                      F = rand(4, 2))
 
@@ -140,5 +146,28 @@
 
         ncrra = NormalisedConstantRelativeRiskAversion(; g = 0.25)
         @test ncrra.g == 0.25
+
+        @test_throws IsEmptyError OWAJuMP(; slv = Solver[])
+        @test_throws DomainError OWAJuMP(; max_phi = 0)
+        @test_throws DomainError OWAJuMP(; max_phi = 1)
+        @test_throws DomainError OWAJuMP(; sc = 0)
+        @test_throws DomainError OWAJuMP(; sc = Inf)
+        @test_throws DomainError OWAJuMP(; so = 0)
+        @test_throws DomainError OWAJuMP(; so = Inf)
+
+        owj = OWAJuMP()
+        @test owj.slv == Solver()
+        @test owj.max_phi == 0.5
+        @test owj.sc == 1.0
+        @test owj.so == 1.0
+        @test owj.alg == MaximumEntropy()
+
+        owj = OWAJuMP(; slv = Solver(; name = "Foo"), max_phi = 0.25, sc = 2.0, so = 3.0,
+                      alg = MinimumSumSquares())
+        @test owj.slv == Solver(; name = "Foo")
+        @test owj.max_phi == 0.25
+        @test owj.sc == 2.0
+        @test owj.so == 3.0
+        @test owj.alg == MinimumSumSquares()
     end
 end
