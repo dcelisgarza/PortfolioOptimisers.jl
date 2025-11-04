@@ -328,7 +328,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
                                                  <:AbstractClusteringResult},
                                        B::Union{<:Integer, <:IntVec}, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
-        if isa(B, NumVec)
+        if isa(B, IntVec)
             validate_length_integer_phylogeny_constraint_B(pe, B)
         end
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
@@ -399,7 +399,7 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
         assert_nonempty_nonneg_finite_val(B, :B)
-        if isa(B, NumVec)
+        if isa(B, IntVec)
             @argcheck(size(A, 1) == length(B))
         end
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
@@ -747,7 +747,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 function centrality_constraints(ccs::Union{<:CentralityConstraint,
                                            <:AbstractVector{<:CentralityConstraint}},
                                 X::NumMat; dims::Int = 1, kwargs...)
-    if isa(ccs, NumVec)
+    if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs))
     end
     A_ineq = Vector{eltype(X)}(undef, 0)

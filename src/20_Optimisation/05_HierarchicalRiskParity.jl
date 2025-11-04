@@ -8,7 +8,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
                                              <:AbstractVector{<:OptimisationRiskMeasure}},
                                     sce::Scalariser,
                                     fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, NumVec)
+        if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
         return new{typeof(opt), typeof(r), typeof(sce), typeof(fb)}(opt, r, sce, fb)

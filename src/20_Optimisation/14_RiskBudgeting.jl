@@ -43,10 +43,10 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                            rba::RiskBudgetingAlgorithm, wi::Union{Nothing, <:NumVec},
                            fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, NumVec)
+        if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
-        if isa(wi, NumVec)
+        if !isnothing(wi)
             @argcheck(!isempty(wi))
         end
         if isa(rba.rkb, RiskBudgetEstimator)

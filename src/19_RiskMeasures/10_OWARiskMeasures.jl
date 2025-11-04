@@ -17,7 +17,7 @@ struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
     alg::T3
     function OrderedWeightsArray(settings::RiskMeasureSettings, w::Union{Nothing, <:NumVec},
                                  alg::OrderedWeightsArrayFormulation)
-        if isa(w, NumVec)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w), typeof(alg)}(settings, w, alg)

@@ -8,10 +8,10 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
                       r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                       obj::ObjectiveFunction, wi::Union{Nothing, <:NumVec},
                       fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, NumVec)
+        if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
-        if isa(wi, NumVec)
+        if !isnothing(wi)
             @argcheck(!isempty(wi))
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,

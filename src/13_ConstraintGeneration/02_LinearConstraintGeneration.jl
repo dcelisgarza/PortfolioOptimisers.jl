@@ -1098,7 +1098,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
                                 sets::AssetSets; datatype::DataType = Float64,
                                 strict::Bool = false)
-    if isa(lcs, NumVec)
+    if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError(non_empty_msg("lcs") * "."))
     end
     A_ineq = Vector{datatype}(undef, 0)

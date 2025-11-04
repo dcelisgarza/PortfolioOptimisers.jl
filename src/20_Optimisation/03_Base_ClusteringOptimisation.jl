@@ -23,7 +23,7 @@ struct JuMPWeightFinaliser{T1, T2, T3, T4} <: WeightFinaliser
     alg::T4
     function JuMPWeightFinaliser(slv::Union{<:Solver, <:SlvVec}, sc::Number, so::Number,
                                  alg::JuMPWeightFinaliserFormulation)
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc > zero(sc))

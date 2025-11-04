@@ -24,7 +24,7 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
     fb::T4
     function DiscreteAllocation(slv::Union{<:Solver, <:SlvVec}, sc::Number, so::Number,
                                 fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator})
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc > zero(sc))

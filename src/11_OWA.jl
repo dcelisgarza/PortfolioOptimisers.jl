@@ -179,7 +179,7 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     alg::T5
     function OWAJuMP(slv::Union{<:Solver, <:SlvVec}, max_phi::Number, sc::Number,
                      so::Number, alg::AbstractOrderedWeightsArrayAlgorithm)
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv), IsEmptyError)
         end
         @argcheck(zero(max_phi) < max_phi < one(max_phi),

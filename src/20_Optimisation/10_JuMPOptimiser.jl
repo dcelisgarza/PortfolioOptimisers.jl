@@ -252,7 +252,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isfinite(sbgt))
             @argcheck(sbgt >= 0)
         end
-        if isa(cent, NumVec)
+        if isa(cent, AbstractVector)
             @argcheck(!isempty(cent))
         end
         if !isnothing(card)
@@ -265,17 +265,17 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
             @argcheck(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
             @argcheck(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-        elseif isa(scard, NumVec)
+        elseif isa(scard, IntVec)
             @argcheck(!isempty(scard))
             @argcheck(all(isfinite, scard))
             @argcheck(all(x -> x > 0, scard))
-            @argcheck(isa(smtx, NumVec))
+            @argcheck(isa(smtx, AbstractVector))
             @argcheck(length(scard) == length(smtx))
-            if isa(slt, NumVec)
+            if isa(slt, AbstractVector)
                 @argcheck(!isempty(slt))
                 @argcheck(length(scard) == length(slt))
             end
-            if isa(sst, NumVec)
+            if isa(sst, AbstractVector)
                 @argcheck(!isempty(sst))
                 @argcheck(length(scard) == length(sst))
             end
@@ -283,14 +283,14 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                (isa(slt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
                 isa(sst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
             @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
-        elseif isnothing(scard) && (isa(slt, NumVec) || isa(sst, NumVec))
-            @argcheck(isa(smtx, NumVec))
+        elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
+            @argcheck(isa(smtx, AbstractVector))
             @argcheck(!isempty(smtx))
-            if isa(slt, NumVec)
+            if isa(slt, AbstractVector)
                 @argcheck(!isempty(slt))
                 @argcheck(length(slt) == length(smtx))
             end
-            if isa(sst, NumVec)
+            if isa(sst, AbstractVector)
                 @argcheck(!isempty(sst))
                 @argcheck(length(sst) == length(smtx))
             end
@@ -301,26 +301,26 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                           Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
             @argcheck(isa(sgst,
                           Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-            if isa(sgcard, LinearConstraint) && isa(smtx, NumMatrix)
+            if isa(sgcard, LinearConstraint) && isa(smtx, NumMat)
                 N = size(smtx, 1)
                 N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
                 N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
                 @argcheck(N == N_ineq + N_eq)
             end
-        elseif isa(sgcard, NumVec)
+        elseif isa(sgcard, AbstractVector)
             @argcheck(!isempty(sgcard))
-            @argcheck(isa(sgmtx, NumVec))
+            @argcheck(isa(sgmtx, AbstractVector))
             @argcheck(!isempty(sgmtx))
             @argcheck(length(sgcard) == length(sgmtx))
-            if isa(sglt, NumVec)
+            if isa(sglt, AbstractVector)
                 @argcheck(!isempty(sglt))
                 @argcheck(length(sgcard) == length(sglt))
             end
-            if isa(sgst, NumVec)
+            if isa(sgst, AbstractVector)
                 @argcheck(length(sgcard) == length(sgst))
             end
             for (sgc, smt) in zip(sgcard, sgmtx)
-                if isa(sgc, LinearConstraint) && isa(smt, NumMatrix)
+                if isa(sgc, LinearConstraint) && isa(smt, NumMat)
                     N = size(smt, 1)
                     N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
                     N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
@@ -331,14 +331,14 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                (isa(sglt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
                 isa(sgst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
             @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
-        elseif isnothing(sgcard) && (isa(sglt, NumVec) || isa(sgst, NumVec))
-            @argcheck(isa(sgmtx, NumVec))
+        elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
+            @argcheck(isa(sgmtx, AbstractVector))
             @argcheck(!isempty(sgmtx))
-            if isa(sglt, NumVec)
+            if isa(sglt, AbstractVector)
                 @argcheck(!isempty(sglt))
                 @argcheck(length(sglt) == length(sgmtx))
             end
-            if isa(sgst, NumVec)
+            if isa(sgst, AbstractVector)
                 @argcheck(!isempty(sgst))
                 @argcheck(length(sgst) == length(sgmtx))
             end
@@ -355,16 +355,16 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
            isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets))
         end
-        if isa(tn, NumVec)
+        if isa(tn, AbstractVector)
             @argcheck(!isempty(tn))
         end
-        if isa(te, NumVec)
+        if isa(te, AbstractVector)
             @argcheck(!isempty(te))
         end
         if !isnothing(nea)
             @argcheck(nea > zero(nea))
         end
-        if isa(slv, NumVec)
+        if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),

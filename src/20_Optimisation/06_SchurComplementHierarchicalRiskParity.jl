@@ -70,7 +70,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
                                                                  <:AbstractVector{<:SchurComplementParams}},
                                                    fb::Union{Nothing,
                                                              <:OptimisationEstimator})
-        if isa(params, NumVec)
+        if isa(params, AbstractVector)
             @argcheck(!isempty(params))
         end
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)

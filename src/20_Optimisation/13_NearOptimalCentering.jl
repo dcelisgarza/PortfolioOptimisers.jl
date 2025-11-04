@@ -54,7 +54,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                                   w_max_ini::Union{Nothing, <:NumVec}, ucs_flag::Bool,
                                   alg::NearOptimalCenteringAlgorithm,
                                   fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(r, NumVec)
+        if isa(r, AbstractVector)
             @argcheck(!isempty(r))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
                 @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
@@ -64,25 +64,25 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                 @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
         end
-        if isa(w_min, NumVec)
+        if !isnothing(w_min)
             @argcheck(!isempty(w_min))
         end
-        if isa(w_min_ini, NumVec)
+        if !isnothing(w_min_ini)
             @argcheck(!isempty(w_min_ini))
         end
-        if isa(w_opt, NumVec)
+        if !isnothing(w_opt)
             @argcheck(!isempty(w_opt))
         end
-        if isa(w_opt_ini, NumVec)
+        if !isnothing(w_opt_ini)
             @argcheck(!isempty(w_opt_ini))
         end
-        if isa(w_max, NumVec)
+        if !isnothing(w_max)
             @argcheck(!isempty(w_max))
         end
-        if isa(w_max_ini, NumVec)
+        if !isnothing(w_max_ini)
             @argcheck(!isempty(w_max_ini))
         end
-        if isa(bins, Number)
+        if !isnothing(bins)
             @argcheck(isfinite(bins) && bins > 0)
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),

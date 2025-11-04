@@ -102,7 +102,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
                       kt::Union{Nothing, <:NumMat}, N::Union{Nothing, <:Integer},
                       alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation)
         mu_flag = isa(mu, NumVec)
-        kt_flag = isa(kt, NumMat)
+        kt_flag = !isnothing(kt)
         if mu_flag
             @argcheck(!isempty(mu))
             @argcheck(all(isfinite, mu))

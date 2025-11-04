@@ -100,7 +100,7 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
                                               <:AbstractVector{<:ParsingResult}},
                                    sets::AssetSets; datatype::DataType = Float64,
                                    strict::Bool = false)
-    if isa(lcs, NumVec)
+    if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs))
     end
     P = Vector{datatype}(undef, 0)

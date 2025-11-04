@@ -1,6 +1,6 @@
 function ERM(x::NumVec, slv::Union{<:Solver, <:SlvVec}, alpha::Number = 0.05,
              w::Union{Nothing, <:AbstractWeights} = nothing)
-    if isa(slv, NumVec)
+    if isa(slv, SlvVec)
         @argcheck(!isempty(slv))
     end
     model = JuMP.Model()
@@ -40,7 +40,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     function EntropicValueatRisk(settings::RiskMeasureSettings,
                                  slv::Union{Nothing, <:Solver, <:SlvVec}, alpha::Number,
                                  w::Union{Nothing, <:AbstractWeights})
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -76,7 +76,7 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
                                       slv::Union{Nothing, <:Solver, <:SlvVec},
                                       alpha::Number, beta::Number,
                                       w::Union{Nothing, <:AbstractWeights})
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -113,7 +113,7 @@ struct EntropicDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     alpha::T3
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Union{Nothing, <:Solver, <:SlvVec}, alpha::Number)
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -147,7 +147,7 @@ struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Union{Nothing, <:Solver, <:SlvVec},
                                             alpha::Number)
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))

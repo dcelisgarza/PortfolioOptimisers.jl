@@ -325,14 +325,14 @@ BoxUncertaintySet
 struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     lb::T1
     ub::T2
-    function BoxUncertaintySet(lb::AbstractArray, ub::AbstractArray)
+    function BoxUncertaintySet(lb::Union{<:NumVec, <:NumMat}, ub::Union{<:NumVec, <:NumMat})
         @argcheck(!isempty(lb))
         @argcheck(!isempty(ub))
         @argcheck(size(lb) == size(ub))
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
+function BoxUncertaintySet(; lb::Union{<:NumVec, <:NumMat}, ub::Union{<:NumVec, <:NumMat})
     return BoxUncertaintySet(lb, ub)
 end
 function ucs_view(risk_ucs::BoxUncertaintySet{<:NumVec, <:NumVec}, i::NumVec)

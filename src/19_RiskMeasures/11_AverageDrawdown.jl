@@ -3,7 +3,7 @@ struct AverageDrawdown{T1, T2} <: RiskMeasure
     w::T2
     function AverageDrawdown(settings::RiskMeasureSettings,
                              w::Union{Nothing, <:AbstractWeights})
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w)}(settings, w)
@@ -54,7 +54,7 @@ struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
     w::T2
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Union{Nothing, <:AbstractWeights})
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w)}(settings, w)

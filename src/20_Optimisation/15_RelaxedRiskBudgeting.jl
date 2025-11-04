@@ -21,7 +21,7 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
                                   wi::Union{Nothing, <:NumVec},
                                   alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(wi, NumVec)
+        if !isnothing(wi)
             @argcheck(!isempty(wi))
         end
         if isa(rba.rkb, RiskBudgetEstimator)

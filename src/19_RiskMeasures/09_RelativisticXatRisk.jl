@@ -1,6 +1,6 @@
 function RRM(x::NumVec, slv::Union{<:Solver, <:SlvVec}, alpha::Number = 0.05,
              kappa::Number = 0.3, w::Union{Nothing, AbstractWeights} = nothing)
-    if isa(slv, NumVec)
+    if isa(slv, SlvVec)
         @argcheck(!isempty(slv))
     end
     T = length(x)
@@ -84,7 +84,7 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Union{Nothing, <:Solver, <:SlvVec}, alpha::Number,
                                      kappa::Number, w::Union{Nothing, AbstractWeights})
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -128,7 +128,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
                                           alpha::Number, kappa_a::Number, beta::Number,
                                           kappa_b::Number,
                                           w::Union{Nothing, <:AbstractWeights})
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -168,7 +168,7 @@ struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     kappa::T4
     function RelativisticDrawdownatRisk(settings, slv::Union{Nothing, <:Solver, <:SlvVec},
                                         alpha::Number, kappa::Number)
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -206,7 +206,7 @@ struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMea
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Union{Nothing, <:Solver, <:SlvVec},
                                                 alpha::Number, kappa::Number)
-        if isa(slv, NumVec)
+        if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))

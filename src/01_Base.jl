@@ -85,7 +85,7 @@ function Base.show(io::IO,
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
             print(io, "| nothing",'\n')
-        elseif isa(val, NumMatrix)
+        elseif isa(val, NumMat)
             print(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))",'\n')
         elseif isa(val, NumVec) && length(val) > 6
             print(io, "| $(length(val))-element $(typeof(val))",'\n')
@@ -157,7 +157,7 @@ function Base.show(io::IO,
                 sym2 = '│'
                 print(io, lpad("$sym2 ", padding + 3), l, '\n')
             end
-        elseif isa(val, NumMatrix)
+        elseif isa(val, NumMat)
             print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
         elseif isa(val, NumVec) && length(val) > 6
             print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')

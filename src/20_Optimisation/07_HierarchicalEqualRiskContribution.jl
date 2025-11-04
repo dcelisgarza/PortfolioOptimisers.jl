@@ -15,10 +15,10 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
                                                scei::Scalariser, sceo::Scalariser,
                                                threads::FLoops.Transducers.Executor,
                                                fb::Union{Nothing, <:OptimisationEstimator})
-        if isa(ri, NumVec)
+        if isa(ri, AbstractVector)
             @argcheck(!isempty(ri))
         end
-        if isa(ro, NumVec)
+        if isa(ro, AbstractVector)
             @argcheck(!isempty(ro))
         end
         return new{typeof(opt), typeof(ri), typeof(ro), typeof(scei), typeof(sceo),

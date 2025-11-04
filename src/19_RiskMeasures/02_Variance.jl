@@ -234,7 +234,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     function Variance(settings::RiskMeasureSettings, sigma::Union{Nothing, <:NumMat},
                       rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
                       alg::VarianceFormulation)
-        if isa(sigma, NumMatrix)
+        if !isnothing(sigma)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
@@ -379,7 +379,7 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
     sigma::T2
     function StandardDeviation(settings::RiskMeasureSettings,
                                sigma::Union{Nothing, <:NumMat})
-        if isa(sigma, NumMatrix)
+        if !isnothing(sigma)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
@@ -610,7 +610,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
                                     ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                                <:AbstractUncertaintySetEstimator},
                                     sigma::Union{Nothing, <:NumMat})
-        if isa(sigma, NumMatrix)
+        if !isnothing(sigma)
             @argcheck(!isempty(sigma))
         end
         return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
