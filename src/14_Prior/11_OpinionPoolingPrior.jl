@@ -250,10 +250,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
         if isa(w, NumVec)
             @argcheck(!isempty(w))
             @argcheck(length(w) == length(pes))
-            @argcheck(all(x -> zero(x) <= x <= one(x), w),
-                      DomainError(w,
-                                  range_msg("all entries of `w`", zero(w), one(w), nothing,
-                                            true, true) * "."))
+            @argcheck(all(x -> zero(x) <= x <= one(x), w), DomainError)
             @argcheck(sum(w) <= one(eltype(w)))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),

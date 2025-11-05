@@ -73,8 +73,8 @@ function DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
 """
-    ucs(ue::DeltaUncertaintySet, X::NumMat,
-        F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::DeltaUncertaintySet, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+        dims::Int = 1, kwargs...)
 
 Constructs box uncertainty sets for mean and covariance statistics using delta bounds from a prior estimator.
 
@@ -115,8 +115,8 @@ function ucs(ue::DeltaUncertaintySet, X::NumMat, F::Union{Nothing, <:NumMat} = n
            BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
 end
 """
-    mu_ucs(ue::DeltaUncertaintySet, X::NumMat,
-           F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::DeltaUncertaintySet, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+           dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for expected returns (mean) using delta bounds from a prior estimator.
 
@@ -154,8 +154,8 @@ function mu_ucs(ue::DeltaUncertaintySet, X::NumMat, F::Union{Nothing, <:NumMat} 
                              ub = ue.dmu * abs.(pr.mu) * 2)
 end
 """
-    sigma_ucs(ue::DeltaUncertaintySet, X::NumMat,
-              F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+sigma_ucs(ue::DeltaUncertaintySet, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using delta bounds from a prior estimator.
 

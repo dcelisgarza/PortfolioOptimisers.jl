@@ -14,8 +14,7 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:EstValType, <:NumVec},
-                                      val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:EstValType, <:NumVec}, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(args...)
 
 Validate that the input value is non-negative and finite.
@@ -24,8 +23,9 @@ Checks that the provided value (scalar, vector, dictionary, or pair) contains on
 
 # Arguments
 
-  - `val`: Input value to validate.
+  - `val`: Input value to validate. Can be a scalar, vector, dictionary, or pair.
   - `val_sym`: Symbolic name for the value (used in error messages).
+  - `args...`: Accepts any arguments, always passes.
 
 # Returns
 
@@ -33,12 +33,23 @@ Checks that the provided value (scalar, vector, dictionary, or pair) contains on
 
 # Validation
 
-  - `args...`: always passes.
-  - `Number`: `isfinite(val)` and `val >= 0`.
-  - `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
-  - `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
-  - `NumVec`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-  - `AbstractVector{<:Pair}`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+  - For `Number`: `isfinite(val)` and `val >= 0`.
+  - For `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
+  - For `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
+  - For `NumVec`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+  - For `AbstractVector{<:Pair}`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+
+# Details
+
+  - Validates input for non-negativity and finiteness.
+  - Throws informative errors if validation fails.
+  - Accepts multiple types for flexible input checking.
+  - Used extensively for defensive programming in PortfolioOptimisers.jl.
+
+# Related
+
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_nonempty_geq0_finite_val`](@ref)
 """
 function assert_nonempty_nonneg_finite_val(val::AbstractDict{<:Any, <:Number},
                                            val_sym::Symbol = :val)
@@ -87,6 +98,44 @@ end
 function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
+"""
+    assert_nonempty_finite_val(val::Union{<:Number, <:EstValType, <:NumVec}, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(args...)
+
+Validate that the input value is finite and non-empty.
+
+Checks that the provided value (scalar, vector, dictionary, or pair) contains only finite entries and is not empty. Used for defensive programming and input validation throughout PortfolioOptimisers.jl.
+
+# Arguments
+
+  - `val`: Input value to validate. Can be a scalar, vector, dictionary, or pair.
+  - `val_sym`: Symbolic name for the value (used in error messages).
+  - `args...`: Accepts any arguments, always passes.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Validation
+
+  - For `Number`: `isfinite(val)`.
+  - For `Pair`: `isfinite(val[2])`.
+  - For `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
+  - For `NumVec`: `!isempty(val)`, `any(isfinite, val)`.
+  - For `AbstractVector{<:Pair}`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
+
+# Details
+
+  - Validates input for finiteness and non-emptiness.
+  - Throws informative errors if validation fails.
+  - Accepts multiple types for flexible input checking.
+  - Used extensively for defensive programming in PortfolioOptimisers.jl.
+
+# Related
+
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_geq0_finite_val`](@ref)
+"""
 function assert_nonempty_finite_val(val::AbstractDict{<:Any, <:Number},
                                     val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -123,6 +172,44 @@ end
 function assert_nonempty_finite_val(args...)
     return nothing
 end
+"""
+    assert_nonempty_geq0_finite_val(val::Union{<:Number, <:EstValType, <:NumVec}, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(args...)
+
+Validate that the input value is strictly positive and finite.
+
+Checks that the provided value (scalar, vector, dictionary, or pair) contains only finite and strictly positive entries. Used for defensive programming and input validation throughout PortfolioOptimisers.jl.
+
+# Arguments
+
+  - `val`: Input value to validate. Can be a scalar, vector, dictionary, or pair.
+  - `val_sym`: Symbolic name for the value (used in error messages).
+  - `args...`: Accepts any arguments, always passes.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Validation
+
+  - For `Number`: `isfinite(val)` and `val > 0`.
+  - For `Pair`: `isfinite(val[2])` and `val[2] > 0`.
+  - For `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
+  - For `NumVec`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
+  - For `AbstractVector{<:Pair}`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
+
+# Details
+
+  - Validates input for strict positivity and finiteness.
+  - Throws informative errors if validation fails.
+  - Accepts multiple types for flexible input checking.
+  - Used extensively for defensive programming in PortfolioOptimisers.jl.
+
+# Related
+
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+"""
 function assert_nonempty_geq0_finite_val(val::AbstractDict{<:Any, <:Number},
                                          val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -172,7 +259,33 @@ end
 """
     assert_matrix_issquare(A::NumMat, A_sym::Symbol = :A)
 
-Assert that `size(A, 1) == size(A, 2)`.
+Checks that the input matrix is square.
+
+Validates that the number of rows and columns in the matrix are equal. Used for defensive programming and input validation throughout PortfolioOptimisers.jl.
+
+# Arguments
+
+  - `A`: Matrix to validate.
+  - `A_sym`: Symbolic name for the matrix (used in error messages).
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Validation
+
+  - `size(A, 1) == size(A, 2)` must hold.
+
+# Details
+
+  - Throws a `DimensionMismatch` error if the matrix is not square.
+  - Used to ensure matrices meet requirements for algorithms that require square matrices.
+
+# Related
+
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_geq0_finite_val`](@ref)
 """
 function assert_matrix_issquare(A::NumMat, A_sym::Symbol = :A)
     @argcheck(size(A, 1) == size(A, 2),
@@ -233,7 +346,23 @@ end
 """
     ⊗(A::NumArr, B::NumArr)
 
-Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
+Compute the tensor product of two arrays.
+
+Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`. This operation is commonly used in higher-order moment calculations and portfolio analytics.
+
+# Arguments
+
+  - `A`: First input array. Can be a vector or matrix of numbers or JuMP scalars.
+  - `B`: Second input array. Can be a vector or matrix of numbers or JuMP scalars.
+
+# Returns
+
+  - `Matrix`: A matrix of size `(length(A), length(B))` containing the tensor product.
+
+# Details
+
+  - Computes the tensor (outer) product using `kron(B, A)`.
+  - Reshapes the result to `(length(A), length(B))`.
 
 # Examples
 
@@ -243,13 +372,32 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
  3  4
  6  8
 ```
+
+# Related
+
+  - [`NumArr`](@ref)
+  - [`kron`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#Base.kron)
 """
 ⊗(A::NumArr, B::NumArr) = reshape(kron(B, A), (length(A), length(B)))
-
 """
     ⊙(A, B)
 
-Elementwise multiplication.
+Elementwise multiplication or scalar multiplication.
+
+# Arguments
+
+  - `A`: First input, can be a vector, matrix, or scalar.
+  - `B`: Second input, can be a vector, matrix, or scalar.
+
+# Returns
+
+  - `res::Union{<:NumArr, <:Number, <:AbstractJuMPScalar}`: promoted element-wise multiplication.
+
+# Details
+
+  - Returns the elementwise product if both inputs are arrays (`NumArr`).
+  - Returns the scalar product if one input is a scalar and the other is an array.
+  - Returns the scalar product if both inputs are scalars.
 
 # Examples
 
@@ -272,24 +420,46 @@ julia> PortfolioOptimisers.:⊙(2, [3, 4])
 julia> PortfolioOptimisers.:⊙(2, 3)
 6
 ```
+
+# Related
+
+  - [`NumArr`](@ref)
+  - [`⊗`](@ref)
+  - [`⊘`](@ref)
+  - [`⊕`](@ref)
+  - [`⊖`](@ref)
 """
 ⊙(A::NumArr, B::NumArr) = A .* B
 ⊙(A::NumArr, B) = A * B
 ⊙(A, B::NumArr) = A * B
 ⊙(A, B) = A * B
-
 """
     ⊘(A, B)
 
-Elementwise division.
+Element-wise division or scalar division.
+
+# Arguments
+
+  - `A`: First input, can be a vector, matrix, or scalar.
+  - `B`: Second input, can be a vector, matrix, or scalar.
+
+# Returns
+
+  - `res::Union{<:NumArr, <:Number, <:AbstractJuMPScalar}`: promoted element-wise division.
+
+# Details
+
+  - Returns the element-wise division if both inputs are arrays (`NumArr`).
+  - Returns the scalar division if one input is a scalar and the other is an array.
+  - Returns the scalar division if both inputs are scalars.
 
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.:⊘([4, 9], [2, 3])
+julia> PortfolioOptimisers.:⊘([4, 6], [2, 3])
 2-element Vector{Float64}:
  2.0
- 3.0
+ 2.0
 
 julia> PortfolioOptimisers.:⊘([4, 6], 2)
 2-element Vector{Float64}:
@@ -304,16 +474,37 @@ julia> PortfolioOptimisers.:⊘(8, [2, 4])
 julia> PortfolioOptimisers.:⊘(8, 2)
 4.0
 ```
+
+# Related
+
+  - [`NumArr`](@ref)
+  - [`⊙`](@ref)
+  - [`⊕`](@ref)
+  - [`⊖`](@ref)
 """
 ⊘(A::NumArr, B::NumArr) = A ./ B
 ⊘(A::NumArr, B) = A / B
 ⊘(A, B::NumArr) = A ./ B
 ⊘(A, B) = A / B
-
 """
     ⊕(A, B)
 
-Elementwise addition.
+Elementwise addition or scalar addition.
+
+# Arguments
+
+  - `A`: First input, can be a vector, matrix, or scalar.
+  - `B`: Second input, can be a vector, matrix, or scalar.
+
+# Returns
+
+  - `res::Union{<:NumArr, <:Number, <:AbstractJuMPScalar}`: promoted element-wise addition.
+
+# Details
+
+  - Returns the elementwise sum if both inputs are arrays (`NumArr`).
+  - Returns the elementwise sum if one input is an array and the other is a scalar.
+  - Returns the scalar sum if both inputs are scalars.
 
 # Examples
 
@@ -336,16 +527,37 @@ julia> PortfolioOptimisers.:⊕(2, [3, 4])
 julia> PortfolioOptimisers.:⊕(2, 3)
 5
 ```
+
+# Related
+
+  - [`NumArr`](@ref)
+  - [`⊙`](@ref)
+  - [`⊘`](@ref)
+  - [`⊖`](@ref)
 """
 ⊕(A::NumArr, B::NumArr) = A .+ B
 ⊕(A::NumArr, B) = A .+ B
 ⊕(A, B::NumArr) = A .+ B
 ⊕(A, B) = A + B
-
 """
     ⊖(A, B)
 
-Elementwise subtraction.
+Elementwise subtraction or scalar subtraction.
+
+# Arguments
+
+  - `A`: First input, can be a vector, matrix, or scalar.
+  - `B`: Second input, can be a vector, matrix, or scalar.
+
+# Returns
+
+  - `res::Union{<:NumArr, <:Number, <:AbstractJuMPScalar}`: promoted element-wise subtraction.
+
+# Details
+
+  - Returns the elementwise difference if both inputs are arrays (`NumArr`).
+  - Returns the elementwise difference if one input is an array and the other is a scalar.
+  - Returns the scalar difference if both inputs are scalars.
 
 # Examples
 
@@ -368,25 +580,38 @@ julia> PortfolioOptimisers.:⊖(8, [2, 4])
 julia> PortfolioOptimisers.:⊖(8, 2)
 6
 ```
+
+# Related
+
+  - [`NumArr`](@ref)
+  - [`⊕`](@ref)
+  - [`⊙`](@ref)
+  - [`⊘`](@ref)
 """
 ⊖(A::NumArr, B::NumArr) = A - B
 ⊖(A::NumArr, B) = A .- B
 ⊖(A, B::NumArr) = A .- B
 ⊖(A, B) = A - B
-
 """
-    dot_scalar(a::Number, b::NumVec)
-    dot_scalar(a::NumVec, b::Number)
+    dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::NumVec)
+    dot_scalar(a::NumVec, b::Union{<:Number, <:AbstractJuMPScalar})
     dot_scalar(a::NumVec, b::NumVec)
 
-Efficient scalar and vector dot product utility.
+Interior (dot) product.
 
-  - If one argument is a `Number` and the other an `AbstractVector`, returns the scalar times the sum of the vector.
-  - If both arguments are `AbstractVector`s, returns their `dot` product.
+# Arguments
+
+  - `a`: First input.
+  - `b`: Second input.
 
 # Returns
 
-  - `Number`: The resulting scalar.
+  - `res::Union{<:Number, <:AbstractJuMPScalar}`: promoted interior product.
+
+# Details
+
+  - Returns the scalar times the sum of the vector if one argument is a scalar and the other is a vector.
+  - Returns the dot product if both arguments are vectors.
 
 # Examples
 
@@ -400,11 +625,16 @@ julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], 2.0)
 julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
 32.0
 ```
+
+# Related
+
+  - [`NumVec`](@ref)
+  - [`dot`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.dot)
 """
-function dot_scalar(a::Number, b::NumVec)
+function dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::NumVec)
     return a * sum(b)
 end
-function dot_scalar(a::NumVec, b::Number)
+function dot_scalar(a::NumVec, b::Union{<:Number, <:AbstractJuMPScalar})
     return sum(a) * b
 end
 function dot_scalar(a::NumVec, b::NumVec)
@@ -522,7 +752,7 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <
                                    i)
     return [view(xi, i) for xi in x]
 end
-function nothing_scalar_array_view(x::NumArr, i)
+function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
 end
 """
@@ -555,7 +785,7 @@ julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_view_odd_order(x::NumArr, i, j)
+function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
     return view(x, i, j)
 end
 """
@@ -604,23 +834,23 @@ end
 function nothing_scalar_array_getindex(::Nothing, ::Any)
     return nothing
 end
-function nothing_scalar_array_getindex(x::NumVec, i)
+function nothing_scalar_array_getindex(x::AbstractVector, i)
     return x[i]
 end
-function nothing_scalar_array_getindex(x::NumMat, i)
+function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
 end
 function nothing_scalar_array_getindex(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_getindex(x::NumMat, i, j)
+function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
 function nothing_scalar_array_getindex(x::VecScalar, i)
     return VecScalar(x.v[i], x.s)
 end
 """
-    fourth_moment_index_factory(N::Integer, i::NumVec)
+    fourth_moment_index_factory(N::Integer, i)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
@@ -695,9 +925,9 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} =
     return ctarr
 end
 """
-    concrete_typed_array(A::NumArr)
+    concrete_typed_array(A::AbstractArray)
 
-Convert an `NumArr` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
+Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 
 This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
 
@@ -721,7 +951,7 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
  3
 ```
 """
-function concrete_typed_array(A::NumArr)
+function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 function factory(::Nothing, args...; kwargs...)

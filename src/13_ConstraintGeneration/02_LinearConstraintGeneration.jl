@@ -1099,7 +1099,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
                                 sets::AssetSets; datatype::DataType = Float64,
                                 strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @argcheck(!isempty(lcs), IsEmptyError(non_empty_msg("lcs") * "."))
+        @argcheck(!isempty(lcs), IsEmptyError)
     end
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)

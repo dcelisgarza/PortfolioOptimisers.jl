@@ -195,10 +195,10 @@ struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
                                    ub::Union{Nothing, <:EstValType,
                                              <:CustomWeightBoundsConstraint})
         if isa(lb, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(lb), IsEmptyError(non_empty_msg("`lb`") * "."))
+            @argcheck(!isempty(lb), IsEmptyError)
         end
         if isa(ub, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(ub), IsEmptyError(non_empty_msg("`ub`") * "."))
+            @argcheck(!isempty(ub), IsEmptyError)
         end
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end

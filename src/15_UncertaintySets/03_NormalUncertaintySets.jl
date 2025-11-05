@@ -97,7 +97,7 @@ function NormalUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
     return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed)
 end
 """
-    commutation_matrix(X::NumMat)
+    commutation_matrix(X::AbstractMatrix)
 
 Constructs the commutation matrix for a given matrix.
 
@@ -144,7 +144,7 @@ julia> PortfolioOptimisers.commutation_matrix(rand(3, 2))
   ⋅    ⋅    ⋅    ⋅    ⋅   1.0
 ```
 """
-function commutation_matrix(X::NumMat)
+function commutation_matrix(X::AbstractMatrix)
     m, n = size(X)
     mn = m * n
     row = 1:mn
@@ -154,8 +154,7 @@ function commutation_matrix(X::NumMat)
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
-        X::NumMat,
-        F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+        X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
 
@@ -218,8 +217,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
-           X::NumMat,
-           F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+           X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
 
@@ -261,9 +259,9 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
-              X::NumMat,
-              F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                       <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+              dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
 
@@ -323,10 +321,9 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any,
-                                 <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
-                                 <:Any, <:Any, <:Any},
-        X::NumMat,
-        F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                 <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                  <:Any}, <:Any, <:Any, <:Any},
+        X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs ellipse uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
 
@@ -395,10 +392,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any,
-                                 <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
-                                 <:Any, <:Any, <:Any},
-        X::NumMat,
-        F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                 <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                  <:Any}, <:Any, <:Any, <:Any},
+        X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs ellipse uncertainty sets for expected returns and covariance statistics using the chi-squared scaling algorithm under the assumption of normally distributed returns.
 
@@ -457,9 +453,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                                  class = SigmaEllipseUncertaintySet())
 end
 """
-    ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
-                                 <:Any, <:Any, <:Any}, X::NumMat,
-        F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:Any, <:Any}, <:Any,
+                                 <:Any, <:Any}, X::NumMat;
+        F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs ellipse uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic ellipse algorithm.
 
@@ -516,10 +512,10 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
-                                    <:Any, <:Any, <:Any},
-           X::NumMat,
-           F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                    <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                     <:Any}, <:Any, <:Any,
+                                    <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+           dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
 
@@ -574,10 +570,10 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
-                                    <:Any, <:Any, <:Any},
-           X::NumMat,
-           F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                    <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                     <:Any}, <:Any, <:Any,
+                                    <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+           dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
 
@@ -629,10 +625,10 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
-                                    <:Any, <:Any, <:Any},
-           X::NumMat,
-           F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                    <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                     <:Any}, <:Any, <:Any,
+                                    <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+           dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
 
@@ -683,10 +679,10 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                       <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
-                                       <:Any, <:Any, <:Any},
-              X::NumMat,
-              F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                       <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                        <:Any}, <:Any, <:Any,
+                                       <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+              dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
 
@@ -750,10 +746,10 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                       <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
-                                       <:Any, <:Any, <:Any},
-              X::NumMat,
-              F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+                                       <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                        <:Any}, <:Any, <:Any,
+                                       <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+              dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for covariance under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
 
@@ -808,10 +804,9 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                  class = SigmaEllipseUncertaintySet())
 end
 """
-    sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                       <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
-                                       <:Any, <:Any, <:Any}, X::NumMat,
-              F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
+                                       <:Any, <:Any, <:Any}, X::NumMat;
+              F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for covariance under the assumption of normally distributed returns, using a generic ellipse algorithm.
 

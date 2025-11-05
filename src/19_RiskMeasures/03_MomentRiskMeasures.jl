@@ -801,9 +801,9 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return HighOrderMoment(settings, w, mu, alg)
 end
 """
-    calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
-                               <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
-                       ::Any, x::NumVec)
+calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
+<:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}}, ::Any,
+x::NumVec)
 
 Compute the target value for moment calculations when neither a target value (`mu`) nor observation weights are provided in the risk measure.
 
@@ -829,9 +829,9 @@ function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:
     return mean(x)
 end
 """
-    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
-                                <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any}},
-                       ::Any, x::NumVec)
+calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
+<:HighOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any}},
+::Any, x::NumVec)
 
 Compute the target value for moment calculations when the risk measure provides an observation weights vector but no explicit target value (`mu`).
 
@@ -858,9 +858,9 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, 
     return mean(x, r.w)
 end
 """
-    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:NumVec, <:Any},
-                                <:HighOrderMoment{<:Any, <:Any, <:NumVec, <:Any}},
-                       w::NumVec, ::Any)
+calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:NumVec, <:Any},
+<:HighOrderMoment{<:Any, <:Any, <:NumVec, <:Any}}, w::NumVec,
+::Any)
 
 Compute the target value for moment calculations when the risk measure provides an explicit expected returns vector (`mu`).
 
@@ -886,9 +886,9 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:NumVec, <:
     return dot(w, r.mu)
 end
 """
-    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
-                                <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
-                       w::NumVec, ::Any)
+calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+<:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}}, w::NumVec,
+::Any)
 
 Compute the target value for moment calculations when the risk measure provides a `VecScalar` as the expected returns (`mu`).
 
@@ -915,8 +915,8 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar,
     return dot(w, r.mu.v) + r.mu.s
 end
 """
-    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:Any},
-                                <:HighOrderMoment{<:Any, <:Any, <:Number, <:Any}}, ::Any, ::Any)
+calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:Any},
+<:HighOrderMoment{<:Any, <:Any, <:Number, <:Any}}, ::Any, ::Any)
 
 Compute the target value for moment calculations when the risk measure provides a scalar value for the expected returns (`mu`).
 
@@ -942,8 +942,8 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:
     return r.mu
 end
 """
-    calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                    X::NumMat; fees::Union{Nothing, <:Fees} = nothing)
+    calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec, X::NumMat;
+                        fees::Union{Nothing, <:Fees} = nothing)
 
 Compute the vector of deviations from the target value for moment-based risk measures.
 

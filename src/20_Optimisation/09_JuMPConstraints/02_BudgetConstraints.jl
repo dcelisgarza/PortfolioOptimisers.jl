@@ -129,10 +129,7 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
         else
             @argcheck(un >= zero(un))
         end
-        @argcheck(zero(beta) <= beta <= one(beta),
-                  DomainError(beta,
-                              range_msg("`beta`", zero(beta), one(beta), nothing, true,
-                                        true) * "."))
+        @argcheck(zero(beta) <= beta <= one(beta), DomainError)
         return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
                    typeof(beta)}(bgt, w, vp, vn, up, un, beta)
     end
