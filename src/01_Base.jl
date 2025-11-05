@@ -465,8 +465,8 @@ Type alias for arrays of scalars in PortfolioOptimisers.jl.
 const NumArr = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
 """
     const EstValType = Union{<:Pair{<:AbstractString, <:Number},
-                            <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
-                            <:AbstractDict{<:AbstractString, <:Number}}
+                             <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
+                             <:AbstractDict{<:AbstractString, <:Number}}
 
 Type alias for value types used in the `val` field of estimators in PortfolioOptimisers.jl.
 

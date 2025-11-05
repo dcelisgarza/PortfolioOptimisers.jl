@@ -355,8 +355,7 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::NumMat)
     end
 end
 """
-    owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator,
-                     weights::NumMat)
+    owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator, weights::NumMat)
 
 Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
 
@@ -622,8 +621,7 @@ function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
 """
-    owa_wcvarrg(T::Integer, alphas::NumVec, weights_a::NumVec;
-                betas::NumVec = alphas,
+    owa_wcvarrg(T::Integer, alphas::NumVec, weights_a::NumVec; betas::NumVec = alphas,
                 weights_b::NumVec = weights_a)
 
 Compute the Ordered Weights Array (OWA) weights for the weighted Conditional Value at Risk Range risk measure.

@@ -145,8 +145,8 @@ function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::NumMat,
-                       X::NumMat, args...; kwargs...)
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::NumMat, X::NumMat, args...;
+                       kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
 
 In-place processing of a covariance or correlation matrix.
@@ -242,8 +242,8 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::NumMat, X::NumMa
     return nothing
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::NumMat,
-                      X::NumMat, args...; kwargs...)
+    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::NumMat, X::NumMat, args...;
+                      kwargs...)
     matrix_processing(::Nothing, args...; kwargs...)
 
 Out-of-place version of [`matrix_processing!`](@ref).

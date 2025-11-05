@@ -197,8 +197,8 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise(alg, args, kwargs, kernel, m, n)
 end
 """
-    _denoise!(alg::AbstractDenoiseAlgorithm, X::NumMat, vals::NumVec,
-              vecs::NumMat, num_factors::Integer)
+    _denoise!(alg::AbstractDenoiseAlgorithm, X::NumMat, vals::NumVec, vecs::NumMat,
+              num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
 

@@ -282,8 +282,7 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::NumArr, sigma::NumMat;
-                kwargs...)
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::NumArr, sigma::NumMat; kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
 

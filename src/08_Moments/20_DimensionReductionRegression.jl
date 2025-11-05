@@ -273,8 +273,8 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::NumMat)
     return x1, Vp
 end
 """
-    _regression(re::DimensionReductionRegression, y::NumVec, mu::NumVec,
-               sigma::NumVec, x1::NumMat, Vp::NumMat)
+    _regression(re::DimensionReductionRegression, y::NumVec, mu::NumVec, sigma::NumVec,
+                x1::NumMat, Vp::NumMat)
 
 Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
 

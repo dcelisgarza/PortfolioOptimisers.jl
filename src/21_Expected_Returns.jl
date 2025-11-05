@@ -57,8 +57,8 @@ function expected_return(ret::JuMPReturnsEstimator, w::AbstractVector{<:NumVec},
 end
 """
     expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
-                   pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing, rf::Number = 0,
-                   kwargs...)
+                   pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing,
+                   rf::Number = 0, kwargs...)
 
 Compute the expected risk-adjusted return ratio for a portfolio.
 
@@ -93,9 +93,9 @@ function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w
     return (rt - rf) / rk
 end
 """
-    expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                            w::NumVec, pr::AbstractPriorResult;
-                            fees::Union{Nothing, Fees} = nothing, rf::Number = 0, kwargs...)
+    expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
+                            pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing,
+                            rf::Number = 0, kwargs...)
 
 Compute expected risk, expected return, and risk-adjusted return ratio for a portfolio.
 
@@ -168,9 +168,9 @@ function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w:
     return sr - N / (T * sr)
 end
 """
-    expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                           w::NumVec, pr::AbstractPriorResult;
-                           fees::Union{Nothing, Fees} = nothing, rf::Number = 0, kwargs...)
+    expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
+                           pr::AbstractPriorResult; fees::Union{Nothing, Fees} = nothing,
+                           rf::Number = 0, kwargs...)
 
 Compute expected risk, expected return, and SRIC for a portfolio.
 

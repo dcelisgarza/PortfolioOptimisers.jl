@@ -343,9 +343,8 @@ function compute_pooling(::LogarithmicOpinionPooling, ow::NumVec, pw::NumMat)
     return pweights(vec(exp.(u .- lse)))
 end
 """
-    prior(pe::OpinionPoolingPrior, X::NumMat;
-          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
-          kwargs...)
+    prior(pe::OpinionPoolingPrior, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+          dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
 

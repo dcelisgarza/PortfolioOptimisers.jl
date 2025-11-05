@@ -17,15 +17,15 @@ PortfolioOptimisers.GerberCovarianceAlgorithm
 PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat,
-                std_vec::AbstractArray)
+                std_vec::NumArr)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0},
                 X::NumMat)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat,
-                std_vec::AbstractArray)
+                std_vec::NumArr)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1},
                 X::NumMat)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat,
-                std_vec::AbstractArray)
+                std_vec::NumArr)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2},
                 X::NumMat)
 ```

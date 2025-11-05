@@ -14,7 +14,8 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:EstValType, <:NumVec}, val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:EstValType, <:NumVec};
+                                      val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(args...)
 
 Validate that the input value is non-negative and finite.
@@ -99,7 +100,8 @@ function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_finite_val(val::Union{<:Number, <:EstValType, <:NumVec}, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(val::Union{<:Number, <:EstValType, <:NumVec};
+                               val_sym::Symbol = :val)
     assert_nonempty_finite_val(args...)
 
 Validate that the input value is finite and non-empty.
@@ -173,7 +175,8 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_geq0_finite_val(val::Union{<:Number, <:EstValType, <:NumVec}, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(val::Union{<:Number, <:EstValType, <:NumVec};
+                                    val_sym::Symbol = :val)
     assert_nonempty_geq0_finite_val(args...)
 
 Validate that the input value is strictly positive and finite.
@@ -292,8 +295,8 @@ function assert_matrix_issquare(A::NumMat, A_sym::Symbol = :A)
               DimensionMismatch("size($A_sym, 1) == size($A_sym, 2) must hold. Got\nsize($A_sym, 1) => $(size(A, 1))\nsize($A_sym, 2) => $(size(A, 2))."))
 end
 """
-    brinson_attribution(X::TimeArray, w::NumVec, wb::NumVec,
-                        asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
+    brinson_attribution(X::TimeArray, w::NumVec, wb::NumVec, asset_classes::DataFrame, col;
+                        date0 = nothing, date1 = nothing)
 """
 function brinson_attribution(X::TimeArray, w::NumVec, wb::NumVec, asset_classes::DataFrame,
                              col, date0 = nothing, date1 = nothing)

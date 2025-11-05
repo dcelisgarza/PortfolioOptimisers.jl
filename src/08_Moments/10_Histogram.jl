@@ -150,8 +150,8 @@ function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
 end
 """
-    calc_num_bins(bins::Union{<:AbstractBins, <:Integer}, xj::NumVec,
-                  xi::NumVec, j::Integer, i::Integer, bin_width_func, T::Integer)
+    calc_num_bins(bins::Union{<:AbstractBins, <:Integer}, xj::NumVec, xi::NumVec, j::Integer,
+                  i::Integer, bin_width_func, T::Integer)
 
 Compute the number of histogram bins for a pair of variables using a specified binning algorithm.
 
@@ -314,8 +314,7 @@ function intrinsic_mutual_info(X::NumMat)
     return sum(mi)
 end
 """
-    variation_info(X::NumMat;
-                   bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+    variation_info(X::NumMat; bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                    normalise::Bool = true)
 
 Compute the variation of information (VI) matrix for a set of variables.
@@ -413,8 +412,7 @@ function mutual_variation_info(X::NumMat, bins::Union{<:AbstractBins, <:Integer}
 end
 # COV_EXCL_STOP
 """
-    mutual_info(X::NumMat;
-                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+    mutual_info(X::NumMat; bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                 normalise::Bool = true)
 
 Compute the mutual information (MI) matrix for a set of variables.

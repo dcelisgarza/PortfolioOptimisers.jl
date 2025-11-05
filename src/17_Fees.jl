@@ -589,8 +589,7 @@ end
 """
     calc_fixed_fees(w::NumVec, ::Nothing, kwargs::NamedTuple, ::Function)
     calc_fixed_fees(w::NumVec, fees::Number, kwargs::NamedTuple, op::Function)
-    calc_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple,
-                    op::Function)
+    calc_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::Function)
 
 Compute the fixed portfolio fees for assets that have been allocated.
 
@@ -682,8 +681,7 @@ end
 """
     calc_asset_fees(w::NumVec, p::NumVec, ::Nothing, ::Function)
     calc_asset_fees(w::NumVec, p::NumVec, fees::Number, op::Function)
-    calc_asset_fees(w::NumVec, p::NumVec, fees::NumVec,
-                    op::Function)
+    calc_asset_fees(w::NumVec, p::NumVec, fees::NumVec, op::Function)
 
 Compute the actual proportional per asset fees for portfolio weights and prices.
 
@@ -928,8 +926,7 @@ end
 """
     calc_asset_fixed_fees(w::NumVec, ::Nothing, kwargs::NamedTuple, ::Function)
     calc_asset_fixed_fees(w::NumVec, fees::Number, kwargs::NamedTuple, op::Function)
-    calc_asset_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple,
-                          op::Function)
+    calc_asset_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::Function)
 
 Compute the per asset fixed portfolio fees for assets that have been allocated.
 

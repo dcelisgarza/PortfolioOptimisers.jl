@@ -2,8 +2,8 @@
 
 ```@docs
 EmpiricalPrior
-prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...; dims::Int = 1,
+prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::NumMat, args...; dims::Int = 1,
       kwargs...)
-prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...;
+prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::NumMat, args...;
                dims::Int = 1, kwargs...)
 ```

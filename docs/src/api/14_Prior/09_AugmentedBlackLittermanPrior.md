@@ -2,6 +2,6 @@
 
 ```@docs
 AugmentedBlackLittermanPrior
-prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
+prior(pe::AugmentedBlackLittermanPrior, X::NumMat, F::NumMat;
                dims::Int = 1, strict::Bool = false, kwargs...)
 ```

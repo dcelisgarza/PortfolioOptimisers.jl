@@ -2003,11 +2003,10 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
     return to_fix
 end
 """
-    prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-          X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1,
-          strict::Bool = false, kwargs...)
+prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+<:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}}, X::NumMat;
+F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with iterative constraint enforcement.
 
@@ -2139,8 +2138,7 @@ end
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:H0_EntropyPooling}, X::NumMat;
-          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
-          kwargs...)
+          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
 

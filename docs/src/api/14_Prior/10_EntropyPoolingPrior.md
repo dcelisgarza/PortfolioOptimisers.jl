@@ -10,17 +10,14 @@ CVaREntropyPooling
 OptimEntropyPooling
 JuMPEntropyPooling
 EntropyPoolingPrior
-prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any,
-                                       <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-               X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                  <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                  <:H0_EntropyPooling}, X::NumMat;
+          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false, kwargs...)
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:H0_EntropyPooling}, X::AbstractMatrix;
-      F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
-      kwargs...)
+                              <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}}, X::NumMat;
+      F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false, kwargs...)
 PortfolioOptimisers.AbstractEntropyPoolingOptimiser
 PortfolioOptimisers.AbstractEntropyPoolingAlgorithm
 PortfolioOptimisers.AbstractEntropyPoolingOptAlgorithm

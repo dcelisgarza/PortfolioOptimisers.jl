@@ -313,8 +313,7 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
     return GerberCovariance(ve, pdm, threshold, alg)
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat,
-           std_vec::NumArr)
+    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat, std_vec::NumArr)
 
 Implements the original Gerber correlation algorithm.
 
@@ -417,8 +416,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat,
-           std_vec::NumArr)
+    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat, std_vec::NumArr)
 
 Implements the first variant of the Gerber correlation algorithm.
 
@@ -519,8 +517,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat,
-           std_vec::NumArr)
+    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat, std_vec::NumArr)
 
 Implements the second variant of the Gerber correlation algorithm.
 

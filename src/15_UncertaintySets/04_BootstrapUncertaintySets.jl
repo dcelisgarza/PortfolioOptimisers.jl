@@ -319,9 +319,9 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::NumMat; kwargs...)
     return sigmas
 end
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                               <:Any, <:Any, <:Any}, X::NumMat,
-        F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any, <:Any,
+                               <:Any}, X::NumMat; F::Union{Nothing, <:NumMat} = nothing,
+        dims::Int = 1, kwargs...)
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
@@ -377,9 +377,9 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any}, X::NumMat,
-           F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any,
+                                  <:Any, <:Any}, X::NumMat;
+           F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
@@ -427,9 +427,9 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                     <:Any, <:Any, <:Any}, X::NumMat,
-              F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any,
+                                     <:Any, <:Any}, X::NumMat;
+              F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
 
