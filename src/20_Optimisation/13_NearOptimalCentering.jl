@@ -133,7 +133,8 @@ end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
                                       slv::Union{<:Solver, <:SlvVec}, w_min::NumVec,
-                                      w_opt::NumVec, w_max::NumVec)
+                                      w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_max::NumVec)
     X = pr.X
     r = factory(r, pr, slv)
     scale = r.settings.scale
@@ -144,10 +145,9 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
 end
 function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{<:Solver, <:SlvVec},
-                                      w_min::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      slv::Union{<:Solver, <:SlvVec}, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
-                                      w_max::Union{<:NumVec, <:AbstractVector{<:NumVec}})
+                                      w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -166,10 +166,9 @@ end
 function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
                                       rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{<:Solver, <:SlvVec},
-                                      w_min::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      slv::Union{<:Solver, <:SlvVec}, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
-                                      w_max::Union{<:NumVec, <:AbstractVector{<:NumVec}})
+                                      w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -194,9 +193,9 @@ end
 function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
                                       slv::Union{Nothing, <:Solver, <:SlvVec},
-                                      w_min::Union{<:NumVec, <:AbstractVector{<:NumVec}},
+                                      w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:AbstractVector{<:NumVec}},
-                                      w_max::Union{<:NumVec, <:AbstractVector{<:NumVec}})
+                                      w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -419,13 +418,13 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
-function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:NumVec, <:Any, <:Any,
+function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector, <:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any,
+                                                         <:Any, <:Any, <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
                                risk_frontier::AbstractVector, w_min::NumVec, w_max::NumVec,
-                               idx::NumVec)
+                               idx::IntVec)
     risk_frontier = copy(risk_frontier)
     r = factory(view(noc.r, idx), pr, noc.opt.slv)
     for (i, ri) in zip(idx, r)

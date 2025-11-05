@@ -93,7 +93,7 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Union{Nothing, <:
     return risk_frontier[i].first => (risk_frontier[1].second[1], ub)
 end
 function rebuild_risk_frontier(model::JuMP.Model,
-                               mr::MeanRisk{<:Any, <:NumVec, <:Any, <:Any},
+                               mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
                                ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
                                fees::Union{Nothing, <:Fees}, risk_frontier::AbstractVector,
                                idx::NumVec)
