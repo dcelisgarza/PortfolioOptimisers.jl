@@ -13,7 +13,7 @@ Estimator for turnover portfolio constraints.
 
   - `w`: Vector of current portfolio weights.
   - `val`: Asset-specific turnover values, as a dictionary, pair, or vector of pairs.
-  - `default`: Default turnover value for assets not specified in `val`.
+  - `dval`: Default turnover value for assets not specified in `val`.
 
 # Constructor
 
@@ -27,11 +27,11 @@ Estimator for turnover portfolio constraints.
 # Examples
 
 ```jldoctest
-julia> TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2), default = 0.0)
+julia> TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2), dval = 0.0)
 TurnoverEstimator
-        w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-      val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  default ┴ Float64: 0.0
+     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+   val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+  dval ┴ Float64: 0.0
 ```
 
 # Related
@@ -44,7 +44,8 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     w::T1
     val::T2
     dval::T3
-    function TurnoverEstimator(w::NumVec, val::EstValType, dval::Union{Nothing, <:Number})
+    function TurnoverEstimator(w::NumVec, val::EstValType,
+                               dval::Union{Nothing, <:Number} = nothing)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)

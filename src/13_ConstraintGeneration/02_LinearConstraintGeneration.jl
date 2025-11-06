@@ -375,7 +375,7 @@ function group_to_val!(nx::AbstractVector{<:String}, sdict::AbstractDict, key::A
     return nothing
 end
 """
-    estimator_to_val(dict::EstValType, sets::AssetSets; val::Union{Nothing, Number}=nothing, strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::AssetSets; val::Union{Nothing, <:Number}=nothing, strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -414,7 +414,7 @@ The function creates the vector and sets the values for assets or groups as spec
 """
 function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number},
                                       <:AbstractVector{<:Pair{<:AbstractString, <:Number}}},
-                          sets::AssetSets, val::Union{Nothing, Number} = nothing;
+                          sets::AssetSets, val::Union{Nothing, <:Number} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]
@@ -429,7 +429,7 @@ function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number}
     return arr
 end
 function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSets,
-                          val::Union{Nothing, Number} = nothing;
+                          val::Union{Nothing, <:Number} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]

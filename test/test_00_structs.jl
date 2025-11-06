@@ -190,17 +190,17 @@
                                                     val = Pair{String, Real}[])
 
         @test_throws DomainError TurnoverEstimator(; w = [1], val = val = "a" => 1,
-                                                   default = -eps())
+                                                   dval = -eps())
 
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
         @test te.w === w
         @test te.val == Dict("A" => 0.1, "B" => 0.2)
-        @test te.default == 0.0
+        @test te.dval == 0.0
 
-        te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), default = 0.2)
+        te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.2)
         @test te.w === w
         @test te.val == Dict("A" => 0.1, "B" => 0.2)
-        @test te.default == 0.2
+        @test te.dval == 0.2
 
         @test_throws IsEmptyError Turnover(; w = Float64[], val = 0)
 

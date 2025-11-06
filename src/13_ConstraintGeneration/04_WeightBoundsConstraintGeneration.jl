@@ -126,7 +126,7 @@ Custom weight bounds constraint for uniformly distributing asset weights, `1/N` 
 ```jldoctest
 julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
 
-julia> PortfolioOptimisers.get_weight_bounds(UniformlyDistributedBounds(), true, sets)
+julia> PortfolioOptimisers.estimator_to_val(UniformlyDistributedBounds(), sets)
 0.3333333333333333
 ```
 
@@ -139,8 +139,7 @@ julia> PortfolioOptimisers.get_weight_bounds(UniformlyDistributedBounds(), true,
 struct UniformlyDistributedBounds <: CustomWeightBoundsConstraint end
 function estimator_to_val(::UniformlyDistributedBounds, sets::AssetSets, args...;
                           datatype::DataType = Float64, kwargs...)
-    N = length(sets.dict[sets.key])
-    return fill(datatype(inv(N)), N)
+    return datatype(inv(length(sets.dict[sets.key])))
 end
 """
     struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
@@ -179,13 +178,17 @@ Estimator for portfolio weight bounds constraints.
 julia> WeightBoundsEstimator(; lb = Dict("A" => 0.1, "B" => 0.2),
                              ub = Dict("A" => 0.8, "B" => 0.9))
 WeightBoundsEstimator
-  lb ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  ub ┴ Dict{String, Float64}: Dict("B" => 0.9, "A" => 0.8)
+   lb ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   ub ┼ Dict{String, Float64}: Dict("B" => 0.9, "A" => 0.8)
+  dlb ┼ nothing
+  dub ┴ nothing
 
 julia> WeightBoundsEstimator(; lb = UniformlyDistributedBounds(), ub = nothing)
 WeightBoundsEstimator
-  lb ┼ UniformlyDistributedBounds()
-  ub ┴ nothing
+   lb ┼ UniformlyDistributedBounds()
+   ub ┼ nothing
+  dlb ┼ nothing
+  dub ┴ nothing
 ```
 
 # Related
@@ -254,7 +257,7 @@ Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and 
 
 # Details
 
-  - Lower and upper bounds are extracted using [`get_weight_bounds`](@ref), mapped to assets in `sets`.
+  - Lower and upper bounds are extracted using [`estimator_to_val`](@ref), mapped to assets in `sets`.
   - Supports composable and asset-specific constraints.
   - If a bound is `nothing`, indicates no constraint in that direction.
 
@@ -275,16 +278,20 @@ WeightBounds
 
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
-  - [`get_weight_bounds`](@ref)
+  - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
 function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,
                                    kwargs...)
     return WeightBounds(;
-                        lb = estimator_to_val(wb.lb, sets, wb.dlb; datatype = datatype,
+                        lb = estimator_to_val(wb.lb, sets,
+                                              ifelse(isnothing(wb.dlb), zero(datatype),
+                                                     wb.dlb); datatype = datatype,
                                               strict = strict),
-                        ub = estimator_to_val(wb.ub, sets, wb.dub; datatype = datatype,
+                        ub = estimator_to_val(wb.ub, sets,
+                                              ifelse(isnothing(wb.dub), one(datatype),
+                                                     wb.dub); datatype = datatype,
                                               strict = strict))
 end
 """

@@ -1,11 +1,15 @@
 """
-    struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
+    struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimator
         tn::T1
         l::T2
         s::T3
         fl::T4
         fs::T5
-        kwargs::T6
+        dl::T6
+        ds::T7
+        dfl::T8
+        dfs::T9
+        kwargs::T10
     end
 
 Estimator for portfolio transaction fees constraints.
@@ -19,36 +23,50 @@ Estimator for portfolio transaction fees constraints.
   - `s`: Short proportional fees.
   - `fl`: Long fixed fees.
   - `fs`: Short fixed fees.
+  - `dl`: Default long proportional fees.
+  - `ds`: Default short proportional fees.
+  - `dfl`: Default long fixed fees.
+  - `dfs`: Default short fixed fees.
   - `kwargs`: Named tuple of keyword arguments for rounding fixed fees calculation.
 
 # Constructor
 
     FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                  l::Union{Nothing, <:EstValType} = nothing,
-                  s::Union{Nothing, <:EstValType} = nothing,
-                  fl::Union{Nothing, <:EstValType} = nothing,
-                  fs::Union{Nothing, <:EstValType} = nothing,
-                  kwargs::NamedTuple = (; atol = 1e-8))
+                    l::Union{Nothing, <:EstValType} = nothing,
+                    s::Union{Nothing, <:EstValType} = nothing,
+                    fl::Union{Nothing, <:EstValType} = nothing,
+                    fs::Union{Nothing, <:EstValType} = nothing,
+                    dl::Union{Nothing, <:Number} = nothing,
+                    ds::Union{Nothing, <:Number} = nothing,
+                    dfl::Union{Nothing, <:Number} = nothing,
+                    dfs::Union{Nothing, <:Number} = nothing,
+                    kwargs::NamedTuple = (; atol = 1e-8))
+
+Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `l`, `s`, `fl`, `fs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - `l`, `s`, `fl`, `fs`, `dl`, `ds`, `dfl`, `dfs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
 ```jldoctest
-julia> FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
+julia> FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1)),
                      l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                      fl = Dict("A" => 5.0), fs = ["B" => 10.0])
 FeesEstimator
       tn ┼ TurnoverEstimator
-         │         w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │       val ┼ Dict{String, Float64}: Dict("A" => 0.1)
-         │   default ┴ Float64: 0.0
+         │      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │    val ┼ Dict{String, Float64}: Dict("A" => 0.1)
+         │   dval ┴ nothing
        l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
        s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
       fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
       fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
+      dl ┼ nothing
+      ds ┼ nothing
+     dfl ┼ nothing
+     dfs ┼ nothing
   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
 ```
 
@@ -84,18 +102,10 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimat
         assert_nonempty_nonneg_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
-        if !isnothing(dl)
-            @argcheck(zero(dl) <= dl, DomainError)
-        end
-        if !isnothing(ds)
-            @argcheck(zero(ds) <= ds, DomainError)
-        end
-        if !isnothing(dfl)
-            @argcheck(zero(dfl) <= dfl, DomainError)
-        end
-        if !isnothing(dfs)
-            @argcheck(zero(dfs) <= dfs, DomainError)
-        end
+        assert_nonempty_nonneg_finite_val(dl, :dl)
+        assert_nonempty_nonneg_finite_val(ds, :ds)
+        assert_nonempty_nonneg_finite_val(dfl, :dfl)
+        assert_nonempty_nonneg_finite_val(dfs, :dfs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(dl),
                    typeof(ds), typeof(dfl), typeof(dfs), typeof(kwargs)}(tn, l, s, fl, fs,
                                                                          dl, ds, dfl, dfs,

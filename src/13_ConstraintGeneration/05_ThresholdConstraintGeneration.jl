@@ -24,11 +24,28 @@ Estimator for buy-in threshold portfolio constraints.
 ```jldoctest
 julia> BuyInThresholdEstimator(Dict("A" => 0.05, "B" => 0.1))
 BuyInThresholdEstimator
-  val ┴ Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
+   val ┼ Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
+  dval ┴ nothing
 
 julia> BuyInThresholdEstimator(["A" => 0.05, "B" => 0.1])
 BuyInThresholdEstimator
-  val ┴ Vector{Pair{String, Float64}}: ["A" => 0.05, "B" => 0.1]
+   val ┼ Vector{Pair{String, Float64}}: ["A" => 0.05, "B" => 0.1]
+  dval ┴ nothing
+
+julia> BuyInThresholdEstimator("A" => 0.05)
+BuyInThresholdEstimator
+   val ┼ Pair{String, Float64}: "A" => 0.05
+  dval ┴ nothing
+
+julia> BuyInThresholdEstimator(0.05)
+BuyInThresholdEstimator
+   val ┼ Float64: 0.05
+  dval ┴ nothing
+
+julia> BuyInThresholdEstimator(UniformlyDistributedBounds())
+BuyInThresholdEstimator
+   val ┼ UniformlyDistributedBounds()
+  dval ┴ nothing
 ```
 
 # Related
@@ -40,14 +57,15 @@ BuyInThresholdEstimator
 struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
     dval::T2
-    function BuyInThresholdEstimator(val::EstValType,
+    function BuyInThresholdEstimator(val::Union{<:EstValType,
+                                                <:CustomWeightBoundsConstraint},
                                      dval::Union{Nothing, <:Number} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function BuyInThresholdEstimator(; val::EstValType,
+function BuyInThresholdEstimator(; val::Union{<:EstValType, <:CustomWeightBoundsConstraint},
                                  dval::Union{Nothing, <:Number} = nothing)
     return BuyInThresholdEstimator(val, dval)
 end
