@@ -277,7 +277,7 @@ julia> throw(IsNothingError("Input data is nothing"))
 ERROR: IsNothingError: Input data is nothing
 Stacktrace:
  [1] top-level scope
-   @ REPL[2]:1
+   @ none:1
 ```
 
 # Related Types
@@ -315,7 +315,7 @@ julia> throw(IsEmptyError("Input array is empty"))
 ERROR: IsEmptyError: Input array is empty
 Stacktrace:
  [1] top-level scope
-   @ REPL[2]:1
+   @ none:1
 ```
 
 # Related Types
@@ -353,7 +353,7 @@ julia> throw(IsNonFiniteError("Input contains NaN"))
 ERROR: IsNonFiniteError: Input contains NaN
 Stacktrace:
  [1] top-level scope
-   @ REPL[2]:1
+   @ none:1
 ```
 
 # Related

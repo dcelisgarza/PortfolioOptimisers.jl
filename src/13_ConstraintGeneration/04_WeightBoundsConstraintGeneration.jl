@@ -152,9 +152,9 @@ Estimator for portfolio weight bounds constraints.
 # Constructor
 
     WeightBoundsEstimator(;
-                          lb::Union{Nothing, <:EstValType,
+                          lb::Union{Nothing, <:Number, <:EstValType,
                                     <:CustomWeightBoundsConstraint} = nothing,
-                          ub::Union{Nothing, <:EstValType,
+                          ub::Union{Nothing, <:Number, <:EstValType,
                                     <:CustomWeightBoundsConstraint} = nothing)
 
 ## Validation
@@ -190,9 +190,9 @@ WeightBoundsEstimator
 struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
     lb::T1
     ub::T2
-    function WeightBoundsEstimator(lb::Union{Nothing, <:EstValType,
+    function WeightBoundsEstimator(lb::Union{Nothing, <:Number, <:EstValType,
                                              <:CustomWeightBoundsConstraint},
-                                   ub::Union{Nothing, <:EstValType,
+                                   ub::Union{Nothing, <:Number, <:EstValType,
                                              <:CustomWeightBoundsConstraint})
         if isa(lb, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(lb), IsEmptyError)
@@ -204,9 +204,9 @@ struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
     end
 end
 function WeightBoundsEstimator(;
-                               lb::Union{Nothing, <:EstValType,
+                               lb::Union{Nothing, <:Number, <:EstValType,
                                          <:CustomWeightBoundsConstraint} = nothing,
-                               ub::Union{Nothing, <:EstValType,
+                               ub::Union{Nothing, <:Number, <:EstValType,
                                          <:CustomWeightBoundsConstraint} = nothing)
     return WeightBoundsEstimator(lb, ub)
 end
@@ -216,26 +216,21 @@ function weight_bounds_view(wb::Union{<:AbstractString, Expr,
     return wb
 end
 """
-    get_weight_bounds(wb::Nothing, args...; kwargs...)
+    get_weight_bounds(wb::Union{Nothing, <:Number, <:NumVec}, args...; kwargs...)
 
-Extracts portfolio weight bounds when no bounds are specified.
+Extracts portfolio weight bounds from a scalar, vector, or `nothing`.
 
-This method returns `nothing` when the input bound specification `wb` is `nothing`, indicating that no constraint is applied in that direction. It is used as a fallback in constraint generation routines to represent unconstrained portfolio weights.
+`get_weight_bounds` returns the input value unchanged when the weight bounds are specified as a scalar, vector, or `nothing`. This method is used internally to propagate simple bound specifications in portfolio optimisation workflows.
 
 # Arguments
 
-  - `wb`: Bound specification (`nothing` indicates no constraint).
+  - `wb`: Lower or upper bound(s) for portfolio weights.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `nothing`: Indicates no constraint for portfolio weights.
-
-# Details
-
-  - Used as a fallback when no bound is provided.
-  - Enables composable constraint generation by propagating unconstrained directions.
+  - `wb`: The input value, unchanged.
 
 # Related
 
@@ -243,7 +238,8 @@ This method returns `nothing` when the input bound specification `wb` is `nothin
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-function get_weight_bounds(wb::Nothing, args...; kwargs...)
+function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
+                           kwargs...)
     return wb
 end
 """
