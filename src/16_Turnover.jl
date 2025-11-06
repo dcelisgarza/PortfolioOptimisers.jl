@@ -48,6 +48,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
                                dval::Union{Nothing, <:Number} = nothing)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end
 end
