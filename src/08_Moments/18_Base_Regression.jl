@@ -125,7 +125,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(re::LinearModel, w::WeightsType = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -209,7 +209,7 @@ end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(re::GeneralisedLinearModel, w::WeightsType = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)

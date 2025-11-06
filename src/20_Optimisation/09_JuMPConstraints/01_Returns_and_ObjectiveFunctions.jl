@@ -37,7 +37,7 @@ end
 struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
-    function KellyReturn(w::Union{Nothing, <:AbstractWeights},
+    function KellyReturn(w::WeightsType,
                          lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier})
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -51,7 +51,7 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
         return new{typeof(w), typeof(lb)}(w, lb)
     end
 end
-function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
+function KellyReturn(; w::WeightsType = nothing,
                      lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
     return KellyReturn(w, lb)
 end

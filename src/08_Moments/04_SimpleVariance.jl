@@ -19,7 +19,7 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
     SimpleVariance(;
                    me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                   w::Union{Nothing, <:AbstractWeights} = nothing, corrected::Bool = true)
+                   w::WeightsType = nothing, corrected::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -65,15 +65,14 @@ struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     w::T2
     corrected::T3
     function SimpleVariance(me::Union{Nothing, <:AbstractExpectedReturnsEstimator},
-                            w::Union{Nothing, <:AbstractWeights}, corrected::Bool)
+                            w::WeightsType, corrected::Bool)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
     end
 end
 function SimpleVariance(;
                         me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        w::Union{Nothing, <:AbstractWeights} = nothing,
-                        corrected::Bool = true)
+                        w::WeightsType = nothing, corrected::Bool = true)
     return SimpleVariance(me, w, corrected)
 end
 """
@@ -307,7 +306,7 @@ function Statistics.var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
         var(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function factory(ve::SimpleVariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ve::SimpleVariance, w::WeightsType = nothing)
     return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
                           corrected = ve.corrected)
 end

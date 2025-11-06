@@ -63,7 +63,7 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
                               normalise::Bool = true)
     return MutualInfoCovariance(ve, bins, normalise)
 end
-function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::MutualInfoCovariance, w::WeightsType = nothing)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end

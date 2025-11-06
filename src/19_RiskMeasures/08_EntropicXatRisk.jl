@@ -1,5 +1,5 @@
 function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-             alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing)
+             alpha::Real = 0.05, w::WeightsType = nothing)
     if isa(slv, AbstractVector)
         @argcheck(!isempty(slv))
     end
@@ -39,7 +39,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     w::T4
     function EntropicValueatRisk(settings::RiskMeasureSettings,
                                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                                 alpha::Real, w::Union{Nothing, <:AbstractWeights})
+                                 alpha::Real, w::WeightsType)
         if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
@@ -53,8 +53,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
-                             alpha::Real = 0.05,
-                             w::Union{Nothing, <:AbstractWeights} = nothing)
+                             alpha::Real = 0.05, w::WeightsType = nothing)
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::AbstractVector)
@@ -76,7 +75,7 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Union{Nothing, <:Solver,
                                                  <:AbstractVector{<:Solver}}, alpha::Real,
-                                      beta::Real, w::Union{Nothing, <:AbstractWeights})
+                                      beta::Real, w::WeightsType)
         if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
@@ -95,7 +94,7 @@ end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                   alpha::Real = 0.05, beta::Real = 0.05,
-                                  w::Union{Nothing, <:AbstractWeights} = nothing)
+                                  w::WeightsType = nothing)
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
 function (r::EntropicValueatRiskRange)(x::AbstractVector)

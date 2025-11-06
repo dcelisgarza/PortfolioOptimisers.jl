@@ -33,8 +33,10 @@ end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
                                                            X::AbstractMatrix,
                                                            fees::Union{Nothing, <:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Union{Nothing, <:Real} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -129,7 +131,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVec
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:AbstractVector{<:Real},
                                                                     <:AbstractVector{<:AbstractVector}},
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",
@@ -251,8 +254,7 @@ function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractMatrix,
                                             fees::Union{Nothing, <:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Real = 0.05,
-                                            kappa::Real = 0.3,
-                                            rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                            kappa::Real = 0.3, rw::WeightsType = nothing,
                                             theme::Symbol = :Dark2_5,
                                             dd_kwargs = (;
                                                          label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
@@ -355,7 +357,7 @@ function PortfolioOptimisers.plot_histogram(w::AbstractArray, X::AbstractMatrix,
                                             kappa::Real = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
-                                            rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                            rw::WeightsType = nothing,
                                             theme::Symbol = :Paired_10,
                                             h_kwargs::NamedTuple = (;
                                                                     ylabel = "Probability Density",

@@ -310,6 +310,7 @@ const NumArr = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
 const EstValType = Union{<:Number, <:NumVec, <:Pair{<:AbstractString, <:Number},
                          <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
                          <:AbstractDict{<:AbstractString, <:Number}}
+const WeightsType = Union{Nothing, <:AbstractWeights}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
-       NumMat, NumArr, EstValType
+       NumMat, NumArr, EstValType, WeightsType

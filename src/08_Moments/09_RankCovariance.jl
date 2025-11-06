@@ -246,7 +246,7 @@ function Statistics.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote
-             function factory(ce::$(ce), w::Union{Nothing, <:AbstractWeights} = nothing)
+             function factory(ce::$(ce), w::WeightsType = nothing)
                  return $(ce)(; ve = factory(ce.ve, w))
              end
          end)

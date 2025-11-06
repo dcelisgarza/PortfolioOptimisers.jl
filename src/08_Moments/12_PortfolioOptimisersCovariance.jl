@@ -57,8 +57,7 @@ function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covar
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
-function factory(ce::PortfolioOptimisersCovariance,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::PortfolioOptimisersCovariance, w::WeightsType = nothing)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """

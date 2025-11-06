@@ -130,8 +130,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
                                           slv::Union{Nothing, <:Solver,
                                                      <:AbstractVector{<:Solver}},
                                           alpha::Real, kappa_a::Real, beta::Real,
-                                          kappa_b::Real,
-                                          w::Union{Nothing, <:AbstractWeights})
+                                          kappa_b::Real, w::WeightsType)
         if isa(slv, AbstractVector)
             @argcheck(!isempty(slv))
         end
@@ -153,7 +152,7 @@ function RelativisticValueatRiskRange(;
                                                  <:AbstractVector{<:Solver}} = nothing,
                                       alpha::Real = 0.05, kappa_a::Real = 0.3,
                                       beta::Real = 0.05, kappa_b::Real = 0.3,
-                                      w::Union{Nothing, <:AbstractWeights} = nothing)
+                                      w::WeightsType = nothing)
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
 function (r::RelativisticValueatRiskRange)(x::AbstractVector)

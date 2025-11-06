@@ -26,8 +26,8 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 # Constructors
 
     Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       w::Union{Nothing, <:AbstractWeights} = nothing,
-                       mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                       w::WeightsType = nothing,
+                       mu::MuType = nothing,
                        kt::Union{Nothing, <:AbstractMatrix} = nothing,
                        N::Union{Nothing, <:Integer} = nothing,
                        alg1::AbstractMomentAlgorithm = Full(),
@@ -97,8 +97,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     N::T5
     alg1::T6
     alg2::T7
-    function Kurtosis(settings::RiskMeasureSettings, w::Union{Nothing, <:AbstractWeights},
-                      mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar},
+    function Kurtosis(settings::RiskMeasureSettings, w::WeightsType, mu::MuType,
                       kt::Union{Nothing, <:AbstractMatrix}, N::Union{Nothing, <:Integer},
                       alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation)
         mu_flag = isa(mu, AbstractVector)
@@ -129,8 +128,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::Union{Nothing, <:AbstractWeights} = nothing,
-                  mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:VecScalar} = nothing,
+                  w::WeightsType = nothing, mu::MuType = nothing,
                   kt::Union{Nothing, <:AbstractMatrix} = nothing,
                   N::Union{Nothing, <:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),

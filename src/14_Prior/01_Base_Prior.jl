@@ -467,7 +467,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
     LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
                   chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                  w::Union{Nothing, <:AbstractWeights} = nothing,
+                  w::WeightsType = nothing,
                   ens::Union{Nothing, <:Real} = nothing,
                   kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                   ow::Union{Nothing, <:AbstractVector} = nothing,
@@ -532,8 +532,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_sigma::T11
     f_w::T12
     function LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                           chol::Union{Nothing, <:AbstractMatrix},
-                           w::Union{Nothing, <:AbstractWeights},
+                           chol::Union{Nothing, <:AbstractMatrix}, w::WeightsType,
                            ens::Union{Nothing, <:Real},
                            kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                            ow::Union{Nothing, <:AbstractVector},
@@ -585,8 +584,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
 end
 function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
                        chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                       w::Union{Nothing, <:AbstractWeights} = nothing,
-                       ens::Union{Nothing, <:Real} = nothing,
+                       w::WeightsType = nothing, ens::Union{Nothing, <:Real} = nothing,
                        kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        ow::Union{Nothing, <:AbstractVector} = nothing,
                        rr::Union{Nothing, <:Regression} = nothing,

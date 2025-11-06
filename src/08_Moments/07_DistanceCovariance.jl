@@ -22,7 +22,7 @@ A flexible container type for configuring and applying distance-based covariance
 # Constructor
 
     DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                       kwargs::NamedTuple = (;), w::Union{Nothing, <:AbstractWeights} = nothing,
+                       kwargs::NamedTuple = (;), w::WeightsType = nothing,
                        threads::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
@@ -53,8 +53,7 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     w::T4
     threads::T5
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Union{Nothing, <:AbstractWeights},
-                                threads::FLoops.Transducers.Executor)
+                                w::WeightsType, threads::FLoops.Transducers.Executor)
         return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(threads)}(dist,
                                                                                            args,
                                                                                            kwargs,
@@ -64,11 +63,11 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Union{Nothing, <:AbstractWeights} = nothing,
+                            w::WeightsType = nothing,
                             threads::FLoops.Transducers.Executor = ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, threads)
 end
-function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::DistanceCovariance, w::WeightsType = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, threads = ce.threads)
 end

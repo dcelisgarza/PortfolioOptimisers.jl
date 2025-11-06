@@ -363,7 +363,7 @@ function SmythBrobyCovariance(;
                               threads::FLoops.Transducers.Executor = ThreadedEx())
     return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
-function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::SmythBrobyCovariance, w::WeightsType = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,
                                 c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg,

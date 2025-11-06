@@ -172,8 +172,7 @@ function BayesianBlackLittermanPrior(;
                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPrior,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(pe::BayesianBlackLittermanPrior, w::WeightsType = nothing)
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)

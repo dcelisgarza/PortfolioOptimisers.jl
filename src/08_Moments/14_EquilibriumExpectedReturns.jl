@@ -72,8 +72,7 @@ function EquilibriumExpectedReturns(;
                                     l::Real = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::EquilibriumExpectedReturns, w::WeightsType = nothing)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """
