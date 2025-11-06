@@ -553,7 +553,7 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
                                  w::Union{Nothing, <:ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
-        if isa(w, ProbabilityWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
             if ismutable(w.values)
                 normalize!(w, 1)

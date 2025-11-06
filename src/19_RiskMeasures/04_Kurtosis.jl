@@ -109,7 +109,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
         elseif isa(mu, Real)
             @argcheck(isfinite(mu))
         end
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         if kt_flag

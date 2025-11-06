@@ -44,7 +44,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
@@ -82,7 +82,7 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(w)}(settings,

@@ -39,7 +39,7 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     lb::T2
     function KellyReturn(w::Union{Nothing, <:AbstractWeights},
                          lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier})
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         if isa(lb, Real)

@@ -246,7 +246,6 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 ```
 """
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
-
 """
     ⊙(A, B)
 
@@ -278,7 +277,6 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 ⊙(A::AbstractArray, B) = A * B
 ⊙(A, B::AbstractArray) = A * B
 ⊙(A, B) = A * B
-
 """
     ⊘(A, B)
 
@@ -310,7 +308,6 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 ⊘(A::AbstractArray, B) = A / B
 ⊘(A, B::AbstractArray) = A ./ B
 ⊘(A, B) = A / B
-
 """
     ⊕(A, B)
 
@@ -342,7 +339,6 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 ⊕(A::AbstractArray, B) = A .+ B
 ⊕(A, B::AbstractArray) = A .+ B
 ⊕(A, B) = A + B
-
 """
     ⊖(A, B)
 
@@ -374,7 +370,6 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A::AbstractArray, B) = A .- B
 ⊖(A, B::AbstractArray) = A .- B
 ⊖(A, B) = A - B
-
 """
     dot_scalar(a::Real, b::AbstractVector)
     dot_scalar(a::AbstractVector, b::Real)
@@ -453,17 +448,13 @@ VecScalar
 struct VecScalar{T1, T2} <: AbstractResult
     v::T1
     s::T2
-    function VecScalar(v::AbstractVector{<:Real}, s::Real)
-        @argcheck(!isempty(v),
-                  IsEmptyError("!isempty(v) must hold. Got\n!isempty($v) => $(isempty(v))."))
-        @argcheck(all(isfinite, v),
-                  DomainError("all(isfinite, values(v)) must hold. Got\nall(isfinite, values(v)) => $(all(isfinite, values(v)))."))
-        @argcheck(isfinite(s),
-                  DomainError("isfinite(s) must hold. Got\nisfinite(s) => $(isfinite(s))."))
+    function VecScalar(v::NumVec, s::Number)
+        assert_nonempty_finite_val(v, :v)
+        assert_nonempty_finite_val(s, :s)
         return new{typeof(v), typeof(s)}(v, s)
     end
 end
-function VecScalar(; v::AbstractVector{<:Real}, s::Real)
+function VecScalar(; v::NumVec, s::Number)
     return VecScalar(v, s)
 end
 """

@@ -17,7 +17,7 @@ struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
         elseif isa(mu, Real)
             @argcheck(isfinite(mu))
         end
-        if isa(w, AbstractWeights)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(flag)}(settings, w, mu,

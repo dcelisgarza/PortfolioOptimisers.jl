@@ -18,7 +18,7 @@ struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
     function OrderedWeightsArray(settings::RiskMeasureSettings,
                                  w::Union{Nothing, <:AbstractVector},
                                  alg::OrderedWeightsArrayFormulation)
-        if isa(w, AbstractVector)
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return new{typeof(settings), typeof(w), typeof(alg)}(settings, w, alg)

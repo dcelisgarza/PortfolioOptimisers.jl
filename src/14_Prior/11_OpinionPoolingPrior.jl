@@ -248,7 +248,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
         if !isnothing(p)
             @argcheck(p > zero(p))
         end
-        if isa(w, AbstractVector)
+        if !isnothing(w)
             @argcheck(!isempty(w))
             @argcheck(length(w) == length(pes))
             @argcheck(all(x -> zero(x) <= x <= one(x), w),

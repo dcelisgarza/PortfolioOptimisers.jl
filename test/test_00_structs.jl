@@ -2,7 +2,7 @@
     using Test, PortfolioOptimisers, AverageShiftedHistograms, Dates
     @testset "VecScalar" begin
         @test_throws IsEmptyError VecScalar(; v = Float64[], s = 1)
-        @test_throws DomainError VecScalar(; v = [1.0, Inf, 3.0], s = 1)
+        @test_throws DomainError VecScalar(; v = [Inf, Inf, NaN], s = 1)
         @test_throws DomainError VecScalar(; v = [1.0, -2.0, 3.0], s = Inf)
         vs = VecScalar(; v = [1.0, -2.0, 3.0], s = 2)
         @test vs.v == [1.0, -2.0, 3.0]
@@ -184,17 +184,71 @@
         @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => -1))
         @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => Inf))
 
+        @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
+                                                    val = Dict{String, Real}())
+        @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
+                                                    val = Pair{String, Real}[])
+
         @test_throws DomainError TurnoverEstimator(; w = [1], val = val = "a" => 1,
                                                    dval = -eps())
 
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
         @test te.w === w
         @test te.val == Dict("A" => 0.1, "B" => 0.2)
-        @test te.dval == 0.0
+        @test isnothing(te.dval)
 
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.2)
         @test te.w === w
         @test te.val == Dict("A" => 0.1, "B" => 0.2)
         @test te.dval == 0.2
+
+        @test_throws IsEmptyError Turnover(; w = Float64[], val = 0)
+
+        @test_throws DomainError Turnover(; w = Float64[Inf], val = 0)
+        @test_throws DomainError Turnover(; w = [1], val = Inf)
+        @test_throws DomainError Turnover(; w = [1], val = [Inf])
+        @test_throws DomainError Turnover(; w = [1], val = -1)
+        @test_throws DomainError Turnover(; w = [1], val = [-1])
+
+        @test_throws DimensionMismatch Turnover(; w = [1], val = [1, 2])
+    end
+    @testset "Fees" begin
+        @test_throws DomainError FeesEstimator(; l = "a" => -1)
+        @test_throws DomainError FeesEstimator(; l = "a" => Inf)
+        @test_throws DomainError FeesEstimator(; l = ["a" => -1])
+        @test_throws DomainError FeesEstimator(; l = ["a" => Inf])
+        @test_throws DomainError FeesEstimator(; l = Dict("a" => -1))
+        @test_throws DomainError FeesEstimator(; l = Dict("a" => Inf))
+        @test_throws IsEmptyError FeesEstimator(; l = Dict{String, Real}())
+        @test_throws IsEmptyError FeesEstimator(; l = Pair{String, Real}[])
+
+        @test_throws DomainError FeesEstimator(; s = "a" => -1)
+        @test_throws DomainError FeesEstimator(; s = "a" => Inf)
+        @test_throws DomainError FeesEstimator(; s = ["a" => -1])
+        @test_throws DomainError FeesEstimator(; s = ["a" => Inf])
+        @test_throws DomainError FeesEstimator(; s = Dict("a" => -1))
+        @test_throws DomainError FeesEstimator(; s = Dict("a" => Inf))
+        @test_throws IsEmptyError FeesEstimator(; s = Dict{String, Real}())
+        @test_throws IsEmptyError FeesEstimator(; s = Pair{String, Real}[])
+
+        @test_throws DomainError FeesEstimator(; fl = "a" => -1)
+        @test_throws DomainError FeesEstimator(; fl = "a" => Inf)
+        @test_throws DomainError FeesEstimator(; fl = ["a" => -1])
+        @test_throws DomainError FeesEstimator(; fl = ["a" => Inf])
+        @test_throws DomainError FeesEstimator(; fl = Dict("a" => -1))
+        @test_throws DomainError FeesEstimator(; fl = Dict("a" => Inf))
+        @test_throws IsEmptyError FeesEstimator(; fl = Dict{String, Real}())
+        @test_throws IsEmptyError FeesEstimator(; fl = Pair{String, Real}[])
+
+        @test_throws DomainError FeesEstimator(; fs = "a" => -1)
+        @test_throws DomainError FeesEstimator(; fs = "a" => Inf)
+        @test_throws DomainError FeesEstimator(; fs = ["a" => -1])
+        @test_throws DomainError FeesEstimator(; fs = ["a" => Inf])
+        @test_throws DomainError FeesEstimator(; fs = Dict("a" => -1))
+        @test_throws DomainError FeesEstimator(; fs = Dict("a" => Inf))
+        @test_throws IsEmptyError FeesEstimator(; fs = Dict{String, Real}())
+        @test_throws IsEmptyError FeesEstimator(; fs = Pair{String, Real}[])
+
+        f = FeesEstimator(; l = "a" => 1, s = ["a" => 1], fl = Dict("a" => 1), fs = 1)
     end
 end
