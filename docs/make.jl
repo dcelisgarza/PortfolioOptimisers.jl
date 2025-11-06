@@ -104,7 +104,6 @@ DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimis
                                push_preview = true)
 
 # ~/docs $ npm run docs:dev
-
 # allpages = String[]
 # for page in api_pages
 #     append!(allpages, joinpath.(page[1][idx1:end], page[3]))
