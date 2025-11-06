@@ -76,12 +76,12 @@ makedocs(; #modules = [PortfolioOptimisers],
                   # "Home" => root_pages[1];
                   # "Examples" => example_pages;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
-                            "Moments" => joinpath.(api_pages[2][1][idx1:end],
-                                                   api_pages[2][3])
-                            "Distance" => joinpath.(api_pages[3][1][idx1:end],
-                                                    api_pages[3][3])
-                            "Phylogeny" => joinpath.(api_pages[4][1][idx1:end],
-                                                     api_pages[4][3])
+                            # "Moments" => joinpath.(api_pages[2][1][idx1:end],
+                            #                        api_pages[2][3])
+                            # "Distance" => joinpath.(api_pages[3][1][idx1:end],
+                            #                         api_pages[3][3])
+                            # "Phylogeny" => joinpath.(api_pages[4][1][idx1:end],
+                            #                          api_pages[4][3])
                             # "Constraint Generation" => joinpath.(api_pages[5][1][idx1:end],
                             #                                      api_pages[5][3])
                             # "Prior" => joinpath.(api_pages[6][1][idx1:end], api_pages[6][3]);
