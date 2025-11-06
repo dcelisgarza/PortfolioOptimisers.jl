@@ -402,13 +402,13 @@ julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
 32.0
 ```
 """
-function dot_scalar(a::Real, b::AbstractVector)
+function dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::NumVec)
     return a * sum(b)
 end
-function dot_scalar(a::AbstractVector, b::Real)
+function dot_scalar(a::NumVec, b::Union{<:Number, <:AbstractJuMPScalar})
     return sum(a) * b
 end
-function dot_scalar(a::AbstractVector, b::AbstractVector)
+function dot_scalar(a::NumVec, b::NumVec)
     return dot(a, b)
 end
 """
@@ -507,13 +507,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
  fill(3)
 ```
 """
-function nothing_scalar_array_view(::Nothing, ::Any)
-    return nothing
-end
-function nothing_scalar_array_view(x::Real, ::Any)
+function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair,
+                                            <:AbstractVector{<:Pair}, <:Dict}, ::Any)
     return x
 end
-function nothing_scalar_array_view(x::AbstractVector, i)
+function nothing_scalar_array_view(x::NumVec, i)
     return view(x, i)
 end
 function nothing_scalar_array_view(x::VecScalar, i)
