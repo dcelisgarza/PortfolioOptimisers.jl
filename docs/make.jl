@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, Statistics, StatsBase, DocumenterVitepress
+      Handcalcs, StatsBase, DocumenterVitepress
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
                     recursive = true)

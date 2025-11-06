@@ -195,7 +195,7 @@
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
         @test te.w === w
         @test te.val == Dict("A" => 0.1, "B" => 0.2)
-        @test te.dval == 0.0
+        @test isnothing(te.dval)
 
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.2)
         @test te.w === w

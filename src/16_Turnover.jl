@@ -17,7 +17,7 @@ Estimator for turnover portfolio constraints.
 
 # Constructor
 
-    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Union{Nothing, <:Number} = 0.0)
+    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Union{Nothing, <:Number} = nothing)
 
 ## Validation
 
@@ -48,9 +48,6 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
                                dval::Union{Nothing, <:Number} = nothing)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
-        if !isnothing(dval)
-            @argcheck(zero(dval) <= dval, DomainError)
-        end
         return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end
 end
@@ -86,7 +83,7 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 ```jldoctest
 julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
 
-julia> tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1, "B" => 0.2), 0.0);
+julia> tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1, "B" => 0.2));
 
 julia> turnover_constraints(tn, sets)
 Turnover
