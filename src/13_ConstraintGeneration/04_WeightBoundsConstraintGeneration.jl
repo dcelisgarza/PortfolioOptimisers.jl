@@ -159,9 +159,9 @@ Estimator for portfolio weight bounds constraints.
 # Constructor
 
     WeightBoundsEstimator(;
-                          lb::Union{Nothing, <:Number, <:EstValType,
+                          lb::Union{Nothing, <:EstValType,
                                     <:CustomWeightBoundsConstraint} = nothing,
-                          ub::Union{Nothing, <:Number, <:EstValType,
+                          ub::Union{Nothing, <:EstValType,
                                     <:CustomWeightBoundsConstraint} = nothing)
 
 ## Validation
@@ -207,8 +207,8 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
                                              <:CustomWeightBoundsConstraint},
                                    ub::Union{Nothing, <:EstValType,
                                              <:CustomWeightBoundsConstraint},
-                                   dlb::Union{Nothing, <:Number},
-                                   dub::Union{Nothing, <:Number})
+                                   dlb::Union{Nothing, <:Number} = nothing,
+                                   dub::Union{Nothing, <:Number} = nothing)
         if isa(lb, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(lb), IsEmptyError)
         end
