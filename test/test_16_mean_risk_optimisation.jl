@@ -1177,7 +1177,7 @@
                             wb = WeightBounds(; lb = -1, ub = 1),
                             tn = [TurnoverEstimator(; w = w0,
                                                     val = ["AAPL" => 0, "MRK" => 0.05],
-                                                    default = Inf)])
+                                                    dval = Inf)])
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,
