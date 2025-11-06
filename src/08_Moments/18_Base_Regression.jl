@@ -476,7 +476,7 @@ function Base.getproperty(re::Regression{<:Any, <:NumMat, <:Any}, sym::Symbol)
     end
 end
 """
-    regression_view(re::Regression, i::NumVec)
+    regression_view(re::Regression, i)
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
@@ -511,7 +511,7 @@ Regression
 
   - [`Regression`](@ref)
 """
-function regression_view(re::Regression, i::NumVec)
+function regression_view(re::Regression, i)
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end

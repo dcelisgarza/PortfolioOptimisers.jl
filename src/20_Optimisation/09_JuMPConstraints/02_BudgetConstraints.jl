@@ -83,7 +83,7 @@ function BudgetCosts(; bgt::Union{<:Number, <:BudgetRange} = 1.0, w::NumVec,
                      un::Union{<:Number, <:NumVec} = 1.0)
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
-function budget_view(bgt::BudgetCosts, i::NumVec)
+function budget_view(bgt::BudgetCosts, i)
     w = view(bgt.w, i)
     vp = nothing_scalar_array_view(bgt.vp, i)
     vn = nothing_scalar_array_view(bgt.vn, i)
@@ -141,7 +141,7 @@ function BudgetMarketImpact(; bgt::Union{<:Number, <:BudgetRange} = 1.0, w::NumV
                             un::Union{<:Number, <:NumVec} = 1.0, beta::Number = 2 / 3)
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
-function budget_view(bgt::BudgetMarketImpact, i::NumVec)
+function budget_view(bgt::BudgetMarketImpact, i)
     w = view(bgt.w, i)
     vp = nothing_scalar_array_view(bgt.vp, i)
     vn = nothing_scalar_array_view(bgt.vn, i)

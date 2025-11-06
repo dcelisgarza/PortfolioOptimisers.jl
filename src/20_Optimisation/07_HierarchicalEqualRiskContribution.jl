@@ -37,7 +37,7 @@ function HierarchicalEqualRiskContribution(;
                                            fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fb)
 end
-function opt_view(hec::HierarchicalEqualRiskContribution, i::NumVec, X::NumMat)
+function opt_view(hec::HierarchicalEqualRiskContribution, i, X::NumMat)
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro

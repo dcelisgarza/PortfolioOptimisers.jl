@@ -146,7 +146,7 @@ function assert_external_optimiser(opt::NestedClustered)
     end
     return nothing
 end
-function opt_view(nco::NestedClustered, i::NumVec, X::NumMat)
+function opt_view(nco::NestedClustered, i, X::NumMat)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)

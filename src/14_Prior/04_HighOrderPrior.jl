@@ -285,7 +285,7 @@ end
 function dup_elim_sum_view(::NumMat, N)
     return dup_elim_sum_matrices(N)
 end
-function prior_view(pr::HighOrderPrior, i::NumVec)
+function prior_view(pr::HighOrderPrior, i)
     idx = fourth_moment_index_factory(length(pr.mu), i)
     kt = pr.kt
     L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]

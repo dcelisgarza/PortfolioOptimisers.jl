@@ -281,7 +281,7 @@ function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
-function risk_measure_view(r::Variance, i::NumVec, args...)
+function risk_measure_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
@@ -423,7 +423,7 @@ function factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwar
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-function risk_measure_view(r::StandardDeviation, i::NumVec, args...)
+function risk_measure_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
@@ -681,7 +681,7 @@ function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function risk_measure_view(r::UncertaintySetVariance, i::NumVec, args...)
+function risk_measure_view(r::UncertaintySetVariance, i, args...)
     ucs = ucs_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)

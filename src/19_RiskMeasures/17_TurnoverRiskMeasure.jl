@@ -13,7 +13,7 @@ end
 function (r::TurnoverRiskMeasure)(w::NumVec)
     return norm(r.w - w, 1)
 end
-function risk_measure_view(r::TurnoverRiskMeasure, i::NumVec, args...)
+function risk_measure_view(r::TurnoverRiskMeasure, i, args...)
     w = view(r.w, i)
     return TurnoverRiskMeasure(; settings = r.settings, w = w)
 end

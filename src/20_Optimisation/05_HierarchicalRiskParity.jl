@@ -21,7 +21,7 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                 fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return HierarchicalRiskParity(opt, r, sce, fb)
 end
-function opt_view(hrp::HierarchicalRiskParity, i::NumVec, X::NumMat)
+function opt_view(hrp::HierarchicalRiskParity, i, X::NumMat)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)

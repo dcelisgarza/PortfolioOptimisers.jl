@@ -25,7 +25,7 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
                   fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
 end
-function opt_view(mr::MeanRisk, i::NumVec, X::NumMat)
+function opt_view(mr::MeanRisk, i, X::NumMat)
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)

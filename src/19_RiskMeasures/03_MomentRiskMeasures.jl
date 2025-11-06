@@ -1086,7 +1086,7 @@ for rt in (LowOrderMoment, HighOrderMoment)
                  alg = factory(r.alg, w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
-             function risk_measure_view(r::$(rt), i::NumVec, args...)
+             function risk_measure_view(r::$(rt), i, args...)
                  mu = nothing_scalar_array_view(r.mu, i)
                  return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
              end

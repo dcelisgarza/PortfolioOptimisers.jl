@@ -14,8 +14,7 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:EstValType, <:NumVec};
-                                      val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::EstValType, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(args...)
 
 Validate that the input value is non-negative and finite.
@@ -100,8 +99,7 @@ function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_finite_val(val::Union{<:Number, <:EstValType, <:NumVec};
-                               val_sym::Symbol = :val)
+    assert_nonempty_finite_val(val::EstValType, val_sym::Symbol = :val)
     assert_nonempty_finite_val(args...)
 
 Validate that the input value is finite and non-empty.
@@ -175,8 +173,7 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_geq0_finite_val(val::Union{<:Number, <:EstValType, <:NumVec};
-                                    val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(val::EstValType, val_sym::Symbol = :val)
     assert_nonempty_geq0_finite_val(args...)
 
 Validate that the input value is strictly positive and finite.
@@ -686,12 +683,8 @@ struct VecScalar{T1, T2} <: AbstractResult
     v::T1
     s::T2
     function VecScalar(v::NumVec, s::Number)
-        @argcheck(!isempty(v),
-                  IsEmptyError("!isempty(v) must hold. Got\n!isempty($v) => $(isempty(v))."))
-        @argcheck(all(isfinite, v),
-                  DomainError("all(isfinite, values(v)) must hold. Got\nall(isfinite, values(v)) => $(all(isfinite, values(v)))."))
-        @argcheck(isfinite(s),
-                  DomainError("isfinite(s) must hold. Got\nisfinite(s) => $(isfinite(s))."))
+        assert_nonempty_finite_val(v, :v)
+        assert_nonempty_finite_val(s, :s)
         return new{typeof(v), typeof(s)}(v, s)
     end
 end
@@ -739,13 +732,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
  fill(3)
 ```
 """
-function nothing_scalar_array_view(::Nothing, ::Any)
-    return nothing
-end
-function nothing_scalar_array_view(x::Number, ::Any)
+function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair,
+                                            <:AbstractVector{<:Pair}, <:Dict}, ::Any)
     return x
 end
-function nothing_scalar_array_view(x::AbstractVector, i)
+function nothing_scalar_array_view(x::NumVec, i)
     return view(x, i)
 end
 function nothing_scalar_array_view(x::VecScalar, i)

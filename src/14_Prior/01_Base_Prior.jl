@@ -593,7 +593,7 @@ function LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
                        f_w::Union{Nothing, <:NumVec} = nothing)
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
-function prior_view(pr::LowOrderPrior, i::NumVec)
+function prior_view(pr::LowOrderPrior, i)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,

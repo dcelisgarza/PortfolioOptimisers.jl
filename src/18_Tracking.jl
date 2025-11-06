@@ -269,7 +269,7 @@ end
 function factory(tracking::WeightsTracking, w::NumVec)
     return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
 end
-function tracking_view(tracking::WeightsTracking, i::NumVec)
+function tracking_view(tracking::WeightsTracking, i)
     fees = fees_view(tracking.fees, i)
     w = view(tracking.w, i)
     return WeightsTracking(; fees = fees, w = w)
@@ -470,7 +470,7 @@ function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormTracking = SOCTracking())
     return TrackingError(tracking, err, alg)
 end
-function tracking_view(tracking::TrackingError, i::NumVec, args...)
+function tracking_view(tracking::TrackingError, i, args...)
     return TrackingError(; tracking = tracking_view(tracking.tracking, i),
                          err = tracking.err, alg = tracking.alg)
 end

@@ -39,7 +39,7 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
-function opt_view(rrb::RelaxedRiskBudgeting, i::NumVec, X::NumMat)
+function opt_view(rrb::RelaxedRiskBudgeting, i, X::NumMat)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rba = risk_budgeting_algorithm_view(rrb.rba, i)

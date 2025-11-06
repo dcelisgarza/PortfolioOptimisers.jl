@@ -25,7 +25,7 @@ function ArithmeticReturn(;
                           lb::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing)
     return ArithmeticReturn(ucs, lb)
 end
-function jump_returns_view(r::ArithmeticReturn, i::NumVec, args...)
+function jump_returns_view(r::ArithmeticReturn, i, args...)
     uset = ucs_view(r.ucs, i)
     return ArithmeticReturn(; ucs = uset, lb = r.lb)
 end

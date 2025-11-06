@@ -51,8 +51,8 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any
                            args...)
     return r
 end
-function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:NumMat, <:NumMat, <:Any},
-                           i::NumVec, X::NumMat)
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:NumMat, <:NumMat, <:Any}, i,
+                           X::NumMat)
     sk = r.sk
     idx = fourth_moment_index_factory(size(sk, 1), i)
     sk = view(r.sk, i, idx)

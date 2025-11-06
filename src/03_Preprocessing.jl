@@ -162,7 +162,7 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector{<:AbstractString}} 
                        ivpa::Union{Nothing, <:Number, <:NumVec} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
-function returns_result_view(rd::ReturnsResult, i::NumVec)
+function returns_result_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)

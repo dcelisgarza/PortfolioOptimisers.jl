@@ -39,7 +39,7 @@ end
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
     return x
 end
-function risk_measure_view(r::MedianAbsoluteDeviation, i::NumVec, args...)
+function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end

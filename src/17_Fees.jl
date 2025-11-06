@@ -60,91 +60,68 @@ FeesEstimator
   - [`Turnover`](@ref)
   - [`AbstractEstimator`](@ref)
 """
-struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
+struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimator
     tn::T1
     l::T2
     s::T3
     fl::T4
     fs::T5
-    kwargs::T6
+    dl::T6
+    ds::T7
+    dfl::T8
+    dfs::T9
+    kwargs::T10
     function FeesEstimator(tn::Union{Nothing, <:TurnoverEstimator, <:Turnover},
                            l::Union{Nothing, <:EstValType}, s::Union{Nothing, <:EstValType},
                            fl::Union{Nothing, <:EstValType},
                            fs::Union{Nothing, <:EstValType},
+                           dl::Union{Nothing, <:Number} = nothing,
+                           ds::Union{Nothing, <:Number} = nothing,
+                           dfl::Union{Nothing, <:Number} = nothing,
+                           dfs::Union{Nothing, <:Number} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
-        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
-                   typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
+        if !isnothing(dl)
+            @argcheck(zero(dl) <= dl, DomainError)
+        end
+        if !isnothing(ds)
+            @argcheck(zero(ds) <= ds, DomainError)
+        end
+        if !isnothing(dfl)
+            @argcheck(zero(dfl) <= dfl, DomainError)
+        end
+        if !isnothing(dfs)
+            @argcheck(zero(dfs) <= dfs, DomainError)
+        end
+        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(dl),
+                   typeof(ds), typeof(dfl), typeof(dfs), typeof(kwargs)}(tn, l, s, fl, fs,
+                                                                         dl, ds, dfl, dfs,
+                                                                         kwargs)
     end
 end
-"""
-    fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
-                     strict::Bool = false)
-
-Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set.
-
-`fees_constraints` constructs a [`Fees`](@ref) object representing transaction fee constraints for the assets in `sets`, using the specifications in `fees`. Supports asset-specific turnover, long/short proportional fees, and long/short fixed fees via dictionaries, pairs, or vectors of pairs, with flexible assignment and validation.
-
-# Arguments
-
-  - `fees`: [`FeesEstimator`](@ref) specifying turnover, proportional, and fixed fee values.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
-  - `datatype`: Output data type for fee values.
-  - `strict`: If `true`, enforces strict matching between assets and fee values (throws error on mismatch); if `false`, issues a warning.
-
-# Returns
-
-  - `Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
-
-# Details
-
-  - Fee values are extracted and mapped to assets using `estimator_to_val`.
-  - If a fee value is missing for an asset, assigns zero unless `strict` is `true`.
-  - Turnover constraints are generated using `turnover_constraints`.
-
-# Examples
-
-```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
-
-julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
-                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
-                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
-
-julia> fees_constraints(fees, sets)
-Fees
-      tn ┼ Turnover
-         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
-       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-```
-
-# Related
-
-  - [`FeesEstimator`](@ref)
-  - [`Fees`](@ref)
-  - [`turnover_constraints`](@ref)
-  - [`AssetSets`](@ref)
-"""
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
                        l::Union{Nothing, <:EstValType} = nothing,
                        s::Union{Nothing, <:EstValType} = nothing,
                        fl::Union{Nothing, <:EstValType} = nothing,
                        fs::Union{Nothing, <:EstValType} = nothing,
+                       dl::Union{Nothing, <:Number} = nothing,
+                       ds::Union{Nothing, <:Number} = nothing,
+                       dfl::Union{Nothing, <:Number} = nothing,
+                       dfs::Union{Nothing, <:Number} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
-    return FeesEstimator(tn, l, s, fl, fs, kwargs)
+    return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end
-function fees_view(fees::FeesEstimator, i::NumVec)
+function fees_view(fees::FeesEstimator, i)
     tn = turnover_view(fees.tn, i)
-    return FeesEstimator(; tn = tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
-                         kwargs = fees.kwargs)
+    l = nothing_scalar_array_view(fees.l, i)
+    s = nothing_scalar_array_view(fees.s, i)
+    fl = nothing_scalar_array_view(fees.fl, i)
+    fs = nothing_scalar_array_view(fees.fs, i)
+    return FeesEstimator(; tn = tn, l = l, s = s, fl = fl, fs = fs, dl = fees.dl,
+                         ds = fees.ds, dfl = fees.dfl, dfs = fees.dfs, kwargs = fees.kwargs)
 end
 """
     struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
@@ -291,11 +268,17 @@ Fees
 """
 function fees_constraints(fees::FeesEstimator, sets::AssetSets;
                           datatype::DataType = Float64, strict::Bool = false)
-    return Fees(; tn = turnover_constraints(fees.tn, sets; strict = strict),
-                l = estimator_to_val(fees.l, sets, zero(datatype); strict = strict),
-                s = estimator_to_val(fees.s, sets, zero(datatype); strict = strict),
-                fl = estimator_to_val(fees.fl, sets, zero(datatype); strict = strict),
-                fs = estimator_to_val(fees.fs, sets, zero(datatype); strict = strict))
+    return Fees(;
+                tn = turnover_constraints(fees.tn, sets; datatype = datatype,
+                                          strict = strict),
+                l = estimator_to_val(fees.l, sets, fees.dl; datatype = datatype,
+                                     strict = strict),
+                s = estimator_to_val(fees.s, sets, fees.ds; datatype = datatype,
+                                     strict = strict),
+                fl = estimator_to_val(fees.fl, sets, fees.dfl; datatype = datatype,
+                                      strict = strict),
+                fs = estimator_to_val(fees.fs, sets, fees.dfs; datatype = datatype,
+                                      strict = strict))
 end
 """
     fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
@@ -345,7 +328,7 @@ end
 function fees_view(::Nothing, ::Any)
     return nothing
 end
-function fees_view(fees::Fees, i::NumVec)
+function fees_view(fees::Fees, i)
     tn = turnover_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)

@@ -56,7 +56,7 @@ function SchurComplementParams(; r::Union{<:StandardDeviation, <:Variance} = Var
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)
 end
-function schur_complement_params_view(sp::SchurComplementParams, i::NumVec, X::NumMat)
+function schur_complement_params_view(sp::SchurComplementParams, i, X::NumMat)
     r = risk_measure_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
@@ -83,7 +83,7 @@ function SchurComplementHierarchicalRiskParity(;
                                                fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
-function opt_view(sh::SchurComplementHierarchicalRiskParity, i::NumVec, X::NumMat)
+function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::NumMat)
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_complement_params_view(sh.params, i, X)

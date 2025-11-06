@@ -21,7 +21,7 @@ end
 function tracking_view(::Nothing, args...)
     return nothing
 end
-function tracking_view(tracking::RiskTrackingError, i::NumVec, X::NumMat)
+function tracking_view(tracking::RiskTrackingError, i, X::NumMat)
     return RiskTrackingError(; tracking = tracking_view(tracking.tracking, i),
                              r = risk_measure_view(tracking.r, i, X), err = tracking.err,
                              alg = tracking.alg)
@@ -55,7 +55,7 @@ function (r::TrackingRiskMeasure)(w::NumVec, X::NumMat,
     benchmark = tracking_benchmark(r.tracking, X)
     return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
-function risk_measure_view(r::TrackingRiskMeasure, i::NumVec, args...)
+function risk_measure_view(r::TrackingRiskMeasure, i, args...)
     tracking = tracking_view(r.tracking, i)
     return TrackingRiskMeasure(; settings = r.settings, tracking = tracking, alg = r.alg)
 end
@@ -106,7 +106,7 @@ function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
     r2 = expected_risk(r.r, wb, X, fees)
     return abs(r1 - r2)
 end
-function risk_measure_view(r::RiskTrackingRiskMeasure, i::NumVec, X::NumMat)
+function risk_measure_view(r::RiskTrackingRiskMeasure, i, X::NumMat)
     tracking = tracking_view(r.tracking, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                    r = risk_measure_view(r.r, i, X), alg = r.alg)

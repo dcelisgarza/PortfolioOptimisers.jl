@@ -91,7 +91,7 @@ function factory(r::ThirdCentralMoment, prior::AbstractPriorResult, args...; kwa
     mu = nothing_scalar_array_factory(r.mu, prior.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
 end
-function risk_measure_view(r::ThirdCentralMoment, i::NumVec, args...)
+function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
@@ -106,7 +106,7 @@ function factory(r::Skewness, prior::AbstractPriorResult, args...; kwargs...)
     mu = nothing_scalar_array_factory(r.mu, prior.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
 end
-function risk_measure_view(r::Skewness, i::NumVec, args...)
+function risk_measure_view(r::Skewness, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, w = r.w, mu = mu)
 end

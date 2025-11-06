@@ -34,7 +34,8 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 # Constructor
 
     Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-           settings::Union{Nothing, <:EstValType} = nothing,
+           settings::Union{Nothing, <:AbstractDict, <:Pair,
+                                    <:AbstractVector{<:Pair}} = nothing,
            check_sol::NamedTuple = (;), add_bridges::Bool = true)
 
 Keyword arguments correspond to the fields above.

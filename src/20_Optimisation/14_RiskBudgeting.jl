@@ -10,7 +10,7 @@ function AssetRiskBudgeting(;
                             rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing)
     return AssetRiskBudgeting(rkb)
 end
-function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i::NumVec)
+function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     return AssetRiskBudgeting(; rkb = risk_budget_view(r.rkb, i))
 end
 struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
@@ -29,7 +29,7 @@ function FactorRiskBudgeting(;
                              flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, flag)
 end
-function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i::NumVec)
+function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, flag = r.flag)
 end
@@ -63,7 +63,7 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                        fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
-function opt_view(rb::RiskBudgeting, i::NumVec, X::NumMat)
+function opt_view(rb::RiskBudgeting, i, X::NumMat)
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)

@@ -207,7 +207,7 @@ function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
-function risk_measure_view(r::Kurtosis, i::NumVec, args...)
+function risk_measure_view(r::Kurtosis, i, args...)
     mu = r.mu
     kt = r.kt
     j = if isa(mu, NumVec)

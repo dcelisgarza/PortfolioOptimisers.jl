@@ -2,7 +2,7 @@
     struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
         w::T1
         val::T2
-        default::T3
+        dval::T3
     end
 
 Estimator for turnover portfolio constraints.
@@ -17,7 +17,7 @@ Estimator for turnover portfolio constraints.
 
 # Constructor
 
-    TurnoverEstimator(; w::NumVec, val::EstValType, default::Number = 0.0)
+    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Union{Nothing, <:Number} = 0.0)
 
 ## Validation
 
@@ -43,19 +43,23 @@ TurnoverEstimator
 struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     w::T1
     val::T2
-    default::T3
-    function TurnoverEstimator(w::NumVec, val::EstValType, default::Number)
+    dval::T3
+    function TurnoverEstimator(w::NumVec, val::EstValType, dval::Union{Nothing, <:Number})
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
-        @argcheck(zero(default) <= default, DomainError)
-        return new{typeof(w), typeof(val), typeof(default)}(w, val, default)
+        if !isnothing(dval)
+            @argcheck(zero(dval) <= dval, DomainError)
+        end
+        return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end
 end
-function TurnoverEstimator(; w::NumVec, val::EstValType, default::Number = 0.0)
-    return TurnoverEstimator(w, val, default)
+function TurnoverEstimator(; w::NumVec, val::EstValType,
+                           dval::Union{Nothing, <:Number} = nothing)
+    return TurnoverEstimator(w, val, dval)
 end
 """
-    turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
+    turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; datatype::DataType = Float64,
+                         strict::Bool = false)
 
 Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set.
 
@@ -96,9 +100,11 @@ Turnover
   - [`turnover_constraints`](@ref)
   - [`AssetSets`](@ref)
 """
-function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
+function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
+                              datatype::DataType = Float64, strict::Bool = false)
     return Turnover(; w = tn.w,
-                    val = estimator_to_val(tn.val, sets, tn.default; strict = strict))
+                    val = estimator_to_val(tn.val, sets, tn.dval; datatype = datatype,
+                                           strict = strict))
 end
 """
     struct Turnover{T1, T2} <: AbstractResult
@@ -202,29 +208,32 @@ function turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...
 end
 """
     turnover_constraints(tn::AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}},
-                         sets::AssetSets; strict::Bool = false)
+                         sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
 function turnover_constraints(tn::AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}},
-                              sets::AssetSets; strict::Bool = false)
-    return [turnover_constraints(tni, sets; strict = strict) for tni in tn]
+                              sets::AssetSets; datatype::DataType = Float64,
+                              strict::Bool = false)
+    return [turnover_constraints(tni, sets; datatype = datatype, strict = strict)
+            for tni in tn]
 end
 function turnover_view(::Nothing, ::Any)
     return nothing
 end
-function turnover_view(tn::TurnoverEstimator, i::NumVec)
+function turnover_view(tn::TurnoverEstimator, i)
     w = view(tn.w, i)
-    return TurnoverEstimator(; w = w, val = tn.val, default = tn.default)
+    val = nothing_scalar_array_view(tn.val, i)
+    return TurnoverEstimator(; w = w, val = val, dval = tn.dval)
 end
-function turnover_view(tn::Turnover, i::NumVec)
+function turnover_view(tn::Turnover, i)
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
     return Turnover(; w = w, val = val)
 end
-function turnover_view(tn::AbstractVector{<:Turnover}, i::NumVec)
+function turnover_view(tn::AbstractVector{<:Turnover}, i)
     return [turnover_view(tni, i) for tni in tn]
 end
 function factory(tn::Turnover, w::NumVec)

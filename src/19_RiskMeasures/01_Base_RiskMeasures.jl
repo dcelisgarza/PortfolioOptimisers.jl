@@ -266,8 +266,7 @@ end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
-function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::NumVec,
-                           X::NumMat)
+function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i, X::NumMat)
     return [risk_measure_view(r, i, X) for r in rs]
 end
 """
@@ -439,15 +438,14 @@ function nothing_scalar_array_factory(::Nothing,
                                                             <:VecScalar})
     return prior_variable
 end
-function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::NumVec)
+function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
 function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Number, <:NumArr},
-                                                ::Any, i::NumVec)
+                                                ::Any, i)
     return nothing_scalar_array_view(risk_variable, i)
 end
-function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::NumArr,
-                                                i::NumVec)
+function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::NumArr, i)
     return nothing_scalar_array_view(prior_variable, i)
 end
 function risk_measure_nothing_scalar_array_view(risk_variable::Union{Nothing, <:Number},

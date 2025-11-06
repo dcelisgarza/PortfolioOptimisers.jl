@@ -52,7 +52,7 @@ function HierarchicalOptimiser(;
                                strict::Bool = false)
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
 end
-function opt_view(hco::HierarchicalOptimiser, i::NumVec)
+function opt_view(hco::HierarchicalOptimiser, i)
     pe = prior_view(hco.pe, i)
     fees = fees_view(hco.fees, i)
     wb = weight_bounds_view(hco.wb, i)

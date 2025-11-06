@@ -296,7 +296,7 @@ function AssetSets(; key::AbstractString = "nx",
                    dict::AbstractDict{<:AbstractString, <:Any})
     return AssetSets(key, dict)
 end
-function nothing_asset_sets_view(sets::AssetSets, i::NumVec)
+function nothing_asset_sets_view(sets::AssetSets, i)
     key = sets.key
     dict = typeof(sets.dict)()
     dict[key] = view(sets.dict[key], i)
@@ -375,7 +375,7 @@ function group_to_val!(nx::AbstractVector{<:String}, sdict::AbstractDict, key::A
     return nothing
 end
 """
-    estimator_to_val(dict::EstValType, sets::AssetSets; val::Number = 0.0, strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::AssetSets; val::Union{Nothing, Number}=nothing, strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -414,7 +414,9 @@ The function creates the vector and sets the values for assets or groups as spec
 """
 function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number},
                                       <:AbstractVector{<:Pair{<:AbstractString, <:Number}}},
-                          sets::AssetSets, val::Number = 0.0; strict::Bool = false)
+                          sets::AssetSets, val::Union{Nothing, Number} = nothing;
+                          datatype::DataType = Float64, strict::Bool = false)
+    val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
     for (key, val) in dict
@@ -427,7 +429,9 @@ function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number}
     return arr
 end
 function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSets,
-                          val::Number = 0.0; strict::Bool = false)
+                          val::Union{Nothing, Number} = nothing;
+                          datatype::DataType = Float64, strict::Bool = false)
+    val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
     key, val = dict
@@ -439,7 +443,7 @@ function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSet
     return arr
 end
 """
-    estimator_to_val(val::Union{Nothing, <:Number, <:NumVec}, args...; kwargs...)
+    estimator_to_val(val::Union{Nothing, <:Number}, args...; kwargs...)
 
 Fallback no-op for value mapping in asset/group estimators.
 
@@ -447,13 +451,13 @@ This method returns the input value `val` as-is, without modification or mapping
 
 # Arguments
 
-  - `val`: A value of type `Nothing`, a single numeric value, or a vector of numeric values.
+  - `val`: A value of type `Nothing` or a single numeric value.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `val::Union{Nothing, <:Number, <:NumVec}`: The input `val`, unchanged.
+  - `val::Union{Nothing, <:Number}`: The input `val`, unchanged.
 
 # Related
 
@@ -461,7 +465,39 @@ This method returns the input value `val` as-is, without modification or mapping
   - [`group_to_val!`](@ref)
   - [`AssetSets`](@ref)
 """
-function estimator_to_val(val::Union{Nothing, <:Number, <:NumVec}, args...; kwargs...)
+function estimator_to_val(val::Union{Nothing, <:Number}, args...; kwargs...)
+    return val
+end
+"""
+    estimator_to_val(val::NumVec, sets::AssetSets, args...; kwargs...)
+
+Return a numeric vector for asset/group estimators, validating length against asset universe.
+
+This method checks that the input vector `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value vector is already constructed and requires only defensive validation.
+
+# Arguments
+
+  - `val`: Numeric vector to be mapped to assets/groups.
+  - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `val::NumVec`: The input vector, unchanged.
+
+# Validation
+
+  - `length(val) == length(sets.dict[sets.key])`.
+
+# Related
+
+  - [`estimator_to_val`](@ref)
+  - [`AssetSets`](@ref)
+  - [`group_to_val!`](@ref)
+"""
+function estimator_to_val(val::NumVec, sets::AssetSets, args...; kwargs...)
+    @argcheck(length(val) == length(sets.dict[sets.key]), DimensionMismatch)
     return val
 end
 """
@@ -1389,7 +1425,7 @@ end
 function risk_budget_view(::Nothing, args...)
     return nothing
 end
-function risk_budget_view(rb::RiskBudgetResult, i::NumVec)
+function risk_budget_view(rb::RiskBudgetResult, i)
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudgetResult(; val = val)
 end

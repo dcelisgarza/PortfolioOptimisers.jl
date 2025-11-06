@@ -94,7 +94,7 @@ function WeightBounds(; lb::Union{Nothing, <:Number, <:NumVec} = 0.0,
                       ub::Union{Nothing, <:Number, <:NumVec} = 1.0)
     return WeightBounds(lb, ub)
 end
-function weight_bounds_view(wb::WeightBounds, i::NumVec)
+function weight_bounds_view(wb::WeightBounds, i)
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return WeightBounds(; lb = lb, ub = ub)
@@ -113,6 +113,9 @@ Abstract supertype for custom portfolio weight bounds constraints.
   - [`UniformlyDistributedBounds`](@ref)
 """
 abstract type CustomWeightBoundsConstraint <: AbstractConstraintEstimator end
+function nothing_scalar_array_view(x::CustomWeightBoundsConstraint, ::Any)
+    return x
+end
 """
     struct UniformlyDistributedBounds <: CustomWeightBoundsConstraint end
 
@@ -134,6 +137,11 @@ julia> PortfolioOptimisers.get_weight_bounds(UniformlyDistributedBounds(), true,
   - [`WeightBounds`](@ref)
 """
 struct UniformlyDistributedBounds <: CustomWeightBoundsConstraint end
+function estimator_to_val(::UniformlyDistributedBounds, sets::AssetSets, args...;
+                          datatype::DataType = Float64, kwargs...)
+    N = length(sets.dict[sets.key])
+    return fill(datatype(inv(N)), N)
+end
 """
     struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
         lb::T1
@@ -187,132 +195,42 @@ WeightBoundsEstimator
   - [`UniformlyDistributedBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
+struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
     lb::T1
     ub::T2
-    function WeightBoundsEstimator(lb::Union{Nothing, <:Number, <:EstValType,
+    dlb::T3
+    dub::T4
+    function WeightBoundsEstimator(lb::Union{Nothing, <:EstValType,
                                              <:CustomWeightBoundsConstraint},
-                                   ub::Union{Nothing, <:Number, <:EstValType,
-                                             <:CustomWeightBoundsConstraint})
+                                   ub::Union{Nothing, <:EstValType,
+                                             <:CustomWeightBoundsConstraint},
+                                   dlb::Union{Nothing, <:Number},
+                                   dub::Union{Nothing, <:Number})
         if isa(lb, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(lb), IsEmptyError)
         end
         if isa(ub, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(ub), IsEmptyError)
         end
-        return new{typeof(lb), typeof(ub)}(lb, ub)
+        if !isnothing(dlb) && !isnothing(dub)
+            @argcheck(dlb <= dub)
+        end
+        return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end
 end
 function WeightBoundsEstimator(;
-                               lb::Union{Nothing, <:Number, <:EstValType,
+                               lb::Union{Nothing, <:EstValType,
                                          <:CustomWeightBoundsConstraint} = nothing,
-                               ub::Union{Nothing, <:Number, <:EstValType,
-                                         <:CustomWeightBoundsConstraint} = nothing)
-    return WeightBoundsEstimator(lb, ub)
+                               ub::Union{Nothing, <:EstValType,
+                                         <:CustomWeightBoundsConstraint} = nothing,
+                               dlb::Union{Nothing, <:Number} = nothing,
+                               dub::Union{Nothing, <:Number} = nothing)
+    return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
-function weight_bounds_view(wb::Union{<:AbstractString, Expr,
-                                      <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                      <:WeightBoundsEstimator}, ::Any)
-    return wb
-end
-"""
-    get_weight_bounds(wb::Union{Nothing, <:Number, <:NumVec}, args...; kwargs...)
-
-Extracts portfolio weight bounds from a scalar, vector, or `nothing`.
-
-`get_weight_bounds` returns the input value unchanged when the weight bounds are specified as a scalar, vector, or `nothing`. This method is used internally to propagate simple bound specifications in portfolio optimisation workflows.
-
-# Arguments
-
-  - `wb`: Lower or upper bound(s) for portfolio weights.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `wb`: The input value, unchanged.
-
-# Related
-
-  - [`WeightBoundsEstimator`](@ref)
-  - [`WeightBounds`](@ref)
-  - [`weight_bounds_constraints`](@ref)
-"""
-function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
-                           kwargs...)
-    return wb
-end
-"""
-    get_weight_bounds(wb::EstValType, lub::Bool, sets::AssetSets; strict::Bool = false,
-                      datatype::DataType = Float64)
-
-Extracts portfolio weight bounds from a dictionary, pair, or vector of pairs.
-
-`get_weight_bounds` converts asset-specific bound specifications into a vector of bounds aligned with the assets in `sets`. This method is used to map named or indexed bounds to the corresponding assets for portfolio optimisation.
-
-# Arguments
-
-  - `wb`: Asset-specific bounds as a dictionary.
-
-  - `lub`: Boolean flag indicating whether the bounds are lower or upper.
-
-      + `true`: lower bounds
-      + `false`: upper bounds.
-  - `sets`: [`AssetSets`](@ref) object containing asset names or indices.
-  - `strict`: If `true`, throws error enforcing strict matching between assets and bounds, else throws a warning.
-  - `datatype`: Output data type for bounds.
-
-# Returns
-
-  - `wb::Vector{<:Number}`: Vector of bounds aligned with the assets in `sets`.
-
-# Related
-
-  - [`WeightBoundsEstimator`](@ref)
-  - [`WeightBounds`](@ref)
-  - [`AssetSets`](@ref)
-  - [`weight_bounds_constraints`](@ref)
-"""
-function get_weight_bounds(wb::EstValType, lub::Bool, sets::AssetSets; strict::Bool = false,
-                           datatype::DataType = Float64)
-    return estimator_to_val(wb, sets, ifelse(lub, zero(datatype), one(datatype));
-                            strict = strict)
-end
-"""
-    get_weight_bounds(wb::UniformlyDistributedBounds, lub::Bool, sets::AssetSets;
-                      datatype::DataType = Float64, kwargs...)
-
-Extracts uniformly distributed portfolio weight bounds.
-
-`get_weight_bounds` returns a uniform bound for all assets in `sets` when using [`UniformlyDistributedBounds`](@ref). For lower bounds (`lub = true`), it returns `1/N` where `N` is the number of assets; for upper bounds (`lub = false`), it returns `1` (or `one(datatype)`).
-
-# Arguments
-
-  - `wb`: An instance of [`UniformlyDistributedBounds`](@ref).
-
-  - `lub`: Boolean flag indicating whether the bounds are lower or upper.
-
-      + `true`: lower bounds
-      + `false`: upper bounds.
-  - `sets`: [`AssetSets`](@ref) object containing asset names or indices.
-  - `datatype`: Output data type for bounds.
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `wb::Number`: `1/N` for lower, `1` for upper as `datatype`.
-
-# Related
-
-  - [`UniformlyDistributedBounds`](@ref)
-  - [`WeightBoundsEstimator`](@ref)
-  - [`WeightBounds`](@ref)
-  - [`AssetSets`](@ref)
-  - [`weight_bounds_constraints`](@ref)
-"""
-function get_weight_bounds(wb::UniformlyDistributedBounds, lub::Bool, sets::AssetSets;
-                           datatype::DataType = Float64, kwargs...)
-    return lub ? inv(length(sets.dict[sets.key])) : one(datatype)
+function weight_bounds_view(wb::WeightBoundsEstimator, i)
+    lb = nothing_scalar_array_view(wb.lb, i)
+    ub = nothing_scalar_array_view(wb.ub, i)
+    return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)
 end
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets; strict::Bool = false,
@@ -364,10 +282,10 @@ function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,
                                    kwargs...)
     return WeightBounds(;
-                        lb = get_weight_bounds(wb.lb, true, sets; strict = strict,
-                                               datatype = datatype),
-                        ub = get_weight_bounds(wb.ub, false, sets; strict = strict,
-                                               datatype = datatype))
+                        lb = estimator_to_val(wb.lb, sets, wb.dlb; datatype = datatype,
+                                              strict = strict),
+                        ub = estimator_to_val(wb.ub, sets, wb.dub; datatype = datatype,
+                                              strict = strict))
 end
 """
     weight_bounds_constraints_side(::Nothing, N::Integer, val::Number)
@@ -443,7 +361,7 @@ julia> PortfolioOptimisers.weight_bounds_constraints_side(Inf, 3, -Inf)
 function weight_bounds_constraints_side(wb::Number, N::Integer, val::Number)
     return if isinf(wb)
         fill(val, N)
-    elseif isa(wb, Number)
+    else
         range(wb, wb; length = N)
     end
 end
@@ -573,18 +491,16 @@ function weight_bounds_constraints(wb::WeightBounds{<:NumVec, <:NumVec}, args...
     return wb
 end
 """
-    weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false, N::Integer = 0,
-                              kwargs...)
+    weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0, kwargs...)
 
 Generate unconstrained portfolio weight bounds when no bounds are specified.
 
-`weight_bounds_constraints` returns a [`WeightBounds`](@ref) object with lower bounds set to `-Inf` and upper bounds set to `Inf` for all assets when `wb` is `nothing`. If `scalar` is `true` or `N` is zero, returns scalar bounds; otherwise, returns vectors of length `N` filled with `-Inf` and `Inf`.
+`weight_bounds_constraints` returns a [`WeightBounds`](@ref) object with lower bounds set to `-Inf` and upper bounds set to `Inf` for all assets when `wb` is `nothing`.
 
 # Arguments
 
   - `wb::Nothing`: Indicates no constraint for portfolio weights.
   - `args...`: Additional positional arguments (ignored).
-  - `scalar::Bool`: If `true`, return scalar bounds (`-Inf`, `Inf`).
   - `N::Integer`: Number of assets (length for expansion; if zero, treat as scalar).
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -604,11 +520,6 @@ julia> weight_bounds_constraints(nothing; N = 3)
 WeightBounds
   lb ┼ Vector{Float64}: [-Inf, -Inf, -Inf]
   ub ┴ Vector{Float64}: [Inf, Inf, Inf]
-
-julia> weight_bounds_constraints(nothing; scalar = true)
-WeightBounds
-  lb ┼ Float64: -Inf
-  ub ┴ Float64: Inf
 ```
 
 # Related
@@ -617,11 +528,7 @@ WeightBounds
   - [`WeightBoundsEstimator`](@ref)
   - [`weight_bounds_constraints_side`](@ref)
 """
-function weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false,
-                                   N::Integer = 0, kwargs...)
-    if scalar || iszero(N)
-        return WeightBounds(; lb = -Inf, ub = Inf)
-    end
+function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0, kwargs...)
     return WeightBounds(; lb = fill(-Inf, N), ub = fill(Inf, N))
 end
 

@@ -473,7 +473,7 @@ function JuMPOptimiser(;
                          sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sce,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
 end
-function opt_view(opt::JuMPOptimiser, i::NumVec, X::NumMat)
+function opt_view(opt::JuMPOptimiser, i, X::NumMat)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
@@ -551,7 +551,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                      strict = opt.strict)
     end
     plg = phylogeny_constraints(opt.plg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
-    tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict)
+    tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     ret = jump_returns_factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx,

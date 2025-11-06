@@ -115,7 +115,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
-function opt_view(noc::NearOptimalCentering, i::NumVec, X::NumMat)
+function opt_view(noc::NearOptimalCentering, i, X::NumMat)
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = opt_view(noc.opt, i, X)
     r = risk_measure_view(noc.r, i, X)

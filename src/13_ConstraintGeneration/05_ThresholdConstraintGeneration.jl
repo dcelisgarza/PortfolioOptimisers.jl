@@ -37,17 +37,19 @@ BuyInThresholdEstimator
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
-struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
+struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
-    function BuyInThresholdEstimator(val::EstValType)
-        if isa(val, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(val))
-        end
-        return new{typeof(val)}(val)
+    dval::T2
+    function BuyInThresholdEstimator(val::EstValType,
+                                     dval::Union{Nothing, <:Number} = nothing)
+        assert_nonempty_nonneg_finite_val(val, :val)
+        assert_nonempty_nonneg_finite_val(dval, :dval)
+        return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function BuyInThresholdEstimator(; val::EstValType)
-    return BuyInThresholdEstimator(val)
+function BuyInThresholdEstimator(; val::EstValType,
+                                 dval::Union{Nothing, <:Number} = nothing)
+    return BuyInThresholdEstimator(val, dval)
 end
 """
     struct BuyInThreshold{T1} <: AbstractConstraintResult
@@ -98,14 +100,17 @@ end
 function BuyInThreshold(; val::Union{<:Number, <:NumVec})
     return BuyInThreshold(val)
 end
-function threshold_view(t::Union{Nothing, <:BuyInThresholdEstimator}, ::Any)
-    return t
+function threshold_view(::Nothing, ::Any)
+    return nothing
 end
-function threshold_view(t::BuyInThreshold, i::NumVec)
+function threshold_view(t::BuyInThresholdEstimator, ::Any)
+    return BuyInThresholdEstimator(; val = nothing_scalar_array_view(t.val), dval = t.dval)
+end
+function threshold_view(t::BuyInThreshold, i)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
 end
 function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
-                                                  <:BuyInThresholdEstimator}}, i::NumVec)
+                                                  <:BuyInThresholdEstimator}}, i)
     return [threshold_view(ti, i) for ti in t]
 end
 """
@@ -191,47 +196,8 @@ BuyInThreshold
 function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                                datatype::DataType = Float64, strict::Bool = false)
     return BuyInThreshold(;
-                          val = estimator_to_val(t.val, sets, zero(datatype);
+                          val = estimator_to_val(t.val, sets, t.dval; datatype = datatype,
                                                  strict = strict))
-end
-"""
-    threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets; kwargs...)
-
-Generate uniform buy-in threshold portfolio constraints for all assets.
-
-`threshold_constraints` constructs a [`BuyInThreshold`](@ref) object with a uniform threshold value for each asset in `sets`, using [`UniformlyDistributedBounds`](@ref). The threshold is set to `1/N`, where `N` is the number of assets, ensuring equal minimum allocation across all assets.
-
-# Arguments
-
-  - `bounds`: [`UniformlyDistributedBounds`](@ref) specifying uniform threshold logic.
-  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `BuyInThreshold`: Object with uniform threshold values for all assets.
-
-# Examples
-
-```jldoctest
-julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
-
-julia> threshold_constraints(UniformlyDistributedBounds(), sets)
-BuyInThreshold
-  val ┴ Float64: 0.3333333333333333
-```
-
-# Related
-
-  - [`BuyInThresholdEstimator`](@ref)
-  - [`BuyInThreshold`](@ref)
-  - [`UniformlyDistributedBounds`](@ref)
-  - [`threshold_constraints`](@ref)
-  - [`AssetSets`](@ref)
-"""
-function threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets;
-                               kwargs...)
-    return BuyInThreshold(; val = inv(length(sets.dict[sets.key])))
 end
 """
     threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
