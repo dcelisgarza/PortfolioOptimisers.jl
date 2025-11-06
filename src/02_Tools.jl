@@ -376,7 +376,6 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 # Related
 
   - [`NumArr`](@ref)
-  - [`kron`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#Base.kron)
 """
 ⊗(A::NumArr, B::NumArr) = reshape(kron(B, A), (length(A), length(B)))
 """
@@ -629,7 +628,6 @@ julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
 # Related
 
   - [`NumVec`](@ref)
-  - [`dot`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.dot)
 """
 function dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::NumVec)
     return a * sum(b)

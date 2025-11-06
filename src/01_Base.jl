@@ -397,7 +397,6 @@ Type alias for vectors of scalars in PortfolioOptimisers.jl.
   - [`NumMat`](@ref)
   - [`NumArr`](@ref)
   - [`IntVec`](@ref)
-  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
 """
 const NumVec = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
 """
@@ -439,7 +438,6 @@ Type alias for matrices of scalars in PortfolioOptimisers.jl.
   - [`NumVec`](@ref)
   - [`NumArr`](@ref)
   - [`IntVec`](@ref)
-  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
 """
 const NumMat = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
 """
@@ -460,7 +458,6 @@ Type alias for arrays of scalars in PortfolioOptimisers.jl.
   - [`NumVec`](@ref)
   - [`NumMat`](@ref)
   - [`IntVec`](@ref)
-  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
 """
 const NumArr = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
 """
