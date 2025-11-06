@@ -75,7 +75,7 @@ makedocs(; #modules = [PortfolioOptimisers],
          pages = [
                   # "Home" => root_pages[1];
                   # "Examples" => example_pages;
-                  "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
+                  "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3][1]);
                             # "Moments" => joinpath.(api_pages[2][1][idx1:end],
                             #                        api_pages[2][3])
                             # "Distance" => joinpath.(api_pages[3][1][idx1:end],
