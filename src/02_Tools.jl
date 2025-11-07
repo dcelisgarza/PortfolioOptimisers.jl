@@ -495,13 +495,14 @@ function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:PairVec
                                    ::Any)
     return x
 end
-function nothing_scalar_array_view(x::NumVec, i)
+function nothing_scalar_array_view(x::AbstractVector, i)
     return view(x, i)
 end
 function nothing_scalar_array_view(x::VecScalar, i)
     return VecScalar(; v = view(x.v, i), s = x.s)
 end
-function nothing_scalar_array_view(x::NumVec{<:Union{<:NumVec, <:VecScalar}}, i)
+function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}},
+                                   i)
     return [view(xi, i) for xi in x]
 end
 function nothing_scalar_array_view(x::NumArr, i)
