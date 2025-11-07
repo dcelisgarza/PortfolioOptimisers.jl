@@ -906,7 +906,7 @@ Add constraints to fix the mean of specified assets in entropy pooling.
   - [`add_ep_constraint!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function fix_mu!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
+function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
                  pr::AbstractPriorResult)
     fix = to_fix .& .!fixed
     if any(fix)
@@ -1607,7 +1607,7 @@ Add constraints to fix the variance of specified assets in entropy pooling.
   - [`add_ep_constraint!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function fix_sigma!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
+function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
                     pr::AbstractPriorResult)
     sigma = diag(pr.sigma)
     fix = to_fix .& .!fixed
