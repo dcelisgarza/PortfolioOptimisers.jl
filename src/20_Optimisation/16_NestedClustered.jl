@@ -100,10 +100,9 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                              wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
                              sets::Option{<:AssetSets}, opti::OptimisationEstimator,
                              opto::OptimisationEstimator,
-                             cv::Union{Nothing, <:CrossValidationEstimator},
-                             cwf::WeightFinaliser, strict::Bool,
-                             threads::FLoops.Transducers.Executor,
-                             fb::Union{Nothing, <:OptimisationEstimator})
+                             cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
+                             strict::Bool, threads::FLoops.Transducers.Executor,
+                             fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)
@@ -122,11 +121,11 @@ function NestedClustered(;
                          wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
                          sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,
                          opto::OptimisationEstimator,
-                         cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
+                         cv::Option{<:CrossValidationEstimator} = nothing,
                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
                          threads::FLoops.Transducers.Executor = ThreadedEx(),
-                         fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                         fb::Option{<:OptimisationEstimator} = nothing)
     return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)

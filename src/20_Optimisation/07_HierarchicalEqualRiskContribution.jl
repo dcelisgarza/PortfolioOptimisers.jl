@@ -14,7 +14,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
                                                scei::Scalariser, sceo::Scalariser,
                                                threads::FLoops.Transducers.Executor,
-                                               fb::Union{Nothing, <:OptimisationEstimator})
+                                               fb::Option{<:OptimisationEstimator})
         if isa(ri, AbstractVector)
             @argcheck(!isempty(ri))
         end
@@ -34,7 +34,7 @@ function HierarchicalEqualRiskContribution(;
                                            scei::Scalariser = SumScalariser(),
                                            sceo::Scalariser = scei,
                                            threads::FLoops.Transducers.Executor = ThreadedEx(),
-                                           fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                                           fb::Option{<:OptimisationEstimator} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fb)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i, X::NumMat)

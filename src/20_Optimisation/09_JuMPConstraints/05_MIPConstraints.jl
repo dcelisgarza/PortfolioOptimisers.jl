@@ -140,7 +140,7 @@ function set_iplg_constraints!(model::JuMP.Model,
     return nothing
 end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
-                              gcard::Union{Nothing, <:LinearConstraint},
+                              gcard::Option{<:LinearConstraint},
                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                               lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
@@ -347,7 +347,7 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:Nu
 end
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:Integer},
-                                   gcard::Union{Nothing, <:LinearConstraint},
+                                   gcard::Option{<:LinearConstraint},
                                    smtx::Option{<:NumMat}, lt::Option{<:BuyInThreshold},
                                    st::Option{<:BuyInThreshold}, ss::Option{<:Number},
                                    i::Integer = 1)
@@ -445,7 +445,7 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::In
     return nothing
 end
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                    gcard::Union{Nothing, <:LinearConstraint},
+                                    gcard::Option{<:LinearConstraint},
                                     smtx::Option{<:NumMat}, lt::Option{<:BuyInThreshold},
                                     st::Option{<:BuyInThreshold}, ss::Option{<:Number},
                                     i::Integer = 1)
@@ -497,7 +497,7 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     return nothing
 end
 function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                               card::Union{Nothing, <:Integer, <:IntVec},
+                               card::Union{Nothing, <:UIntegerIntVec},
                                gcard::Union{Nothing, <:LinearConstraint,
                                             <:AbstractVector{<:LinearConstraint}},
                                smtx::Option{<:UNumMatVecNumMat},

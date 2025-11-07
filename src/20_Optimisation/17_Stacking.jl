@@ -31,10 +31,10 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                       sets::Option{<:AssetSets},
                       opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                    <:OptimisationResult}},
-                      opto::OptimisationEstimator,
-                      cv::Union{Nothing, <:CrossValidationEstimator}, cwf::WeightFinaliser,
-                      strict::Bool, threads::FLoops.Transducers.Executor,
-                      fb::Union{Nothing, <:OptimisationEstimator})
+                      opto::OptimisationEstimator, cv::Option{<:CrossValidationEstimator},
+                      cwf::WeightFinaliser, strict::Bool,
+                      threads::FLoops.Transducers.Executor,
+                      fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -59,10 +59,10 @@ function Stacking(;
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                <:OptimisationResult}},
                   opto::OptimisationEstimator,
-                  cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
+                  cv::Option{<:CrossValidationEstimator} = nothing,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   threads::FLoops.Transducers.Executor = ThreadedEx(),
-                  fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                  fb::Option{<:OptimisationEstimator} = nothing)
     return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
 end
 function assert_external_optimiser(opt::Stacking)

@@ -147,6 +147,7 @@ end
 function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
     return Frontier(N, factor, flag)
 end
+const URkRtBounds = Union{<:UNumNumVec, <:Frontier}
 """
     struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
         scale::T1
@@ -166,7 +167,7 @@ Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures 
 # Constructors
 
     RiskMeasureSettings(; scale::Number = 1.0,
-                        ub::Union{Nothing, <:UNumNumVec, <:Frontier} = nothing,
+                        ub::Option{<:URkRtBounds} = nothing,
                         rke::Bool = true)
 
 Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, and risk evaluation flag.
@@ -197,15 +198,13 @@ struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
-    function RiskMeasureSettings(scale::Number,
-                                 ub::Union{Nothing, <:UNumNumVec, <:Frontier}, rke::Bool)
+    function RiskMeasureSettings(scale::Number, ub::Option{<:URkRtBounds}, rke::Bool)
         assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end
 end
-function RiskMeasureSettings(; scale::Number = 1.0,
-                             ub::Union{Nothing, <:UNumNumVec, <:Frontier} = nothing,
+function RiskMeasureSettings(; scale::Number = 1.0, ub::Option{<:URkRtBounds} = nothing,
                              rke::Bool = true)
     return RiskMeasureSettings(scale, ub, rke)
 end
@@ -462,4 +461,4 @@ function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure
+       HierarchicalRiskMeasure, URkRtBounds

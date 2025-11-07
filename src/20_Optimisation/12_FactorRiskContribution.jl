@@ -9,8 +9,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     wi::T7
     flag::T8
     fb::T9
-    function FactorRiskContribution(opt::JuMPOptimiser,
-                                    re::Union{<:Regression, <:AbstractRegressionEstimator},
+    function FactorRiskContribution(opt::JuMPOptimiser, re::URegRegEst,
                                     r::Union{<:RiskMeasure,
                                              <:AbstractVector{<:RiskMeasure}},
                                     obj::ObjectiveFunction,
@@ -20,7 +19,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
                                                <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                        <:AbstractPhylogenyConstraintResult}},
                                     sets::Option{<:AssetSets}, wi::Option{<:NumVec},
-                                    flag::Bool, fb::Union{Nothing, <:OptimisationEstimator})
+                                    flag::Bool, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -33,7 +32,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
-                                re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
+                                re::URegRegEst = StepwiseRegression(),
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 plg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,
@@ -42,7 +41,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                                    <:AbstractPhylogenyConstraintResult}} = nothing,
                                 sets::Option{<:AssetSets} = nothing,
                                 wi::Option{<:NumVec} = nothing, flag::Bool = true,
-                                fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                                fb::Option{<:OptimisationEstimator} = nothing)
     return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fb)
 end
 function opt_view(frc::FactorRiskContribution, i, X::NumMat)

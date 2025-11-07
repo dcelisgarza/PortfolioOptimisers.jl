@@ -51,7 +51,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                                   w_opt_ini::Union{Nothing, <:NumVec, <:VecNumVec},
                                   w_max::Option{<:NumVec}, w_max_ini::Option{<:NumVec},
                                   ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
-                                  fb::Union{Nothing, <:OptimisationEstimator})
+                                  fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
@@ -108,7 +108,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               w_max::Option{<:NumVec} = nothing,
                               w_max_ini::Option{<:NumVec} = nothing, ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
-                              fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                              fb::Option{<:OptimisationEstimator} = nothing)
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end

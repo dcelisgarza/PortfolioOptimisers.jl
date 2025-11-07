@@ -67,8 +67,8 @@ Container for a set of linear constraints, separating inequality and equality co
 
 # Constructor
 
-    LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
-                     eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
+    LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
+                     eq::Option{<:PartialLinearConstraint} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -101,15 +101,15 @@ LinearConstraint
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     ineq::T1
     eq::T2
-    function LinearConstraint(ineq::Union{Nothing, <:PartialLinearConstraint},
-                              eq::Union{Nothing, <:PartialLinearConstraint})
+    function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
+                              eq::Option{<:PartialLinearConstraint})
         @argcheck(!(isnothing(ineq) && isnothing(eq)),
                   IsNothingError("ineq and eq cannot both be nothing. Got\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
         return new{typeof(ineq), typeof(eq)}(ineq, eq)
     end
 end
-function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
-                          eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
+function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
+                          eq::Option{<:PartialLinearConstraint} = nothing)
     return LinearConstraint(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)

@@ -79,7 +79,7 @@ function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::Union{<:SchurComplementParams,
                                                              <:AbstractVector{<:SchurComplementParams}} = SchurComplementParams(),
-                                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                                               fb::Option{<:OptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::NumMat)

@@ -19,13 +19,13 @@ struct InverseVolatility{T1, T2} <: NaiveOptimisationEstimator
     pe::T1
     fb::T2
     function InverseVolatility(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                               fb::Option{<:OptimisationEstimator} = nothing)
         return new{typeof(pe), typeof(fb)}(pe, fb)
     end
 end
 function InverseVolatility(;
                            pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                           fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                           fb::Option{<:OptimisationEstimator} = nothing)
     return InverseVolatility(pe, fb)
 end
 function opt_view(opt::InverseVolatility, i, args...)

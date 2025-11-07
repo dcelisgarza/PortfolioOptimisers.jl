@@ -475,6 +475,7 @@ function Base.getproperty(re::Regression{<:Any, <:NumMat, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
+const URegRegEst = Union{<:Regression, <:AbstractRegressionEstimator}
 """
     regression_view(re::Regression, i)
 

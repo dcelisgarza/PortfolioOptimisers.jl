@@ -234,12 +234,11 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                      <:AbstractVector{<:AbstractTracking}},
                            fees::Union{Nothing, <:FeesEstimator, <:Fees},
                            ret::JuMPReturnsEstimator, sce::Scalariser,
-                           ccnt::Union{Nothing, <:CustomJuMPConstraint},
-                           cobj::Union{Nothing, <:CustomJuMPObjective}, sc::Number,
-                           so::Number, ss::Option{<:Number}, card::Option{<:Integer},
-                           scard::Union{Nothing, <:Integer, <:IntVec},
-                           nea::Option{<:Number}, l1::Option{<:Number},
-                           l2::Option{<:Number}, strict::Bool)
+                           ccnt::Option{<:CustomJuMPConstraint},
+                           cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
+                           ss::Option{<:Number}, card::Option{<:Integer},
+                           scard::Union{Nothing, <:UIntegerIntVec}, nea::Option{<:Number},
+                           l1::Option{<:Number}, l2::Option{<:Number}, strict::Bool)
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
         elseif isa(bgt, BudgetCostEstimator)
@@ -457,11 +456,11 @@ function JuMPOptimiser(;
                        fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),
-                       ccnt::Union{Nothing, <:CustomJuMPConstraint} = nothing,
-                       cobj::Union{Nothing, <:CustomJuMPObjective} = nothing,
-                       sc::Number = 1, so::Number = 1, ss::Option{<:Number} = nothing,
+                       ccnt::Option{<:CustomJuMPConstraint} = nothing,
+                       cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
+                       so::Number = 1, ss::Option{<:Number} = nothing,
                        card::Option{<:Integer} = nothing,
-                       scard::Union{Nothing, <:Integer, <:IntVec} = nothing,
+                       scard::Union{Nothing, <:UIntegerIntVec} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,

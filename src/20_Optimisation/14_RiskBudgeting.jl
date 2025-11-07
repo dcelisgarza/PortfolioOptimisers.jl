@@ -17,14 +17,13 @@ struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
     flag::T3
-    function FactorRiskBudgeting(re::Union{<:Regression, <:AbstractRegressionEstimator},
+    function FactorRiskBudgeting(re::URegRegEst,
                                  rkb::Union{Nothing, <:RiskBudgetEstimator,
                                             <:RiskBudgetResult}, flag::Bool)
         return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
     end
 end
-function FactorRiskBudgeting(;
-                             re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
+function FactorRiskBudgeting(; re::URegRegEst = StepwiseRegression(),
                              rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing,
                              flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, flag)
@@ -42,7 +41,7 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     function RiskBudgeting(opt::JuMPOptimiser,
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                            rba::RiskBudgetingAlgorithm, wi::Option{<:NumVec},
-                           fb::Union{Nothing, <:OptimisationEstimator})
+                           fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -60,7 +59,7 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                        r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:NumVec} = nothing,
-                       fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                       fb::Option{<:OptimisationEstimator} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::NumMat)
