@@ -121,8 +121,9 @@ end
 function threshold_view(::Nothing, ::Any)
     return nothing
 end
-function threshold_view(t::BuyInThresholdEstimator, ::Any)
-    return BuyInThresholdEstimator(; val = nothing_scalar_array_view(t.val), dval = t.dval)
+function threshold_view(t::BuyInThresholdEstimator, i)
+    return BuyInThresholdEstimator(; val = nothing_scalar_array_view(t.val, i),
+                                   dval = t.dval)
 end
 function threshold_view(t::BuyInThreshold, i)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
