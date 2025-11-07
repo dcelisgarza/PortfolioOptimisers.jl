@@ -31,10 +31,8 @@ function compute_relevant_assets(w::NumVec, M::Number, N::Number)
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::NumVec, X::NumMat,
                                                            fees::Union{Nothing, <:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X,
-                                                                                       1),
-                                                           nx::AbstractVector = 1:size(X,
-                                                                                       2),
+                                                           ts::AbstractVector = 1:size(X, 1),
+                                                           nx::AbstractVector = 1:size(X, 2),
                                                            N::Union{Nothing, <:Number} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -126,8 +124,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:NumVec, <:V
                       kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:NumVec, <:VecNumVec},
-                                                           nx::AbstractVector = 1:size(w,
-                                                                                       1);
+                                                           nx::AbstractVector = 1:size(w, 1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",

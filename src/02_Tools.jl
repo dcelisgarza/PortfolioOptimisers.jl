@@ -677,9 +677,9 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:NumVec} = nothing
     return ctarr
 end
 """
-    concrete_typed_array(A::NumArr)
+    concrete_typed_array(A::AbstractArray)
 
-Convert an `NumArr` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
+Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 
 This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
 
@@ -703,7 +703,7 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
  3
 ```
 """
-function concrete_typed_array(A::NumArr)
+function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 function factory(::Nothing, args...; kwargs...)
