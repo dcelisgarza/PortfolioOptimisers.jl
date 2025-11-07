@@ -243,7 +243,7 @@ for alg in (Gerber0, Gerber1, Gerber2)
 end
 for alg in (StandardisedGerber0, StandardisedGerber1, StandardisedGerber2)
     eval(quote
-             function factory(alg::$(alg), w::WeightsType)
+             function factory(alg::$(alg), w::Option{<:AbstractWeights})
                  return $(alg)(; me = factory(alg.me, w))
              end
          end)
@@ -748,7 +748,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::GerberCovariance, w::WeightsType = nothing)
+function factory(ce::GerberCovariance, w::Option{<:AbstractWeights} = nothing)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
                             pdm = ce.pdm, threshold = ce.threshold)
 end

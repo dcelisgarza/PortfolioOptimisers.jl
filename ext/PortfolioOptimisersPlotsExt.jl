@@ -31,8 +31,10 @@ function compute_relevant_assets(w::NumVec, M::Number, N::Number)
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::NumVec, X::NumMat,
                                                            fees::Union{Nothing, <:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Union{Nothing, <:Number} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -124,7 +126,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:NumVec, <:V
                       kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:NumVec, <:VecNumVec},
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",
@@ -245,7 +248,8 @@ function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat,
                                             fees::Union{Nothing, <:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
-                                            kappa::Number = 0.3, rw::WeightsType = nothing,
+                                            kappa::Number = 0.3,
+                                            rw::Option{<:AbstractWeights} = nothing,
                                             theme::Symbol = :Dark2_5,
                                             dd_kwargs = (;
                                                          label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
@@ -345,7 +349,7 @@ function PortfolioOptimisers.plot_histogram(w::NumArr, X::NumMat,
                                             kappa::Number = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
-                                            rw::WeightsType = nothing,
+                                            rw::Option{<:AbstractWeights} = nothing,
                                             theme::Symbol = :Paired_10,
                                             h_kwargs::NamedTuple = (;
                                                                     ylabel = "Probability Density",

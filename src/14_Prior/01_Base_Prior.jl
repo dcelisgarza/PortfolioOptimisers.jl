@@ -467,7 +467,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
     LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
                   chol::Union{Nothing, <:NumMat} = nothing,
-                  w::WeightsType = nothing,
+                  w::Option{<:AbstractWeights} = nothing,
                   ens::Union{Nothing, <:Number} = nothing,
                   kld::Union{Nothing, <:Number, <:NumVec} = nothing,
                   ow::Union{Nothing, <:NumVec} = nothing,
@@ -532,7 +532,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_sigma::T11
     f_w::T12
     function LowOrderPrior(X::NumMat, mu::NumVec, sigma::NumMat,
-                           chol::Union{Nothing, <:NumMat}, w::WeightsType,
+                           chol::Union{Nothing, <:NumMat}, w::Option{<:AbstractWeights},
                            ens::Union{Nothing, <:Number},
                            kld::Union{Nothing, <:Number, <:NumVec},
                            ow::Union{Nothing, <:NumVec}, rr::Union{Nothing, <:Regression},
@@ -581,7 +581,8 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     end
 end
 function LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
-                       chol::Union{Nothing, <:NumMat} = nothing, w::WeightsType = nothing,
+                       chol::Union{Nothing, <:NumMat} = nothing,
+                       w::Option{<:AbstractWeights} = nothing,
                        ens::Union{Nothing, <:Number} = nothing,
                        kld::Union{Nothing, <:Number, <:NumVec} = nothing,
                        ow::Union{Nothing, <:NumVec} = nothing,

@@ -633,7 +633,7 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::EntropyPoolingPrior, w::WeightsType = nothing)
+function factory(pe::EntropyPoolingPrior, w::Option{<:AbstractWeights} = nothing)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,

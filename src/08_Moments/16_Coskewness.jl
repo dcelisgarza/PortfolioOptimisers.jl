@@ -73,7 +73,7 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
-function factory(ce::Coskewness, w::WeightsType = nothing)
+function factory(ce::Coskewness, w::Option{<:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """

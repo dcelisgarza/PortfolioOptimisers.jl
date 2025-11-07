@@ -7,7 +7,7 @@ struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     mu::T3
     flag::T4
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
-                                     w::WeightsType,
+                                     w::Option{<:AbstractWeights},
                                      mu::Union{<:Number, <:NumVec, <:VecScalar,
                                                <:MedianCenteringFunction},
                                      flag::Bool = true)
@@ -26,7 +26,7 @@ struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::WeightsType = nothing,
+                                 w::Option{<:AbstractWeights} = nothing,
                                  mu::Union{<:Number, <:NumVec, <:VecScalar,
                                            <:MedianCenteringFunction} = MedianCentering(),
                                  flag::Bool = true)

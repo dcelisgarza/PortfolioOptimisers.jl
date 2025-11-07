@@ -227,7 +227,7 @@ function DimensionReductionRegression(;
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression, w::WeightsType = nothing)
+function factory(re::DimensionReductionRegression, w::Option{<:AbstractWeights} = nothing)
     return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))

@@ -127,7 +127,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
                                           slv::Union{Nothing, <:Solver, <:VecSolver},
                                           alpha::Number, kappa_a::Number, beta::Number,
-                                          kappa_b::Number, w::WeightsType)
+                                          kappa_b::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
@@ -148,7 +148,7 @@ function RelativisticValueatRiskRange(;
                                       slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
                                       alpha::Number = 0.05, kappa_a::Number = 0.3,
                                       beta::Number = 0.05, kappa_b::Number = 0.3,
-                                      w::WeightsType = nothing)
+                                      w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
 function (r::RelativisticValueatRiskRange)(x::NumVec)

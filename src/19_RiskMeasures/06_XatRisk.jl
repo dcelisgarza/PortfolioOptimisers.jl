@@ -46,8 +46,8 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     alpha::T2
     w::T3
     alg::T4
-    function ValueatRisk(settings::RiskMeasureSettings, alpha::Number, w::WeightsType,
-                         alg::ValueatRiskFormulation)
+    function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
+                         w::Option{<:AbstractWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -57,7 +57,7 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                     alpha::Number = 0.05, w::WeightsType = nothing,
+                     alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
@@ -85,7 +85,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T4
     alg::T5
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
-                              w::WeightsType, alg::ValueatRiskFormulation)
+                              w::Option{<:AbstractWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -100,7 +100,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           alpha::Number = 0.05, beta::Number = 0.05,
-                          w::WeightsType = nothing,
+                          w::Option{<:AbstractWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end

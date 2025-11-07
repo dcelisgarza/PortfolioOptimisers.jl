@@ -46,7 +46,7 @@ Factor Black-Litterman prior estimator for asset returns.
                               views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
                               sets::Union{Nothing, <:AssetSets} = nothing,
                               views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                              w::WeightsType = nothing, rf::Number = 0.0,
+                              w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
                               l::Union{Nothing, <:Number} = nothing,
                               tau::Union{Nothing, <:Number} = nothing, rsd::Bool = true)
 
@@ -189,7 +189,7 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior, w::WeightsType = nothing)
+function factory(pe::FactorBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,

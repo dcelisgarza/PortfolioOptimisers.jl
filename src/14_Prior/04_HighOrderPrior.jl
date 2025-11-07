@@ -426,7 +426,7 @@ function HighOrderPriorEstimator(;
                                                                                          alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::WeightsType = nothing)
+function factory(pe::HighOrderPriorEstimator, w::Option{<:AbstractWeights} = nothing)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end

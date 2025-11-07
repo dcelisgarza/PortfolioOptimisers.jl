@@ -1,13 +1,13 @@
 struct MeanReturn{T1} <: NoOptimisationRiskMeasure
     w::T1
-    function MeanReturn(w::WeightsType)
+    function MeanReturn(w::Option{<:AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
         return MeanReturn(w)
     end
 end
-function MeanReturn(; w::WeightsType = nothing)
+function MeanReturn(; w::Option{<:AbstractWeights} = nothing)
     return MeanReturn(w)
 end
 function (r::MeanReturn)(x::NumVec)
@@ -23,7 +23,7 @@ end
 struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     w::T1
     mu::T2
-    function ThirdCentralMoment(w::WeightsType,
+    function ThirdCentralMoment(w::Option{<:AbstractWeights},
                                 mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar})
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -34,7 +34,7 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
         return new{typeof(w), typeof(mu)}(w, mu)
     end
 end
-function ThirdCentralMoment(; w::WeightsType = nothing,
+function ThirdCentralMoment(; w::Option{<:AbstractWeights} = nothing,
                             mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
@@ -42,7 +42,8 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     ve::T1
     w::T2
     mu::T3
-    function Skewness(ve::AbstractVarianceEstimator, w::WeightsType, mu::MuType)
+    function Skewness(ve::AbstractVarianceEstimator, w::Option{<:AbstractWeights},
+                      mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -53,7 +54,8 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     end
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                  w::WeightsType = nothing, mu::MuType = nothing)
+                  w::Option{<:AbstractWeights} = nothing,
+                  mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing)
     return Skewness(ve, w, mu)
 end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},

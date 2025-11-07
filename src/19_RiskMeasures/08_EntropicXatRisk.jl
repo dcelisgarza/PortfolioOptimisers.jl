@@ -1,5 +1,5 @@
 function ERM(x::NumVec, slv::Union{<:Solver, <:VecSolver}, alpha::Number = 0.05,
-             w::WeightsType = nothing)
+             w::Option{<:AbstractWeights} = nothing)
     if isa(slv, VecSolver)
         @argcheck(!isempty(slv))
     end
@@ -39,7 +39,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     w::T4
     function EntropicValueatRisk(settings::RiskMeasureSettings,
                                  slv::Union{Nothing, <:Solver, <:VecSolver}, alpha::Number,
-                                 w::WeightsType)
+                                 w::Option{<:AbstractWeights})
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
@@ -53,7 +53,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
-                             alpha::Number = 0.05, w::WeightsType = nothing)
+                             alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing)
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::NumVec)
@@ -73,7 +73,8 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T5
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Union{Nothing, <:Solver, <:VecSolver},
-                                      alpha::Number, beta::Number, w::WeightsType)
+                                      alpha::Number, beta::Number,
+                                      w::Option{<:AbstractWeights})
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
@@ -92,7 +93,7 @@ end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
                                   alpha::Number = 0.05, beta::Number = 0.05,
-                                  w::WeightsType = nothing)
+                                  w::Option{<:AbstractWeights} = nothing)
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
 function (r::EntropicValueatRiskRange)(x::NumVec)
