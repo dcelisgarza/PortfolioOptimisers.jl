@@ -213,14 +213,14 @@ end
 struct MaximumRatio{T1, T2} <: ObjectiveFunction
     rf::T1
     ohf::T2
-    function MaximumRatio(rf::Number, ohf::Union{Nothing, <:Number})
+    function MaximumRatio(rf::Number, ohf::Option{<:Number})
         if !isnothing(ohf)
             @argcheck(ohf > zero(ohf))
         end
         return new{typeof(rf), typeof(ohf)}(rf, ohf)
     end
 end
-function MaximumRatio(; rf::Number = 0.0, ohf::Union{Nothing, <:Number} = nothing)
+function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
     return MaximumRatio(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end

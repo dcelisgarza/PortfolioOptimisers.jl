@@ -416,8 +416,8 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Regression(; M::NumMat, L::Union{Nothing, <:NumMat} = nothing,
-               b::Union{Nothing, <:NumVec} = nothing)
+    Regression(; M::NumMat, L::Option{<:NumMat} = nothing,
+               b::Option{<:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -445,7 +445,7 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
-    function Regression(M::NumMat, L::Union{Nothing, <:NumMat}, b::Union{Nothing, <:NumVec})
+    function Regression(M::NumMat, L::Option{<:NumMat}, b::Option{<:NumVec})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, NumVec)
             @argcheck(!isempty(b), IsEmptyError)
@@ -457,8 +457,8 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
         return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
     end
 end
-function Regression(; M::NumMat, L::Union{Nothing, <:NumMat} = nothing,
-                    b::Union{Nothing, <:NumVec} = nothing)
+function Regression(; M::NumMat, L::Option{<:NumMat} = nothing,
+                    b::Option{<:NumVec} = nothing)
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)

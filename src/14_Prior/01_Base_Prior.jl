@@ -466,15 +466,15 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 # Constructor
 
     LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
-                  chol::Union{Nothing, <:NumMat} = nothing,
+                  chol::Option{<:NumMat} = nothing,
                   w::Option{<:AbstractWeights} = nothing,
-                  ens::Union{Nothing, <:Number} = nothing,
+                  ens::Option{<:Number} = nothing,
                   kld::Union{Nothing, <:Number, <:NumVec} = nothing,
-                  ow::Union{Nothing, <:NumVec} = nothing,
+                  ow::Option{<:NumVec} = nothing,
                   rr::Union{Nothing, <:Regression} = nothing,
-                  f_mu::Union{Nothing, <:NumVec} = nothing,
-                  f_sigma::Union{Nothing, <:NumMat} = nothing,
-                  f_w::Union{Nothing, <:NumVec} = nothing)
+                  f_mu::Option{<:NumVec} = nothing,
+                  f_sigma::Option{<:NumMat} = nothing,
+                  f_w::Option{<:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -531,13 +531,11 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_mu::T10
     f_sigma::T11
     f_w::T12
-    function LowOrderPrior(X::NumMat, mu::NumVec, sigma::NumMat,
-                           chol::Union{Nothing, <:NumMat}, w::Option{<:AbstractWeights},
-                           ens::Union{Nothing, <:Number},
-                           kld::Union{Nothing, <:Number, <:NumVec},
-                           ow::Union{Nothing, <:NumVec}, rr::Union{Nothing, <:Regression},
-                           f_mu::Union{Nothing, <:NumVec},
-                           f_sigma::Union{Nothing, <:NumMat}, f_w::Union{Nothing, <:NumVec})
+    function LowOrderPrior(X::NumMat, mu::NumVec, sigma::NumMat, chol::Option{<:NumMat},
+                           w::Option{<:AbstractWeights}, ens::Option{<:Number},
+                           kld::Union{Nothing, <:Number, <:NumVec}, ow::Option{<:NumVec},
+                           rr::Union{Nothing, <:Regression}, f_mu::Option{<:NumVec},
+                           f_sigma::Option{<:NumMat}, f_w::Option{<:NumVec})
         @argcheck(!isempty(X))
         @argcheck(!isempty(mu))
         @argcheck(!isempty(sigma))
@@ -581,15 +579,14 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     end
 end
 function LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
-                       chol::Union{Nothing, <:NumMat} = nothing,
+                       chol::Option{<:NumMat} = nothing,
                        w::Option{<:AbstractWeights} = nothing,
-                       ens::Union{Nothing, <:Number} = nothing,
+                       ens::Option{<:Number} = nothing,
                        kld::Union{Nothing, <:Number, <:NumVec} = nothing,
-                       ow::Union{Nothing, <:NumVec} = nothing,
+                       ow::Option{<:NumVec} = nothing,
                        rr::Union{Nothing, <:Regression} = nothing,
-                       f_mu::Union{Nothing, <:NumVec} = nothing,
-                       f_sigma::Union{Nothing, <:NumMat} = nothing,
-                       f_w::Union{Nothing, <:NumVec} = nothing)
+                       f_mu::Option{<:NumVec} = nothing,
+                       f_sigma::Option{<:NumMat} = nothing, f_w::Option{<:NumVec} = nothing)
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
 function prior_view(pr::LowOrderPrior, i)
@@ -626,11 +623,11 @@ Container type for high order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:NumMat} = nothing,
-                   L2::Union{Nothing, <:NumMat} = nothing,
-                   S2::Union{Nothing, <:NumMat} = nothing,
-                   sk::Union{Nothing, <:NumMat} = nothing,
-                   V::Union{Nothing, <:NumMat} = nothing,
+    HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:NumMat} = nothing,
+                   L2::Option{<:NumMat} = nothing,
+                   S2::Option{<:NumMat} = nothing,
+                   sk::Option{<:NumMat} = nothing,
+                   V::Option{<:NumMat} = nothing,
                    skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
@@ -688,9 +685,9 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     sk::T5
     V::T6
     skmp::T7
-    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:NumMat},
-                            L2::Union{Nothing, <:NumMat}, S2::Union{Nothing, <:NumMat},
-                            sk::Union{Nothing, <:NumMat}, V::Union{Nothing, <:NumMat},
+    function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:NumMat},
+                            L2::Option{<:NumMat}, S2::Option{<:NumMat},
+                            sk::Option{<:NumMat}, V::Option{<:NumMat},
                             skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
         N = length(pr.mu)
         kt_flag = isa(kt, NumMat)
@@ -720,11 +717,9 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
                    typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
     end
 end
-function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:NumMat} = nothing,
-                        L2::Union{Nothing, <:NumMat} = nothing,
-                        S2::Union{Nothing, <:NumMat} = nothing,
-                        sk::Union{Nothing, <:NumMat} = nothing,
-                        V::Union{Nothing, <:NumMat} = nothing,
+function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:NumMat} = nothing,
+                        L2::Option{<:NumMat} = nothing, S2::Option{<:NumMat} = nothing,
+                        sk::Option{<:NumMat} = nothing, V::Option{<:NumMat} = nothing,
                         skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end

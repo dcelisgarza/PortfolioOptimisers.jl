@@ -17,7 +17,7 @@ Estimator for turnover portfolio constraints.
 
 # Constructor
 
-    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Union{Nothing, <:Number} = nothing)
+    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
 
 ## Validation
 
@@ -44,8 +44,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     w::T1
     val::T2
     dval::T3
-    function TurnoverEstimator(w::NumVec, val::EstValType,
-                               dval::Union{Nothing, <:Number} = nothing)
+    function TurnoverEstimator(w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)
@@ -54,8 +53,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
         return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end
 end
-function TurnoverEstimator(; w::NumVec, val::EstValType,
-                           dval::Union{Nothing, <:Number} = nothing)
+function TurnoverEstimator(; w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
     return TurnoverEstimator(w, val, dval)
 end
 """

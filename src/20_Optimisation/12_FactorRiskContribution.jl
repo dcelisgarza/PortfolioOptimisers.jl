@@ -19,9 +19,8 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
                                                <:AbstractPhylogenyConstraintResult,
                                                <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                        <:AbstractPhylogenyConstraintResult}},
-                                    sets::Union{Nothing, <:AssetSets},
-                                    wi::Union{Nothing, <:NumVec}, flag::Bool,
-                                    fb::Union{Nothing, <:OptimisationEstimator})
+                                    sets::Union{Nothing, <:AssetSets}, wi::Option{<:NumVec},
+                                    flag::Bool, fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -42,7 +41,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                            <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                    <:AbstractPhylogenyConstraintResult}} = nothing,
                                 sets::Union{Nothing, <:AssetSets} = nothing,
-                                wi::Union{Nothing, <:NumVec} = nothing, flag::Bool = true,
+                                wi::Option{<:NumVec} = nothing, flag::Bool = true,
                                 fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fb)
 end
@@ -59,7 +58,7 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:Regression,
                                                              <:AbstractRegressionEstimator},
                                                    rd::ReturnsResult, flag::Bool,
-                                                   wi::Union{Nothing, <:NumVec})
+                                                   wi::Option{<:NumVec})
     rr = regression(re, rd.X, rd.F)
     Bt = transpose(rr.L)
     b1 = pinv(Bt)

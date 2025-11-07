@@ -125,7 +125,7 @@ Represents the portfolio variance using a covariance matrix.
 # Constructors
 
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             sigma::Union{Nothing, <:NumMat} = nothing,
+             sigma::Option{<:NumMat} = nothing,
              rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
@@ -231,7 +231,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     sigma::T2
     rc::T3
     alg::T4
-    function Variance(settings::RiskMeasureSettings, sigma::Union{Nothing, <:NumMat},
+    function Variance(settings::RiskMeasureSettings, sigma::Option{<:NumMat},
                       rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
                       alg::VarianceFormulation)
         if isa(sigma, NumMat)
@@ -243,7 +243,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Union{Nothing, <:NumMat} = nothing,
+                  sigma::Option{<:NumMat} = nothing,
                   rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
@@ -303,7 +303,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 # Constructors
 
     StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       sigma::Union{Nothing, <:NumMat} = nothing)
+                       sigma::Option{<:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -377,8 +377,7 @@ julia> r(w)
 struct StandardDeviation{T1, T2} <: RiskMeasure
     settings::T1
     sigma::T2
-    function StandardDeviation(settings::RiskMeasureSettings,
-                               sigma::Union{Nothing, <:NumMat})
+    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:NumMat})
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -387,7 +386,7 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Union{Nothing, <:NumMat} = nothing)
+                           sigma::Option{<:NumMat} = nothing)
     return StandardDeviation(settings, sigma)
 end
 function (r::StandardDeviation)(w::NumVec)
@@ -443,7 +442,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
     UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                       <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
-                           sigma::Union{Nothing, <:NumMat} = nothing)
+                           sigma::Option{<:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -609,7 +608,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     function UncertaintySetVariance(settings::RiskMeasureSettings,
                                     ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                                <:AbstractUncertaintySetEstimator},
-                                    sigma::Union{Nothing, <:NumMat})
+                                    sigma::Option{<:NumMat})
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
         end
@@ -619,7 +618,7 @@ end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                            <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
-                                sigma::Union{Nothing, <:NumMat} = nothing)
+                                sigma::Option{<:NumMat} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
 function (r::UncertaintySetVariance)(w::NumVec)

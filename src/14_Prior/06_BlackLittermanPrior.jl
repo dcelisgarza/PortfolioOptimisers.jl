@@ -32,7 +32,7 @@ Black-Litterman prior estimator for asset returns.
                         views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
                         sets::Union{Nothing, <:AssetSets} = nothing,
                         views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                        rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
+                        rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -121,7 +121,7 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
                                               <:BlackLittermanViews},
                                  sets::Union{Nothing, <:AssetSets},
                                  views_conf::Union{Nothing, <:Number, <:NumVec}, rf::Number,
-                                 tau::Union{Nothing, <:Number})
+                                 tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -141,7 +141,7 @@ function BlackLittermanPrior(;
                                           <:BlackLittermanViews},
                              sets::Union{Nothing, <:AssetSets} = nothing,
                              views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                             rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
+                             rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
@@ -237,7 +237,7 @@ function vanilla_posteriors(tau::Number, rf::Number, prior_mu::NumVec, prior_sig
 end
 """
     prior(pe::BlackLittermanPrior, X::NumMat;
-          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
+          F::Option{<:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute the Black-Litterman prior moments for asset returns.
@@ -280,7 +280,7 @@ Compute the Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::BlackLittermanPrior, X::NumMat, F::Union{Nothing, <:NumMat} = nothing;
+function prior(pe::BlackLittermanPrior, X::NumMat, F::Option{<:NumMat} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

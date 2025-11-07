@@ -2,7 +2,7 @@ abstract type ValueatRiskFormulation <: AbstractAlgorithm end
 struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
     b::T1
     s::T2
-    function MIPValueatRisk(b::Union{Nothing, <:Number}, s::Union{Nothing, <:Number})
+    function MIPValueatRisk(b::Option{<:Number}, s::Option{<:Number})
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
@@ -17,16 +17,15 @@ struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
         return new{typeof(b), typeof(s)}(b, s)
     end
 end
-function MIPValueatRisk(; b::Union{Nothing, <:Number} = nothing,
-                        s::Union{Nothing, <:Number} = nothing)
+function MIPValueatRisk(; b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
     return MIPValueatRisk(b, s)
 end
 struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
     mu::T1
     sigma::T2
     dist::T3
-    function DistributionValueatRisk(mu::Union{Nothing, <:NumVec},
-                                     sigma::Union{Nothing, <:NumMat}, dist::Distribution)
+    function DistributionValueatRisk(mu::Option{<:NumVec}, sigma::Option{<:NumMat},
+                                     dist::Distribution)
         if !isnothing(mu)
             @argcheck(!isempty(mu))
         end
@@ -36,8 +35,8 @@ struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
         return new{typeof(mu), typeof(sigma), typeof(dist)}(mu, sigma, dist)
     end
 end
-function DistributionValueatRisk(; mu::Union{Nothing, <:NumVec} = nothing,
-                                 sigma::Union{Nothing, <:NumMat} = nothing,
+function DistributionValueatRisk(; mu::Option{<:NumVec} = nothing,
+                                 sigma::Option{<:NumMat} = nothing,
                                  dist::Distribution = Normal())
     return DistributionValueatRisk(mu, sigma, dist)
 end

@@ -635,7 +635,7 @@ function fourth_moment_index_factory(N::Integer, i)
     return idx
 end
 """
-    traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:NumVec} = nothing)
+    traverse_concrete_subtypes(t; ctarr::Option{<:NumVec} = nothing)
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -663,7 +663,7 @@ julia> traverse_concrete_subtypes(MyAbstract)
  MyConcrete2
 ```
 """
-function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:NumVec} = nothing)
+function traverse_concrete_subtypes(t, ctarr::Option{<:NumVec} = nothing)
     if isnothing(ctarr)
         ctarr = []
     end

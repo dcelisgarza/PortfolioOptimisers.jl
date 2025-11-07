@@ -139,8 +139,8 @@ NOCTracking()
 """
 struct NOCTracking <: NormTracking end
 """
-    norm_tracking(f::SOCTracking, a, b; N::Union{Nothing, <:Number} = nothing)
-    norm_tracking(::NOCTracking, a, b; N::Union{Nothing, <:Number} = nothing)
+    norm_tracking(f::SOCTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(::NOCTracking, a, b; N::Option{<:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
@@ -178,11 +178,11 @@ julia> PortfolioOptimisers.norm_tracking(NOCTracking(), [0.5, 0.5], [0.6, 0.4], 
   - [`NOCTracking`](@ref)
   - [`NormTracking`](@ref)
 """
-function norm_tracking(f::SOCTracking, a, b, N::Union{Nothing, <:Number} = nothing)
+function norm_tracking(f::SOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
     return norm(a - b, 2) / factor
 end
-function norm_tracking(::NOCTracking, a, b, N::Union{Nothing, <:Number} = nothing)
+function norm_tracking(::NOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : N
     return norm(a - b, 1) / factor
 end

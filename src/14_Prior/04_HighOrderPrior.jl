@@ -440,7 +440,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     end
 end
 """
-    prior(pe::HighOrderPriorEstimator, X::NumMat, F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::HighOrderPriorEstimator, X::NumMat, F::Option{<:NumMat} = nothing; dims::Int = 1, kwargs...)
 
 Compute high order prior moments for asset returns using a composite estimator.
 
@@ -468,8 +468,8 @@ Compute high order prior moments for asset returns using a composite estimator.
   - [`HighOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::HighOrderPriorEstimator, X::NumMat,
-               F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
+function prior(pe::HighOrderPriorEstimator, X::NumMat, F::Option{<:NumMat} = nothing;
+               dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

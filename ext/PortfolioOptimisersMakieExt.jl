@@ -32,7 +32,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
                                        fees::Union{Nothing, <:Fees} = nothing;
                                        ts::AbstractVector = 1:size(X, 1),
                                        nx::AbstractVector = 1:size(X, 2),
-                                       N::Union{Nothing, <:Number} = nothing,
+                                       N::Option{<:Number} = nothing,
                                        f::Union{Nothing, Figure} = Figure(),
                                        fpos::Tuple = (1, 1), compound::Bool = false,
                                        ax_kwargs::NamedTuple = (; xlabel = "Date",
@@ -64,7 +64,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
     return f
 end
 function plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
-                          N::Union{Nothing, <:Number} = nothing,
+                          N::Option{<:Number} = nothing,
                           f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
                           ax_kwargs::NamedTuple = (; xlabel = "Asset", ylabel = "Weight",
                                                    title = "Portfolio Composition",

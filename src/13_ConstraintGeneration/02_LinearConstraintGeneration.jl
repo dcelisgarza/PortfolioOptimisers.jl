@@ -375,7 +375,7 @@ function group_to_val!(nx::StrVec, sdict::AbstractDict, key::Any, val::Number,
     return nothing
 end
 """
-    estimator_to_val(dict::EstValType, sets::AssetSets; val::Union{Nothing, <:Number}=nothing, strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::AssetSets; val::Option{<:Number}=nothing, strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -414,7 +414,7 @@ The function creates the vector and sets the values for assets or groups as spec
 """
 function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number},
                                       <:AbstractVector{<:Pair{<:AbstractString, <:Number}}},
-                          sets::AssetSets, val::Union{Nothing, <:Number} = nothing;
+                          sets::AssetSets, val::Option{<:Number} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]
@@ -429,8 +429,8 @@ function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number}
     return arr
 end
 function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSets,
-                          val::Union{Nothing, <:Number} = nothing;
-                          datatype::DataType = Float64, strict::Bool = false)
+                          val::Option{<:Number} = nothing; datatype::DataType = Float64,
+                          strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
@@ -443,7 +443,7 @@ function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSet
     return arr
 end
 """
-    estimator_to_val(val::Union{Nothing, <:Number}, args...; kwargs...)
+    estimator_to_val(val::Option{<:Number}, args...; kwargs...)
 
 Fallback no-op for value mapping in asset/group estimators.
 
@@ -457,7 +457,7 @@ This method returns the input value `val` as-is, without modification or mapping
 
 # Returns
 
-  - `val::Union{Nothing, <:Number}`: The input `val`, unchanged.
+  - `val::Option{<:Number}`: The input `val`, unchanged.
 
 # Related
 
@@ -465,7 +465,7 @@ This method returns the input value `val` as-is, without modification or mapping
   - [`group_to_val!`](@ref)
   - [`AssetSets`](@ref)
 """
-function estimator_to_val(val::Union{Nothing, <:Number}, args...; kwargs...)
+function estimator_to_val(val::Option{<:Number}, args...; kwargs...)
     return val
 end
 """
@@ -1731,7 +1731,7 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     return transpose(A)
 end
 """
-    asset_sets_matrix(smtx::Union{Nothing, <:NumMat}, args...)
+    asset_sets_matrix(smtx::Option{<:NumMat}, args...)
 
 No-op fallback for asset set membership matrix construction.
 
@@ -1752,7 +1752,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Union{Nothing, <:NumMat}, args...)
+function asset_sets_matrix(smtx::Option{<:NumMat}, args...)
     return smtx
 end
 """

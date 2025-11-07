@@ -1,6 +1,6 @@
 abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 function setup_alloc_optim(w::NumVec, p::NumVec, cash::Number,
-                           T::Union{Nothing, <:Number} = nothing,
+                           T::Option{<:Number} = nothing,
                            fees::Union{Nothing, <:Fees} = nothing)
     if !isnothing(T) && !isnothing(fees)
         cash -= calc_fees(w, p, fees) * T

@@ -83,9 +83,8 @@ function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,
     return shares, cost, aw, acash, res, model
 end
 function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 1e6,
-                   T::Union{Nothing, <:Number} = nothing,
-                   fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+                   T::Option{<:Number} = nothing, fees::Union{Nothing, <:Fees} = nothing;
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     @argcheck(!isempty(w))
     @argcheck(!isempty(p))
     @argcheck(length(w) == length(p))
@@ -128,7 +127,7 @@ function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 
                                           ifelse(save, lmodel, nothing), lcash, nothing)
 end
 function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::NumVec,
-                  p::NumVec, cash::Number = 1e6, T::Union{Nothing, <:Number} = nothing,
+                  p::NumVec, cash::Number = 1e6, T::Option{<:Number} = nothing,
                   fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)

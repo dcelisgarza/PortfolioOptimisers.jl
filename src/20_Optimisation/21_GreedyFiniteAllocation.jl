@@ -95,8 +95,8 @@ function finite_sub_allocation!(w::NumVec, p::NumVec, cash::Number, bgt::Number,
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
 function _optimise(ga::GreedyAllocation, w::NumVec, p::NumVec, cash::Number = 1e6,
-                   T::Union{Nothing, <:Number} = nothing,
-                   fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+                   T::Option{<:Number} = nothing, fees::Union{Nothing, <:Fees} = nothing;
+                   kwargs...)
     @argcheck(!isempty(w))
     @argcheck(!isempty(p))
     @argcheck(length(w) == length(p))
@@ -122,7 +122,7 @@ function _optimise(ga::GreedyAllocation, w::NumVec, p::NumVec, cash::Number = 1e
                                         lcash, nothing)
 end
 function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::NumVec, p::NumVec,
-                  cash::Number = 1e6, T::Union{Nothing, <:Number} = nothing,
+                  cash::Number = 1e6, T::Option{<:Number} = nothing,
                   fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return _optimise(ga, w, p, cash, T, fees; kwargs...)
 end

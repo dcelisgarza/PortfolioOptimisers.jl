@@ -35,7 +35,7 @@ Bayesian Black-Litterman prior estimator for asset returns.
                                              <:BlackLittermanViews},
                                 sets::Union{Nothing, <:AssetSets} = nothing,
                                 views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                                rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
+                                rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -147,7 +147,7 @@ struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
                                                       <:BlackLittermanViews},
                                          sets::Union{Nothing, <:AssetSets},
                                          views_conf::Union{Nothing, <:Number, <:NumVec},
-                                         rf::Number, tau::Union{Nothing, <:Number})
+                                         rf::Number, tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -168,8 +168,7 @@ function BayesianBlackLittermanPrior(;
                                                   <:BlackLittermanViews},
                                      sets::Union{Nothing, <:AssetSets} = nothing,
                                      views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                                     rf::Number = 0.0,
-                                     tau::Union{Nothing, <:Number} = nothing)
+                                     rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function factory(pe::BayesianBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)

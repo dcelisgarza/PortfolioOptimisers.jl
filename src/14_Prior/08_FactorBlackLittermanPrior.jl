@@ -47,8 +47,8 @@ Factor Black-Litterman prior estimator for asset returns.
                               sets::Union{Nothing, <:AssetSets} = nothing,
                               views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
                               w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
-                              l::Union{Nothing, <:Number} = nothing,
-                              tau::Union{Nothing, <:Number} = nothing, rsd::Bool = true)
+                              l::Option{<:Number} = nothing,
+                              tau::Option{<:Number} = nothing, rsd::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -156,9 +156,8 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                                     <:BlackLittermanViews},
                                        sets::Union{Nothing, <:AssetSets},
                                        views_conf::Union{Nothing, <:Number, <:NumVec},
-                                       w::Union{Nothing, <:NumVec}, rf::Number,
-                                       l::Union{Nothing, <:Number},
-                                       tau::Union{Nothing, <:Number}, rsd::Bool)
+                                       w::Option{<:NumVec}, rf::Number, l::Option{<:Number},
+                                       tau::Option{<:Number}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -182,10 +181,9 @@ function FactorBlackLittermanPrior(;
                                                 <:BlackLittermanViews},
                                    sets::Union{Nothing, <:AssetSets} = nothing,
                                    views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                                   w::Union{Nothing, <:NumVec} = nothing, rf::Number = 0.0,
-                                   l::Union{Nothing, <:Number} = nothing,
-                                   tau::Union{Nothing, <:Number} = nothing,
-                                   rsd::Bool = true)
+                                   w::Option{<:NumVec} = nothing, rf::Number = 0.0,
+                                   l::Option{<:Number} = nothing,
+                                   tau::Option{<:Number} = nothing, rsd::Bool = true)
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end

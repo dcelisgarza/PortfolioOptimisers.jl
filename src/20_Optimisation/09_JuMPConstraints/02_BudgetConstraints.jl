@@ -7,7 +7,7 @@ end
 struct BudgetRange{T1, T2} <: BudgetEstimator
     lb::T1
     ub::T2
-    function BudgetRange(lb::Union{Nothing, <:Number}, ub::Union{Nothing, <:Number})
+    function BudgetRange(lb::Option{<:Number}, ub::Option{<:Number})
         lb_flag = isnothing(lb)
         ub_flag = isnothing(ub)
         @argcheck(!(lb_flag && ub_flag))
@@ -23,8 +23,7 @@ struct BudgetRange{T1, T2} <: BudgetEstimator
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function BudgetRange(; lb::Union{Nothing, <:Number} = 1.0,
-                     ub::Union{Nothing, <:Number} = 1.0)
+function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
 function budget_view(bgt::Union{<:Number, <:BudgetRange}, ::Any)

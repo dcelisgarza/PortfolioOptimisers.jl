@@ -134,7 +134,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecIntVec,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:NonMonotonicSchurComplement,
                                                                 <:Any},
-                                  gamma::Union{Nothing, <:Number} = nothing)
+                                  gamma::Option{<:Number} = nothing)
     r = factory(params.r, pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma

@@ -36,10 +36,10 @@ Estimator for portfolio transaction fees constraints.
                     s::Union{Nothing, <:EstValType} = nothing,
                     fl::Union{Nothing, <:EstValType} = nothing,
                     fs::Union{Nothing, <:EstValType} = nothing,
-                    dl::Union{Nothing, <:Number} = nothing,
-                    ds::Union{Nothing, <:Number} = nothing,
-                    dfl::Union{Nothing, <:Number} = nothing,
-                    dfs::Union{Nothing, <:Number} = nothing,
+                    dl::Option{<:Number} = nothing,
+                    ds::Option{<:Number} = nothing,
+                    dfl::Option{<:Number} = nothing,
+                    dfs::Option{<:Number} = nothing,
                     kwargs::NamedTuple = (; atol = 1e-8))
 
 Keyword arguments correspond to the fields above.
@@ -92,11 +92,9 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimat
     function FeesEstimator(tn::Union{Nothing, <:TurnoverEstimator, <:Turnover},
                            l::Union{Nothing, <:EstValType}, s::Union{Nothing, <:EstValType},
                            fl::Union{Nothing, <:EstValType},
-                           fs::Union{Nothing, <:EstValType},
-                           dl::Union{Nothing, <:Number} = nothing,
-                           ds::Union{Nothing, <:Number} = nothing,
-                           dfl::Union{Nothing, <:Number} = nothing,
-                           dfs::Union{Nothing, <:Number} = nothing,
+                           fs::Union{Nothing, <:EstValType}, dl::Option{<:Number} = nothing,
+                           ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
+                           dfs::Option{<:Number} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -117,10 +115,8 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
                        s::Union{Nothing, <:EstValType} = nothing,
                        fl::Union{Nothing, <:EstValType} = nothing,
                        fs::Union{Nothing, <:EstValType} = nothing,
-                       dl::Union{Nothing, <:Number} = nothing,
-                       ds::Union{Nothing, <:Number} = nothing,
-                       dfl::Union{Nothing, <:Number} = nothing,
-                       dfs::Union{Nothing, <:Number} = nothing,
+                       dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
+                       dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end

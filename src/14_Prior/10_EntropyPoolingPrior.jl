@@ -436,7 +436,7 @@ Entropy pooling prior estimator for asset returns.
                         ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
                         dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
                         opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
-                        w::Union{Nothing, <:ProbabilityWeights} = nothing,
+                        w::Option{<:ProbabilityWeights} = nothing,
                         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
 
 Keyword arguments correspond to the fields above.
@@ -544,13 +544,12 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  sk_views::Union{Nothing, <:LinearConstraintEstimator},
                                  kt_views::Union{Nothing, <:LinearConstraintEstimator},
                                  rho_views::Union{Nothing, <:LinearConstraintEstimator},
-                                 var_alpha::Union{Nothing, <:Number},
-                                 cvar_alpha::Union{Nothing, <:Number},
+                                 var_alpha::Option{<:Number}, cvar_alpha::Option{<:Number},
                                  sets::Union{Nothing, <:AssetSets},
                                  ds_opt::Union{Nothing, <:CVaREntropyPooling},
                                  dm_opt::Union{Nothing, <:OptimEntropyPooling},
                                  opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
-                                 w::Union{Nothing, <:ProbabilityWeights},
+                                 w::Option{<:ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -612,13 +611,13 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              sk_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              kt_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              rho_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
-                             var_alpha::Union{Nothing, <:Number} = nothing,
-                             cvar_alpha::Union{Nothing, <:Number} = nothing,
+                             var_alpha::Option{<:Number} = nothing,
+                             cvar_alpha::Option{<:Number} = nothing,
                              sets::Union{Nothing, <:AssetSets} = nothing,
                              ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
                              dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
                              opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
-                             w::Union{Nothing, <:ProbabilityWeights} = nothing,
+                             w::Option{<:ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
@@ -679,7 +678,7 @@ function add_ep_constraint!(epc::AbstractDict, lhs::NumMat, rhs::NumVec, key::Sy
 end
 """
     replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                        key::Symbol; alpha::Union{Nothing, <:Number} = nothing,
+                        key::Symbol; alpha::Option{<:Number} = nothing,
                         strict::Bool = false)
 
 Replace prior references in view parsing results with their corresponding prior values.
@@ -715,7 +714,7 @@ Replace prior references in view parsing results with their corresponding prior 
   - [`prior`](@ref)
 """
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                             key::Symbol, alpha::Union{Nothing, <:Number} = nothing;
+                             key::Symbol, alpha::Option{<:Number} = nothing;
                              strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
     nx = sets.dict[sets.key]
@@ -2007,7 +2006,7 @@ end
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-          X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1,
+          X::NumMat; F::Option{<:NumMat} = nothing, dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with iterative constraint enforcement.
@@ -2063,7 +2062,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any,
                                        <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-               X::NumMat, F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1,
+               X::NumMat, F::Option{<:NumMat} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -2139,7 +2138,7 @@ end
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:H0_EntropyPooling}, X::NumMat;
-          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
+          F::Option{<:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
@@ -2188,7 +2187,7 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:H0_EntropyPooling}, X::NumMat,
-               F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, strict::Bool = false,
+               F::Option{<:NumMat} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

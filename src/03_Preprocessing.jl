@@ -75,11 +75,11 @@ It supports both asset and factor returns, as well as optional time series and i
 # Constructor
 
     ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
-                  X::Union{Nothing, <:NumMat} = nothing,
+                  X::Option{<:NumMat} = nothing,
                   nf::Union{Nothing, <:StrVec} = nothing,
-                  F::Union{Nothing, <:NumMat} = nothing,
+                  F::Option{<:NumMat} = nothing,
                   ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
-                  iv::Union{Nothing, <:NumMat} = nothing,
+                  iv::Option{<:NumMat} = nothing,
                   ivpa::Union{Nothing, <:Number, <:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -119,11 +119,10 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
-    function ReturnsResult(nx::Union{Nothing, <:StrVec}, X::Union{Nothing, <:NumMat},
-                           nf::Union{Nothing, <:StrVec}, F::Union{Nothing, <:NumMat},
+    function ReturnsResult(nx::Union{Nothing, <:StrVec}, X::Option{<:NumMat},
+                           nf::Union{Nothing, <:StrVec}, F::Option{<:NumMat},
                            ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}},
-                           iv::Union{Nothing, <:NumMat},
-                           ivpa::Union{Nothing, <:Number, <:NumVec})
+                           iv::Option{<:NumMat}, ivpa::Union{Nothing, <:Number, <:NumVec})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
@@ -153,11 +152,11 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     end
 end
 function ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
-                       X::Union{Nothing, <:NumMat} = nothing,
+                       X::Option{<:NumMat} = nothing,
                        nf::Union{Nothing, <:StrVec} = nothing,
-                       F::Union{Nothing, <:NumMat} = nothing,
+                       F::Option{<:NumMat} = nothing,
                        ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
-                       iv::Union{Nothing, <:NumMat} = nothing,
+                       iv::Option{<:NumMat} = nothing,
                        ivpa::Union{Nothing, <:Number, <:NumVec} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
@@ -175,7 +174,7 @@ end
                       ivpa::Union{Nothing, <:Number, <:NumVec} = nothing,
                       ret_method::Symbol = :simple, padding::Bool = false,
                       missing_col_percent::Number = 1.0,
-                      missing_row_percent::Union{Nothing, <:Number} = 1.0,
+                      missing_row_percent::Option{<:Number} = 1.0,
                       collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
                       join_method::Symbol = :outer,
                       impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
@@ -239,7 +238,7 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            ivpa::Union{Nothing, <:Number, <:NumVec} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Number = 1.0,
-                           missing_row_percent::Union{Nothing, <:Number} = 1.0,
+                           missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Union{Nothing, Function} = nothing,
                            join_method::Symbol = :outer,

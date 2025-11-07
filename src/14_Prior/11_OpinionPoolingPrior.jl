@@ -240,7 +240,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
                                  pe1::Union{Nothing,
                                             <:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
-                                 p::Union{Nothing, <:Number}, w::Union{Nothing, <:NumVec},
+                                 p::Option{<:Number}, w::Option{<:NumVec},
                                  alg::OpinionPoolingAlgorithm,
                                  threads::FLoops.Transducers.Executor)
         @argcheck(!isempty(pes))
@@ -263,8 +263,7 @@ end
 function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
                              pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                             p::Union{Nothing, <:Number} = nothing,
-                             w::Union{Nothing, <:NumVec} = nothing,
+                             p::Option{<:Number} = nothing, w::Option{<:NumVec} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
@@ -347,7 +346,7 @@ function compute_pooling(::LogarithmicOpinionPooling, ow::NumVec, pw::NumMat)
 end
 """
     prior(pe::OpinionPoolingPrior, X::NumMat;
-          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
+          F::Option{<:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
@@ -390,7 +389,7 @@ Compute opinion pooling prior moments for asset returns.
   - [`compute_pooling`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::OpinionPoolingPrior, X::NumMat, F::Union{Nothing, <:NumMat} = nothing;
+function prior(pe::OpinionPoolingPrior, X::NumMat, F::Option{<:NumMat} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

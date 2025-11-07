@@ -236,11 +236,11 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ret::JuMPReturnsEstimator, sce::Scalariser,
                            ccnt::Union{Nothing, <:CustomJuMPConstraint},
                            cobj::Union{Nothing, <:CustomJuMPObjective}, sc::Number,
-                           so::Number, ss::Union{Nothing, <:Number},
+                           so::Number, ss::Option{<:Number},
                            card::Union{Nothing, <:Integer},
                            scard::Union{Nothing, <:Integer, <:IntVec},
-                           nea::Union{Nothing, <:Number}, l1::Union{Nothing, <:Number},
-                           l2::Union{Nothing, <:Number}, strict::Bool)
+                           nea::Option{<:Number}, l1::Option{<:Number},
+                           l2::Option{<:Number}, strict::Bool)
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
         elseif isa(bgt, BudgetCostEstimator)
@@ -460,13 +460,11 @@ function JuMPOptimiser(;
                        sce::Scalariser = SumScalariser(),
                        ccnt::Union{Nothing, <:CustomJuMPConstraint} = nothing,
                        cobj::Union{Nothing, <:CustomJuMPObjective} = nothing,
-                       sc::Number = 1, so::Number = 1,
-                       ss::Union{Nothing, <:Number} = nothing,
+                       sc::Number = 1, so::Number = 1, ss::Option{<:Number} = nothing,
                        card::Union{Nothing, <:Integer} = nothing,
                        scard::Union{Nothing, <:Integer, <:IntVec} = nothing,
-                       nea::Union{Nothing, <:Number} = nothing,
-                       l1::Union{Nothing, <:Number} = nothing,
-                       l2::Union{Nothing, <:Number} = nothing, strict::Bool = false)
+                       nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
+                       l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sce,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
