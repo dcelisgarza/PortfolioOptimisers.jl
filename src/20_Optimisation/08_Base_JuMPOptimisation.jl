@@ -57,7 +57,7 @@ function set_initial_w!(w::NumVec, wi::NumVec)
     set_start_value.(w, wi)
     return nothing
 end
-function set_w!(model::JuMP.Model, X::NumMat, wi::Union{Nothing, <:NumVec, <:VecNumVec})
+function set_w!(model::JuMP.Model, X::NumMat, wi::Option{<:NumVecUVecNumVec})
     @variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing

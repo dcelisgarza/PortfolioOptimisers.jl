@@ -497,7 +497,7 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     return nothing
 end
 function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                               card::Union{Nothing, <:IntUIntVec},
+                               card::Option{<:IntUIntVec},
                                gcard::Union{Nothing, <:LinearConstraint,
                                             <:AbstractVector{<:LinearConstraint}},
                                smtx::Option{<:NumMatUVecNumMat},

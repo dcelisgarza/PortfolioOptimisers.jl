@@ -37,9 +37,8 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     slv::T2
     alpha::T3
     w::T4
-    function EntropicValueatRisk(settings::RiskMeasureSettings,
-                                 slv::Union{Nothing, <:Solver, <:SlvVec}, alpha::Number,
-                                 w::Option{<:AbstractWeights})
+    function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:SlvUVecSlv},
+                                 alpha::Number, w::Option{<:AbstractWeights})
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -52,15 +51,15 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
-                             alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing)
+                             slv::Option{<:SlvUVecSlv} = nothing, alpha::Number = 0.05,
+                             w::Option{<:AbstractWeights} = nothing)
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::NumVec)
     return ERM(x, r.slv, r.alpha, r.w)
 end
 function factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
-                 slv::Union{Nothing, <:Solver, <:SlvVec}, args...; kwargs...)
+                 slv::Option{<:SlvUVecSlv}, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
     slv = solver_factory(r.slv, slv)
     return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
@@ -72,9 +71,8 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     beta::T4
     w::T5
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
-                                      slv::Union{Nothing, <:Solver, <:SlvVec},
-                                      alpha::Number, beta::Number,
-                                      w::Option{<:AbstractWeights})
+                                      slv::Option{<:SlvUVecSlv}, alpha::Number,
+                                      beta::Number, w::Option{<:AbstractWeights})
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -91,8 +89,8 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     end
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
-                                  alpha::Number = 0.05, beta::Number = 0.05,
+                                  slv::Option{<:SlvUVecSlv} = nothing, alpha::Number = 0.05,
+                                  beta::Number = 0.05,
                                   w::Option{<:AbstractWeights} = nothing)
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
@@ -100,7 +98,7 @@ function (r::EntropicValueatRiskRange)(x::NumVec)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
 function factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
-                 slv::Union{Nothing, <:Solver, <:SlvVec}, args...; kwargs...)
+                 slv::Option{<:SlvUVecSlv}, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
     slv = solver_factory(r.slv, slv)
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
@@ -111,7 +109,7 @@ struct EntropicDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     slv::T2
     alpha::T3
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
-                                    slv::Union{Nothing, <:Solver, <:SlvVec}, alpha::Number)
+                                    slv::Option{<:SlvUVecSlv}, alpha::Number)
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -120,8 +118,7 @@ struct EntropicDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     end
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
-                                alpha::Number = 0.05)
+                                slv::Option{<:SlvUVecSlv} = nothing, alpha::Number = 0.05)
     return EntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::EntropicDrawdownatRisk)(x::NumVec)
@@ -144,8 +141,7 @@ struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     slv::T2
     alpha::T3
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                            slv::Union{Nothing, <:Solver, <:SlvVec},
-                                            alpha::Number)
+                                            slv::Option{<:SlvUVecSlv}, alpha::Number)
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -155,7 +151,7 @@ struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
 end
 function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                        slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
+                                        slv::Option{<:SlvUVecSlv} = nothing,
                                         alpha::Number = 0.05)
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
 end
@@ -176,8 +172,8 @@ function (r::RelativeEntropicDrawdownatRisk)(x::NumVec)
 end
 for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), ::Any, slv::Union{Nothing, <:Solver, <:SlvVec},
-                              args...; kwargs...)
+             function factory(r::$(r), ::Any, slv::Option{<:SlvUVecSlv}, args...;
+                              kwargs...)
                  slv = solver_factory(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
              end

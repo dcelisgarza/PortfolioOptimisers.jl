@@ -517,7 +517,7 @@ function regression_view(re::Regression, i)
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
-    regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+    regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
 
 No-op fallback for `regression_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
 
@@ -536,7 +536,7 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
   - [`regression_view(::Regression, ::NumVec)`](@ref)
 """
-function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+function regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
     return re
 end
 """

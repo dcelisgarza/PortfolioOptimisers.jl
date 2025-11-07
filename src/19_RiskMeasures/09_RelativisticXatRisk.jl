@@ -82,7 +82,7 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     kappa::T4
     w::T5
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
-                                     slv::Union{Nothing, <:Solver, <:SlvVec}, alpha::Number,
+                                     slv::Option{<:SlvUVecSlv}, alpha::Number,
                                      kappa::Number, w::Union{Nothing, AbstractWeights})
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
@@ -100,13 +100,13 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     end
 end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
-                                 alpha::Number = 0.05, kappa::Number = 0.3,
+                                 slv::Option{<:SlvUVecSlv} = nothing, alpha::Number = 0.05,
+                                 kappa::Number = 0.3,
                                  w::Union{Nothing, AbstractWeights} = nothing)
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
 function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
-                 slv::Union{Nothing, <:Solver, <:SlvVec}, args...; kwargs...)
+                 slv::Option{<:SlvUVecSlv}, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
     slv = solver_factory(r.slv, slv)
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
@@ -124,9 +124,9 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     kappa_b::T6
     w::T7
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
-                                          slv::Union{Nothing, <:Solver, <:SlvVec},
-                                          alpha::Number, kappa_a::Number, beta::Number,
-                                          kappa_b::Number, w::Option{<:AbstractWeights})
+                                          slv::Option{<:SlvUVecSlv}, alpha::Number,
+                                          kappa_a::Number, beta::Number, kappa_b::Number,
+                                          w::Option{<:AbstractWeights})
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -144,7 +144,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
 end
 function RelativisticValueatRiskRange(;
                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                      slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
+                                      slv::Option{<:SlvUVecSlv} = nothing,
                                       alpha::Number = 0.05, kappa_a::Number = 0.3,
                                       beta::Number = 0.05, kappa_b::Number = 0.3,
                                       w::Option{<:AbstractWeights} = nothing)
@@ -154,7 +154,7 @@ function (r::RelativisticValueatRiskRange)(x::NumVec)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
 function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
-                 slv::Union{Nothing, <:Solver, <:SlvVec}, args...; kwargs...)
+                 slv::Option{<:SlvUVecSlv}, args...; kwargs...)
     slv = solver_factory(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
@@ -165,8 +165,8 @@ struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     slv::T2
     alpha::T3
     kappa::T4
-    function RelativisticDrawdownatRisk(settings, slv::Union{Nothing, <:Solver, <:SlvVec},
-                                        alpha::Number, kappa::Number)
+    function RelativisticDrawdownatRisk(settings, slv::Option{<:SlvUVecSlv}, alpha::Number,
+                                        kappa::Number)
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -178,7 +178,7 @@ struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
-                                    slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
+                                    slv::Option{<:SlvUVecSlv} = nothing,
                                     alpha::Number = 0.05, kappa::Number = 0.3)
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
@@ -203,8 +203,8 @@ struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMea
     alpha::T3
     kappa::T4
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                                slv::Union{Nothing, <:Solver, <:SlvVec},
-                                                alpha::Number, kappa::Number)
+                                                slv::Option{<:SlvUVecSlv}, alpha::Number,
+                                                kappa::Number)
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -217,7 +217,7 @@ struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMea
 end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                            slv::Union{Nothing, <:Solver, <:SlvVec} = nothing,
+                                            slv::Option{<:SlvUVecSlv} = nothing,
                                             alpha::Number = 0.05, kappa::Number = 0.3)
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
@@ -238,8 +238,8 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::NumVec)
 end
 for r in (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), ::Any, slv::Union{Nothing, <:Solver, <:SlvVec},
-                              args...; kwargs...)
+             function factory(r::$(r), ::Any, slv::Option{<:SlvUVecSlv}, args...;
+                              kwargs...)
                  slv = solver_factory(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
