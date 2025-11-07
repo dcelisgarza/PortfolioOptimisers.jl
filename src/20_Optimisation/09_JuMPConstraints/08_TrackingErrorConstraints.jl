@@ -56,8 +56,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         plg::Option{<:UPhCRVec}, fees::Option{<:Fees},
-                                         args...; kwargs...)
+                                         plg::Union{Nothing,
+                                                    <:AbstractPhylogenyConstraintResult,
+                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                                         fees::Union{Nothing, <:Fees}, args...; kwargs...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -81,8 +83,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         plg::Option{<:UPhCRVec}, fees::Option{<:Fees},
-                                         args...; kwargs...)
+                                         plg::Union{Nothing,
+                                                    <:AbstractPhylogenyConstraintResult,
+                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                                         fees::Union{Nothing, <:Fees}, args...; kwargs...)
     ri = te.r
     wb = te.tracking.w
     err = te.err

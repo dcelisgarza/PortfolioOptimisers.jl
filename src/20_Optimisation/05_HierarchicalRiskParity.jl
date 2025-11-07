@@ -4,8 +4,10 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     sce::T3
     fb::T4
     function HierarchicalRiskParity(opt::HierarchicalOptimiser,
-                                    r::Union{<:OptimisationRiskMeasure, <:ORMVec},
-                                    sce::Scalariser, fb::Option{<:OptimisationEstimator})
+                                    r::Union{<:OptimisationRiskMeasure,
+                                             <:AbstractVector{<:OptimisationRiskMeasure}},
+                                    sce::Scalariser,
+                                    fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -13,9 +15,10 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                r::Union{<:OptimisationRiskMeasure, <:ORMVec} = Variance(),
+                                r::Union{<:OptimisationRiskMeasure,
+                                         <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
                                 sce::Scalariser = SumScalariser(),
-                                fb::Option{<:OptimisationEstimator} = nothing)
+                                fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return HierarchicalRiskParity(opt, r, sce, fb)
 end
 function opt_view(hrp::HierarchicalRiskParity, i, X::NumMat)
@@ -79,8 +82,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
 function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec, rs::ORMVec, X::NumMat,
-                             fees::Option{<:Fees})
+                             lc::NumVec, rc::NumVec,
+                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     for r in rs
@@ -96,8 +100,9 @@ function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVe
     return lrisk, rrisk
 end
 function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec, rs::ORMVec, X::NumMat,
-                             fees::Option{<:Fees})
+                             lc::NumVec, rc::NumVec,
+                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     trisk = typemin(eltype(X))
@@ -120,8 +125,9 @@ function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVe
     return lrisk, rrisk
 end
 function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec, rs::ORMVec, X::NumMat,
-                             fees::Option{<:Fees})
+                             lc::NumVec, rc::NumVec,
+                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             fees::Union{Nothing, <:Fees})
     lrisk = Vector{eltype(X)}(undef, length(rs))
     rrisk = Vector{eltype(X)}(undef, length(rs))
     for (i, r) in enumerate(rs)
@@ -137,7 +143,8 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, r
     end
     return logsumexp(lrisk) / sce.gamma, logsumexp(rrisk) / sce.gamma
 end
-function _optimise(hrp::HierarchicalRiskParity{<:Any, <:ORMVec},
+function _optimise(hrp::HierarchicalRiskParity{<:Any,
+                                               <:AbstractVector{<:OptimisationRiskMeasure}},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)

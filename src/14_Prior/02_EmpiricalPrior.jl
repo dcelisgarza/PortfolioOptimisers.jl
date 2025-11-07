@@ -19,7 +19,7 @@ Empirical prior estimator for asset returns.
 
     EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                   horizon::Option{<:Number} = nothing)
+                   horizon::Union{Nothing, <:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -65,7 +65,8 @@ struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
     me::T2
     horizon::T3
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
-                            me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number})
+                            me::AbstractExpectedReturnsEstimator,
+                            horizon::Union{Nothing, <:Number})
         if !isnothing(horizon)
             @argcheck(horizon > 0)
         end
@@ -75,10 +76,10 @@ end
 function EmpiricalPrior(;
                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                        horizon::Option{<:Number} = nothing)
+                        horizon::Union{Nothing, <:Number} = nothing)
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::EmpiricalPrior, w::WeightsType = nothing)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end

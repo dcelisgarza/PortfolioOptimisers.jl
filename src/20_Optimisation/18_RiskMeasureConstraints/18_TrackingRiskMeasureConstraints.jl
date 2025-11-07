@@ -42,15 +42,18 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  plg::Option{<:UPhCRVec}, fees::Option{<:Fees}, args...;
-                                  kwargs...)
+                                  plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                             <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                                  fees::Union{Nothing, <:Fees}, args...; kwargs...)
     return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, plg, fees, args...;
                                  kwargs...)
 end
-function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::RMVec,
+function set_risk_tr_constraints!(key::Any, model::JuMP.Model,
+                                  rs::AbstractVector{<:RiskMeasure},
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  plg::Option{<:UPhCRVec}, fees::Option{<:Fees}, args...;
-                                  kwargs...)
+                                  plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                             <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                                  fees::Union{Nothing, <:Fees}, args...; kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, Symbol(key, i), r, opt, pr, plg, fees, args...;
                               kwargs...)
@@ -59,8 +62,10 @@ function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::RMVec,
 end
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult, plg::Option{<:UPhCRVec},
-                                    fees::Option{<:Fees}, args...; kwargs...)
+                                    pr::AbstractPriorResult,
+                                    plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                                    fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
     W = haskey(model, :W)
@@ -390,8 +395,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Option{<:UPhCRVec}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
@@ -410,8 +416,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult, plg::Option{<:UPhCRVec},
-                                    fees::Option{<:Fees}, args...; kwargs...)
+                                    pr::AbstractPriorResult,
+                                    plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                                    fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
     W = haskey(model, :W)
@@ -528,8 +536,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:DependentVariableTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Option{<:UPhCRVec}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w

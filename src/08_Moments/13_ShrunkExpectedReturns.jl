@@ -420,7 +420,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::ShrunkExpectedReturns, w::WeightsType = nothing)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)
 end

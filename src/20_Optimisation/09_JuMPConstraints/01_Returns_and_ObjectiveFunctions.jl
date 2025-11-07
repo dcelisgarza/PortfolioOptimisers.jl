@@ -5,7 +5,7 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     lb::T2
     function ArithmeticReturn(ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                          <:AbstractUncertaintySetEstimator},
-                              lb::Option{<:Union{<:Number, <:NumVec, <:Frontier}})
+                              lb::Union{Nothing, <:Number, <:NumVec, <:Frontier})
         if isa(ucs, EllipseUncertaintySet)
             @argcheck(isa(ucs,
                           EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
@@ -22,7 +22,7 @@ end
 function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator} = nothing,
-                          lb::Option{<:Union{<:Number, <:NumVec, <:Frontier}} = nothing)
+                          lb::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing)
     return ArithmeticReturn(ucs, lb)
 end
 function jump_returns_view(r::ArithmeticReturn, i, args...)
@@ -37,8 +37,7 @@ end
 struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
-    function KellyReturn(w::Option{<:AbstractWeights},
-                         lb::Option{<:Union{<:Number, <:NumVec, <:Frontier}})
+    function KellyReturn(w::WeightsType, lb::Union{Nothing, <:Number, <:NumVec, <:Frontier})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -51,8 +50,8 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
         return new{typeof(w), typeof(lb)}(w, lb)
     end
 end
-function KellyReturn(; w::Option{<:AbstractWeights} = nothing,
-                     lb::Option{<:Union{<:Number, <:NumVec, <:Frontier}} = nothing)
+function KellyReturn(; w::WeightsType = nothing,
+                     lb::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing)
     return KellyReturn(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
@@ -213,14 +212,14 @@ end
 struct MaximumRatio{T1, T2} <: ObjectiveFunction
     rf::T1
     ohf::T2
-    function MaximumRatio(rf::Number, ohf::Option{<:Number})
+    function MaximumRatio(rf::Number, ohf::Union{Nothing, <:Number})
         if !isnothing(ohf)
             @argcheck(ohf > zero(ohf))
         end
         return new{typeof(rf), typeof(ohf)}(rf, ohf)
     end
 end
-function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
+function MaximumRatio(; rf::Number = 0.0, ohf::Union{Nothing, <:Number} = nothing)
     return MaximumRatio(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end
@@ -393,7 +392,7 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -406,7 +405,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -421,7 +420,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::KellyReturn,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -434,7 +433,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -455,7 +454,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]

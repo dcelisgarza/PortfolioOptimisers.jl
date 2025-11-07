@@ -19,13 +19,13 @@ struct InverseVolatility{T1, T2} <: NaiveOptimisationEstimator
     pe::T1
     fb::T2
     function InverseVolatility(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                               fb::Option{<:OptimisationEstimator} = nothing)
+                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
         return new{typeof(pe), typeof(fb)}(pe, fb)
     end
 end
 function InverseVolatility(;
                            pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                           fb::Option{<:OptimisationEstimator} = nothing)
+                           fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return InverseVolatility(pe, fb)
 end
 function opt_view(opt::InverseVolatility, i, args...)
@@ -61,11 +61,11 @@ function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...
 end
 struct RandomWeighted{T1} <: NaiveOptimisationEstimator
     rng::T1
-    function RandomWeighted(rng::Option{<:AbstractRNG})
+    function RandomWeighted(rng::Union{Nothing, <:AbstractRNG})
         return new{typeof(rng)}(rng)
     end
 end
-function RandomWeighted(; rng::Option{<:AbstractRNG} = nothing)
+function RandomWeighted(; rng::Union{Nothing, <:AbstractRNG} = nothing)
     return RandomWeighted(rng)
 end
 function optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)

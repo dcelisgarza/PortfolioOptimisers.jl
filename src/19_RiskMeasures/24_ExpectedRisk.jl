@@ -17,7 +17,7 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                                 <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
                                 <:MeanReturn}, w::NumVec, X::NumMat,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
 function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
@@ -37,19 +37,20 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                                 <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
                                 <:MeanReturn}, w::NumVec, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, pr.X, fees))
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
                                 <:Skewness, <:MedianAbsoluteDeviation}, w::NumVec,
-                       X::NumMat, fees::Option{<:Fees} = nothing; kwargs...)
+                       X::NumMat, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
                                 <:Skewness, <:MedianAbsoluteDeviation}, w::NumVec,
-                       pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
+                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
+                       kwargs...)
     return r(w, pr.X, fees)
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
@@ -58,12 +59,12 @@ function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
     return r(w)
 end
 function expected_risk(r::RiskRatioRiskMeasure, w::NumVec, X::NumMat,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, X, fees; kwargs...) /
            expected_risk(r.r2, w, X, fees; kwargs...)
 end
 function expected_risk(r::RiskRatioRiskMeasure, w::NumVec, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, pr.X, fees; kwargs...) /
            expected_risk(r.r2, w, pr.X, fees; kwargs...)
 end
@@ -75,7 +76,7 @@ function number_effective_assets(w::NumVec)
 end
 function risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
                            X::Union{<:NumMat, <:AbstractPriorResult},
-                           fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
+                           fees::Union{Nothing, <:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
     N = length(w)
     rc = Vector{eltype(w)}(undef, N)
@@ -101,7 +102,7 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
 end
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
                                   X::Union{<:NumMat, <:AbstractPriorResult},
-                                  fees::Option{<:Fees} = nothing;
+                                  fees::Union{Nothing, <:Fees} = nothing;
                                   re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)

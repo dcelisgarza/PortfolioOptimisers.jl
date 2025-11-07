@@ -39,7 +39,7 @@ PortfolioOptimisers.jlogo!
 PortfolioOptimisers.J_LoGo
 PortfolioOptimisers.LoGo_dist_assert
 PortfolioOptimisers.logo!
-PortfolioOptimisers.matrix_processing_algorithm!(je::LoGo, pdm::Option{<:NumMat},
+PortfolioOptimisers.matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
                                       sigma::NumMat, X::NumMat;
                                       dims::Int = 1, kwargs...)
 ```

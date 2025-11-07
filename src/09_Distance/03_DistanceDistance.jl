@@ -30,7 +30,7 @@ where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}
 # Constructor
 
     DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                     kwargs::NamedTuple = (;), power::Option{<:Integer} = 1,
+                     kwargs::NamedTuple = (;), power::Union{Nothing, <:Integer} = 1,
                      alg::AbstractDistanceAlgorithm = SimpleDistance())
 
 Keyword arguments correspond to the fields above.
@@ -64,7 +64,8 @@ struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
     power::T4
     alg::T5
     function DistanceDistance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                              power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
+                              power::Union{Nothing, <:Integer},
+                              alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
             @argcheck(one(power) <= power, DomainError)
         end
@@ -77,7 +78,7 @@ struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
 end
 function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                           args::Tuple = (), kwargs::NamedTuple = (;),
-                          power::Option{<:Integer} = nothing,
+                          power::Union{Nothing, <:Integer} = nothing,
                           alg::AbstractDistanceAlgorithm = SimpleDistance())
     return DistanceDistance(dist, args, kwargs, power, alg)
 end

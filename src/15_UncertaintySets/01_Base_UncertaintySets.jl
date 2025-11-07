@@ -55,8 +55,8 @@ Subtypes implement specific methods for generating the scaling parameter, which 
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """
     ucs(uc::Union{Nothing,
-                  <:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                          <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
+                  <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult},
+                          <:Union{Nothing, <:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
 Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is provided.
 
@@ -68,7 +68,7 @@ Returns the argument(s) unchanged. This is a no-op function used to handle cases
 
 # Returns
 
-  - `uc::Union{Nothing, <:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}`: The input, unchanged.
+  - `uc::Union{Nothing, <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult}, <:Union{Nothing, <:AbstractUncertaintySetResult}}}`: The input, unchanged.
 
 # Related
 
@@ -78,13 +78,13 @@ Returns the argument(s) unchanged. This is a no-op function used to handle cases
   - [`EllipseUncertaintySet`](@ref)
 """
 function ucs(uc::Union{Nothing,
-                       <:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                               <:Option{<:AbstractUncertaintySetResult}}}, args...;
+                       <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult},
+                               <:Union{Nothing, <:AbstractUncertaintySetResult}}}, args...;
              kwargs...)
     return uc
 end
 """
-    mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+    mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
 
 Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is provided.
 
@@ -96,7 +96,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
 
 # Returns
 
-  - `uc::Option{<:AbstractUncertaintySetResult}`: The input, unchanged.
+  - `uc::Union{Nothing, <:AbstractUncertaintySetResult}`: The input, unchanged.
 
 # Related
 
@@ -105,11 +105,11 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`BoxUncertaintySet`](@ref)
   - [`EllipseUncertaintySet`](@ref)
 """
-function mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+function mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
 end
 """
-    sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+    sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
 
 Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is provided.
 
@@ -121,7 +121,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
 
 # Returns
 
-  - `uc::Option{<:AbstractUncertaintySetResult}`: The input, unchanged.
+  - `uc::Union{Nothing, <:AbstractUncertaintySetResult}`: The input, unchanged.
 
 # Related
 
@@ -130,7 +130,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`BoxUncertaintySet`](@ref)
   - [`EllipseUncertaintySet`](@ref)
 """
-function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+function sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
 end
 """

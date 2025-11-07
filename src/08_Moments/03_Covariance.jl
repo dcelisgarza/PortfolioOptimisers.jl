@@ -18,7 +18,7 @@ A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary 
     GeneralCovariance(;
                       ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                      corrected = true),
-                      w::Option{<:AbstractWeights} = nothing)
+                      w::WeightsType = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -54,8 +54,7 @@ GeneralCovariance
 struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     w::T2
-    function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
-                               w::Option{<:AbstractWeights})
+    function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::WeightsType)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
     end
@@ -63,7 +62,7 @@ end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:AbstractWeights} = nothing)
+                           w::WeightsType = nothing)
     return GeneralCovariance(ce, w)
 end
 """
@@ -130,7 +129,7 @@ function Statistics.cor(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = 
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
-function factory(ce::GeneralCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::GeneralCovariance, w::WeightsType = nothing)
     return GeneralCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
 """
@@ -193,7 +192,7 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance(me, ce, alg)
 end
-function factory(ce::Covariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::Covariance, w::WeightsType = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """

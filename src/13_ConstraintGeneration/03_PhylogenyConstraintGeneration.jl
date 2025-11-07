@@ -28,8 +28,6 @@ All concrete types representing the results of phylogeny-based constraint genera
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
-const UPhCRVec = Union{<:AbstractPhylogenyConstraintResult,
-                       <:AbstractVector{<:AbstractPhylogenyConstraintResult}}
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
         pe::T1
@@ -168,7 +166,7 @@ function SemiDefinitePhylogeny(; A::Union{<:PhylogenyResult{<:NumMat}, <:NumMat}
     return SemiDefinitePhylogeny(A, p)
 end
 """
-    _validate_length_integer_phylogeny_constraint_B(alg::Option{<:Integer},
+    _validate_length_integer_phylogeny_constraint_B(alg::Union{Nothing, <:Integer},
                                                     B::NumVec)
 
 Validate that the length of the vector `B` does not exceed the integer value `alg`.
@@ -730,7 +728,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 
 # Returns
 
-  - `lc::Option{<:LinearConstraint}`: An object containing the assembled inequality and equality constraints, or `nothing` if no constraints are present.
+  - `lc::Union{Nothing, <:LinearConstraint}`: An object containing the assembled inequality and equality constraints, or `nothing` if no constraints are present.
 
 # Details
 
@@ -796,7 +794,7 @@ function centrality_constraints(ccs::Union{<:CentralityConstraint,
     end
 end
 """
-    centrality_constraints(ccs::Option{<:LinearConstraint}, args...; kwargs...)
+    centrality_constraints(ccs::Union{Nothing, <:LinearConstraint}, args...; kwargs...)
 
 No-op fallback for centrality-based constraint propagation.
 
@@ -818,10 +816,10 @@ This method returns the input [`LinearConstraint`](@ref) object or `nothing` unc
   - [`LinearConstraint`](@ref)
   - [`centrality_constraints`](@ref)
 """
-function centrality_constraints(ccs::Option{<:LinearConstraint}, args...; kwargs...)
+function centrality_constraints(ccs::Union{Nothing, <:LinearConstraint}, args...; kwargs...)
     return ccs
 end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
-       phylogeny_constraints, centrality_constraints, UPhCRVec
+       phylogeny_constraints, centrality_constraints

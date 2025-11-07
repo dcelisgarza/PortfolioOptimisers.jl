@@ -13,7 +13,7 @@ Container type for phylogeny matrix or vector results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    PhylogenyResult(; X::NumArr)
+    PhylogenyResult(; X::Union{<:NumMat, <:NumVec})
 
 Keyword arguments correspond to the fields above.
 
@@ -46,7 +46,7 @@ PhylogenyResult
 """
 struct PhylogenyResult{T} <: AbstractPhylogenyResult
     X::T
-    function PhylogenyResult(X::NumArr)
+    function PhylogenyResult(X::Union{<:NumMat, <:NumVec})
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, NumMat)
             @argcheck(issymmetric(X))
@@ -55,7 +55,7 @@ struct PhylogenyResult{T} <: AbstractPhylogenyResult
         return new{typeof(X)}(X)
     end
 end
-function PhylogenyResult(; X::NumArr)
+function PhylogenyResult(; X::Union{<:NumMat, <:NumVec})
     return PhylogenyResult(X)
 end
 """

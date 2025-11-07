@@ -169,7 +169,7 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Constructor
 
-    StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
+    StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -189,11 +189,12 @@ StandardisedSilhouetteScore
 """
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
-    function StandardisedSilhouetteScore(metric::Option{<:Distances.SemiMetric})
+    function StandardisedSilhouetteScore(metric::Union{Nothing, <:Distances.SemiMetric})
         return new{typeof(metric)}(metric)
     end
 end
-function StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
+function StandardisedSilhouetteScore(;
+                                     metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
     return StandardisedSilhouetteScore(metric)
 end
 """
@@ -213,7 +214,7 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 
 # Constructor
 
-    OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
+    OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                           alg::Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
 
 Keyword arguments correspond to the fields above.
@@ -240,7 +241,7 @@ OptimalNumberClusters
 struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     max_k::T1
     alg::T2
-    function OptimalNumberClusters(max_k::Option{<:Integer},
+    function OptimalNumberClusters(max_k::Union{Nothing, <:Integer},
                                    alg::Union{<:Integer,
                                               <:AbstractOptimalNumberClustersAlgorithm})
         if !isnothing(max_k)
@@ -252,7 +253,7 @@ struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
         return new{typeof(max_k), typeof(alg)}(max_k, alg)
     end
 end
-function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
+function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                alg::Union{<:Integer,
                                           <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)

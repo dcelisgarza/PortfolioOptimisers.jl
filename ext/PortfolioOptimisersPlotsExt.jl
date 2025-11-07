@@ -4,7 +4,7 @@ using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, 
       Clustering, Distributions
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::NumArr, X::NumMat,
-                                                         fees::Option{<:Fees} = nothing;
+                                                         fees::Union{Nothing, <:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
                                                          compound::Bool = false,
                                                          kwargs::NamedTuple = (;
@@ -30,12 +30,10 @@ function compute_relevant_assets(w::NumVec, M::Number, N::Number)
     return N, idx
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::NumVec, X::NumMat,
-                                                           fees::Option{<:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X,
-                                                                                       1),
-                                                           nx::AbstractVector = 1:size(X,
-                                                                                       2),
-                                                           N::Option{<:Number} = nothing,
+                                                           fees::Union{Nothing, <:Fees} = nothing;
+                                                           ts::AbstractVector = 1:size(X, 1),
+                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           N::Union{Nothing, <:Number} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
                                                                                    xlabel = "Date",
@@ -69,7 +67,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::NumVec, X::NumMat,
     return f
 end
 function PortfolioOptimisers.plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
-                                              N::Option{<:Number} = nothing,
+                                              N::Union{Nothing, <:Number} = nothing,
                                               kwargs::NamedTuple = (title = "Portfolio Composition",
                                                                     xlabel = "Asset",
                                                                     ylabel = "Weight",
@@ -91,9 +89,9 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     w::NumVec,
                                                     X::Union{<:NumMat,
                                                              <:PortfolioOptimisers.AbstractPriorResult},
-                                                    fees::Option{<:Fees} = nothing;
+                                                    fees::Union{Nothing, <:Fees} = nothing;
                                                     nx::AbstractVector = 1:length(w),
-                                                    N::Option{<:Number} = nothing,
+                                                    N::Union{Nothing, <:Number} = nothing,
                                                     percentage::Bool = false,
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
@@ -126,8 +124,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:NumVec, <:V
                       kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:NumVec, <:VecNumVec},
-                                                           nx::AbstractVector = 1:size(w,
-                                                                                       1);
+                                                           nx::AbstractVector = 1:size(w, 1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",
@@ -245,7 +242,7 @@ function PortfolioOptimisers.plot_clusters(pe::Union{<:PortfolioOptimisers.Abstr
 end
 function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat,
                                             slv::Union{<:Solver, <:VecSolver},
-                                            fees::Option{<:Fees} = nothing;
+                                            fees::Union{Nothing, <:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3, rw::WeightsType = nothing,
@@ -306,7 +303,7 @@ function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat,
 end
 function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
                                            pr::PortfolioOptimisers.AbstractPriorResult,
-                                           fees::Option{<:Fees} = nothing;
+                                           fees::Union{Nothing, <:Fees} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
                                            z::Union{Nothing,
@@ -315,7 +312,7 @@ function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
                                                                                                              rk = x,
                                                                                                              rt = ArithmeticReturn(),
                                                                                                              rf = 0),
-                                           slv::Option{<:Union{<:Solver, <:VecSolver}} = nothing,
+                                           slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
                                            flag::Bool = true,
                                            kwargs::NamedTuple = (title = "Pareto Frontier",
                                                                  xlabel = "X", ylabel = "Y",
@@ -343,8 +340,9 @@ function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
 end
 function PortfolioOptimisers.plot_histogram(w::NumArr, X::NumMat,
                                             slv::Union{<:Solver, <:VecSolver},
-                                            fees::Option{<:Fees} = nothing; flag = true,
-                                            alpha::Number = 0.05, kappa::Number = 0.3,
+                                            fees::Union{Nothing, <:Fees} = nothing;
+                                            flag = true, alpha::Number = 0.05,
+                                            kappa::Number = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
                                             rw::WeightsType = nothing,

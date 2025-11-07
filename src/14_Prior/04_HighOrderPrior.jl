@@ -344,9 +344,9 @@ High order prior estimator for asset returns.
 # Constructor
 
     HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                            kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
+                            kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
                                                                                     alg = Full()),
-                            ske::Option{<:CoskewnessEstimator} = Coskewness(;
+                            ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
                                                                                     alg = Full()))
 
 Keyword arguments correspond to the fields above.
@@ -413,20 +413,20 @@ struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     kte::T2
     ske::T3
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
-                                     kte::Option{<:CokurtosisEstimator},
-                                     ske::Option{<:CoskewnessEstimator})
+                                     kte::Union{Nothing, <:CokurtosisEstimator},
+                                     ske::Union{Nothing, <:CoskewnessEstimator})
         return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
     end
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                                 kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
-                                                                                 alg = Full()),
-                                 ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                 alg = Full()))
+                                 kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
+                                                                                         alg = Full()),
+                                 ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
+                                                                                         alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::HighOrderPriorEstimator, w::WeightsType = nothing)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end
@@ -440,7 +440,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     end
 end
 """
-    prior(pe::HighOrderPriorEstimator, X::NumMat, F::Option{<:NumMat} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::HighOrderPriorEstimator, X::NumMat, F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
 
 Compute high order prior moments for asset returns using a composite estimator.
 
@@ -468,8 +468,8 @@ Compute high order prior moments for asset returns using a composite estimator.
   - [`HighOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::HighOrderPriorEstimator, X::NumMat, F::Option{<:NumMat} = nothing;
-               dims::Int = 1, kwargs...)
+function prior(pe::HighOrderPriorEstimator, X::NumMat,
+               F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

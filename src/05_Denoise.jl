@@ -337,7 +337,7 @@ function find_max_eval(vals::NumVec, q::Number;
     return e_max, x
 end
 """
-    denoise!(de::Denoise, X::NumMat, q::Number; pdm::Option{<:Posdef} = Posdef())
+    denoise!(de::Denoise, X::NumMat, q::Number; pdm::Union{Nothing, <:Posdef} = Posdef())
     denoise!(::Nothing, args...)
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
@@ -399,7 +399,8 @@ julia> X
 function denoise!(::Nothing, args...)
     return nothing
 end
-function denoise!(de::Denoise, X::NumMat, q::Number, pdm::Option{<:Posdef} = Posdef())
+function denoise!(de::Denoise, X::NumMat, q::Number,
+                  pdm::Union{Nothing, <:Posdef} = Posdef())
     assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
@@ -419,7 +420,7 @@ function denoise!(de::Denoise, X::NumMat, q::Number, pdm::Option{<:Posdef} = Pos
     return nothing
 end
 """
-    denoise(de::Denoise, X::NumMat, q::Number; pdm::Option{<:Posdef} = Posdef())
+    denoise(de::Denoise, X::NumMat, q::Number; pdm::Union{Nothing, <:Posdef} = Posdef())
     denoise(::Nothing, args...)
 
 Out-of-place version of [`denoise!`](@ref).
@@ -436,7 +437,8 @@ Out-of-place version of [`denoise!`](@ref).
 function denoise(::Nothing, args...)
     return nothing
 end
-function denoise(de::Denoise, X::NumMat, q::Number, pdm::Option{<:Posdef} = Posdef())
+function denoise(de::Denoise, X::NumMat, q::Number,
+                 pdm::Union{Nothing, <:Posdef} = Posdef())
     X = copy(X)
     denoise!(de, X, q, pdm)
     return X

@@ -45,14 +45,17 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
 end
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Option{<:UPhCRVec}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
     set_risk_constraints!(model, 1, r, opt, pr, plg, fees, args...; kwargs...)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, rs::RMVec, opt::JuMPOptimisationEstimator,
-                               pr::AbstractPriorResult, plg::Option{<:UPhCRVec},
-                               fees::Option{<:Fees}, args...; kwargs...)
+function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
+                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, plg, fees, args...; kwargs...)
     end

@@ -50,7 +50,8 @@ function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettin
                              alg::NormTracking = SOCTracking())
     return TrackingRiskMeasure(settings, tracking, alg)
 end
-function (r::TrackingRiskMeasure)(w::NumVec, X::NumMat, fees::Option{<:Fees} = nothing)
+function (r::TrackingRiskMeasure)(w::NumVec, X::NumMat,
+                                  fees::Union{Nothing, <:Fees} = nothing)
     benchmark = tracking_benchmark(r.tracking, X)
     return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end

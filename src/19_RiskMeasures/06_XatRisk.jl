@@ -2,7 +2,7 @@ abstract type ValueatRiskFormulation <: AbstractAlgorithm end
 struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
     b::T1
     s::T2
-    function MIPValueatRisk(b::Option{<:Number}, s::Option{<:Number})
+    function MIPValueatRisk(b::Union{Nothing, <:Number}, s::Union{Nothing, <:Number})
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
@@ -17,15 +17,16 @@ struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
         return new{typeof(b), typeof(s)}(b, s)
     end
 end
-function MIPValueatRisk(; b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
+function MIPValueatRisk(; b::Union{Nothing, <:Number} = nothing,
+                        s::Union{Nothing, <:Number} = nothing)
     return MIPValueatRisk(b, s)
 end
 struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
     mu::T1
     sigma::T2
     dist::T3
-    function DistributionValueatRisk(mu::Option{<:NumVec}, sigma::Option{<:NumMat},
-                                     dist::Distribution)
+    function DistributionValueatRisk(mu::Union{Nothing, <:NumVec},
+                                     sigma::Union{Nothing, <:NumMat}, dist::Distribution)
         if !isnothing(mu)
             @argcheck(!isempty(mu))
         end
@@ -35,8 +36,8 @@ struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
         return new{typeof(mu), typeof(sigma), typeof(dist)}(mu, sigma, dist)
     end
 end
-function DistributionValueatRisk(; mu::Option{<:NumVec} = nothing,
-                                 sigma::Option{<:NumMat} = nothing,
+function DistributionValueatRisk(; mu::Union{Nothing, <:NumVec} = nothing,
+                                 sigma::Union{Nothing, <:NumMat} = nothing,
                                  dist::Distribution = Normal())
     return DistributionValueatRisk(mu, sigma, dist)
 end
@@ -45,8 +46,8 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     alpha::T2
     w::T3
     alg::T4
-    function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
-                         w::Option{<:AbstractWeights}, alg::ValueatRiskFormulation)
+    function ValueatRisk(settings::RiskMeasureSettings, alpha::Number, w::WeightsType,
+                         alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -56,7 +57,7 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                     alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing,
+                     alpha::Number = 0.05, w::WeightsType = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
@@ -84,7 +85,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T4
     alg::T5
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
-                              w::Option{<:AbstractWeights}, alg::ValueatRiskFormulation)
+                              w::WeightsType, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -99,7 +100,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           alpha::Number = 0.05, beta::Number = 0.05,
-                          w::Option{<:AbstractWeights} = nothing,
+                          w::WeightsType = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end

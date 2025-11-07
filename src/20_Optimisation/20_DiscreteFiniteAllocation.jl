@@ -23,7 +23,7 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
     so::T3
     fb::T4
     function DiscreteAllocation(slv::Union{<:Solver, <:VecSolver}, sc::Number, so::Number,
-                                fb::Option{<:FiniteAllocationOptimisationEstimator})
+                                fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator})
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
@@ -34,7 +34,7 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
 end
 function DiscreteAllocation(; slv::Union{<:Solver, <:VecSolver}, sc::Number = 1,
                             so::Number = 1,
-                            fb::Option{<:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
+                            fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, fb)
 end
 function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,
@@ -83,8 +83,9 @@ function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,
     return shares, cost, aw, acash, res, model
 end
 function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 1e6,
-                   T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing;
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   T::Union{Nothing, <:Number} = nothing,
+                   fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
+                   save::Bool = true, kwargs...)
     @argcheck(!isempty(w))
     @argcheck(!isempty(p))
     @argcheck(length(w) == length(p))
@@ -127,8 +128,8 @@ function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 
                                           ifelse(save, lmodel, nothing), lcash, nothing)
 end
 function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::NumVec,
-                  p::NumVec, cash::Number = 1e6, T::Option{<:Number} = nothing,
-                  fees::Option{<:Fees} = nothing; str_names::Bool = false,
+                  p::NumVec, cash::Number = 1e6, T::Union{Nothing, <:Number} = nothing,
+                  fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)
 end

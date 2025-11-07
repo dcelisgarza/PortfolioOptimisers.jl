@@ -57,7 +57,7 @@ function Detone(; n::Integer = 1)
     return Detone(n)
 end
 """
-    detone!(dt::Detone, X::NumMat; pdm::Option{<:Posdef} = Posdef())
+    detone!(dt::Detone, X::NumMat; pdm::Union{Nothing, <:Posdef} = Posdef())
     detone!(::Nothing, args...)
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
@@ -118,7 +118,7 @@ julia> X
 function detone!(::Nothing, args...)
     return nothing
 end
-function detone!(ce::Detone, X::NumMat, pdm::Option{<:Posdef} = Posdef())
+function detone!(ce::Detone, X::NumMat, pdm::Union{Nothing, <:Posdef} = Posdef())
     n = ce.n
     @argcheck(zero(n) < n <= size(X, 2),
               DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
@@ -141,7 +141,7 @@ function detone!(ce::Detone, X::NumMat, pdm::Option{<:Posdef} = Posdef())
     return nothing
 end
 """
-    detone(dt::Detone, X::NumMat; pdm::Option{<:Posdef} = Posdef())
+    detone(dt::Detone, X::NumMat; pdm::Union{Nothing, <:Posdef} = Posdef())
     detone(::Nothing, args...)
 
 Out-of-place version of [`detone!`](@ref).
@@ -154,7 +154,7 @@ Out-of-place version of [`detone!`](@ref).
 function detone(::Nothing, args...)
     return nothing
 end
-function detone(ce::Detone, X::NumMat, pdm::Option{<:Posdef} = Posdef())
+function detone(ce::Detone, X::NumMat, pdm::Union{Nothing, <:Posdef} = Posdef())
     X = copy(X)
     detone!(ce, X, pdm)
     return X

@@ -16,8 +16,8 @@ struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
     tol::T2
     iter::T3
     strict::T4
-    function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
-                                      strict::Bool)
+    function MonotonicSchurComplement(N::Integer, tol::Number,
+                                      iter::Union{Nothing, Integer}, strict::Bool)
         @argcheck(N > 0)
         @argcheck(tol > 0)
         if !isnothing(iter)
@@ -28,7 +28,8 @@ struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
     end
 end
 function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
-                                  iter::Option{<:Integer} = nothing, strict::Bool = false)
+                                  iter::Union{Nothing, Integer} = nothing,
+                                  strict::Bool = false)
     return MonotonicSchurComplement(N, tol, iter, strict)
 end
 struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
@@ -38,8 +39,8 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     alg::T4
     flag::T5
     function SchurComplementParams(r::Union{<:StandardDeviation, <:Variance}, gamma::Number,
-                                   pdm::Option{<:Posdef}, alg::SchurComplementAlgorithm,
-                                   flag::Bool)
+                                   pdm::Union{Nothing, <:Posdef},
+                                   alg::SchurComplementAlgorithm, flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma))
         return new{typeof(r), typeof(gamma), typeof(pdm), typeof(alg), typeof(flag)}(r,
                                                                                      gamma,
@@ -49,7 +50,8 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     end
 end
 function SchurComplementParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                               gamma::Number = 0.5, pdm::Option{<:Posdef} = Posdef(),
+                               gamma::Number = 0.5,
+                               pdm::Union{Nothing, <:Posdef} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)
@@ -78,7 +80,7 @@ function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::Union{<:SchurComplementParams,
                                                              <:AbstractVector{<:SchurComplementParams}} = SchurComplementParams(),
-                                               fb::Option{<:OptimisationEstimator} = nothing)
+                                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::NumMat)
@@ -132,7 +134,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecIntVec,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:NonMonotonicSchurComplement,
                                                                 <:Any},
-                                  gamma::Option{<:Number} = nothing)
+                                  gamma::Union{Nothing, <:Number} = nothing)
     r = factory(params.r, pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
@@ -184,7 +186,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecIntVec,
 end
 function schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number,
                                         lrisk::Number, tol::Number = 1e-4,
-                                        iter::Option{<:Integer} = nothing,
+                                        iter::Union{Nothing, <:Integer} = nothing,
                                         strict::Bool = false)
     w = nothing
     if isnothing(iter)

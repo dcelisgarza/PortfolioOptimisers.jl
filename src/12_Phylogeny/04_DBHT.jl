@@ -272,8 +272,8 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
   - `A::SparseMatrixCSC{<:Number, Int}`: Adjacency matrix of the PMFG with weights.
   - `tri::Matrix{Int}`: List of triangles (triangular faces) in the PMFG.
   - `clique3::Matrix{Int}`: List of 3-cliques that are not triangular faces; all 3-cliques are given by `[tri; clique3]`.
-  - `cliques::Option{Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
-  - `cliqueTree::Option{SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
+  - `cliques::Union{Nothing, Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
+  - `cliqueTree::Union{Nothing, SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
 
 # Related
 
@@ -1918,7 +1918,7 @@ function LoGo_dist_assert(args...)
     return nothing
 end
 """
-    logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat, X::NumMat;
+    logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat, X::NumMat;
           dims::Int = 1, kwargs...)
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
@@ -1962,8 +1962,8 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - [`dbht_similarity`](@ref)
   - [`Posdef`](@ref)
 """
-function logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat, X::NumMat; dims::Int = 1,
-               kwargs...)
+function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat, X::NumMat;
+               dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -1982,7 +1982,7 @@ function logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat, X::NumMat; dims::
     return nothing
 end
 """
-    matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat,
+    matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat,
                                  X::NumMat; dims::Int = 1, kwargs...)
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
@@ -2014,8 +2014,8 @@ This method provides a standard interface for applying the LoGo algorithm to a c
   - [`Posdef`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
 """
-function matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat,
-                                      X::NumMat; dims::Int = 1, kwargs...)
+function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
+                                      sigma::NumMat, X::NumMat; dims::Int = 1, kwargs...)
     return logo!(je, pdm, sigma, X; dims = dims, kwargs...)
 end
 

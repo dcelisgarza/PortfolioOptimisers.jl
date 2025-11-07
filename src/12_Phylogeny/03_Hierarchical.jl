@@ -21,8 +21,8 @@ Node type for representing clusters in a hierarchical clustering tree.
 
 # Constructor
 
-    ClusterNode(id, left::Option{<:ClusterNode} = nothing,
-                right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
+    ClusterNode(id, left::Union{Nothing, <:ClusterNode} = nothing,
+                right::Union{Nothing, <:ClusterNode} = nothing, height::Number = 0.0,
                 level::Int = 1)
 
 Positional and keyword arguments correspond to the fields above. The `level` is automatically computed based on the levels of child nodes if they exist.
@@ -50,9 +50,9 @@ struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
     right::tr
     height::td
     level::tcnt
-    function ClusterNode(id, left::Option{<:ClusterNode} = nothing,
-                         right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
-                         level::Int = 1)
+    function ClusterNode(id, left::Union{Nothing, <:ClusterNode} = nothing,
+                         right::Union{Nothing, <:ClusterNode} = nothing,
+                         height::Number = 0.0, level::Int = 1)
         ilevel = isnothing(left) ? level : (left.level + right.level)
         return new{typeof(id), typeof(left), typeof(right), typeof(height), typeof(level)}(id,
                                                                                            left,

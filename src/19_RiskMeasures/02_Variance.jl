@@ -125,8 +125,8 @@ Represents the portfolio variance using a covariance matrix.
 # Constructors
 
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             sigma::Option{<:NumMat} = nothing,
-             rc::Option{<:Union{<:LinearConstraintEstimator, <:LinearConstraint}} = nothing,
+             sigma::Union{Nothing, <:NumMat} = nothing,
+             rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
 Keyword arguments correspond to the fields above.
@@ -231,8 +231,8 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     sigma::T2
     rc::T3
     alg::T4
-    function Variance(settings::RiskMeasureSettings, sigma::Option{<:NumMat},
-                      rc::Option{<:Union{<:LinearConstraintEstimator, <:LinearConstraint}},
+    function Variance(settings::RiskMeasureSettings, sigma::Union{Nothing, <:NumMat},
+                      rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
                       alg::VarianceFormulation)
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
@@ -243,8 +243,8 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:NumMat} = nothing,
-                  rc::Option{<:Union{<:LinearConstraintEstimator, <:LinearConstraint}} = nothing,
+                  sigma::Union{Nothing, <:NumMat} = nothing,
+                  rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end
@@ -303,7 +303,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 # Constructors
 
     StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       sigma::Option{<:NumMat} = nothing)
+                       sigma::Union{Nothing, <:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -377,7 +377,8 @@ julia> r(w)
 struct StandardDeviation{T1, T2} <: RiskMeasure
     settings::T1
     sigma::T2
-    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:NumMat})
+    function StandardDeviation(settings::RiskMeasureSettings,
+                               sigma::Union{Nothing, <:NumMat})
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -386,7 +387,7 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Option{<:NumMat} = nothing)
+                           sigma::Union{Nothing, <:NumMat} = nothing)
     return StandardDeviation(settings, sigma)
 end
 function (r::StandardDeviation)(w::NumVec)
@@ -442,7 +443,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
     UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                       <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
-                           sigma::Option{<:NumMat} = nothing)
+                           sigma::Union{Nothing, <:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -608,7 +609,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     function UncertaintySetVariance(settings::RiskMeasureSettings,
                                     ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                                <:AbstractUncertaintySetEstimator},
-                                    sigma::Option{<:NumMat})
+                                    sigma::Union{Nothing, <:NumMat})
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
         end
@@ -618,7 +619,7 @@ end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                            <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
-                                sigma::Option{<:NumMat} = nothing)
+                                sigma::Union{Nothing, <:NumMat} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
 function (r::UncertaintySetVariance)(w::NumVec)
@@ -639,8 +640,8 @@ function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
 end
 """
     factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-            ucs::Option{<:Union{<:AbstractUncertaintySetResult,
-                                <:AbstractUncertaintySetEstimator}} = nothing, args...;
+            ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                       <:AbstractUncertaintySetEstimator} = nothing, args...;
             kwargs...)
 
 Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertainty set and covariance matrix from the risk-measure instance or falling back to the prior result.
@@ -673,8 +674,8 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
   - [`nothing_scalar_array_factory`](@ref)
 """
 function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-                 ucs::Option{<:Union{<:AbstractUncertaintySetResult,
-                                     <:AbstractUncertaintySetEstimator}} = nothing, args...;
+                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                            <:AbstractUncertaintySetEstimator} = nothing, args...;
                  kwargs...)
     ucs = ucs_factory(r.ucs, ucs)
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
