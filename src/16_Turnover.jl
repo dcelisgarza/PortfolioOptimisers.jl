@@ -49,7 +49,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)
-            @argcheck(zero(dval) <= dval)
+            @argcheck(zero(dval) <= dval, DomainError)
         end
         return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end

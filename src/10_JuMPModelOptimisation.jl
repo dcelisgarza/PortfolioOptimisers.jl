@@ -247,4 +247,4 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:VecSolve
     return JuMPResult(; trials = trials, success = success)
 end
 
-export Solver, JuMPResult
+export Solver, JuMPResult, VecSolver

@@ -321,4 +321,5 @@ const PairVec = AbstractVector{<:Pair}
 const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
-       NumMat, NumArr, EstValType, WeightsType, VecNumVec, StrVec, PairVec
+       NumMat, NumArr, EstValType, StrExprVec, EqnType, WeightsType, VecNumVec, VecIntVec,
+       VecNumMat, StrVec, PairVec, VecJuMPScalar
