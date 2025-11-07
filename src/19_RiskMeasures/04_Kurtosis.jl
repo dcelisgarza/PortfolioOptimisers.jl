@@ -26,10 +26,10 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 # Constructors
 
     Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       w::WeightsType = nothing,
-                       mu::MuType = nothing,
-                       kt::Union{Nothing, <:NumMat} = nothing,
-                       N::Union{Nothing, <:Integer} = nothing,
+                       w::Option{<:AbstractWeights} = nothing,
+                       mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
+                       kt::Option{<:NumMat} = nothing,
+                       N::Option{<:Integer} = nothing,
                        alg1::AbstractMomentAlgorithm = Full(),
                        alg2::VarianceFormulation = SOCRiskExpr())
 
@@ -97,8 +97,9 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     N::T5
     alg1::T6
     alg2::T7
-    function Kurtosis(settings::RiskMeasureSettings, w::WeightsType, mu::MuType,
-                      kt::Union{Nothing, <:NumMat}, N::Union{Nothing, <:Integer},
+    function Kurtosis(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
+                      mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}},
+                      kt::Option{<:NumMat}, N::Option{<:Integer},
                       alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation)
         mu_flag = isa(mu, NumVec)
         kt_flag = isa(kt, NumMat)
@@ -128,9 +129,9 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::WeightsType = nothing, mu::MuType = nothing,
-                  kt::Union{Nothing, <:NumMat} = nothing,
-                  N::Union{Nothing, <:Integer} = nothing,
+                  w::Option{<:AbstractWeights} = nothing,
+                  mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
+                  kt::Option{<:NumMat} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
                   alg2::SecondMomentFormulation = SOCRiskExpr())
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
@@ -156,7 +157,7 @@ function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, <:Any, <:Any, <:
     return r.mu
 end
 function calc_deviations_vec(r::Kurtosis, w::NumVec, X::NumMat,
-                             fees::Union{Nothing, <:Fees} = nothing)
+                             fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -179,14 +180,14 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
                       <:QuadSecondMomentFormulations})(w::NumVec, X::NumMat,
-                                                       fees::Union{Nothing, <:Fees} = nothing)
+                                                       fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
                       <:QuadSecondMomentFormulations})(w::NumVec, X::NumMat,
-                                                       fees::Union{Nothing, <:Fees} = nothing)
+                                                       fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)

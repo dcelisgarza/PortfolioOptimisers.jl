@@ -17,7 +17,7 @@ Estimator for turnover portfolio constraints.
 
 # Constructor
 
-    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Union{Nothing, <:Number} = nothing)
+    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
 
 ## Validation
 
@@ -44,8 +44,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     w::T1
     val::T2
     dval::T3
-    function TurnoverEstimator(w::NumVec, val::EstValType,
-                               dval::Union{Nothing, <:Number} = nothing)
+    function TurnoverEstimator(w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)
@@ -54,8 +53,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
         return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end
 end
-function TurnoverEstimator(; w::NumVec, val::EstValType,
-                           dval::Union{Nothing, <:Number} = nothing)
+function TurnoverEstimator(; w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
     return TurnoverEstimator(w, val, dval)
 end
 """
@@ -171,7 +169,7 @@ function Turnover(; w::NumVec, val::Union{<:Number, <:NumVec} = 0.0)
     return Turnover(w, val)
 end
 """
-    turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...)
+    turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
 
 Propagate or pass through turnover portfolio constraints.
 
@@ -185,7 +183,7 @@ Propagate or pass through turnover portfolio constraints.
 
 # Returns
 
-  - `tn::Union{Nothing, Turnover}`: The input constraint object, unchanged.
+  - `tn::Option{<:Turnover}`: The input constraint object, unchanged.
 
 # Examples
 
@@ -204,7 +202,7 @@ Turnover
   - [`Turnover`](@ref)
   - [`turnover_constraints`](@ref)
 """
-function turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...)
+function turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
     return tn
 end
 """

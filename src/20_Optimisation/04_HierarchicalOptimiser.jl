@@ -26,12 +26,11 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                              <:AbstractPriorResult},
                                    cle::Union{<:ClusteringEstimator,
                                               <:AbstractClusteringResult},
-                                   slv::Union{Nothing, <:Solver, <:VecSolver},
-                                   fees::Union{Nothing, <:FeesEstimator, <:Fees},
+                                   slv::Option{<:Union{<:Solver, <:VecSolver}},
+                                   fees::Option{<:Union{<:FeesEstimator, <:Fees}},
                                    wb::Union{Nothing, <:WeightBoundsEstimator,
-                                             <:WeightBounds},
-                                   sets::Union{Nothing, <:AssetSets}, cwf::WeightFinaliser,
-                                   strict::Bool)
+                                             <:WeightBounds}, sets::Option{<:AssetSets},
+                                   cwf::WeightFinaliser, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -44,10 +43,10 @@ function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
-                               slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
-                               fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
-                               wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
-                               sets::Union{Nothing, <:AssetSets} = nothing,
+                               slv::Option{<:Union{<:Solver, <:VecSolver}} = nothing,
+                               fees::Option{<:Union{<:FeesEstimator, <:Fees}} = nothing,
+                               wb::Option{<:Union{<:WeightBoundsEstimator, <:WeightBounds}} = WeightBounds(),
+                               sets::Option{<:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
@@ -61,7 +60,7 @@ function opt_view(hco::HierarchicalOptimiser, i)
                                  wb = wb, cwf = hco.cwf, sets = sets, strict = hco.strict)
 end
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
-                                fees::Union{Nothing, <:Fees} = nothing)
+                                fees::Option{<:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
     for i in eachindex(wk)
@@ -72,7 +71,7 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
     return rk
 end
 function unitary_expected_risks!(wk::NumVec, rk::NumVec, r::OptimisationRiskMeasure,
-                                 X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+                                 X::NumMat, fees::Option{<:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
     for i in eachindex(wk)
         wk[i] = one(eltype(X))

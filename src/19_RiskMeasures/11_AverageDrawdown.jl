@@ -1,7 +1,7 @@
 struct AverageDrawdown{T1, T2} <: RiskMeasure
     settings::T1
     w::T2
-    function AverageDrawdown(settings::RiskMeasureSettings, w::WeightsType)
+    function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -9,7 +9,7 @@ struct AverageDrawdown{T1, T2} <: RiskMeasure
     end
 end
 function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::WeightsType = nothing)
+                         w::Option{<:AbstractWeights} = nothing)
     return AverageDrawdown(settings, w)
 end
 function (::AverageDrawdown{<:Any, Nothing})(x::NumVec)
@@ -52,7 +52,7 @@ struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
-                                     w::WeightsType)
+                                     w::Option{<:AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -61,7 +61,7 @@ struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
 end
 function RelativeAverageDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::WeightsType = nothing)
+                                 w::Option{<:AbstractWeights} = nothing)
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::NumVec)

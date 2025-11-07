@@ -18,9 +18,8 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     alg::T4
     fb::T5
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
-                                  wi::Union{Nothing, <:NumVec},
-                                  alg::RelaxedRiskBudgetingAlgorithm,
-                                  fb::Union{Nothing, <:OptimisationEstimator})
+                                  wi::Option{<:NumVec}, alg::RelaxedRiskBudgetingAlgorithm,
+                                  fb::Option{<:OptimisationEstimator})
         if isa(wi, NumVec)
             @argcheck(!isempty(wi))
         end
@@ -34,9 +33,9 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                              wi::Union{Nothing, <:NumVec} = nothing,
+                              wi::Option{<:NumVec} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-                              fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                              fb::Option{<:OptimisationEstimator} = nothing)
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
 function opt_view(rrb::RelaxedRiskBudgeting, i, X::NumMat)

@@ -3,7 +3,7 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     alpha::T2
     w::T3
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
-                                    w::WeightsType)
+                                    w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -12,7 +12,8 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Number = 0.05, w::WeightsType = nothing)
+                                alpha::Number = 0.05,
+                                w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
 function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
@@ -44,7 +45,7 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                       alpha::Number = 0.05, l::Number = 1.0,
                                                       r::Number = 0.02,
-                                                      w::WeightsType = nothing)
+                                                      w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
 function factory(r::DistributionallyRobustConditionalValueatRisk,
@@ -90,7 +91,7 @@ struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     beta::T3
     w::T4
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
-                                         beta::Number, w::WeightsType)
+                                         beta::Number, w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -103,7 +104,7 @@ end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Number = 0.05, beta::Number = 0.05,
-                                     w::WeightsType = nothing)
+                                     w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
 function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, args...;

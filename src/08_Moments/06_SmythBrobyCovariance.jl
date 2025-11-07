@@ -258,7 +258,7 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 
     SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                          ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                         pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Number = 0.5,
+                         pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
                          c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4, n::Number = 2,
                          alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                          threads::FLoops.Transducers.Executor = ThreadedEx())
@@ -331,10 +331,9 @@ struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     alg::T9
     threads::T10
     function SmythBrobyCovariance(me::AbstractExpectedReturnsEstimator,
-                                  ve::StatsBase.CovarianceEstimator,
-                                  pdm::Union{Nothing, <:Posdef}, threshold::Number,
-                                  c1::Number, c2::Number, c3::Number, n::Number,
-                                  alg::SmythBrobyCovarianceAlgorithm,
+                                  ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
+                                  threshold::Number, c1::Number, c2::Number, c3::Number,
+                                  n::Number, alg::SmythBrobyCovarianceAlgorithm,
                                   threads::FLoops.Transducers.Executor)
         @argcheck(zero(threshold) < threshold < one(threshold),
                   DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
@@ -356,14 +355,14 @@ end
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                               ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                              pdm::Union{Nothing, <:Posdef} = Posdef(),
-                              threshold::Number = 0.5, c1::Number = 0.5, c2::Number = 0.5,
-                              c3::Number = 4, n::Number = 2,
+                              pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
+                              c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4,
+                              n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               threads::FLoops.Transducers.Executor = ThreadedEx())
     return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
-function factory(ce::SmythBrobyCovariance, w::WeightsType = nothing)
+function factory(ce::SmythBrobyCovariance, w::Option{<:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,
                                 c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg,

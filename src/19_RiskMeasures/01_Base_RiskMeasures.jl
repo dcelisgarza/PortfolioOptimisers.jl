@@ -45,6 +45,7 @@ All concrete risk measures that can be used as objectives or constraints in opti
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+const ORMVec = AbstractVector{<:OptimisationRiskMeasure}
 """
     abstract type RiskMeasure <: OptimisationRiskMeasure end
 
@@ -58,6 +59,7 @@ Subtype `RiskMeasure` to implement concrete risk measures that quantify portfoli
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
+const RMVec = AbstractVector{<:RiskMeasure}
 """
     abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 
@@ -166,7 +168,7 @@ Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures 
 # Constructors
 
     RiskMeasureSettings(; scale::Number = 1.0,
-                        ub::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing,
+                        ub::Option{<:Union{<:Number, <:NumVec, <:Frontier}} = nothing,
                         rke::Bool = true)
 
 Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, and risk evaluation flag.
@@ -198,7 +200,7 @@ struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     ub::T2
     rke::T3
     function RiskMeasureSettings(scale::Number,
-                                 ub::Union{Nothing, <:Number, <:NumVec, <:Frontier},
+                                 ub::Option{<:Union{<:Number, <:NumVec, <:Frontier}},
                                  rke::Bool)
         assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
@@ -206,7 +208,7 @@ struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     end
 end
 function RiskMeasureSettings(; scale::Number = 1.0,
-                             ub::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing,
+                             ub::Option{<:Union{<:Number, <:NumVec, <:Frontier}} = nothing,
                              rke::Bool = true)
     return RiskMeasureSettings(scale, ub, rke)
 end
@@ -463,4 +465,4 @@ function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure
+       HierarchicalRiskMeasure, RMVec, ORMVec

@@ -30,5 +30,5 @@ PortfolioOptimisers.calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <
 PortfolioOptimisers.calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:Any},
                                 <:HighOrderMoment{<:Any, <:Any, <:Number, <:Any}}, ::Any, ::Any)
 PortfolioOptimisers.calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                         X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+                         X::NumMat, fees::Option{<:Fees} = nothing)
 ```

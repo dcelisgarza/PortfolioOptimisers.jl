@@ -50,8 +50,8 @@ Container for lower and upper portfolio weight bounds.
 
 # Constructor
 
-    WeightBounds(lb::Union{Nothing, <:Number, <:NumVec},
-                 ub::Union{Nothing, <:Number, <:NumVec})
+    WeightBounds(lb::Option{<:Union{<:Number, <:NumVec}},
+                 ub::Option{<:Union{<:Number, <:NumVec}})
 
 ## Validation
 
@@ -84,14 +84,14 @@ WeightBounds
 struct WeightBounds{T1, T2} <: AbstractConstraintResult
     lb::T1
     ub::T2
-    function WeightBounds(lb::Union{Nothing, <:Number, <:NumVec},
-                          ub::Union{Nothing, <:Number, <:NumVec})
+    function WeightBounds(lb::Option{<:Union{<:Number, <:NumVec}},
+                          ub::Option{<:Union{<:Number, <:NumVec}})
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function WeightBounds(; lb::Union{Nothing, <:Number, <:NumVec} = 0.0,
-                      ub::Union{Nothing, <:Number, <:NumVec} = 1.0)
+function WeightBounds(; lb::Option{<:Union{<:Number, <:NumVec}} = 0.0,
+                      ub::Option{<:Union{<:Number, <:NumVec}} = 1.0)
     return WeightBounds(lb, ub)
 end
 function weight_bounds_view(wb::WeightBounds, i)
@@ -207,8 +207,8 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
                                              <:CustomWeightBoundsConstraint},
                                    ub::Union{Nothing, <:EstValType,
                                              <:CustomWeightBoundsConstraint},
-                                   dlb::Union{Nothing, <:Number} = nothing,
-                                   dub::Union{Nothing, <:Number} = nothing)
+                                   dlb::Option{<:Number} = nothing,
+                                   dub::Option{<:Number} = nothing)
         if isa(lb, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(lb), IsEmptyError)
         end
@@ -226,8 +226,8 @@ function WeightBoundsEstimator(;
                                          <:CustomWeightBoundsConstraint} = nothing,
                                ub::Union{Nothing, <:EstValType,
                                          <:CustomWeightBoundsConstraint} = nothing,
-                               dlb::Union{Nothing, <:Number} = nothing,
-                               dub::Union{Nothing, <:Number} = nothing)
+                               dlb::Option{<:Number} = nothing,
+                               dub::Option{<:Number} = nothing)
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
 function weight_bounds_view(wb::WeightBoundsEstimator, i)

@@ -44,11 +44,11 @@ Factor Black-Litterman prior estimator for asset returns.
                               re::AbstractRegressionEstimator = StepwiseRegression(),
                               ve::AbstractVarianceEstimator = SimpleVariance(),
                               views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
-                              sets::Union{Nothing, <:AssetSets} = nothing,
-                              views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                              w::WeightsType = nothing, rf::Number = 0.0,
-                              l::Union{Nothing, <:Number} = nothing,
-                              tau::Union{Nothing, <:Number} = nothing, rsd::Bool = true)
+                              sets::Option{<:AssetSets} = nothing,
+                              views_conf::Option{<:Union{<:Number, <:NumVec}} = nothing,
+                              w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
+                              l::Option{<:Number} = nothing,
+                              tau::Option{<:Number} = nothing, rsd::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -154,11 +154,10 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                        ve::AbstractVarianceEstimator,
                                        views::Union{<:LinearConstraintEstimator,
                                                     <:BlackLittermanViews},
-                                       sets::Union{Nothing, <:AssetSets},
-                                       views_conf::Union{Nothing, <:Number, <:NumVec},
-                                       w::Union{Nothing, <:NumVec}, rf::Number,
-                                       l::Union{Nothing, <:Number},
-                                       tau::Union{Nothing, <:Number}, rsd::Bool)
+                                       sets::Option{<:AssetSets},
+                                       views_conf::Option{<:Union{<:Number, <:NumVec}},
+                                       w::Option{<:NumVec}, rf::Number, l::Option{<:Number},
+                                       tau::Option{<:Number}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -180,16 +179,15 @@ function FactorBlackLittermanPrior(;
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
                                    views::Union{<:LinearConstraintEstimator,
                                                 <:BlackLittermanViews},
-                                   sets::Union{Nothing, <:AssetSets} = nothing,
-                                   views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                                   w::Union{Nothing, <:NumVec} = nothing, rf::Number = 0.0,
-                                   l::Union{Nothing, <:Number} = nothing,
-                                   tau::Union{Nothing, <:Number} = nothing,
-                                   rsd::Bool = true)
+                                   sets::Option{<:AssetSets} = nothing,
+                                   views_conf::Option{<:Union{<:Number, <:NumVec}} = nothing,
+                                   w::Option{<:NumVec} = nothing, rf::Number = 0.0,
+                                   l::Option{<:Number} = nothing,
+                                   tau::Option{<:Number} = nothing, rsd::Bool = true)
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior, w::WeightsType = nothing)
+function factory(pe::FactorBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,

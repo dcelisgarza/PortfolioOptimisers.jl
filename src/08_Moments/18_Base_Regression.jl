@@ -125,7 +125,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::WeightsType = nothing)
+function factory(re::LinearModel, w::Option{<:AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -209,7 +209,7 @@ end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::WeightsType = nothing)
+function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -416,8 +416,8 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Regression(; M::NumMat, L::Union{Nothing, <:NumMat} = nothing,
-               b::Union{Nothing, <:NumVec} = nothing)
+    Regression(; M::NumMat, L::Option{<:NumMat} = nothing,
+               b::Option{<:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -445,7 +445,7 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
-    function Regression(M::NumMat, L::Union{Nothing, <:NumMat}, b::Union{Nothing, <:NumVec})
+    function Regression(M::NumMat, L::Option{<:NumMat}, b::Option{<:NumVec})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, NumVec)
             @argcheck(!isempty(b), IsEmptyError)
@@ -457,8 +457,8 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
         return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
     end
 end
-function Regression(; M::NumMat, L::Union{Nothing, <:NumMat} = nothing,
-                    b::Union{Nothing, <:NumVec} = nothing)
+function Regression(; M::NumMat, L::Option{<:NumMat} = nothing,
+                    b::Option{<:NumVec} = nothing)
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
@@ -516,7 +516,7 @@ function regression_view(re::Regression, i)
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
-    regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+    regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
 
 No-op fallback for `regression_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
 
@@ -535,7 +535,7 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
   - [`regression_view(::Regression, ::NumVec)`](@ref)
 """
-function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+function regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
     return re
 end
 """

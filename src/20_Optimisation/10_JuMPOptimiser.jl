@@ -186,11 +186,11 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     strict::T35
     function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                            slv::Union{<:Solver, <:VecSolver},
-                           wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
-                           bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator},
-                           sbgt::Union{Nothing, <:Number, <:BudgetRange},
-                           lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold},
-                           st::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold},
+                           wb::Option{<:Union{<:WeightBoundsEstimator, <:WeightBounds}},
+                           bgt::Option{<:Union{<:Number, <:BudgetConstraintEstimator}},
+                           sbgt::Union{<:Union{<:Number, <:BudgetRange}},
+                           lt::Option{<:Union{<:BuyInThresholdEstimator, <:BuyInThreshold}},
+                           st::Option{<:Union{<:BuyInThresholdEstimator, <:BuyInThreshold}},
                            lcs::Union{Nothing, <:LinearConstraintEstimator,
                                       <:LinearConstraint,
                                       <:AbstractVector{<:Union{<:LinearConstraintEstimator,
@@ -211,18 +211,18 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                         <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
                                                                  <:NumMat}}},
                            slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                      <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                      <:AbstractVector{<:Union{<:BuyInThreshold,
                                                                <:BuyInThresholdEstimator}}},
                            sst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                      <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                      <:AbstractVector{<:Union{<:BuyInThreshold,
                                                                <:BuyInThresholdEstimator}}},
                            sglt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                       <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                       <:AbstractVector{<:Union{<:BuyInThreshold,
                                                                 <:BuyInThresholdEstimator}}},
                            sgst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                       <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                       <:AbstractVector{<:Union{<:BuyInThreshold,
                                                                 <:BuyInThresholdEstimator}}},
-                           sets::Union{Nothing, <:AssetSets},
+                           sets::Option{<:AssetSets},
                            plg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,
                                       <:AbstractPhylogenyConstraintResult,
                                       <:AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
@@ -232,15 +232,14 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                                               <:Turnover}}},
                            te::Union{Nothing, <:AbstractTracking,
                                      <:AbstractVector{<:AbstractTracking}},
-                           fees::Union{Nothing, <:FeesEstimator, <:Fees},
+                           fees::Option{<:Union{<:FeesEstimator, <:Fees}},
                            ret::JuMPReturnsEstimator, sce::Scalariser,
-                           ccnt::Union{Nothing, <:CustomJuMPConstraint},
-                           cobj::Union{Nothing, <:CustomJuMPObjective}, sc::Number,
-                           so::Number, ss::Union{Nothing, <:Number},
-                           card::Union{Nothing, <:Integer},
-                           scard::Union{Nothing, <:Integer, <:IntVec},
-                           nea::Union{Nothing, <:Number}, l1::Union{Nothing, <:Number},
-                           l2::Union{Nothing, <:Number}, strict::Bool)
+                           ccnt::Option{<:CustomJuMPConstraint},
+                           cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
+                           ss::Option{<:Number}, card::Option{<:Integer},
+                           scard::Option{<:Union{<:Integer, <:IntVec}},
+                           nea::Option{<:Number}, l1::Option{<:Number},
+                           l2::Option{<:Number}, strict::Bool)
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
         elseif isa(bgt, BudgetCostEstimator)
@@ -261,8 +260,10 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isfinite(scard))
             @argcheck(scard > 0)
             @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
-            @argcheck(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-            @argcheck(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(slt,
+                          Option{<:Union{<:BuyInThreshold, <:BuyInThresholdEstimator}}))
+            @argcheck(isa(sst,
+                          Option{<:Union{<:BuyInThreshold, <:BuyInThresholdEstimator}}))
         elseif isa(scard, IntVec)
             @argcheck(!isempty(scard))
             @argcheck(all(isfinite, scard))
@@ -296,9 +297,9 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if isa(sgcard, Union{<:LinearConstraintEstimator, <:LinearConstraint})
             @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
             @argcheck(isa(sglt,
-                          Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+                          Option{<:Union{<:BuyInThreshold, <:BuyInThresholdEstimator}}))
             @argcheck(isa(sgst,
-                          Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+                          Option{<:Union{<:BuyInThreshold, <:BuyInThresholdEstimator}}))
             if isa(sgcard, LinearConstraint) && isa(smtx, NumMat)
                 N = size(smtx, 1)
                 N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
@@ -411,11 +412,11 @@ end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                        slv::Union{<:Solver, <:VecSolver},
-                       wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
-                       bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator} = 1.0,
-                       sbgt::Union{Nothing, <:Number, <:BudgetRange} = nothing,
-                       lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold} = nothing,
-                       st::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold} = nothing,
+                       wb::Option{<:Union{<:WeightBoundsEstimator, <:WeightBounds}} = WeightBounds(),
+                       bgt::Option{<:Union{<:Number, <:BudgetConstraintEstimator}} = 1.0,
+                       sbgt::Union{<:Union{<:Number, <:BudgetRange}} = nothing,
+                       lt::Option{<:Union{<:BuyInThresholdEstimator, <:BuyInThreshold}} = nothing,
+                       st::Option{<:Union{<:BuyInThresholdEstimator, <:BuyInThreshold}} = nothing,
                        lcs::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint,
                                   <:AbstractVector{<:Union{<:LinearConstraintEstimator,
                                                            <:LinearConstraint}}} = nothing,
@@ -435,18 +436,18 @@ function JuMPOptimiser(;
                                     <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
                                                              <:NumMat}}} = nothing,
                        slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                  <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                  <:AbstractVector{<:Union{<:BuyInThreshold,
                                                            <:BuyInThresholdEstimator}}} = nothing,
                        sst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                  <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                  <:AbstractVector{<:Union{<:BuyInThreshold,
                                                            <:BuyInThresholdEstimator}}} = nothing,
                        sglt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                   <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                   <:AbstractVector{<:Union{<:BuyInThreshold,
                                                             <:BuyInThresholdEstimator}}} = nothing,
                        sgst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                                   <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                   <:AbstractVector{<:Union{<:BuyInThreshold,
                                                             <:BuyInThresholdEstimator}}} = nothing,
-                       sets::Union{Nothing, <:AssetSets} = nothing,
+                       sets::Option{<:AssetSets} = nothing,
                        plg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,
                                   <:AbstractPhylogenyConstraintResult,
                                   <:AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
@@ -455,18 +456,16 @@ function JuMPOptimiser(;
                                  <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}} = nothing,
                        te::Union{Nothing, <:AbstractTracking,
                                  <:AbstractVector{<:AbstractTracking}} = nothing,
-                       fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
+                       fees::Option{<:Union{<:FeesEstimator, <:Fees}} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),
-                       ccnt::Union{Nothing, <:CustomJuMPConstraint} = nothing,
-                       cobj::Union{Nothing, <:CustomJuMPObjective} = nothing,
-                       sc::Number = 1, so::Number = 1,
-                       ss::Union{Nothing, <:Number} = nothing,
-                       card::Union{Nothing, <:Integer} = nothing,
-                       scard::Union{Nothing, <:Integer, <:IntVec} = nothing,
-                       nea::Union{Nothing, <:Number} = nothing,
-                       l1::Union{Nothing, <:Number} = nothing,
-                       l2::Union{Nothing, <:Number} = nothing, strict::Bool = false)
+                       ccnt::Option{<:CustomJuMPConstraint} = nothing,
+                       cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
+                       so::Number = 1, ss::Option{<:Number} = nothing,
+                       card::Option{<:Integer} = nothing,
+                       scard::Option{<:Union{<:Integer, <:IntVec}} = nothing,
+                       nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
+                       l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sce,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)

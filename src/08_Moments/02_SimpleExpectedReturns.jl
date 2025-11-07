@@ -13,7 +13,7 @@ A simple expected returns estimator for PortfolioOptimisers.jl, representing the
 
 # Constructor
 
-    SimpleExpectedReturns(; w::WeightsType = nothing)
+    SimpleExpectedReturns(; w::Option{<:AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -29,12 +29,12 @@ Keyword arguments correspond to the fields above.
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
-    function SimpleExpectedReturns(w::WeightsType)
+    function SimpleExpectedReturns(w::Option{<:AbstractWeights})
         assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::WeightsType = nothing)
+function SimpleExpectedReturns(; w::Option{<:AbstractWeights} = nothing)
     return SimpleExpectedReturns(w)
 end
 """
@@ -89,7 +89,7 @@ julia> mean(serw, X)
 function Statistics.mean(me::SimpleExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
-function factory(me::SimpleExpectedReturns, w::WeightsType = nothing)
+function factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
     return SimpleExpectedReturns(; w = isnothing(w) ? me.w : w)
 end
 

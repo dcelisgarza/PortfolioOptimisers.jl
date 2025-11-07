@@ -19,7 +19,7 @@ Container type for equilibrium expected returns estimators.
 
     EquilibriumExpectedReturns(;
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               w::Union{Nothing, <:NumVec} = nothing, l::Number = 1)
+                               w::Option{<:NumVec} = nothing, l::Number = 1)
 
 Keyword arguments correspond to the fields above.
 
@@ -61,17 +61,17 @@ struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEs
     w::T2
     l::T3
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
-                                        w::Union{Nothing, <:NumVec}, l::Number)
+                                        w::Option{<:NumVec}, l::Number)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
     end
 end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                    w::Union{Nothing, <:NumVec} = nothing, l::Number = 1)
+                                    w::Option{<:NumVec} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns, w::WeightsType = nothing)
+function factory(ce::EquilibriumExpectedReturns, w::Option{<:AbstractWeights} = nothing)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """

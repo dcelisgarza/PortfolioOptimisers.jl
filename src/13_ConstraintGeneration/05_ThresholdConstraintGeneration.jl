@@ -59,14 +59,14 @@ struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
     dval::T2
     function BuyInThresholdEstimator(val::Union{<:EstValType,
                                                 <:CustomWeightBoundsConstraint},
-                                     dval::Union{Nothing, <:Number} = nothing)
+                                     dval::Option{<:Number} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
 function BuyInThresholdEstimator(; val::Union{<:EstValType, <:CustomWeightBoundsConstraint},
-                                 dval::Union{Nothing, <:Number} = nothing)
+                                 dval::Option{<:Number} = nothing)
     return BuyInThresholdEstimator(val, dval)
 end
 """
@@ -133,7 +133,7 @@ function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
     return [threshold_view(ti, i) for ti in t]
 end
 """
-    threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
+    threshold_constraints(t::Option{<:BuyInThreshold}, args...; kwargs...)
 
 Propagate or pass through buy-in threshold portfolio constraints.
 
@@ -147,7 +147,7 @@ Propagate or pass through buy-in threshold portfolio constraints.
 
 # Returns
 
-  - `bt::Union{Nothing, <:BuyInThreshold}`: The input constraint object, unchanged.
+  - `bt::Option{<:BuyInThreshold}`: The input constraint object, unchanged.
 
 # Examples
 
@@ -166,7 +166,7 @@ julia> threshold_constraints(nothing)
   - [`BuyInThreshold`](@ref)
   - [`threshold_constraints`](@ref)
 """
-function threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
+function threshold_constraints(t::Option{<:BuyInThreshold}, args...; kwargs...)
     return t
 end
 """

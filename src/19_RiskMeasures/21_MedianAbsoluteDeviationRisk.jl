@@ -7,7 +7,7 @@ struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     mu::T3
     flag::T4
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
-                                     w::WeightsType,
+                                     w::Option{<:AbstractWeights},
                                      mu::Union{<:Number, <:NumVec, <:VecScalar,
                                                <:MedianCenteringFunction},
                                      flag::Bool = true)
@@ -26,7 +26,7 @@ struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::WeightsType = nothing,
+                                 w::Option{<:AbstractWeights} = nothing,
                                  mu::Union{<:Number, <:NumVec, <:VecScalar,
                                            <:MedianCenteringFunction} = MedianCentering(),
                                  flag::Bool = true)
@@ -74,13 +74,12 @@ function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecScalar
     return dot(w, r.mu.v) + r.mu.s
 end
 function calc_deviations_vec(r::MedianAbsoluteDeviation, w::NumVec, X::NumMat,
-                             fees::Union{Nothing, <:Fees} = nothing)
+                             fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
 end
-function (r::MedianAbsoluteDeviation)(w::NumVec, X::NumMat,
-                                      fees::Union{Nothing, <:Fees} = nothing)
+function (r::MedianAbsoluteDeviation)(w::NumVec, X::NumMat, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return mad(val; center = zero(eltype(X)), normalize = r.flag)
 end

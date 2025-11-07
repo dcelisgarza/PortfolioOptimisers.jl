@@ -246,16 +246,107 @@ function mul_cond_msg(conds::AbstractString...)
     end
     return msg
 end
+"""
+    abstract type PortfolioOptimisersError <: Exception end
+
+Abstract supertype for all custom exception types in PortfolioOptimisers.jl.
+
+All error types specific to PortfolioOptimisers.jl should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
+
+# Related Types
+
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
 abstract type PortfolioOptimisersError <: Exception end
+"""
+    struct IsNothingError{T1} <: PortfolioOptimisersError
+        msg::T1
+    end
+
+Exception type thrown when an argument or value is unexpectedly `nothing`.
+
+# Fields
+
+  - `msg`: Error message describing the condition that triggered the exception.
+
+# Examples
+
+```jldoctest
+julia> throw(IsNothingError("Input data must not be nothing"))
+ERROR: IsNothingError: Input data must not be nothing
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
 struct IsNothingError{T1} <: PortfolioOptimisersError
     msg::T1
 end
+"""
+    struct IsEmptyError{T1} <: PortfolioOptimisersError
+        msg::T1
+    end
+
+Exception type thrown when an argument or value is unexpectedly empty.
+
+# Fields
+
+  - `msg`: Error message describing the condition that triggered the exception.
+
+# Examples
+
+```jldoctest
+julia> throw(IsEmptyError("Input vector must not be empty"))
+ERROR: IsEmptyError: Input vector must not be empty
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
 struct IsEmptyError{T1} <: PortfolioOptimisersError
     msg::T1
 end
-struct IsNothingEmptyError{T1} <: PortfolioOptimisersError
-    msg::T1
-end
+"""
+    struct IsNonFiniteError{T1} <: PortfolioOptimisersError
+        msg::T1
+    end
+
+Exception type thrown when an argument or value is not finite.
+
+# Fields
+
+  - `msg`: Error message describing the condition that triggered the exception.
+
+# Examples
+
+```jldoctest
+julia> throw(IsNonFiniteError("Input must be finite"))
+ERROR: IsNonFiniteError: Input must be finite
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+"""
 struct IsNonFiniteError{T1} <: PortfolioOptimisersError
     msg::T1
 end
@@ -263,36 +354,6 @@ function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
     name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
-end
-function non_finite_msg(a)
-    return "$a must finite"
-end
-function non_zero_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-zero"
-end
-function non_neg_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-negative"
-end
-function non_pos_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-positive"
-end
-function some_msg(a, va = nothing)
-    return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`"
-end
-function non_empty_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "") must be non-empty"
-end
-function nothing_non_empty_msg(a, va = nothing)
-    return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`, and non-empty$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "")"
-end
-function range_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c$(ci ? ']' : ')')"
-end
-function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
-    msg = (; :eq => "must be equal to", :gt => "must be greater than",
-           :lt => "must be smaller than", :geq => "must be greater than or equal to",
-           :leq => "must be smaller than or equal to")
-    return "$a$(!isnothing(va) ? " ($va)" : "") $(msg[c]) $b$(!isnothing(vb) ? " ($vb)" : "")"
 end
 function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                  <:AbstractResult}, state = 1)
@@ -312,14 +373,15 @@ const EstValType = Union{<:Number, <:NumVec, <:Pair{<:AbstractString, <:Number},
                          <:AbstractDict{<:AbstractString, <:Number}}
 const StrExprVec = AbstractVector{<:Union{<:AbstractString, Expr}}
 const EqnType = Union{<:AbstractString, Expr, <:StrExprVec}
-const WeightsType = Union{Nothing, <:AbstractWeights}
 const VecNumVec = AbstractVector{<:NumVec}
 const VecIntVec = AbstractVector{<:IntVec}
 const VecNumMat = AbstractVector{<:NumMat}
 const StrVec = AbstractVector{<:AbstractString}
 const PairVec = AbstractVector{<:Pair}
 const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
+const Option{T} = Union{Nothing, T}
+const DatesVec = AbstractVector{<:Dates.AbstractTime}
 
-export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
-       NumMat, NumArr, EstValType, StrExprVec, EqnType, WeightsType, VecNumVec, VecIntVec,
-       VecNumMat, StrVec, PairVec, VecJuMPScalar
+export IsEmptyError, IsNothingError, IsNonFiniteError, NumVec, IntVec, NumMat, NumArr,
+       EstValType, StrExprVec, EqnType, VecNumVec, VecIntVec, VecNumMat, StrVec, PairVec,
+       VecJuMPScalar, Option, DatesVec

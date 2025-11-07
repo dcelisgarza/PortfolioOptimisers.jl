@@ -243,7 +243,7 @@ for alg in (Gerber0, Gerber1, Gerber2)
 end
 for alg in (StandardisedGerber0, StandardisedGerber1, StandardisedGerber2)
     eval(quote
-             function factory(alg::$(alg), w::WeightsType)
+             function factory(alg::$(alg), w::Option{<:AbstractWeights})
                  return $(alg)(; me = factory(alg.me, w))
              end
          end)
@@ -270,7 +270,7 @@ A flexible container type for configuring and applying Gerber covariance estimat
 # Constructor
 
     GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                     pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Number = 0.5,
+                     pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
                      alg::GerberCovarianceAlgorithm = Gerber1())
 
 Keyword arguments correspond to the fields above.
@@ -298,9 +298,8 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     pdm::T2
     threshold::T3
     alg::T4
-    function GerberCovariance(ve::StatsBase.CovarianceEstimator,
-                              pdm::Union{Nothing, <:Posdef}, threshold::Number,
-                              alg::GerberCovarianceAlgorithm)
+    function GerberCovariance(ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
+                              threshold::Number, alg::GerberCovarianceAlgorithm)
         @argcheck(zero(threshold) < threshold < one(threshold),
                   DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         return new{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve, pdm,
@@ -308,7 +307,7 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     end
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Number = 0.5,
+                          pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
     return GerberCovariance(ve, pdm, threshold, alg)
 end
@@ -748,7 +747,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::GerberCovariance, w::WeightsType = nothing)
+function factory(ce::GerberCovariance, w::Option{<:AbstractWeights} = nothing)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
                             pdm = ce.pdm, threshold = ce.threshold)
 end

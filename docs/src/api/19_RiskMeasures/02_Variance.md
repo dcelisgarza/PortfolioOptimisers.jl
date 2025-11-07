@@ -11,8 +11,8 @@ UncertaintySetVariance
 factory(r::Variance, prior::PortfolioOptimisers.AbstractPriorResult, args...; kwargs...)
 factory(r::StandardDeviation, prior::PortfolioOptimisers.AbstractPriorResult, args...; kwargs...)
 factory(r::UncertaintySetVariance, prior::PortfolioOptimisers.AbstractPriorResult, ::Any,
-                 ucs::Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult,
-                            <:PortfolioOptimisers.AbstractUncertaintySetEstimator} = nothing, args...;
+                 ucs::Option{<:Union{<:PortfolioOptimisers.AbstractUncertaintySetResult,
+                            <:PortfolioOptimisers.AbstractUncertaintySetEstimator}} = nothing, args...;
                  kwargs...)
 PortfolioOptimisers.SecondMomentFormulation
 PortfolioOptimisers.VarianceFormulation

@@ -30,9 +30,9 @@ Black-Litterman prior estimator for asset returns.
                                                                                    me = EquilibriumExpectedReturns()),
                         mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                         views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
-                        sets::Union{Nothing, <:AssetSets} = nothing,
-                        views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                        rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
+                        sets::Option{<:AssetSets} = nothing,
+                        views_conf::Option{<:Union{<:Number, <:NumVec}} = nothing,
+                        rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -119,9 +119,9 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
                                  mp::AbstractMatrixProcessingEstimator,
                                  views::Union{<:LinearConstraintEstimator,
                                               <:BlackLittermanViews},
-                                 sets::Union{Nothing, <:AssetSets},
-                                 views_conf::Union{Nothing, <:Number, <:NumVec}, rf::Number,
-                                 tau::Union{Nothing, <:Number})
+                                 sets::Option{<:AssetSets},
+                                 views_conf::Option{<:Union{<:Number, <:NumVec}},
+                                 rf::Number, tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -139,9 +139,9 @@ function BlackLittermanPrior(;
                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                              views::Union{<:LinearConstraintEstimator,
                                           <:BlackLittermanViews},
-                             sets::Union{Nothing, <:AssetSets} = nothing,
-                             views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                             rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
+                             sets::Option{<:AssetSets} = nothing,
+                             views_conf::Option{<:Union{<:Number, <:NumVec}} = nothing,
+                             rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
@@ -153,13 +153,13 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::WeightsType = nothing)
+function factory(pe::BlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
 """
-    calc_omega(views_conf::Union{Nothing, <:Number, <:NumVec}, P::NumMat,
+    calc_omega(views_conf::Option{<:Union{<:Number, <:NumVec}}, P::NumMat,
                sigma::NumMat)
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.
@@ -237,7 +237,7 @@ function vanilla_posteriors(tau::Number, rf::Number, prior_mu::NumVec, prior_sig
 end
 """
     prior(pe::BlackLittermanPrior, X::NumMat;
-          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
+          F::Option{<:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute the Black-Litterman prior moments for asset returns.
@@ -280,7 +280,7 @@ Compute the Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::BlackLittermanPrior, X::NumMat, F::Union{Nothing, <:NumMat} = nothing;
+function prior(pe::BlackLittermanPrior, X::NumMat, F::Option{<:NumMat} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

@@ -126,7 +126,7 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondMoment(ve, alg1, alg2)
 end
-function factory(alg::SecondMoment, w::WeightsType = nothing)
+function factory(alg::SecondMoment, w::Option{<:AbstractWeights} = nothing)
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
@@ -266,10 +266,9 @@ function StandardisedHighOrderMoment(;
                                      alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return StandardisedHighOrderMoment(ve, alg)
 end
-function factory(alg::StandardisedHighOrderMoment, w::WeightsType = nothing)
+function factory(alg::StandardisedHighOrderMoment, w::Option{<:AbstractWeights} = nothing)
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
-const MuType = Union{Nothing, <:Number, <:NumVec, <:VecScalar}
 """
     struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
         settings::T1
@@ -292,8 +291,8 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 # Constructors
 
     LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                   w::WeightsType = nothing,
-                   mu::MuType = nothing,
+                   w::Option{<:AbstractWeights} = nothing,
+                   mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
                    alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -583,7 +582,7 @@ Where:
 # Functor
 
     (r::LowOrderMoment)(w::NumVec, X::NumMat;
-                        fees::Union{Nothing, <:Fees} = nothing)
+                        fees::Option{<:Fees} = nothing)
 
 Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
@@ -623,8 +622,8 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     w::T2
     mu::T3
     alg::T4
-    function LowOrderMoment(settings::RiskMeasureSettings, w::WeightsType,
-                            mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar},
+    function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
+                            mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}},
                             alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, NumVec)
             @argcheck(!isempty(mu))
@@ -640,7 +639,8 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        w::WeightsType = nothing, mu::MuType = nothing,
+                        w::Option{<:AbstractWeights} = nothing,
+                        mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -666,8 +666,8 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 # Constructors
 
     HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                    w::WeightsType = nothing,
-                    mu::MuType = nothing,
+                    w::Option{<:AbstractWeights} = nothing,
+                    mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
                     alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -739,7 +739,7 @@ Where:
 # Functor
 
     (r::HighOrderMoment)(w::NumVec, X::NumMat;
-                        fees::Union{Nothing, <:Fees} = nothing)
+                        fees::Option{<:Fees} = nothing)
 
 Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
@@ -775,8 +775,8 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     w::T2
     mu::T3
     alg::T4
-    function HighOrderMoment(settings::RiskMeasureSettings, w::WeightsType,
-                             mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar},
+    function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
+                             mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}},
                              alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, NumVec)
             @argcheck(!isempty(mu))
@@ -792,7 +792,8 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     end
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::WeightsType = nothing, mu::MuType = nothing,
+                         w::Option{<:AbstractWeights} = nothing,
+                         mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
@@ -939,7 +940,7 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:
 end
 """
     calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                    X::NumMat; fees::Union{Nothing, <:Fees} = nothing)
+                    X::NumMat; fees::Option{<:Fees} = nothing)
 
 Compute the vector of deviations from the target value for moment-based risk measures.
 
@@ -968,7 +969,7 @@ Compute the vector of deviations from the target value for moment-based risk mea
   - [`calc_net_returns`](@ref)
 """
 function calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                             X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+                             X::NumMat, fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -1090,4 +1091,4 @@ for rt in (LowOrderMoment, HighOrderMoment)
 end
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
-       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment, MuType
+       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment

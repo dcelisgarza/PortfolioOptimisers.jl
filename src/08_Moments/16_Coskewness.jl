@@ -73,7 +73,7 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
-function factory(ce::Coskewness, w::WeightsType = nothing)
+function factory(ce::Coskewness, w::Option{<:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """
@@ -153,7 +153,7 @@ function _coskewness(Y::NumMat, X::NumMat, mp::AbstractMatrixProcessingEstimator
     return cskew, V
 end
 """
-    coskewness(ske::Union{Nothing, <:Coskewness}, X::NumMat; dims::Int = 1,
+    coskewness(ske::Option{<:Coskewness}, X::NumMat; dims::Int = 1,
                mean = nothing, kwargs...)
 
 Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.

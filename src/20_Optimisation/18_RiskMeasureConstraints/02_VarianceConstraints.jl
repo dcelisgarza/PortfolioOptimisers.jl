@@ -8,9 +8,9 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,
-                                                  ub::Union{Nothing, <:Number, <:NumVec,
-                                                            <:Frontier}, key::Symbol,
-                                                  r_expr::AbstractJuMPScalar,
+                                                  ub::Option{<:Union{<:Number, <:NumVec,
+                                                                     <:Frontier}},
+                                                  key::Symbol, r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
@@ -46,9 +46,7 @@ function sdp_rc_variance_flag!(::JuMP.Model,
                                ::LinearConstraint)
     return true
 end
-function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
-                            plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                       <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
+function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, plg::Option{<:UPhCRVec})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
               isa(plg, SemiDefinitePhylogeny) ||
@@ -147,10 +145,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
 end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance,
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult,
-                   plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                              <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                   args...; kwargs...)
+                   pr::AbstractPriorResult, plg::Option{<:UPhCRVec}, args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
@@ -163,9 +158,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
-                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                               args...; kwargs...)
+                               plg::Option{<:UPhCRVec}, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end

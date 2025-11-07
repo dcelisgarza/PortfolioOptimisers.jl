@@ -33,9 +33,9 @@ Bayesian Black-Litterman prior estimator for asset returns.
                                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                 views::Union{<:LinearConstraintEstimator,
                                              <:BlackLittermanViews},
-                                sets::Union{Nothing, <:AssetSets} = nothing,
-                                views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                                rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
+                                sets::Option{<:AssetSets} = nothing,
+                                views_conf::Option{<:Union{<:Number, <:NumVec}} = nothing,
+                                rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -145,9 +145,9 @@ struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Union{<:LinearConstraintEstimator,
                                                       <:BlackLittermanViews},
-                                         sets::Union{Nothing, <:AssetSets},
-                                         views_conf::Union{Nothing, <:Number, <:NumVec},
-                                         rf::Number, tau::Union{Nothing, <:Number})
+                                         sets::Option{<:AssetSets},
+                                         views_conf::Option{<:Union{<:Number, <:NumVec}},
+                                         rf::Number, tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -166,13 +166,12 @@ function BayesianBlackLittermanPrior(;
                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                      views::Union{<:LinearConstraintEstimator,
                                                   <:BlackLittermanViews},
-                                     sets::Union{Nothing, <:AssetSets} = nothing,
-                                     views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
-                                     rf::Number = 0.0,
-                                     tau::Union{Nothing, <:Number} = nothing)
+                                     sets::Option{<:AssetSets} = nothing,
+                                     views_conf::Option{<:Union{<:Number, <:NumVec}} = nothing,
+                                     rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPrior, w::WeightsType = nothing)
+function factory(pe::BayesianBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)

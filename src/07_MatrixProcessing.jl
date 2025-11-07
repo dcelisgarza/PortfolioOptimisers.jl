@@ -83,10 +83,10 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                            denoise::Union{Nothing, <:Denoise} = nothing,
-                            detone::Union{Nothing, <:Detone} = nothing,
-                            alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+    DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
+                            denoise::Option{<:Denoise} = nothing,
+                            detone::Option{<:Detone} = nothing,
+                            alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -129,19 +129,18 @@ struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstima
     denoise::T2
     detone::T3
     alg::T4
-    function DefaultMatrixProcessing(pdm::Union{Nothing, <:Posdef},
-                                     denoise::Union{Nothing, <:Denoise},
-                                     detone::Union{Nothing, <:Detone},
+    function DefaultMatrixProcessing(pdm::Option{<:Posdef}, denoise::Option{<:Denoise},
+                                     detone::Option{<:Detone},
                                      alg::Union{Nothing,
                                                 <:AbstractMatrixProcessingAlgorithm})
         return new{typeof(pdm), typeof(denoise), typeof(detone), typeof(alg)}(pdm, denoise,
                                                                               detone, alg)
     end
 end
-function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                                 denoise::Union{Nothing, <:Denoise} = nothing,
-                                 detone::Union{Nothing, <:Detone} = nothing,
-                                 alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+function DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
+                                 denoise::Option{<:Denoise} = nothing,
+                                 detone::Option{<:Detone} = nothing,
+                                 alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing)
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """

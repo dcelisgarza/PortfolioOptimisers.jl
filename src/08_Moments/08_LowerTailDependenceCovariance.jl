@@ -63,7 +63,7 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        threads::FLoops.Transducers.Executor = ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, threads)
 end
-function factory(ce::LowerTailDependenceCovariance, w::WeightsType = nothing)
+function factory(ce::LowerTailDependenceCovariance, w::Option{<:AbstractWeights} = nothing)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          threads = ce.threads)
 end

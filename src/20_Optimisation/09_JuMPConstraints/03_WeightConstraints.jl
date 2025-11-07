@@ -14,8 +14,8 @@ function set_weight_constraints!(args...)
     return nothing
 end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                 bgt::Union{Nothing, <:Number, <:BudgetRange},
-                                 sbgt::Union{Nothing, <:Number, <:BudgetRange},
+                                 bgt::Union{<:Union{<:Number, <:BudgetRange}},
+                                 sbgt::Union{<:Union{<:Number, <:BudgetRange}},
                                  long::Bool = false)
     lb = wb.lb
     ub = wb.ub

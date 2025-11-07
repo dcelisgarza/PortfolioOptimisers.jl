@@ -15,7 +15,7 @@ struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
     settings::T1
     w::T2
     alg::T3
-    function OrderedWeightsArray(settings::RiskMeasureSettings, w::Union{Nothing, <:NumVec},
+    function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:NumVec},
                                  alg::OrderedWeightsArrayFormulation)
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -24,7 +24,7 @@ struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
     end
 end
 function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             w::Union{Nothing, <:NumVec} = nothing,
+                             w::Option{<:NumVec} = nothing,
                              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
     return OrderedWeightsArray(settings, w, alg)
 end
@@ -37,9 +37,8 @@ struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
     w1::T2
     w2::T3
     alg::T4
-    function OrderedWeightsArrayRange(settings::RiskMeasureSettings,
-                                      w1::Union{Nothing, <:NumVec},
-                                      w2::Union{Nothing, <:NumVec},
+    function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::Option{<:NumVec},
+                                      w2::Option{<:NumVec},
                                       alg::OrderedWeightsArrayFormulation, rev::Bool)
         w1_flag = !isnothing(w1)
         w2_flag = !isnothing(w2)
@@ -60,8 +59,8 @@ struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  w1::Union{Nothing, <:NumVec} = nothing,
-                                  w2::Union{Nothing, <:NumVec} = nothing,
+                                  w1::Option{<:NumVec} = nothing,
+                                  w2::Option{<:NumVec} = nothing,
                                   alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
                                   rev::Bool = false)
     return OrderedWeightsArrayRange(settings, w1, w2, alg, rev)

@@ -59,8 +59,7 @@ function assert_nonempty_nonneg_finite_val(val::PairVec, val_sym::Symbol = :val)
               DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::Union{<:NumVec, <:NumMat},
-                                           val_sym::Symbol = :val)
+function assert_nonempty_nonneg_finite_val(val::NumArr, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -99,7 +98,7 @@ function assert_nonempty_finite_val(val::PairVec, val_sym::Symbol = :val)
               DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::Union{<:NumVec, <:NumMat}, val_sym::Symbol = :val)
+function assert_nonempty_finite_val(val::NumArr, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -137,8 +136,7 @@ function assert_nonempty_geq0_finite_val(val::PairVec, val_sym::Symbol = :val)
               DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
     return nothing
 end
-function assert_nonempty_geq0_finite_val(val::Union{<:NumVec, <:NumMat},
-                                         val_sym::Symbol = :val)
+function assert_nonempty_geq0_finite_val(val::NumArr, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -491,7 +489,7 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
  fill(3)
 ```
 """
-function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:PairVec, <:Dict},
+function nothing_scalar_array_view(x::Option{<:Union{<:Number, <:Pair, <:PairVec, <:Dict}},
                                    ::Any)
     return x
 end
@@ -635,7 +633,7 @@ function fourth_moment_index_factory(N::Integer, i)
     return idx
 end
 """
-    traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:NumVec} = nothing)
+    traverse_concrete_subtypes(t; ctarr::Option{<:NumVec} = nothing)
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -663,7 +661,7 @@ julia> traverse_concrete_subtypes(MyAbstract)
  MyConcrete2
 ```
 """
-function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:NumVec} = nothing)
+function traverse_concrete_subtypes(t, ctarr::Option{<:NumVec} = nothing)
     if isnothing(ctarr)
         ctarr = []
     end

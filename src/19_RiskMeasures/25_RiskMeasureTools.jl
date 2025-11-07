@@ -14,7 +14,7 @@ for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVarianc
              end
          end)
 end
-function no_bounds_risk_measure(rs::AbstractVector{<:RiskMeasure}, args...)
+function no_bounds_risk_measure(rs::RMVec, args...)
     return [no_bounds_risk_measure(r, args...) for r in rs]
 end
 for r in traverse_concrete_subtypes(RiskMeasure)
