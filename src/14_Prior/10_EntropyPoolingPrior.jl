@@ -2082,7 +2082,6 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     end
     fixed = falses(N, 2)
     epc = Dict{Symbol, Tuple{<:NumMat, <:NumVec}}()
-
     # mu and VaR
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
