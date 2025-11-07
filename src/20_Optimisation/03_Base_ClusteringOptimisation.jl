@@ -21,7 +21,7 @@ struct JuMPWeightFinaliser{T1, T2, T3, T4} <: WeightFinaliser
     sc::T2
     so::T3
     alg::T4
-    function JuMPWeightFinaliser(slv::Union{<:Solver, <:VecSolver}, sc::Number, so::Number,
+    function JuMPWeightFinaliser(slv::USolverVec, sc::Number, so::Number,
                                  alg::JuMPWeightFinaliserFormulation)
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
@@ -31,8 +31,7 @@ struct JuMPWeightFinaliser{T1, T2, T3, T4} <: WeightFinaliser
         return new{typeof(slv), typeof(sc), typeof(so), typeof(alg)}(slv, sc, so, alg)
     end
 end
-function JuMPWeightFinaliser(; slv::Union{<:Solver, <:VecSolver}, sc::Number = 1.0,
-                             so::Number = 1.0,
+function JuMPWeightFinaliser(; slv::USolverVec, sc::Number = 1.0, so::Number = 1.0,
                              alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())
     return JuMPWeightFinaliser(slv, sc, so, alg)
 end

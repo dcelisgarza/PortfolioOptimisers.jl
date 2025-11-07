@@ -1,5 +1,5 @@
-function RRM(x::NumVec, slv::Union{<:Solver, <:VecSolver}, alpha::Number = 0.05,
-             kappa::Number = 0.3, w::Union{Nothing, AbstractWeights} = nothing)
+function RRM(x::NumVec, slv::USolverVec, alpha::Number = 0.05, kappa::Number = 0.3,
+             w::Union{Nothing, AbstractWeights} = nothing)
     if isa(slv, VecSolver)
         @argcheck(!isempty(slv))
     end

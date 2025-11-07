@@ -153,7 +153,7 @@ function _coskewness(Y::NumMat, X::NumMat, mp::AbstractMatrixProcessingEstimator
     return cskew, V
 end
 """
-    coskewness(ske::Union{Nothing, <:Coskewness}, X::NumMat; dims::Int = 1,
+    coskewness(ske::Option{<:Coskewness}, X::NumMat; dims::Int = 1,
                mean = nothing, kwargs...)
 
 Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.

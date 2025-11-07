@@ -89,6 +89,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
 const VecSolver = AbstractVector{<:Solver}
+const USolverVec = Union{<:Solver, <:VecSolver}
 """
     struct JuMPResult{T1, T2} <: AbstractJuMPResult
         trials::T1
@@ -197,7 +198,7 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)
     return nothing
 end
 """
-    optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:VecSolver})
+    optimise_JuMP_model!(model::JuMP.Model, slv::USolverVec)
 
 Attempt to optimise a JuMP model using one or more configured solvers.
 
@@ -218,7 +219,7 @@ Tries each solver in order, applying settings and checking for solution feasibil
   - If a solver fails, records the error and tries the next.
   - Stops at the first successful solution.
 """
-function optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:VecSolver})
+function optimise_JuMP_model!(model::JuMP.Model, slv::USolverVec)
     trials = Dict()
     success = false
     for solver in slv
@@ -247,4 +248,4 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:VecSolve
     return JuMPResult(; trials = trials, success = success)
 end
 
-export Solver, JuMPResult, VecSolver
+export Solver, JuMPResult, VecSolver, USolverVec

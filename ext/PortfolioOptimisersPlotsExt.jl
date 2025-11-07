@@ -240,8 +240,7 @@ function PortfolioOptimisers.plot_clusters(pe::Union{<:PortfolioOptimisers.Abstr
     return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
                 hmap, dend2; layout = l, fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat,
-                                            slv::Union{<:Solver, <:VecSolver},
+function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat, slv::USolverVec,
                                             fees::Option{<:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
@@ -339,8 +338,7 @@ function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
         scatter(xr, yr, zr; zcolor = cr, kwargs..., ekwargs...)
     end
 end
-function PortfolioOptimisers.plot_histogram(w::NumArr, X::NumMat,
-                                            slv::Union{<:Solver, <:VecSolver},
+function PortfolioOptimisers.plot_histogram(w::NumArr, X::NumMat, slv::USolverVec,
                                             fees::Option{<:Fees} = nothing; flag = true,
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             points::Integer = ceil(Int,

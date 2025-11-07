@@ -134,7 +134,7 @@ Estimator type for OWA weights using JuMP-based optimization.
 
 # Constructor
 
-    OWAJuMP(; slv::Union{<:Solver, <:VecSolver} = Solver(), max_phi::Number = 0.5,
+    OWAJuMP(; slv::USolverVec = Solver(), max_phi::Number = 0.5,
             sc::Number = 1.0, so::Number = 1.0,
             alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
 
@@ -177,8 +177,8 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     sc::T3
     so::T4
     alg::T5
-    function OWAJuMP(slv::Union{<:Solver, <:VecSolver}, max_phi::Number, sc::Number,
-                     so::Number, alg::AbstractOrderedWeightsArrayAlgorithm)
+    function OWAJuMP(slv::USolverVec, max_phi::Number, sc::Number, so::Number,
+                     alg::AbstractOrderedWeightsArrayAlgorithm)
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv), IsEmptyError)
         end
@@ -193,8 +193,8 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
                                                                                       alg)
     end
 end
-function OWAJuMP(; slv::Union{<:Solver, <:VecSolver} = Solver(), max_phi::Number = 0.5,
-                 sc::Number = 1.0, so::Number = 1.0,
+function OWAJuMP(; slv::USolverVec = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
+                 so::Number = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end

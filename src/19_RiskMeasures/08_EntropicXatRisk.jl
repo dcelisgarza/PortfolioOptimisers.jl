@@ -1,4 +1,4 @@
-function ERM(x::NumVec, slv::Union{<:Solver, <:VecSolver}, alpha::Number = 0.05,
+function ERM(x::NumVec, slv::USolverVec, alpha::Number = 0.05,
              w::Option{<:AbstractWeights} = nothing)
     if isa(slv, VecSolver)
         @argcheck(!isempty(slv))

@@ -107,7 +107,7 @@ function _cokurtosis(X::NumMat, mp::AbstractMatrixProcessingEstimator)
     return ckurt
 end
 """
-    cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::NumMat; dims::Int = 1,
+    cokurtosis(ke::Option{<:Cokurtosis}, X::NumMat; dims::Int = 1,
                mean = nothing, kwargs...)
 
 Compute the cokurtosis tensor for a dataset.

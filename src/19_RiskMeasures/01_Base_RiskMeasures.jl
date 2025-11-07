@@ -448,10 +448,10 @@ end
 function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::NumArr, i)
     return nothing_scalar_array_view(prior_variable, i)
 end
-function solver_factory(risk_solvers::Union{<:Solver, <:VecSolver}, ::Any)
+function solver_factory(risk_solvers::USolverVec, ::Any)
     return risk_solvers
 end
-function solver_factory(::Nothing, slv::Union{<:Solver, <:VecSolver})
+function solver_factory(::Nothing, slv::USolverVec)
     return slv
 end
 function solver_factory(::Nothing, ::Nothing)

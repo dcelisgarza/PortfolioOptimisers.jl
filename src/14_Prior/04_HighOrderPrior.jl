@@ -344,9 +344,9 @@ High order prior estimator for asset returns.
 # Constructor
 
     HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                            kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
+                            kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                     alg = Full()),
-                            ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
+                            ske::Option{<:CoskewnessEstimator} = Coskewness(;
                                                                                     alg = Full()))
 
 Keyword arguments correspond to the fields above.
@@ -413,17 +413,17 @@ struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     kte::T2
     ske::T3
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
-                                     kte::Union{Nothing, <:CokurtosisEstimator},
-                                     ske::Union{Nothing, <:CoskewnessEstimator})
+                                     kte::Option{<:CokurtosisEstimator},
+                                     ske::Option{<:CoskewnessEstimator})
         return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
     end
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                                 kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
-                                                                                         alg = Full()),
-                                 ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
-                                                                                         alg = Full()))
+                                 kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
+                                                                                 alg = Full()),
+                                 ske::Option{<:CoskewnessEstimator} = Coskewness(;
+                                                                                 alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
 function factory(pe::HighOrderPriorEstimator, w::Option{<:AbstractWeights} = nothing)
