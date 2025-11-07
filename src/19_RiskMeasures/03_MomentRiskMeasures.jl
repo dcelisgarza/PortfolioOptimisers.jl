@@ -292,7 +292,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
     LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                    w::Option{<:AbstractWeights} = nothing,
-                   mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
+                   mu::Option{<:Union{<:UNumNumVec, <:VecScalar}} = nothing,
                    alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -623,7 +623,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     mu::T3
     alg::T4
     function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                            mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar},
+                            mu::Union{Nothing, <:UNumNumVec, <:VecScalar},
                             alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, NumVec)
             @argcheck(!isempty(mu))
@@ -640,7 +640,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Option{<:AbstractWeights} = nothing,
-                        mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
+                        mu::Option{<:Union{<:UNumNumVec, <:VecScalar}} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -667,7 +667,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
     HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                     w::Option{<:AbstractWeights} = nothing,
-                    mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
+                    mu::Option{<:Union{<:UNumNumVec, <:VecScalar}} = nothing,
                     alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -776,7 +776,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     mu::T3
     alg::T4
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                             mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar},
+                             mu::Union{Nothing, <:UNumNumVec, <:VecScalar},
                              alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, NumVec)
             @argcheck(!isempty(mu))
@@ -793,7 +793,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Option{<:AbstractWeights} = nothing,
-                         mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing,
+                         mu::Option{<:Union{<:UNumNumVec, <:VecScalar}} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end

@@ -8,7 +8,7 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,
-                                                  ub::Union{Nothing, <:Number, <:NumVec,
+                                                  ub::Union{Nothing, <:UNumNumVec,
                                                             <:Frontier}, key::Symbol,
                                                   r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)

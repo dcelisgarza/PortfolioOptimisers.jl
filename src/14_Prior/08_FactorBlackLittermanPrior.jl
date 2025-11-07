@@ -45,7 +45,7 @@ Factor Black-Litterman prior estimator for asset returns.
                               ve::AbstractVarianceEstimator = SimpleVariance(),
                               views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
                               sets::Option{<:AssetSets} = nothing,
-                              views_conf::Option{<:UNumVec} = nothing,
+                              views_conf::Option{<:UNumNumVec} = nothing,
                               w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
                               l::Option{<:Number} = nothing,
                               tau::Option{<:Number} = nothing, rsd::Bool = true)
@@ -155,8 +155,8 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                        views::Union{<:LinearConstraintEstimator,
                                                     <:BlackLittermanViews},
                                        sets::Option{<:AssetSets},
-                                       views_conf::Option{<:UNumVec}, w::Option{<:NumVec},
-                                       rf::Number, l::Option{<:Number},
+                                       views_conf::Option{<:UNumNumVec},
+                                       w::Option{<:NumVec}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
@@ -180,7 +180,7 @@ function FactorBlackLittermanPrior(;
                                    views::Union{<:LinearConstraintEstimator,
                                                 <:BlackLittermanViews},
                                    sets::Option{<:AssetSets} = nothing,
-                                   views_conf::Option{<:UNumVec} = nothing,
+                                   views_conf::Option{<:UNumNumVec} = nothing,
                                    w::Option{<:NumVec} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
                                    tau::Option{<:Number} = nothing, rsd::Bool = true)

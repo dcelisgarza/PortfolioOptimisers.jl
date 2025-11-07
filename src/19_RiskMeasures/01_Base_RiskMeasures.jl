@@ -166,7 +166,7 @@ Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures 
 # Constructors
 
     RiskMeasureSettings(; scale::Number = 1.0,
-                        ub::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing,
+                        ub::Union{Nothing, <:UNumNumVec, <:Frontier} = nothing,
                         rke::Bool = true)
 
 Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, and risk evaluation flag.
@@ -198,15 +198,14 @@ struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     ub::T2
     rke::T3
     function RiskMeasureSettings(scale::Number,
-                                 ub::Union{Nothing, <:Number, <:NumVec, <:Frontier},
-                                 rke::Bool)
+                                 ub::Union{Nothing, <:UNumNumVec, <:Frontier}, rke::Bool)
         assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end
 end
 function RiskMeasureSettings(; scale::Number = 1.0,
-                             ub::Union{Nothing, <:Number, <:NumVec, <:Frontier} = nothing,
+                             ub::Union{Nothing, <:UNumNumVec, <:Frontier} = nothing,
                              rke::Bool = true)
     return RiskMeasureSettings(scale, ub, rke)
 end
@@ -448,10 +447,10 @@ end
 function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::NumArr, i)
     return nothing_scalar_array_view(prior_variable, i)
 end
-function solver_factory(risk_solvers::USolverVec, ::Any)
+function solver_factory(risk_solvers::USolverVecSolver, ::Any)
     return risk_solvers
 end
-function solver_factory(::Nothing, slv::USolverVec)
+function solver_factory(::Nothing, slv::USolverVecSolver)
     return slv
 end
 function solver_factory(::Nothing, ::Nothing)

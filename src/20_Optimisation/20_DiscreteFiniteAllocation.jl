@@ -22,8 +22,8 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
     sc::T2
     so::T3
     fb::T4
-    function DiscreteAllocation(slv::USolverVec, sc::Number, so::Number,
-                                fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator})
+    function DiscreteAllocation(slv::USolverVecSolver, sc::Number, so::Number,
+                                fb::Option{<:FiniteAllocationOptimisationEstimator})
         if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
@@ -32,8 +32,8 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
         return new{typeof(slv), typeof(sc), typeof(so), typeof(fb)}(slv, sc, so, fb)
     end
 end
-function DiscreteAllocation(; slv::USolverVec, sc::Number = 1, so::Number = 1,
-                            fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
+function DiscreteAllocation(; slv::USolverVecSolver, sc::Number = 1, so::Number = 1,
+                            fb::Option{<:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, fb)
 end
 function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,

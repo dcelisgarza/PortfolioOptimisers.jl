@@ -469,7 +469,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
                   chol::Option{<:NumMat} = nothing,
                   w::Option{<:AbstractWeights} = nothing,
                   ens::Option{<:Number} = nothing,
-                  kld::Option{<:UNumVec} = nothing,
+                  kld::Option{<:UNumNumVec} = nothing,
                   ow::Option{<:NumVec} = nothing,
                   rr::Option{<:Regression} = nothing,
                   f_mu::Option{<:NumVec} = nothing,
@@ -533,7 +533,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_w::T12
     function LowOrderPrior(X::NumMat, mu::NumVec, sigma::NumMat, chol::Option{<:NumMat},
                            w::Option{<:AbstractWeights}, ens::Option{<:Number},
-                           kld::Option{<:UNumVec}, ow::Option{<:NumVec},
+                           kld::Option{<:UNumNumVec}, ow::Option{<:NumVec},
                            rr::Option{<:Regression}, f_mu::Option{<:NumVec},
                            f_sigma::Option{<:NumMat}, f_w::Option{<:NumVec})
         @argcheck(!isempty(X))
@@ -581,7 +581,7 @@ end
 function LowOrderPrior(; X::NumMat, mu::NumVec, sigma::NumMat,
                        chol::Option{<:NumMat} = nothing,
                        w::Option{<:AbstractWeights} = nothing,
-                       ens::Option{<:Number} = nothing, kld::Option{<:UNumVec} = nothing,
+                       ens::Option{<:Number} = nothing, kld::Option{<:UNumNumVec} = nothing,
                        ow::Option{<:NumVec} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:NumVec} = nothing,
                        f_sigma::Option{<:NumMat} = nothing, f_w::Option{<:NumVec} = nothing)

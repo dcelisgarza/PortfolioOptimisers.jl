@@ -80,7 +80,7 @@ It supports both asset and factor returns, as well as optional time series and i
                   F::Option{<:NumMat} = nothing,
                   ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
                   iv::Option{<:NumMat} = nothing,
-                  ivpa::Option{<:UNumVec} = nothing)
+                  ivpa::Option{<:UNumNumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -122,7 +122,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     function ReturnsResult(nx::Union{Nothing, <:StrVec}, X::Option{<:NumMat},
                            nf::Union{Nothing, <:StrVec}, F::Option{<:NumMat},
                            ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}},
-                           iv::Option{<:NumMat}, ivpa::Option{<:UNumVec})
+                           iv::Option{<:NumMat}, ivpa::Option{<:UNumNumVec})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
@@ -156,7 +156,7 @@ function ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
                        nf::Union{Nothing, <:StrVec} = nothing,
                        F::Option{<:NumMat} = nothing,
                        ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
-                       iv::Option{<:NumMat} = nothing, ivpa::Option{<:UNumVec} = nothing)
+                       iv::Option{<:NumMat} = nothing, ivpa::Option{<:UNumNumVec} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i)
@@ -170,7 +170,7 @@ end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
                       iv::Union{Nothing, <:TimeArray} = nothing,
-                      ivpa::Option{<:UNumVec} = nothing,
+                      ivpa::Option{<:UNumNumVec} = nothing,
                       ret_method::Symbol = :simple, padding::Bool = false,
                       missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0,
@@ -234,8 +234,9 @@ ReturnsResult
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            iv::Union{Nothing, <:TimeArray} = nothing,
-                           ivpa::Option{<:UNumVec} = nothing, ret_method::Symbol = :simple,
-                           padding::Bool = false, missing_col_percent::Number = 1.0,
+                           ivpa::Option{<:UNumNumVec} = nothing,
+                           ret_method::Symbol = :simple, padding::Bool = false,
+                           missing_col_percent::Number = 1.0,
                            missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Union{Nothing, Function} = nothing,

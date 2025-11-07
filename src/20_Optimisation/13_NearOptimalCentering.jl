@@ -128,8 +128,9 @@ function opt_view(noc::NearOptimalCentering, i, X::NumMat)
                                 w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::USolverVec, w_min::NumVec,
-                                      w_opt::Union{<:NumVec, <:VecNumVec}, w_max::NumVec)
+                                      fees::Option{<:Fees}, slv::USolverVecSolver,
+                                      w_min::NumVec, w_opt::Union{<:NumVec, <:VecNumVec},
+                                      w_max::NumVec)
     X = pr.X
     r = factory(r, pr, slv)
     scale = r.settings.scale
@@ -140,7 +141,7 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
 end
 function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::USolverVec, w_min::NumVec,
+                                      slv::USolverVecSolver, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:VecNumVec}, w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)
@@ -160,7 +161,7 @@ end
 function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
                                       rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::USolverVec, w_min::NumVec,
+                                      slv::USolverVecSolver, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:VecNumVec}, w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)

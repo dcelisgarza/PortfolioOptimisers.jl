@@ -50,8 +50,8 @@ Container for lower and upper portfolio weight bounds.
 
 # Constructor
 
-    WeightBounds(lb::Option{<:UNumVec},
-                 ub::Option{<:UNumVec})
+    WeightBounds(lb::Option{<:UNumNumVec},
+                 ub::Option{<:UNumNumVec})
 
 ## Validation
 
@@ -84,12 +84,12 @@ WeightBounds
 struct WeightBounds{T1, T2} <: AbstractConstraintResult
     lb::T1
     ub::T2
-    function WeightBounds(lb::Option{<:UNumVec}, ub::Option{<:UNumVec})
+    function WeightBounds(lb::Option{<:UNumNumVec}, ub::Option{<:UNumNumVec})
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function WeightBounds(; lb::Option{<:UNumVec} = 0.0, ub::Option{<:UNumVec} = 1.0)
+function WeightBounds(; lb::Option{<:UNumNumVec} = 0.0, ub::Option{<:UNumNumVec} = 1.0)
     return WeightBounds(lb, ub)
 end
 function weight_bounds_view(wb::WeightBounds, i)

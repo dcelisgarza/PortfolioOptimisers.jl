@@ -185,7 +185,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l2::T34
     strict::T35
     function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                           slv::USolverVec,
+                           slv::USolverVecSolver,
                            wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
                            bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator},
                            sbgt::Union{Nothing, <:Number, <:BudgetRange},
@@ -409,7 +409,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                       slv::USolverVec,
+                       slv::USolverVecSolver,
                        wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
                        bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Number, <:BudgetRange} = nothing,

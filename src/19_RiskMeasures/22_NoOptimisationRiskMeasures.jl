@@ -24,7 +24,7 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     w::T1
     mu::T2
     function ThirdCentralMoment(w::Option{<:AbstractWeights},
-                                mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar})
+                                mu::Union{Nothing, <:UNumNumVec, <:VecScalar})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -35,7 +35,7 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     end
 end
 function ThirdCentralMoment(; w::Option{<:AbstractWeights} = nothing,
-                            mu::Union{Nothing, <:Number, <:NumVec, <:VecScalar} = nothing)
+                            mu::Union{Nothing, <:UNumNumVec, <:VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
 struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
@@ -43,7 +43,7 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     w::T2
     mu::T3
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:AbstractWeights},
-                      mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}})
+                      mu::Option{<:Union{<:UNumNumVec, <:VecScalar}})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -55,7 +55,7 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Option{<:AbstractWeights} = nothing,
-                  mu::Option{<:Union{<:Number, <:NumVec, <:VecScalar}} = nothing)
+                  mu::Option{<:Union{<:UNumNumVec, <:VecScalar}} = nothing)
     return Skewness(ve, w, mu)
 end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},

@@ -31,7 +31,7 @@ Black-Litterman prior estimator for asset returns.
                         mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                         views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
                         sets::Option{<:AssetSets} = nothing,
-                        views_conf::Option{<:UNumVec} = nothing,
+                        views_conf::Option{<:UNumNumVec} = nothing,
                         rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -119,8 +119,9 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
                                  mp::AbstractMatrixProcessingEstimator,
                                  views::Union{<:LinearConstraintEstimator,
                                               <:BlackLittermanViews},
-                                 sets::Option{<:AssetSets}, views_conf::Option{<:UNumVec},
-                                 rf::Number, tau::Option{<:Number})
+                                 sets::Option{<:AssetSets},
+                                 views_conf::Option{<:UNumNumVec}, rf::Number,
+                                 tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -139,7 +140,7 @@ function BlackLittermanPrior(;
                              views::Union{<:LinearConstraintEstimator,
                                           <:BlackLittermanViews},
                              sets::Option{<:AssetSets} = nothing,
-                             views_conf::Option{<:UNumVec} = nothing, rf::Number = 0.0,
+                             views_conf::Option{<:UNumNumVec} = nothing, rf::Number = 0.0,
                              tau::Option{<:Number} = nothing)
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
@@ -158,7 +159,7 @@ function factory(pe::BlackLittermanPrior, w::Option{<:AbstractWeights} = nothing
                                tau = pe.tau)
 end
 """
-    calc_omega(views_conf::Option{<:UNumVec}, P::NumMat,
+    calc_omega(views_conf::Option{<:UNumNumVec}, P::NumMat,
                sigma::NumMat)
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.

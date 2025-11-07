@@ -273,7 +273,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
     IntegerPhylogenyEstimator(;
                               pe::Union{<:AbstractPhylogenyEstimator,
                                         <:AbstractClusteringResult} = NetworkEstimator(),
-                              B::Union{<:Integer, <:IntVec} = 1,
+                              B::UIntegerIntVec = 1,
                               scale::Number = 100_000.0)
 
 ## Validation
@@ -326,7 +326,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
     scale::T3
     function IntegerPhylogenyEstimator(pe::Union{<:AbstractPhylogenyEstimator,
                                                  <:AbstractClusteringResult},
-                                       B::Union{<:Integer, <:IntVec}, scale::Number)
+                                       B::UIntegerIntVec, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, IntVec)
             validate_length_integer_phylogeny_constraint_B(pe, B)
@@ -337,8 +337,7 @@ end
 function IntegerPhylogenyEstimator(;
                                    pe::Union{<:AbstractPhylogenyEstimator,
                                              <:AbstractClusteringResult} = NetworkEstimator(),
-                                   B::Union{<:Integer, <:IntVec} = 1,
-                                   scale::Number = 100_000.0)
+                                   B::UIntegerIntVec = 1, scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
 """
@@ -363,7 +362,7 @@ Container for the result of integer phylogeny-based constraint generation.
     IntegerPhylogeny(;
                      A::Union{<:PhylogenyResult{<:NumMat},
                               <:NumMat},
-                     B::Union{<:Integer, <:IntVec} = 1,
+                     B::UIntegerIntVec = 1,
                      scale::Number = 100_000.0)
 
 ## Validation
@@ -394,7 +393,7 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     A::T1
     B::T2
     scale::T3
-    function IntegerPhylogeny(A::NumMat, B::Union{<:Integer, <:IntVec}, scale::Number)
+    function IntegerPhylogeny(A::NumMat, B::UIntegerIntVec, scale::Number)
         @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
@@ -405,12 +404,11 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:NumMat}, B::Union{<:Integer, <:IntVec},
-                          scale::Number)
+function IntegerPhylogeny(A::PhylogenyResult{<:NumMat}, B::UIntegerIntVec, scale::Number)
     return IntegerPhylogeny(A.X, B, scale)
 end
 function IntegerPhylogeny(; A::Union{<:PhylogenyResult{<:NumMat}, <:NumMat},
-                          B::Union{<:Integer, <:IntVec} = 1, scale::Number = 100_000.0)
+                          B::UIntegerIntVec = 1, scale::Number = 100_000.0)
     return IntegerPhylogeny(A, B, scale)
 end
 """

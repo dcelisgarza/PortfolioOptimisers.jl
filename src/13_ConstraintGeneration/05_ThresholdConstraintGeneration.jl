@@ -84,7 +84,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Constructor
 
-    BuyInThreshold(; val::UNumVec)
+    BuyInThreshold(; val::UNumNumVec)
 
 ## Validation
 
@@ -110,12 +110,12 @@ BuyInThreshold
 """
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
-    function BuyInThreshold(val::UNumVec)
+    function BuyInThreshold(val::UNumNumVec)
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function BuyInThreshold(; val::UNumVec)
+function BuyInThreshold(; val::UNumNumVec)
     return BuyInThreshold(val)
 end
 function threshold_view(::Nothing, ::Any)
@@ -133,7 +133,7 @@ function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
     return [threshold_view(ti, i) for ti in t]
 end
 """
-    threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
+    threshold_constraints(t::Option{<:BuyInThreshold}, args...; kwargs...)
 
 Propagate or pass through buy-in threshold portfolio constraints.
 
@@ -147,7 +147,7 @@ Propagate or pass through buy-in threshold portfolio constraints.
 
 # Returns
 
-  - `bt::Union{Nothing, <:BuyInThreshold}`: The input constraint object, unchanged.
+  - `bt::Option{<:BuyInThreshold}`: The input constraint object, unchanged.
 
 # Examples
 
@@ -166,7 +166,7 @@ julia> threshold_constraints(nothing)
   - [`BuyInThreshold`](@ref)
   - [`threshold_constraints`](@ref)
 """
-function threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
+function threshold_constraints(t::Option{<:BuyInThreshold}, args...; kwargs...)
     return t
 end
 """

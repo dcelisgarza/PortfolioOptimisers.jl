@@ -37,11 +37,12 @@ function mip_wb(model::JuMP.Model, wb::WeightBounds, il::NumVec, is::NumVec)
     return nothing
 end
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
-                                         lt::Union{Nothing, <:BuyInThreshold},
-                                         st::Union{Nothing, <:BuyInThreshold},
-                                         ffl::Option{<:UNumVec}, ffs::Option{<:UNumVec},
-                                         ss::Option{<:Number}, lt_flag::Bool, st_flag::Bool,
-                                         ffl_flag::Bool, ffs_flag::Bool)
+                                         lt::Option{<:BuyInThreshold},
+                                         st::Option{<:BuyInThreshold},
+                                         ffl::Option{<:UNumNumVec},
+                                         ffs::Option{<:UNumNumVec}, ss::Option{<:Number},
+                                         lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
+                                         ffs_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -93,9 +94,9 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     end
     return i_mip
 end
-function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:UNumVec},
-                         lt::Union{Nothing, <:BuyInThreshold}, ss::Option{<:Number},
-                         lt_flag::Bool, ffl_flag::Bool)
+function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:UNumNumVec},
+                         lt::Option{<:BuyInThreshold}, ss::Option{<:Number}, lt_flag::Bool,
+                         ffl_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -142,9 +143,8 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
                               gcard::Union{Nothing, <:LinearConstraint},
                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                              lt::Union{Nothing, <:BuyInThreshold},
-                              st::Union{Nothing, <:BuyInThreshold}, fees::Option{<:Fees},
-                              ss::Option{<:Number})
+                              lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
+                              fees::Option{<:Fees}, ss::Option{<:Number})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(plg, IntegerPhylogeny) ||
@@ -207,8 +207,8 @@ function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::NumMat,
 end
 function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                           smtx::Option{<:NumMat},
-                                          lt::Union{Nothing, <:BuyInThreshold},
-                                          st::Union{Nothing, <:BuyInThreshold},
+                                          lt::Option{<:BuyInThreshold},
+                                          st::Option{<:BuyInThreshold},
                                           ss::Option{<:Number}, lt_flag::Bool,
                                           st_flag::Bool, key1::Symbol = :si,
                                           key7::Symbol = :smtx_expr_,
@@ -302,8 +302,8 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     return i_mip
 end
 function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:NumMat},
-                          lt::Union{Nothing, <:BuyInThreshold}, ss::Option{<:Number},
-                          lt_flag::Bool, key1::Symbol = :sib_, key2::Symbol = :i_smip_,
+                          lt::Option{<:BuyInThreshold}, ss::Option{<:Number}, lt_flag::Bool,
+                          key1::Symbol = :sib_, key2::Symbol = :i_smip_,
                           key3::Symbol = :isbf_, key4::Symbol = :smtx_expr_,
                           key5::Symbol = :set_w_mip_, key6::Symbol = :w_smip_lt_,
                           i::Integer = 1)
@@ -348,10 +348,9 @@ end
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:Integer},
                                    gcard::Union{Nothing, <:LinearConstraint},
-                                   smtx::Option{<:NumMat},
-                                   lt::Union{Nothing, <:BuyInThreshold},
-                                   st::Union{Nothing, <:BuyInThreshold},
-                                   ss::Option{<:Number}, i::Integer = 1)
+                                   smtx::Option{<:NumMat}, lt::Option{<:BuyInThreshold},
+                                   st::Option{<:BuyInThreshold}, ss::Option{<:Number},
+                                   i::Integer = 1)
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
@@ -401,17 +400,17 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::In
                                                                       <:BuyInThreshold}}},
                                    ss::Option{<:Number})
     for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
-        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
+        lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Option{<:BuyInThreshold}) ? st : st[i]
         set_all_smip_constraints!(model, wb, c, g, s, lti, sti, ss, i)
     end
     return nothing
 end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:Integer}, smtx::Option{<:NumMat},
-                                   lt::Union{Nothing, <:BuyInThreshold},
-                                   st::Union{Nothing, <:BuyInThreshold},
-                                   ss::Option{<:Number}, i::Integer = 1)
+                                   lt::Option{<:BuyInThreshold},
+                                   st::Option{<:BuyInThreshold}, ss::Option{<:Number},
+                                   i::Integer = 1)
     card_flag = !isnothing(card)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
@@ -439,18 +438,17 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::In
                                                                       <:BuyInThreshold}}},
                                    ss::Option{<:Number})
     for (i, (c, s)) in enumerate(zip(card, smtx))
-        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
+        lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Option{<:BuyInThreshold}) ? st : st[i]
         set_scardmip_constraints!(model, wb, c, s, lti, sti, ss, i)
     end
     return nothing
 end
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                     gcard::Union{Nothing, <:LinearConstraint},
-                                    smtx::Option{<:NumMat},
-                                    lt::Union{Nothing, <:BuyInThreshold},
-                                    st::Union{Nothing, <:BuyInThreshold},
-                                    ss::Option{<:Number}, i::Integer = 1)
+                                    smtx::Option{<:NumMat}, lt::Option{<:BuyInThreshold},
+                                    st::Option{<:BuyInThreshold}, ss::Option{<:Number},
+                                    i::Integer = 1)
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
@@ -492,8 +490,8 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                                                        <:BuyInThreshold}}},
                                     ss::Option{<:Number})
     for (i, (gc, s)) in enumerate(zip(gcard, smtx))
-        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
+        lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Option{<:BuyInThreshold}) ? st : st[i]
         set_sgcardmip_constraints!(model, wb, gc, s, lti, sti, ss, i)
     end
     return nothing
@@ -502,12 +500,11 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                card::Union{Nothing, <:Integer, <:IntVec},
                                gcard::Union{Nothing, <:LinearConstraint,
                                             <:AbstractVector{<:LinearConstraint}},
-                               smtx::Union{Nothing, <:NumMat, <:VecNumMat},
-                               sgmtx::Union{Nothing, <:NumMat, <:VecNumMat},
-                               lt::Union{Nothing, <:BuyInThreshold},
-                               st::Union{Nothing, <:BuyInThreshold},
-                               glt::Union{Nothing, <:BuyInThreshold},
-                               gst::Union{Nothing, <:BuyInThreshold}, ss::Option{<:Number})
+                               smtx::Option{<:UNumMatVecNumMat},
+                               sgmtx::Option{<:UNumMatVecNumMat},
+                               lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
+                               glt::Option{<:BuyInThreshold}, gst::Option{<:BuyInThreshold},
+                               ss::Option{<:Number})
     if smtx === sgmtx
         set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss)
     else
