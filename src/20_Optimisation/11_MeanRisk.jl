@@ -85,7 +85,7 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Union{Nothing, <:
     rk_min = expected_risk(r, w_min, pr.X, fees)
     rk_max = expected_risk(r, w_max, pr.X, fees)
     rk_min, rk_max = if flag
-        factor * rk_min, factor * rk_maxb
+        factor * rk_min, factor * rk_max
     else
         factor * sqrt(rk_min), factor * sqrt(rk_max)
     end
