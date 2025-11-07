@@ -419,7 +419,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
                                                          <:Any, <:Any, <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                               risk_frontier::NumVec, w_min::NumVec, w_max::NumVec,
+                               risk_frontier::PairVec, w_min::NumVec, w_max::NumVec,
                                idx::IntVec)
     risk_frontier = copy(risk_frontier)
     r = factory(view(noc.r, idx), pr, noc.opt.slv)
@@ -434,7 +434,8 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
                                                          <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                               risk_frontier::NumVec, w_min::NumVec, w_max::NumVec, args...)
+                               risk_frontier::PairVec, w_min::NumVec, w_max::NumVec,
+                               args...)
     risk_frontier = copy(risk_frontier)
     r = factory(noc.r, pr, noc.opt.slv)
     return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
