@@ -232,7 +232,7 @@ Asset weights-based tracking algorithm.
 
 # Constructor
 
-    WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::NumVec)
+    WeightsTracking(; fees::Option{<:Fees} = nothing, w::NumVec)
 
 ## Validation
 
@@ -258,12 +258,12 @@ WeightsTracking
 struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
-    function WeightsTracking(fees::Union{Nothing, <:Fees}, w::NumVec)
+    function WeightsTracking(fees::Option{<:Fees}, w::NumVec)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w)}(fees, w)
     end
 end
-function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing, w::NumVec)
+function WeightsTracking(; fees::Option{<:Fees} = nothing, w::NumVec)
     return WeightsTracking(fees, w)
 end
 function factory(tracking::WeightsTracking, w::NumVec)

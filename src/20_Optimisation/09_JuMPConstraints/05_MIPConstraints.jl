@@ -140,14 +140,13 @@ function set_iplg_constraints!(model::JuMP.Model,
     end
     return nothing
 end
-function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                              card::Union{Nothing, <:Integer},
+function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
                               gcard::Union{Nothing, <:LinearConstraint},
                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                               lt::Union{Nothing, <:BuyInThreshold},
-                              st::Union{Nothing, <:BuyInThreshold},
-                              fees::Union{Nothing, <:Fees}, ss::Option{<:Number})
+                              st::Union{Nothing, <:BuyInThreshold}, fees::Option{<:Fees},
+                              ss::Option{<:Number})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(plg, IntegerPhylogeny) ||
@@ -349,7 +348,7 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:Nu
     return sib
 end
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                   card::Union{Nothing, <:Integer},
+                                   card::Option{<:Integer},
                                    gcard::Union{Nothing, <:LinearConstraint},
                                    smtx::Option{<:NumMat},
                                    lt::Union{Nothing, <:BuyInThreshold},
@@ -411,7 +410,7 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::In
     return nothing
 end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                   card::Union{Nothing, <:Integer}, smtx::Option{<:NumMat},
+                                   card::Option{<:Integer}, smtx::Option{<:NumMat},
                                    lt::Union{Nothing, <:BuyInThreshold},
                                    st::Union{Nothing, <:BuyInThreshold},
                                    ss::Option{<:Number}, i::Integer = 1)

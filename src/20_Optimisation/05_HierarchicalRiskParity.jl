@@ -84,7 +84,7 @@ end
 function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
                              lc::NumVec, rc::NumVec,
                              rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                             fees::Union{Nothing, <:Fees})
+                             fees::Option{<:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     for r in rs
@@ -102,7 +102,7 @@ end
 function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
                              lc::NumVec, rc::NumVec,
                              rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                             fees::Union{Nothing, <:Fees})
+                             fees::Option{<:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     trisk = typemin(eltype(X))
@@ -127,7 +127,7 @@ end
 function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
                              lc::NumVec, rc::NumVec,
                              rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                             fees::Union{Nothing, <:Fees})
+                             fees::Option{<:Fees})
     lrisk = Vector{eltype(X)}(undef, length(rs))
     rrisk = Vector{eltype(X)}(undef, length(rs))
     for (i, r) in enumerate(rs)

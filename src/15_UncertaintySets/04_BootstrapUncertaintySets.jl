@@ -126,7 +126,7 @@ Estimator for box or ellipse uncertainty sets using bootstrap methods for time s
     ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                        n_sim::Integer = 3_000, block_size::Integer = 3, q::Number = 0.05,
-                       seed::Union{Nothing, <:Integer} = nothing,
+                       seed::Option{<:Integer} = nothing,
                        bootstrap::ARCHBootstrapSet = StationaryBootstrap())
 
 Keyword arguments correspond to the fields above.
@@ -188,8 +188,7 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
     bootstrap::T7
     function ARCHUncertaintySet(pe::AbstractPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
-                                block_size::Integer, q::Number,
-                                seed::Union{Nothing, <:Integer},
+                                block_size::Integer, q::Number, seed::Option{<:Integer},
                                 bootstrap::ARCHBootstrapSet)
         @argcheck(n_sim > zero(n_sim))
         @argcheck(block_size > zero(block_size))
@@ -202,7 +201,7 @@ end
 function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
-                            q::Number = 0.05, seed::Union{Nothing, <:Integer} = nothing,
+                            q::Number = 0.05, seed::Option{<:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap())
     return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
 end

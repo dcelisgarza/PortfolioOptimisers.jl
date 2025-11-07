@@ -25,7 +25,7 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
 
 # Constructor
 
-    Distance(; power::Union{Nothing, <:Integer} = nothing,
+    Distance(; power::Option{<:Integer} = nothing,
              alg::AbstractDistanceAlgorithm = SimpleDistance())
 
 Keyword arguments correspond to the fields above.
@@ -57,14 +57,14 @@ Distance
 struct Distance{T1, T2} <: AbstractDistanceEstimator
     power::T1
     alg::T2
-    function Distance(power::Union{Nothing, <:Integer}, alg::AbstractDistanceAlgorithm)
+    function Distance(power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
             @argcheck(one(power) <= power, DomainError)
         end
         return new{typeof(power), typeof(alg)}(power, alg)
     end
 end
-function Distance(; power::Union{Nothing, <:Integer} = nothing,
+function Distance(; power::Option{<:Integer} = nothing,
                   alg::AbstractDistanceAlgorithm = SimpleDistance())
     return Distance(power, alg)
 end

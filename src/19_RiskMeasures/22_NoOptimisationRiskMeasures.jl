@@ -81,7 +81,7 @@ function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Number},
     return r.mu
 end
 function calc_deviations_vec(r::Union{<:ThirdCentralMoment, <:Skewness}, w::NumVec,
-                             X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+                             X::NumMat, fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -95,8 +95,7 @@ function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
-function (r::ThirdCentralMoment)(w::NumVec, X::NumMat,
-                                 fees::Union{Nothing, <:Fees} = nothing)
+function (r::ThirdCentralMoment)(w::NumVec, X::NumMat, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 3
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
@@ -110,7 +109,7 @@ function risk_measure_view(r::Skewness, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, w = r.w, mu = mu)
 end
-function (r::Skewness)(w::NumVec, X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+function (r::Skewness)(w::NumVec, X::NumMat, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3

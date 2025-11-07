@@ -54,7 +54,7 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i, X::NumMat)
 end
 function herc_scalarised_risk_o!(::SumScalariser, wk::NumVec, roku::NumVec, rkbo::NumVec,
                                  cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::NumMat, fees::Union{Nothing, <:Fees})
+                                 X::NumMat, fees::Option{<:Fees})
     crisk = zero(eltype(X))
     for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -66,7 +66,7 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::NumVec, roku::NumVec, rkbo
 end
 function herc_scalarised_risk_o!(::SumScalariser, wk::NumVec, roku::NumMat, rkbo::NumVec,
                                  cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::NumMat, fees::Union{Nothing, <:Fees})
+                                 X::NumMat, fees::Option{<:Fees})
     crisk = zero(eltype(X))
     for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
@@ -77,7 +77,7 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::NumVec, roku::NumMat, rkbo
 end
 function herc_scalarised_risk_o!(::MaxScalariser, wk::NumVec, roku::NumVec, rkbo::NumVec,
                                  cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::NumMat, fees::Union{Nothing, <:Fees})
+                                 X::NumMat, fees::Option{<:Fees})
     crisk = typemin(eltype(X))
     for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -92,7 +92,7 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::NumVec, roku::NumVec, rkbo
 end
 function herc_scalarised_risk_o!(::MaxScalariser, wk::NumVec, roku::NumMat, rkbo::NumVec,
                                  cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::NumMat, fees::Union{Nothing, <:Fees})
+                                 X::NumMat, fees::Option{<:Fees})
     crisk = typemin(eltype(X))
     for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
@@ -107,7 +107,7 @@ end
 function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::NumVec, roku::NumVec,
                                  rkbo::NumVec, cl::IntVec,
                                  ros::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                                 fees::Union{Nothing, <:Fees})
+                                 fees::Option{<:Fees})
     crisk = Vector{eltype(X)}(undef, length(ros))
     for (i, ro) in enumerate(ros)
         unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -120,7 +120,7 @@ end
 function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::NumVec, roku::NumMat,
                                  rkbo::NumVec, cl::IntVec,
                                  ros::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                                 fees::Union{Nothing, <:Fees})
+                                 fees::Option{<:Fees})
     crisk = Vector{eltype(X)}(undef, length(ros))
     for (i, ro) in enumerate(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
@@ -131,7 +131,7 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::NumVec, roku::NumMa
 end
 function herc_scalarised_risk_i!(::SumScalariser, wk::NumVec, riku::NumVec, cl::IntVec,
                                  ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                                 fees::Union{Nothing, <:Fees})
+                                 fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
@@ -143,7 +143,7 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::NumVec, riku::NumVec, cl::
 end
 function herc_scalarised_risk_i!(::SumScalariser, wk::NumVec, riku::NumMat, cl::IntVec,
                                  ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                                 fees::Union{Nothing, <:Fees})
+                                 fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
@@ -155,7 +155,7 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::NumVec, riku::NumMat, cl::
 end
 function herc_scalarised_risk_i!(::MaxScalariser, wk::NumVec, riku::NumVec, cl::IntVec,
                                  ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                                 fees::Union{Nothing, <:Fees})
+                                 fees::Option{<:Fees})
     risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
@@ -172,7 +172,7 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::NumVec, riku::NumVec, cl::
 end
 function herc_scalarised_risk_i!(::MaxScalariser, wk::NumVec, riku::NumMat, cl::IntVec,
                                  ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
-                                 fees::Union{Nothing, <:Fees})
+                                 fees::Option{<:Fees})
     risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
@@ -189,7 +189,7 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::NumVec, riku::NumMat, cl::
 end
 function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::NumVec, riku::NumVec,
                                  cl::IntVec, ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::NumMat, fees::Union{Nothing, <:Fees})
+                                 X::NumMat, fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
@@ -201,7 +201,7 @@ function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::NumVec, riku::Num
 end
 function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::NumVec, riku::NumMat,
                                  cl::IntVec, ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::NumMat, fees::Union{Nothing, <:Fees})
+                                 X::NumMat, fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)

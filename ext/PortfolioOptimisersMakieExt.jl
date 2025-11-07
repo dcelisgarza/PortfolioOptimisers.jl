@@ -1,6 +1,6 @@
 #=
 function plot_ptf_cumulative_returns(w::NumArr, X::NumMat,
-                                     fees::Union{Nothing, <:Fees} = nothing;
+                                     fees::Option{<:Fees} = nothing;
                                      ts::AbstractVector = 1:size(X, 1),
                                      f::Union{Nothing, Figure} = Figure(),
                                      fpos::Tuple = (1, 1), compound::Bool = false,
@@ -29,7 +29,7 @@ function compute_relevant_assets(w::AbstractVector, M::Number, N::Number)
     return N, idx
 end
 function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
-                                       fees::Union{Nothing, <:Fees} = nothing;
+                                       fees::Option{<:Fees} = nothing;
                                        ts::AbstractVector = 1:size(X, 1),
                                        nx::AbstractVector = 1:size(X, 2),
                                        N::Option{<:Number} = nothing,

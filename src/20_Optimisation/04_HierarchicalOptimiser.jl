@@ -61,7 +61,7 @@ function opt_view(hco::HierarchicalOptimiser, i)
                                  wb = wb, cwf = hco.cwf, sets = sets, strict = hco.strict)
 end
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
-                                fees::Union{Nothing, <:Fees} = nothing)
+                                fees::Option{<:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
     for i in eachindex(wk)
@@ -72,7 +72,7 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
     return rk
 end
 function unitary_expected_risks!(wk::NumVec, rk::NumVec, r::OptimisationRiskMeasure,
-                                 X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+                                 X::NumMat, fees::Option{<:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
     for i in eachindex(wk)
         wk[i] = one(eltype(X))

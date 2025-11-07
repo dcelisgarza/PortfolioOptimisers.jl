@@ -41,9 +41,8 @@ function factory(ce::ImpliedVolatility, w::Option{<:AbstractWeights} = nothing)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 function realised_vol(ce::AbstractVarianceEstimator, X::NumMat, ws::Integer,
-                      chunk::Union{Nothing, <:Integer} = nothing,
-                      T::Union{Nothing, <:Integer} = nothing,
-                      N::Union{Nothing, <:Integer} = nothing)
+                      chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
+                      N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
         T, N = size(X)
         chunk = div(T, ws)
@@ -52,9 +51,8 @@ function realised_vol(ce::AbstractVarianceEstimator, X::NumMat, ws::Integer,
                                    reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk,
                                            N); dims = 1); dims = 1)
 end
-function implied_vol(X::NumMat, ws::Integer, chunk::Union{Nothing, <:Integer} = nothing,
-                     T::Union{Nothing, <:Integer} = nothing,
-                     N::Union{Nothing, <:Integer} = nothing)
+function implied_vol(X::NumMat, ws::Integer, chunk::Option{<:Integer} = nothing,
+                     T::Option{<:Integer} = nothing, N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
         T, N = size(X)
         chunk = div(T, ws)

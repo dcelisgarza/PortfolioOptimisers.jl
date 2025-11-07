@@ -4,7 +4,7 @@ using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, 
       Clustering, Distributions
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::NumArr, X::NumMat,
-                                                         fees::Union{Nothing, <:Fees} = nothing;
+                                                         fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
                                                          compound::Bool = false,
                                                          kwargs::NamedTuple = (;
@@ -30,7 +30,7 @@ function compute_relevant_assets(w::NumVec, M::Number, N::Number)
     return N, idx
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::NumVec, X::NumMat,
-                                                           fees::Union{Nothing, <:Fees} = nothing;
+                                                           fees::Option{<:Fees} = nothing;
                                                            ts::AbstractVector = 1:size(X,
                                                                                        1),
                                                            nx::AbstractVector = 1:size(X,
@@ -91,7 +91,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     w::NumVec,
                                                     X::Union{<:NumMat,
                                                              <:PortfolioOptimisers.AbstractPriorResult},
-                                                    fees::Union{Nothing, <:Fees} = nothing;
+                                                    fees::Option{<:Fees} = nothing;
                                                     nx::AbstractVector = 1:length(w),
                                                     N::Option{<:Number} = nothing,
                                                     percentage::Bool = false,
@@ -245,7 +245,7 @@ function PortfolioOptimisers.plot_clusters(pe::Union{<:PortfolioOptimisers.Abstr
 end
 function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat,
                                             slv::Union{<:Solver, <:VecSolver},
-                                            fees::Union{Nothing, <:Fees} = nothing;
+                                            fees::Option{<:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3,
@@ -307,7 +307,7 @@ function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat,
 end
 function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
                                            pr::PortfolioOptimisers.AbstractPriorResult,
-                                           fees::Union{Nothing, <:Fees} = nothing;
+                                           fees::Option{<:Fees} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
                                            z::Union{Nothing,
@@ -344,9 +344,8 @@ function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
 end
 function PortfolioOptimisers.plot_histogram(w::NumArr, X::NumMat,
                                             slv::Union{<:Solver, <:VecSolver},
-                                            fees::Union{Nothing, <:Fees} = nothing;
-                                            flag = true, alpha::Number = 0.05,
-                                            kappa::Number = 0.3,
+                                            fees::Option{<:Fees} = nothing; flag = true,
+                                            alpha::Number = 0.05, kappa::Number = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
                                             rw::Option{<:AbstractWeights} = nothing,

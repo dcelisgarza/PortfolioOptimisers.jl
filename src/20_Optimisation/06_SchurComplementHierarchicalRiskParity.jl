@@ -186,7 +186,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecIntVec,
 end
 function schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number,
                                         lrisk::Number, tol::Number = 1e-4,
-                                        iter::Union{Nothing, <:Integer} = nothing,
+                                        iter::Option{<:Integer} = nothing,
                                         strict::Bool = false)
     w = nothing
     if isnothing(iter)

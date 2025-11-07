@@ -25,7 +25,7 @@ Estimator for box or ellipse uncertainty sets under the assumption of normally d
                          alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                          n_sim::Integer = 3_000, q::Number = 0.05,
                          rng::AbstractRNG = Random.default_rng(),
-                         seed::Union{Nothing, <:Integer} = nothing)
+                         seed::Option{<:Integer} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -81,8 +81,7 @@ struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6} <: AbstractUncertaintySetEst
     seed::T6
     function NormalUncertaintySet(pe::AbstractPriorEstimator,
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
-                                  q::Number, rng::AbstractRNG,
-                                  seed::Union{Nothing, <:Integer})
+                                  q::Number, rng::AbstractRNG, seed::Option{<:Integer})
         @argcheck(zero(n_sim) < n_sim)
         @argcheck(zero(q) < q < one(q))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
@@ -93,7 +92,7 @@ function NormalUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                               alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                               n_sim::Integer = 3_000, q::Number = 0.05,
                               rng::AbstractRNG = Random.default_rng(),
-                              seed::Union{Nothing, <:Integer} = nothing)
+                              seed::Option{<:Integer} = nothing)
     return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed)
 end
 """

@@ -166,7 +166,7 @@ function SemiDefinitePhylogeny(; A::Union{<:PhylogenyResult{<:NumMat}, <:NumMat}
     return SemiDefinitePhylogeny(A, p)
 end
 """
-    _validate_length_integer_phylogeny_constraint_B(alg::Union{Nothing, <:Integer},
+    _validate_length_integer_phylogeny_constraint_B(alg::Option{<:Integer},
                                                     B::NumVec)
 
 Validate that the length of the vector `B` does not exceed the integer value `alg`.

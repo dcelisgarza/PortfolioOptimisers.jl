@@ -582,7 +582,7 @@ Where:
 # Functor
 
     (r::LowOrderMoment)(w::NumVec, X::NumMat;
-                        fees::Union{Nothing, <:Fees} = nothing)
+                        fees::Option{<:Fees} = nothing)
 
 Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
@@ -739,7 +739,7 @@ Where:
 # Functor
 
     (r::HighOrderMoment)(w::NumVec, X::NumMat;
-                        fees::Union{Nothing, <:Fees} = nothing)
+                        fees::Option{<:Fees} = nothing)
 
 Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
 
@@ -940,7 +940,7 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:
 end
 """
     calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                    X::NumMat; fees::Union{Nothing, <:Fees} = nothing)
+                    X::NumMat; fees::Option{<:Fees} = nothing)
 
 Compute the vector of deviations from the target value for moment-based risk measures.
 
@@ -969,7 +969,7 @@ Compute the vector of deviations from the target value for moment-based risk mea
   - [`calc_net_returns`](@ref)
 """
 function calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                             X::NumMat, fees::Union{Nothing, <:Fees} = nothing)
+                             X::NumMat, fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target

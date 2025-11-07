@@ -32,10 +32,10 @@ Estimator for portfolio transaction fees constraints.
 # Constructor
 
     FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                    l::Union{Nothing, <:EstValType} = nothing,
-                    s::Union{Nothing, <:EstValType} = nothing,
-                    fl::Union{Nothing, <:EstValType} = nothing,
-                    fs::Union{Nothing, <:EstValType} = nothing,
+                    l::Option{<:EstValType} = nothing,
+                    s::Option{<:EstValType} = nothing,
+                    fl::Option{<:EstValType} = nothing,
+                    fs::Option{<:EstValType} = nothing,
                     dl::Option{<:Number} = nothing,
                     ds::Option{<:Number} = nothing,
                     dfl::Option{<:Number} = nothing,
@@ -90,11 +90,10 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimat
     dfs::T9
     kwargs::T10
     function FeesEstimator(tn::Union{Nothing, <:TurnoverEstimator, <:Turnover},
-                           l::Union{Nothing, <:EstValType}, s::Union{Nothing, <:EstValType},
-                           fl::Union{Nothing, <:EstValType},
-                           fs::Union{Nothing, <:EstValType}, dl::Option{<:Number} = nothing,
-                           ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
-                           dfs::Option{<:Number} = nothing,
+                           l::Option{<:EstValType}, s::Option{<:EstValType},
+                           fl::Option{<:EstValType}, fs::Option{<:EstValType},
+                           dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
+                           dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -111,12 +110,11 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimat
     end
 end
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                       l::Union{Nothing, <:EstValType} = nothing,
-                       s::Union{Nothing, <:EstValType} = nothing,
-                       fl::Union{Nothing, <:EstValType} = nothing,
-                       fs::Union{Nothing, <:EstValType} = nothing,
-                       dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
-                       dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
+                       l::Option{<:EstValType} = nothing, s::Option{<:EstValType} = nothing,
+                       fl::Option{<:EstValType} = nothing,
+                       fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
+                       ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
+                       dfs::Option{<:Number} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end
@@ -287,7 +285,7 @@ function fees_constraints(fees::FeesEstimator, sets::AssetSets;
                                       strict = strict))
 end
 """
-    fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
+    fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
 
 Propagate or pass through portfolio transaction fee constraints.
 
@@ -328,7 +326,7 @@ julia> fees_constraints(nothing)
   - [`FeesEstimator`](@ref)
   - [`Fees`](@ref)
 """
-function fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
+function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
     return fees
 end
 function fees_view(::Nothing, ::Any)

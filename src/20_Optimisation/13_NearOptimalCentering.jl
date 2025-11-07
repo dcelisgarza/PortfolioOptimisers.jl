@@ -128,7 +128,7 @@ function opt_view(noc::NearOptimalCentering, i, X::NumMat)
                                 w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
-                                      fees::Union{Nothing, <:Fees},
+                                      fees::Option{<:Fees},
                                       slv::Union{<:Solver, <:VecSolver}, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:VecNumVec}, w_max::NumVec)
     X = pr.X
@@ -140,7 +140,7 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
     return risk_min, risk_opt, risk_max
 end
 function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
-                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      pr::AbstractPriorResult, fees::Option{<:Fees},
                                       slv::Union{<:Solver, <:VecSolver}, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:VecNumVec}, w_max::NumVec)
     X = pr.X
@@ -160,7 +160,7 @@ function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:Risk
 end
 function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
                                       rs::AbstractVector{<:RiskMeasure},
-                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      pr::AbstractPriorResult, fees::Option{<:Fees},
                                       slv::Union{<:Solver, <:VecSolver}, w_min::NumVec,
                                       w_opt::Union{<:NumVec, <:VecNumVec}, w_max::NumVec)
     X = pr.X
@@ -185,7 +185,7 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     return risk_min, risk_opt, risk_max
 end
 function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
-                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      pr::AbstractPriorResult, fees::Option{<:Fees},
                                       slv::Union{Nothing, <:Solver, <:VecSolver},
                                       w_min::NumVec, w_opt::Union{<:NumVec, <:VecNumVec},
                                       w_max::NumVec)
@@ -415,7 +415,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, <:Any, <:Any,
                                                          <:ConstrainedNearOptimalCentering},
-                               pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                               pr::AbstractPriorResult, fees::Option{<:Fees},
                                risk_frontier::PairVec, w_min::NumVec, w_max::NumVec,
                                idx::IntVec)
     risk_frontier = copy(risk_frontier)
@@ -430,7 +430,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any,
                                                          <:ConstrainedNearOptimalCentering},
-                               pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                               pr::AbstractPriorResult, fees::Option{<:Fees},
                                risk_frontier::PairVec, w_min::NumVec, w_max::NumVec,
                                args...)
     risk_frontier = copy(risk_frontier)
@@ -442,8 +442,8 @@ function compute_risk_ubs(model::JuMP.Model,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any,
                                                     <:ConstrainedNearOptimalCentering},
-                          pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                          w_min::NumVec, w_max::NumVec)
+                          pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::NumVec,
+                          w_max::NumVec)
     risk_frontier = model[:risk_frontier]
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)

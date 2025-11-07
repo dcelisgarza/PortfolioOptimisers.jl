@@ -47,7 +47,7 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                           <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
+                               fees::Option{<:Fees}, args...; kwargs...)
     set_risk_constraints!(model, 1, r, opt, pr, plg, fees, args...; kwargs...)
     return nothing
 end
@@ -55,7 +55,7 @@ function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasu
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
                                           <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
+                               fees::Option{<:Fees}, args...; kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, plg, fees, args...; kwargs...)
     end
