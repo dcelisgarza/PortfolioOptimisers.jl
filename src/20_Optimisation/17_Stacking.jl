@@ -27,7 +27,8 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     threads::T9
     fb::T10
     function Stacking(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                      wb::Option{<:UWbWbEst}, sets::Option{<:AssetSets},
+                      wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
+                      sets::Option{<:AssetSets},
                       opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                    <:OptimisationResult}},
                       opto::OptimisationEstimator, cv::Option{<:CrossValidationEstimator},
@@ -53,7 +54,8 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                  wb::Option{<:UWbWbEst} = nothing, sets::Option{<:AssetSets} = nothing,
+                  wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
+                  sets::Option{<:AssetSets} = nothing,
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                <:OptimisationResult}},
                   opto::OptimisationEstimator,

@@ -16,8 +16,8 @@ struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
     tol::T2
     iter::T3
     strict::T4
-    function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
-                                      strict::Bool)
+    function MonotonicSchurComplement(N::Integer, tol::Number,
+                                      iter::Union{Nothing, Integer}, strict::Bool)
         @argcheck(N > 0)
         @argcheck(tol > 0)
         if !isnothing(iter)
@@ -28,7 +28,8 @@ struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
     end
 end
 function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
-                                  iter::Option{<:Integer} = nothing, strict::Bool = false)
+                                  iter::Union{Nothing, Integer} = nothing,
+                                  strict::Bool = false)
     return MonotonicSchurComplement(N, tol, iter, strict)
 end
 struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm

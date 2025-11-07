@@ -140,11 +140,9 @@ function estimator_to_val(::UniformlyDistributedBounds, sets::AssetSets, args...
     return datatype(inv(length(sets.dict[sets.key])))
 end
 """
-    struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
+    struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
         lb::T1
         ub::T2
-        dlb::T3
-        dub::T4
     end
 
 Estimator for portfolio weight bounds constraints.
@@ -155,8 +153,6 @@ Estimator for portfolio weight bounds constraints.
 
   - `lb`: Lower bound(s) for portfolio weights.
   - `ub`: Upper bound(s) for portfolio weights.
-  - `dlb`: Default lower bound applied when no specific bound is provided.
-  - `dub`: Default upper bound applied when no specific bound is provided.
 
 # Constructor
 
@@ -164,9 +160,7 @@ Estimator for portfolio weight bounds constraints.
                           lb::Union{Nothing, <:EstValType,
                                     <:CustomWeightBoundsConstraint} = nothing,
                           ub::Union{Nothing, <:EstValType,
-                                    <:CustomWeightBoundsConstraint} = nothing,
-                          dlb::Option{<:Number} = nothing,
-                          dub::Option{<:Number} = nothing)
+                                    <:CustomWeightBoundsConstraint} = nothing)
 
 ## Validation
 
@@ -175,7 +169,6 @@ Estimator for portfolio weight bounds constraints.
 # Details
 
   - If `lb` or `ub` is `nothing`, it indicates no bound in that direction.
-  - If `lb` or `ub` are not `nothing`, the unspecified entries are filled with `dlb` or `dub`, respectively. If that is the case and `dlb` or `dub` are `nothing`, they default to `0.0` for lower bounds and `1.0` for upper bounds.
 
 # Examples
 
@@ -240,7 +233,6 @@ function weight_bounds_view(wb::WeightBoundsEstimator, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)
 end
-const UWbWbEst = Union{<:WeightBoundsEstimator, <:WeightBounds}
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets; strict::Bool = false,
                               datatype::DataType = Float64, kwargs...)

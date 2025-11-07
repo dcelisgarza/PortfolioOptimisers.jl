@@ -97,8 +97,9 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     fb::T11
     function NestedClustered(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                              cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                             wb::Option{<:UWbWbEst}, sets::Option{<:AssetSets},
-                             opti::OptimisationEstimator, opto::OptimisationEstimator,
+                             wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
+                             sets::Option{<:AssetSets}, opti::OptimisationEstimator,
+                             opto::OptimisationEstimator,
                              cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
                              strict::Bool, threads::FLoops.Transducers.Executor,
                              fb::Option{<:OptimisationEstimator})
@@ -117,7 +118,7 @@ end
 function NestedClustered(;
                          pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                          cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
-                         wb::Option{<:UWbWbEst} = nothing,
+                         wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
                          sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,
                          opto::OptimisationEstimator,
                          cv::Option{<:CrossValidationEstimator} = nothing,

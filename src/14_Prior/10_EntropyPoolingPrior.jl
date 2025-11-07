@@ -433,8 +433,8 @@ Entropy pooling prior estimator for asset returns.
                         rho_views::Option{<:LinearConstraintEstimator} = nothing,
                         var_alpha::Number = 0.05, cvar_alpha::Number = 0.05,
                         sets::Option{<:AssetSets} = nothing,
-                        ds_opt::Option{<:CVaREntropyPooling} = nothing,
-                        dm_opt::Option{<:OptimEntropyPooling} = nothing,
+                        ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
+                        dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
                         opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
                         w::Option{<:ProbabilityWeights} = nothing,
                         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
@@ -546,8 +546,8 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  rho_views::Option{<:LinearConstraintEstimator},
                                  var_alpha::Option{<:Number}, cvar_alpha::Option{<:Number},
                                  sets::Option{<:AssetSets},
-                                 ds_opt::Option{<:CVaREntropyPooling},
-                                 dm_opt::Option{<:OptimEntropyPooling},
+                                 ds_opt::Union{Nothing, <:CVaREntropyPooling},
+                                 dm_opt::Union{Nothing, <:OptimEntropyPooling},
                                  opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
                                  w::Option{<:ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
@@ -614,8 +614,8 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              var_alpha::Option{<:Number} = nothing,
                              cvar_alpha::Option{<:Number} = nothing,
                              sets::Option{<:AssetSets} = nothing,
-                             ds_opt::Option{<:CVaREntropyPooling} = nothing,
-                             dm_opt::Option{<:OptimEntropyPooling} = nothing,
+                             ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
+                             dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
                              opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
                              w::Option{<:ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
@@ -1384,8 +1384,8 @@ end
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                          pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
                          w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
-                         ds_opt::Option{<:CVaREntropyPooling},
-                         dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+                         ds_opt::Union{Nothing, <:CVaREntropyPooling},
+                         dm_opt::Union{Nothing, <:OptimEntropyPooling}; strict::Bool = false)
 
 Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view constraints.
 
@@ -1427,8 +1427,9 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
                               w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
-                              ds_opt::Option{<:CVaREntropyPooling},
-                              dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+                              ds_opt::Union{Nothing, <:CVaREntropyPooling},
+                              dm_opt::Union{Nothing, <:OptimEntropyPooling};
+                              strict::Bool = false)
     cvar_views = parse_equation(cvar_views.val; ops1 = ("==",), ops2 = (:call, :(==)),
                                 datatype = eltype(pr.X))
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
