@@ -62,8 +62,7 @@ end
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::NumMat, ::Any, ivpa::Nothing)
     throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Number` or `<:NumVec`"))
 end
-function predict_realised_vols(::ImpliedVolatilityPremium, iv::NumMat, ::Any,
-                               ivpa::Union{<:Number, <:NumVec})
+function predict_realised_vols(::ImpliedVolatilityPremium, iv::NumMat, ::Any, ivpa::UNumVec)
     return view(iv, size(iv, 1), :) ⊘ ivpa
 end
 function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::NumMat, X::NumMat,
@@ -102,8 +101,7 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::NumMat, X::
     return rv_p
 end
 function Statistics.cov(ce::ImpliedVolatility, X::NumMat; dims::Int = 1, mean = nothing,
-                        iv::NumMat, ivpa::Union{Nothing, <:Number, <:NumVec} = nothing,
-                        kwargs...)
+                        iv::NumMat, ivpa::Option{<:UNumVec} = nothing, kwargs...)
     sigma = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
@@ -112,8 +110,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::NumMat; dims::Int = 1, mean = 
     return sigma
 end
 function Statistics.cor(ce::ImpliedVolatility, X::NumMat; dims::Int = 1, mean = nothing,
-                        iv::NumMat, ivpa::Union{Nothing, <:Number, <:NumVec} = nothing,
-                        kwargs...)
+                        iv::NumMat, ivpa::Option{<:UNumVec} = nothing, kwargs...)
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)

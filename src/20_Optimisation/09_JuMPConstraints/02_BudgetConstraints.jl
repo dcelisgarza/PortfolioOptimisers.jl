@@ -39,9 +39,8 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
     vn::T4
     up::T5
     un::T6
-    function BudgetCosts(bgt::Union{<:Number, <:BudgetRange}, w::NumVec,
-                         vp::Union{<:Number, <:NumVec}, vn::Union{<:Number, <:NumVec},
-                         up::Union{<:Number, <:NumVec}, un::Union{<:Number, <:NumVec})
+    function BudgetCosts(bgt::Union{<:Number, <:BudgetRange}, w::NumVec, vp::UNumVec,
+                         vn::UNumVec, up::UNumVec, un::UNumVec)
         @argcheck(!isempty(w))
         if isa(vp, NumVec)
             @argcheck(!isempty(vp))
@@ -76,10 +75,8 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
     end
 end
 function BudgetCosts(; bgt::Union{<:Number, <:BudgetRange} = 1.0, w::NumVec,
-                     vp::Union{<:Number, <:NumVec} = 1.0,
-                     vn::Union{<:Number, <:NumVec} = 1.0,
-                     up::Union{<:Number, <:NumVec} = 1.0,
-                     un::Union{<:Number, <:NumVec} = 1.0)
+                     vp::UNumVec = 1.0, vn::UNumVec = 1.0, up::UNumVec = 1.0,
+                     un::UNumVec = 1.0)
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
 function budget_view(bgt::BudgetCosts, i)
@@ -98,11 +95,8 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
     up::T5
     un::T6
     beta::T7
-    function BudgetMarketImpact(bgt::Union{<:Number, <:BudgetRange}, w::NumVec,
-                                vp::Union{<:Number, <:NumVec},
-                                vn::Union{<:Number, <:NumVec},
-                                up::Union{<:Number, <:NumVec},
-                                un::Union{<:Number, <:NumVec}, beta::Number)
+    function BudgetMarketImpact(bgt::Union{<:Number, <:BudgetRange}, w::NumVec, vp::UNumVec,
+                                vn::UNumVec, up::UNumVec, un::UNumVec, beta::Number)
         @argcheck(!isempty(w))
         if isa(vp, NumVec)
             @argcheck(!isempty(vp))
@@ -137,10 +131,8 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
     end
 end
 function BudgetMarketImpact(; bgt::Union{<:Number, <:BudgetRange} = 1.0, w::NumVec,
-                            vp::Union{<:Number, <:NumVec} = 1.0,
-                            vn::Union{<:Number, <:NumVec} = 1.0,
-                            up::Union{<:Number, <:NumVec} = 1.0,
-                            un::Union{<:Number, <:NumVec} = 1.0, beta::Number = 2 / 3)
+                            vp::UNumVec = 1.0, vn::UNumVec = 1.0, up::UNumVec = 1.0,
+                            un::UNumVec = 1.0, beta::Number = 2 / 3)
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i)
@@ -302,8 +294,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     end
     return nothing
 end
-function set_cost_budget_constraints!(model::JuMP.Model, vp::Union{<:Number, <:NumVec},
-                                      vn::Union{<:Number, <:NumVec}, val::Number, w::NumVec)
+function set_cost_budget_constraints!(model::JuMP.Model, vp::UNumVec, vn::UNumVec,
+                                      val::Number, w::NumVec)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]
@@ -312,9 +304,8 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::Union{<:Number, <:N
     @constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
 end
-function set_cost_budget_constraints!(model::JuMP.Model, vp::Union{<:Number, <:NumVec},
-                                      vn::Union{<:Number, <:NumVec}, bgt::BudgetRange,
-                                      w::NumVec)
+function set_cost_budget_constraints!(model::JuMP.Model, vp::UNumVec, vn::UNumVec,
+                                      bgt::BudgetRange, w::NumVec)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]

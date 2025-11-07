@@ -1231,7 +1231,7 @@ end
 """
     DendroConstruct(Zi::NumMat, LabelVec1::NumVec,
                     LabelVec2::NumVec,
-                    LinkageDist::Union{<:Number, <:NumVec})
+                    LinkageDist::UNumVec)
 
 Construct the linkage matrix by continually adding rows to the matrix.
 
@@ -1260,7 +1260,7 @@ This function appends a new row to the linkage matrix at each iteration, recordi
   - [`turn_into_Hclust_merges`](@ref)
 """
 function DendroConstruct(Zi::NumMat, LabelVec1::NumVec, LabelVec2::NumVec,
-                         LinkageDist::Union{<:Number, <:NumVec})
+                         LinkageDist::UNumVec)
     indx = LabelVec1 .!= LabelVec2
     Z = vcat(Zi, hcat(transpose(sort!(unique(LabelVec1[indx]))), LinkageDist))
     return Z

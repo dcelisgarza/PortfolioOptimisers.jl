@@ -199,7 +199,7 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
 end
 """
     assert_bl_views_conf(::Nothing, args...)
-    assert_bl_views_conf(views_conf::Union{Nothing, <:Number, <:NumVec},
+    assert_bl_views_conf(views_conf::Option{<:UNumVec},
                          views::Union{<:EqnType, <:LinearConstraintEstimator, <:BlackLittermanViews})
 
 Validate Black-Litterman view confidence specification.
@@ -250,12 +250,10 @@ function assert_bl_views_conf(views_conf::NumVec, val::EqnType)
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::Union{<:Number, <:NumVec},
-                              views::LinearConstraintEstimator)
+function assert_bl_views_conf(views_conf::UNumVec, views::LinearConstraintEstimator)
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::Union{<:Number, <:NumVec},
-                              views::BlackLittermanViews)
+function assert_bl_views_conf(views_conf::UNumVec, views::BlackLittermanViews)
     return @argcheck(length(views_conf) == length(views.Q))
 end
 

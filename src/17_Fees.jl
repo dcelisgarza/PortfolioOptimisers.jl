@@ -153,10 +153,10 @@ Container for portfolio transaction fee constraints.
 # Constructor
 
     Fees(; tn::Union{Nothing, <:Turnover} = nothing,
-         l::Union{Nothing, <:Number, <:NumVec} = nothing,
-         s::Union{Nothing, <:Number, <:NumVec} = nothing,
-         fl::Union{Nothing, <:Number, <:NumVec} = nothing,
-         fs::Union{Nothing, <:Number, <:NumVec} = nothing,
+         l::Option{<:UNumVec} = nothing,
+         s::Option{<:UNumVec} = nothing,
+         fl::Option{<:UNumVec} = nothing,
+         fs::Option{<:UNumVec} = nothing,
          kwargs::NamedTuple = (; atol = 1e-8))
 
 ## Validation
@@ -196,10 +196,8 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
     fl::T4
     fs::T5
     kwargs::T6
-    function Fees(tn::Union{Nothing, <:Turnover}, l::Union{Nothing, <:Number, <:NumVec},
-                  s::Union{Nothing, <:Number, <:NumVec},
-                  fl::Union{Nothing, <:Number, <:NumVec},
-                  fs::Union{Nothing, <:Number, <:NumVec},
+    function Fees(tn::Union{Nothing, <:Turnover}, l::Option{<:UNumVec},
+                  s::Option{<:UNumVec}, fl::Option{<:UNumVec}, fs::Option{<:UNumVec},
                   kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -209,12 +207,9 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
-function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
-              l::Union{Nothing, <:Number, <:NumVec} = nothing,
-              s::Union{Nothing, <:Number, <:NumVec} = nothing,
-              fl::Union{Nothing, <:Number, <:NumVec} = nothing,
-              fs::Union{Nothing, <:Number, <:NumVec} = nothing,
-              kwargs::NamedTuple = (; atol = 1e-8))
+function Fees(; tn::Union{Nothing, <:Turnover} = nothing, l::Option{<:UNumVec} = nothing,
+              s::Option{<:UNumVec} = nothing, fl::Option{<:UNumVec} = nothing,
+              fs::Option{<:UNumVec} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
     return Fees(tn, l, s, fl, fs, kwargs)
 end
 """

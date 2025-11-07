@@ -84,7 +84,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Constructor
 
-    BuyInThreshold(; val::Union{<:Number, <:NumVec})
+    BuyInThreshold(; val::UNumVec)
 
 ## Validation
 
@@ -110,12 +110,12 @@ BuyInThreshold
 """
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
-    function BuyInThreshold(val::Union{<:Number, <:NumVec})
+    function BuyInThreshold(val::UNumVec)
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function BuyInThreshold(; val::Union{<:Number, <:NumVec})
+function BuyInThreshold(; val::UNumVec)
     return BuyInThreshold(val)
 end
 function threshold_view(::Nothing, ::Any)

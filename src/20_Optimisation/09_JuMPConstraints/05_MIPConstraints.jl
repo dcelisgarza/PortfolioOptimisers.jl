@@ -39,8 +39,7 @@ end
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          lt::Union{Nothing, <:BuyInThreshold},
                                          st::Union{Nothing, <:BuyInThreshold},
-                                         ffl::Union{Nothing, <:Number, <:NumVec},
-                                         ffs::Union{Nothing, <:Number, <:NumVec},
+                                         ffl::Option{<:UNumVec}, ffs::Option{<:UNumVec},
                                          ss::Option{<:Number}, lt_flag::Bool, st_flag::Bool,
                                          ffl_flag::Bool, ffs_flag::Bool)
     w = model[:w]
@@ -94,8 +93,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     end
     return i_mip
 end
-function mip_constraints(model::JuMP.Model, wb::WeightBounds,
-                         ffl::Union{Nothing, <:Number, <:NumVec},
+function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:UNumVec},
                          lt::Union{Nothing, <:BuyInThreshold}, ss::Option{<:Number},
                          lt_flag::Bool, ffl_flag::Bool)
     w = model[:w]

@@ -307,7 +307,8 @@ const NumVec = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
 const IntVec = AbstractVector{<:Integer}
 const NumMat = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
 const NumArr = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
-const EstValType = Union{<:Number, <:NumVec, <:Pair{<:AbstractString, <:Number},
+const UNumVec = Union{<:Number, <:NumVec}
+const EstValType = Union{<:UNumVec, <:Pair{<:AbstractString, <:Number},
                          <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
                          <:AbstractDict{<:AbstractString, <:Number}}
 const StrExprVec = AbstractVector{<:Union{<:AbstractString, Expr}}
@@ -322,4 +323,4 @@ const Option{T} = Union{Nothing, T}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
        NumMat, NumArr, EstValType, StrExprVec, EqnType, VecNumVec, VecIntVec, VecNumMat,
-       StrVec, PairVec, VecJuMPScalar, Option
+       StrVec, PairVec, VecJuMPScalar, Option, UNumVec
