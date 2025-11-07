@@ -185,7 +185,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l2::T34
     strict::T35
     function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                           slv::SlvUVecSlv, wb::Union{Nothing, <:WbUWbE},
+                           slv::SlvUVecSlv, wb::Option{<:WbUWbE},
                            bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator},
                            sbgt::Union{Nothing, <:Number, <:BudgetRange},
                            lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold},
@@ -209,16 +209,16 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            sgmtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:NumMat,
                                         <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
                                                                  <:NumMat}}},
-                           slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                           slt::Union{Nothing, <:BtUBtE,
                                       <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                                <:BuyInThresholdEstimator}}},
-                           sst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                           sst::Union{Nothing, <:BtUBtE,
                                       <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                                <:BuyInThresholdEstimator}}},
-                           sglt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                           sglt::Union{Nothing, <:BtUBtE,
                                        <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                                 <:BuyInThresholdEstimator}}},
-                           sgst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                           sgst::Union{Nothing, <:BtUBtE,
                                        <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                                 <:BuyInThresholdEstimator}}},
                            sets::Option{<:AssetSets},
@@ -258,8 +258,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isfinite(scard))
             @argcheck(scard > 0)
             @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
-            @argcheck(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-            @argcheck(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(slt, Option{<:BtUBtE}))
+            @argcheck(isa(sst, Option{<:BtUBtE}))
         elseif isa(scard, IntVec)
             @argcheck(!isempty(scard))
             @argcheck(all(isfinite, scard))
@@ -274,9 +274,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                 @argcheck(!isempty(sst))
                 @argcheck(length(scard) == length(sst))
             end
-        elseif isnothing(scard) &&
-               (isa(slt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
-                isa(sst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
+        elseif isnothing(scard) && (isa(slt, BtUBtE) || isa(sst, BtUBtE))
             @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
         elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
             @argcheck(isa(smtx, AbstractVector))
@@ -292,10 +290,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         end
         if isa(sgcard, Union{<:LinearConstraintEstimator, <:LinearConstraint})
             @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
-            @argcheck(isa(sglt,
-                          Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-            @argcheck(isa(sgst,
-                          Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(sglt, Option{<:BtUBtE}))
+            @argcheck(isa(sgst, Option{<:BtUBtE}))
             if isa(sgcard, LinearConstraint) && isa(smtx, NumMat)
                 N = size(smtx, 1)
                 N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
@@ -322,9 +318,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                     @argcheck(N == N_ineq + N_eq)
                 end
             end
-        elseif isnothing(sgcard) &&
-               (isa(sglt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
-                isa(sgst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
+        elseif isnothing(sgcard) && (isa(sglt, BtUBtE) || isa(sgst, BtUBtE))
             @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
         elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
             @argcheck(isa(sgmtx, AbstractVector))
@@ -407,7 +401,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                       slv::SlvUVecSlv, wb::Union{Nothing, <:WbUWbE} = WeightBounds(),
+                       slv::SlvUVecSlv, wb::Option{<:WbUWbE} = WeightBounds(),
                        bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Number, <:BudgetRange} = nothing,
                        lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold} = nothing,
@@ -430,16 +424,16 @@ function JuMPOptimiser(;
                        sgmtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:NumMat,
                                     <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
                                                              <:NumMat}}} = nothing,
-                       slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                       slt::Union{Nothing, <:BtUBtE,
                                   <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                            <:BuyInThresholdEstimator}}} = nothing,
-                       sst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                       sst::Union{Nothing, <:BtUBtE,
                                   <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                            <:BuyInThresholdEstimator}}} = nothing,
-                       sglt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                       sglt::Union{Nothing, <:BtUBtE,
                                    <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                             <:BuyInThresholdEstimator}}} = nothing,
-                       sgst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                       sgst::Union{Nothing, <:BtUBtE,
                                    <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                             <:BuyInThresholdEstimator}}} = nothing,
                        sets::Option{<:AssetSets} = nothing,

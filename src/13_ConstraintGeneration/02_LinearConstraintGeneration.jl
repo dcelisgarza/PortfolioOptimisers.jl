@@ -1790,8 +1790,7 @@ end
 function asset_sets_matrix_view(smtx::NumMat, i; kwargs...)
     return view(smtx, :, i)
 end
-function asset_sets_matrix_view(smtx::Union{Nothing, AssetSetsMatrixEstimator}, ::Any;
-                                kwargs...)
+function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
     return smtx
 end
 function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:NumMat,

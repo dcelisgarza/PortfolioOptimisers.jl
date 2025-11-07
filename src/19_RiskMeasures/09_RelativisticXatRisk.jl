@@ -1,5 +1,5 @@
 function RRM(x::NumVec, slv::SlvUVecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
-             w::Union{Nothing, AbstractWeights} = nothing)
+             w::Option{<:AbstractWeights} = nothing)
     if isa(slv, SlvVec)
         @argcheck(!isempty(slv))
     end
@@ -83,7 +83,7 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T5
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:SlvUVecSlv}, alpha::Number,
-                                     kappa::Number, w::Union{Nothing, AbstractWeights})
+                                     kappa::Number, w::Option{<:AbstractWeights})
         if isa(slv, SlvVec)
             @argcheck(!isempty(slv))
         end
@@ -102,7 +102,7 @@ end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:SlvUVecSlv} = nothing, alpha::Number = 0.05,
                                  kappa::Number = 0.3,
-                                 w::Union{Nothing, AbstractWeights} = nothing)
+                                 w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
 function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,

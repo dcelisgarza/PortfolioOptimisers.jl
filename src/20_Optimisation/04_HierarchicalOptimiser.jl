@@ -45,7 +45,7 @@ function HierarchicalOptimiser(;
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
                                slv::Option{<:SlvUVecSlv} = nothing,
                                fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
-                               wb::Union{Nothing, <:WbUWbE} = WeightBounds(),
+                               wb::Option{<:WbUWbE} = WeightBounds(),
                                sets::Option{<:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)

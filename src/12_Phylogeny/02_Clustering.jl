@@ -169,7 +169,7 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Constructor
 
-    StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+    StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -189,12 +189,11 @@ StandardisedSilhouetteScore
 """
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
-    function StandardisedSilhouetteScore(metric::Union{Nothing, <:Distances.SemiMetric})
+    function StandardisedSilhouetteScore(metric::Option{<:Distances.SemiMetric})
         return new{typeof(metric)}(metric)
     end
 end
-function StandardisedSilhouetteScore(;
-                                     metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+function StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
     return StandardisedSilhouetteScore(metric)
 end
 """

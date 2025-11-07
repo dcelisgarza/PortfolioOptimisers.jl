@@ -2,7 +2,7 @@
 function plot_ptf_cumulative_returns(w::NumArr, X::NumMat,
                                      fees::Option{<:Fees} = nothing;
                                      ts::AbstractVector = 1:size(X, 1),
-                                     f::Union{Nothing, Figure} = Figure(),
+                                     f::Option{<:Figure} = Figure(),
                                      fpos::Tuple = (1, 1), compound::Bool = false,
                                      ax_kwargs::NamedTuple = (; xlabel = "Date",
                                                               ylabel = "$(compound ? "Compound " : "Simple ") Portfolio Cumulative ReturnsResult"),
@@ -33,7 +33,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
                                        ts::AbstractVector = 1:size(X, 1),
                                        nx::AbstractVector = 1:size(X, 2),
                                        N::Option{<:Number} = nothing,
-                                       f::Union{Nothing, Figure} = Figure(),
+                                       f::Option{<:Figure} = Figure(),
                                        fpos::Tuple = (1, 1), compound::Bool = false,
                                        ax_kwargs::NamedTuple = (; xlabel = "Date",
                                                                 ylabel = "$(compound ? "Compound " : "Simple ") Asset Cumulative ReturnsResult"),
@@ -65,7 +65,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
 end
 function plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
                           N::Option{<:Number} = nothing,
-                          f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
+                          f::Option{<:Figure} = Figure(), fpos::Tuple = (1, 1),
                           ax_kwargs::NamedTuple = (; xlabel = "Asset", ylabel = "Weight",
                                                    title = "Portfolio Composition",
                                                    xticklabelrotation = pi / 3),
@@ -86,7 +86,7 @@ function plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
     return f
 end
 function plot_stacked_bar_composition(w::NumArr, nx::AbstractVector = 1:size(w, 1);
-                                      f::Union{Nothing, Figure} = Figure(),
+                                      f::Option{<:Figure} = Figure(),
                                       fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                       ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
                                                                ylabel = "Weight",
@@ -116,7 +116,7 @@ function plot_stacked_bar_composition(w::NumArr, nx::AbstractVector = 1:size(w, 
     return f
 end
 function plot_stacked_area_composition(w::NumArr, nx::AbstractVector = 1:size(w, 1);
-                                       f::Union{Nothing, Figure} = Figure(),
+                                       f::Option{<:Figure} = Figure(),
                                        fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                        ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
                                                                 ylabel = "Weight",
@@ -172,7 +172,7 @@ function hcl_nodes(hcl; useheight = false)
 end
 function plot_dendrogram(clr::AbstractClusteringResult,
                          nx::AbstractVector = 1:length(clr.clustering.order),
-                         f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
+                         f::Option{<:Figure} = Figure(), fpos::Tuple = (1, 1),
                          ax_kwargs::NamedTuple = (; title = "Dendrogram"),
                          node_kwargs::NamedTuple = (; useheight = true),
                          dendrogram_kwargs::NamedTuple = (; colormap = :seaborn_colorblind,
@@ -191,7 +191,7 @@ function plot_dendrogram(clr::AbstractClusteringResult,
 end
 function plot_clusters(clr::AbstractClusteringResult, X::NumMat,
                        nx::AbstractVector = 1:size(X, 1);
-                       f::Union{Nothing, Figure} = Figure(),
+                       f::Option{<:Figure} = Figure(),
                        ax_kwargs::NamedTuple = (; yreversed = true,
                                                 xticklabelrotation = pi / 2, aspect = 1),
                        color_func = x -> if any(x .< zero(eltype(x)))

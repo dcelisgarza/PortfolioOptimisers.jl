@@ -61,11 +61,11 @@ function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...
 end
 struct RandomWeighted{T1} <: NaiveOptimisationEstimator
     rng::T1
-    function RandomWeighted(rng::Union{Nothing, <:AbstractRNG})
+    function RandomWeighted(rng::Option{<:AbstractRNG})
         return new{typeof(rng)}(rng)
     end
 end
-function RandomWeighted(; rng::Union{Nothing, <:AbstractRNG} = nothing)
+function RandomWeighted(; rng::Option{<:AbstractRNG} = nothing)
     return RandomWeighted(rng)
 end
 function optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)

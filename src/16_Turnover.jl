@@ -183,7 +183,7 @@ Propagate or pass through turnover portfolio constraints.
 
 # Returns
 
-  - `tn::Union{Nothing, Turnover}`: The input constraint object, unchanged.
+  - `tn::Option{ <:Turnover}`: The input constraint object, unchanged.
 
 # Examples
 

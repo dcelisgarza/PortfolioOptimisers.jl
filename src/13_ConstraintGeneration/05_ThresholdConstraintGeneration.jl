@@ -1,6 +1,7 @@
 """
-    struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
+    struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
         val::T1
+        dval::T2
     end
 
 Estimator for buy-in threshold portfolio constraints.
@@ -10,10 +11,11 @@ Estimator for buy-in threshold portfolio constraints.
 # Fields
 
   - `val`: Asset-specific threshold values, as a dictionary, pair, or vector of pairs.
+  - `dval`: Default threshold value applied to assets not explicitly specified in `val`.
 
 # Constructor
 
-    BuyInThresholdEstimator(; val::EstValType)
+    BuyInThresholdEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
 
 ## Validation
 
@@ -118,6 +120,7 @@ end
 function BuyInThreshold(; val::NumUNumVec)
     return BuyInThreshold(val)
 end
+const BtUBtE = Union{<:BuyInThreshold, <:BuyInThresholdEstimator}
 function threshold_view(::Nothing, ::Any)
     return nothing
 end
@@ -233,4 +236,4 @@ function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresho
     return [threshold_constraints(ti, sets; kwargs...) for ti in t]
 end
 
-export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints
+export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints, BtUBtE
