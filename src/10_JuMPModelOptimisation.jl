@@ -88,6 +88,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
+const VecSolver = AbstractVector{<:Solver}
 """
     struct JuMPResult{T1, T2} <: AbstractJuMPResult
         trials::T1
@@ -155,7 +156,7 @@ function set_solver_attributes(args...)
 end
 """
     set_solver_attributes(model::JuMP.Model,
-                          settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+                          settings::Union{<:AbstractDict, <:PairVec})
 
 Set multiple solver attributes on a JuMP model.
 
@@ -171,7 +172,7 @@ Iterates over the provided settings and applies each as a solver attribute.
   - `nothing`
 """
 function set_solver_attributes(model::JuMP.Model,
-                               settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+                               settings::Union{<:AbstractDict, <:PairVec})
     for (k, v) in settings
         set_attribute(model, k, v)
     end
@@ -196,7 +197,7 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)
     return nothing
 end
 """
-    optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+    optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:VecSolver})
 
 Attempt to optimise a JuMP model using one or more configured solvers.
 
@@ -217,8 +218,7 @@ Tries each solver in order, applying settings and checking for solution feasibil
   - If a solver fails, records the error and tries the next.
   - Stops at the first successful solution.
 """
-function optimise_JuMP_model!(model::JuMP.Model,
-                              slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+function optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:VecSolver})
     trials = Dict()
     success = false
     for solver in slv

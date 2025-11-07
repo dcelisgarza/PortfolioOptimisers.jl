@@ -1,6 +1,6 @@
 abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
-function setup_alloc_optim(w::AbstractVector, p::AbstractVector, cash::Real,
-                           T::Union{Nothing, <:Real} = nothing,
+function setup_alloc_optim(w::NumVec, p::NumVec, cash::Number,
+                           T::Union{Nothing, <:Number} = nothing,
                            fees::Union{Nothing, <:Fees} = nothing)
     if !isnothing(T) && !isnothing(fees)
         cash -= calc_fees(w, p, fees) * T
@@ -22,7 +22,7 @@ function setup_alloc_optim(w::AbstractVector, p::AbstractVector, cash::Real,
     lcash = cash * lbgt
     return cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash
 end
-function adjust_long_cash(bgt::Real, lcash::Real, scash::Real)
+function adjust_long_cash(bgt::Number, lcash::Number, scash::Number)
     if iszero(scash)
         return lcash
     end

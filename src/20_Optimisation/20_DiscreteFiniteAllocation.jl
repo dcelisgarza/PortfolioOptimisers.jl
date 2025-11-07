@@ -22,10 +22,9 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
     sc::T2
     so::T3
     fb::T4
-    function DiscreteAllocation(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
-                                so::Real,
+    function DiscreteAllocation(slv::Union{<:Solver, <:VecSolver}, sc::Number, so::Number,
                                 fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator})
-        if isa(slv, AbstractVector)
+        if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc > zero(sc))
@@ -33,12 +32,12 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
         return new{typeof(slv), typeof(sc), typeof(so), typeof(fb)}(slv, sc, so, fb)
     end
 end
-function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                            sc::Real = 1, so::Real = 1,
+function DiscreteAllocation(; slv::Union{<:Solver, <:VecSolver}, sc::Number = 1,
+                            so::Number = 1,
                             fb::Union{Nothing, <:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, fb)
 end
-function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
+function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,
                                da::DiscreteAllocation, str_names::Bool = false)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
@@ -83,8 +82,8 @@ function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real,
     acash = value(r)
     return shares, cost, aw, acash, res, model
 end
-function _optimise(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
-                   cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 1e6,
+                   T::Union{Nothing, <:Number} = nothing,
                    fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
                    save::Bool = true, kwargs...)
     @argcheck(!isempty(w))
@@ -128,8 +127,8 @@ function _optimise(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
                                           ifelse(save, smodel, nothing),
                                           ifelse(save, lmodel, nothing), lcash, nothing)
 end
-function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::AbstractVector,
-                  p::AbstractVector, cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::NumVec,
+                  p::NumVec, cash::Number = 1e6, T::Union{Nothing, <:Number} = nothing,
                   fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)

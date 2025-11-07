@@ -63,11 +63,11 @@ function assert_external_optimiser(::OptimisationResult)
     return nothing
 end
 function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
-                                         pr::AbstractPriorResult, wi::AbstractMatrix,
+                                         pr::AbstractPriorResult, wi::NumMat,
                                          resi::AbstractVector{<:OptimisationResult};
                                          kwargs...)
     iv = isnothing(rd.iv) ? nothing : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Real)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
     return pr.X * wi, rd.F, rd.ts, iv, ivpa
 end
 

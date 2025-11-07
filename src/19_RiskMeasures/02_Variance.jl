@@ -125,7 +125,7 @@ Represents the portfolio variance using a covariance matrix.
 # Constructors
 
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+             sigma::Union{Nothing, <:NumMat} = nothing,
              rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
@@ -174,7 +174,7 @@ Where:
 
 # Functor
 
-    (r::Variance)(w::AbstractVector)
+    (r::Variance)(w::NumVec)
 
 Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
 
@@ -191,7 +191,7 @@ Where:
 
 ## Arguments
 
-  - `w::AbstractVector`: Asset weights.
+  - `w::NumVec`: Asset weights.
 
 # Examples
 
@@ -231,11 +231,10 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     sigma::T2
     rc::T3
     alg::T4
-    function Variance(settings::RiskMeasureSettings,
-                      sigma::Union{Nothing, <:AbstractMatrix},
+    function Variance(settings::RiskMeasureSettings, sigma::Union{Nothing, <:NumMat},
                       rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
                       alg::VarianceFormulation)
-        if isa(sigma, AbstractMatrix)
+        if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
@@ -244,12 +243,12 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+                  sigma::Union{Nothing, <:NumMat} = nothing,
                   rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end
-function (r::Variance)(w::AbstractVector)
+function (r::Variance)(w::NumVec)
     return dot(w, r.sigma, w)
 end
 """
@@ -282,7 +281,7 @@ function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
-function risk_measure_view(r::Variance, i::AbstractVector, args...)
+function risk_measure_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
@@ -304,7 +303,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 # Constructors
 
     StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       sigma::Union{Nothing, <:AbstractMatrix} = nothing)
+                       sigma::Union{Nothing, <:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -330,7 +329,7 @@ Where:
 
 # Functor
 
-    (r::StandardDeviation)(w::AbstractVector)
+    (r::StandardDeviation)(w::NumVec)
 
 Computes the standard deviation risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
 
@@ -347,7 +346,7 @@ Where:
 
 ## Arguments
 
-  - `w::AbstractVector`: Asset weights.
+  - `w::NumVec`: Asset weights.
 
 # Examples
 
@@ -379,8 +378,8 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
     settings::T1
     sigma::T2
     function StandardDeviation(settings::RiskMeasureSettings,
-                               sigma::Union{Nothing, <:AbstractMatrix})
-        if isa(sigma, AbstractMatrix)
+                               sigma::Union{Nothing, <:NumMat})
+        if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
@@ -388,10 +387,10 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Union{Nothing, <:AbstractMatrix} = nothing)
+                           sigma::Union{Nothing, <:NumMat} = nothing)
     return StandardDeviation(settings, sigma)
 end
-function (r::StandardDeviation)(w::AbstractVector)
+function (r::StandardDeviation)(w::NumVec)
     return sqrt(dot(w, r.sigma, w))
 end
 """
@@ -424,7 +423,7 @@ function factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwar
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-function risk_measure_view(r::StandardDeviation, i::AbstractVector, args...)
+function risk_measure_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
@@ -444,7 +443,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
     UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                       <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
-                           sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
+                           sigma::Union{Nothing, <:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -531,7 +530,7 @@ Where:
 
 # Functor
 
-    (r::UncertaintySetVariance)(w::AbstractVector)
+    (r::UncertaintySetVariance)(w::NumVec)
 
 Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
 
@@ -548,7 +547,7 @@ Where:
 
 ## Arguments
 
-  - `w::AbstractVector`: Asset weights.
+  - `w::NumVec`: Asset weights.
 
 # Examples
 
@@ -610,8 +609,8 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     function UncertaintySetVariance(settings::RiskMeasureSettings,
                                     ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                                <:AbstractUncertaintySetEstimator},
-                                    sigma::Union{Nothing, <:AbstractMatrix{<:Real}})
-        if isa(sigma, AbstractMatrix)
+                                    sigma::Union{Nothing, <:NumMat})
+        if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
         end
         return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
@@ -620,10 +619,10 @@ end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                            <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
-                                sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
+                                sigma::Union{Nothing, <:NumMat} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
-function (r::UncertaintySetVariance)(w::AbstractVector)
+function (r::UncertaintySetVariance)(w::NumVec)
     return dot(w, r.sigma, w)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
@@ -682,7 +681,7 @@ function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector, args...)
+function risk_measure_view(r::UncertaintySetVariance, i, args...)
     ucs = ucs_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)

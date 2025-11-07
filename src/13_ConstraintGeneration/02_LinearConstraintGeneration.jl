@@ -171,8 +171,8 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     op::T3
     rhs::T4
     eqn::T5
-    function ParsingResult(vars::AbstractVector{<:AbstractString}, coef::NumVec,
-                           op::AbstractString, rhs::Number, eqn::AbstractString)
+    function ParsingResult(vars::StrVec, coef::NumVec, op::AbstractString, rhs::Number,
+                           eqn::AbstractString)
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
                                                                                      coef,
@@ -223,8 +223,8 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     rhs::T4
     eqn::T5
     ij::T6
-    function RhoParsingResult(vars::AbstractVector{<:AbstractString}, coef::NumVec,
-                              op::AbstractString, rhs::Number, eqn::AbstractString,
+    function RhoParsingResult(vars::StrVec, coef::NumVec, op::AbstractString, rhs::Number,
+                              eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
                                                          <:Tuple{<:IntVec, <:IntVec}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
@@ -323,7 +323,7 @@ function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """
-    group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Number,
+    group_to_val!(nx::StrVec, sdict::AbstractDict, key::Any, val::Number,
                   dict::EstValType, arr::NumVec, strict::Bool)
 
 Set values in a vector for all assets belonging to a specified group.
@@ -354,8 +354,8 @@ Set values in a vector for all assets belonging to a specified group.
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
-function group_to_val!(nx::AbstractVector{<:String}, sdict::AbstractDict, key::Any,
-                       val::Number, dict::EstValType, arr::NumVec, strict::Bool)
+function group_to_val!(nx::StrVec, sdict::AbstractDict, key::Any, val::Number,
+                       dict::EstValType, arr::NumVec, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
         msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
@@ -809,8 +809,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
 """
-    parse_equation(eqn::Union{<:AbstractString, Expr,
-                              <:AbstractVector{<:Union{<:AbstractString, Expr}}};
+    parse_equation(eqn::EqnType;
                    ops1::Tuple = ("==", "<=", ">="), ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                    datatype::DataType = Float64, kwargs...)
 
@@ -1199,9 +1198,7 @@ Container for one or more linear constraint equations to be parsed and converted
 
 # Constructor
 
-    LinearConstraintEstimator(;
-                              val::Union{<:AbstractString, Expr,
-                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+    LinearConstraintEstimator(; val::EqnType)
 
 Keyword arguments correspond to the fields above.
 
@@ -1235,19 +1232,14 @@ LinearConstraint
 """
 struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
     val::T1
-    function LinearConstraintEstimator(val::Union{<:AbstractString, Expr,
-                                                  <:AbstractVector{<:Union{<:AbstractString,
-                                                                           Expr}}})
+    function LinearConstraintEstimator(val::EqnType)
         if isa(val, Union{<:AbstractString, <:AbstractVector})
             @argcheck(!isempty(val))
         end
         return new{typeof(val)}(val)
     end
 end
-function LinearConstraintEstimator(;
-                                   val::Union{<:AbstractString, Expr,
-                                              <:AbstractVector{<:Union{<:AbstractString,
-                                                                       Expr}}})
+function LinearConstraintEstimator(; val::EqnType)
     return LinearConstraintEstimator(val)
 end
 """
@@ -1277,8 +1269,7 @@ function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwar
     return lcs
 end
 """
-    linear_constraints(eqn::Union{<:AbstractString, Expr,
-                                  <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+    linear_constraints(eqn::EqnType,
                        sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
                        ops2::Tuple = (:call, :(==), :(<=), :(>=)), datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false)
@@ -1333,9 +1324,7 @@ LinearConstraint
   - [`AssetSets`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(eqn::Union{<:AbstractString, Expr,
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                            sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+function linear_constraints(eqn::EqnType, sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false)
@@ -1798,7 +1787,7 @@ function asset_sets_matrix(smtx::AbstractVector{<:Union{<:NumMat,
 end
 """
 """
-function asset_sets_matrix_view(smtx::NumMat, i::AbstractVector; kwargs...)
+function asset_sets_matrix_view(smtx::NumMat, i; kwargs...)
     return view(smtx, :, i)
 end
 function asset_sets_matrix_view(smtx::Union{Nothing, AssetSetsMatrixEstimator}, ::Any;
@@ -1807,7 +1796,7 @@ function asset_sets_matrix_view(smtx::Union{Nothing, AssetSetsMatrixEstimator}, 
 end
 function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:NumMat,
                                                              <:AssetSetsMatrixEstimator}},
-                                i::AbstractVector; kwargs...)
+                                i; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
 end
 

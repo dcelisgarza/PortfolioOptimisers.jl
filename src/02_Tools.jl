@@ -14,8 +14,8 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    assert_nonempty_nonneg_finite_val(val::Union{<:Real, <:Pair, <:AbstractDict,
-                                        <:AbstractVector{<:Real}, <:AbstractVector{<:Pair}};
+    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:Pair, <:AbstractDict,
+                                        <:NumVec, <:PairVec};
                              val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(args...)
 
@@ -35,11 +35,11 @@ Checks that the provided value (scalar, vector, dictionary, or pair) contains on
 # Validation
 
   - `args...`: always passes.
-  - `Real`: `isfinite(val)` and `val >= 0`.
+  - `Number`: `isfinite(val)` and `val >= 0`.
   - `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
   - `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
-  - `AbstractVector{<:Real}`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-  - `AbstractVector{<:Pair}`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+  - `NumVec`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+  - `PairVec`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
 """
 function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -50,8 +50,7 @@ function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = 
               DomainError("all(x -> 0 <= x, values($val_sym)) must hold. Got\nall(x -> 0 <= x, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::AbstractVector{<:Pair},
-                                           val_sym::Symbol = :val)
+function assert_nonempty_nonneg_finite_val(val::PairVec, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
@@ -60,8 +59,7 @@ function assert_nonempty_nonneg_finite_val(val::AbstractVector{<:Pair},
               DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::Union{<:AbstractVector{<:Real},
-                                                      <:AbstractMatrix{<:Real}},
+function assert_nonempty_nonneg_finite_val(val::Union{<:NumVec, <:NumMat},
                                            val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
@@ -78,7 +76,7 @@ function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Symbol = :val)
               DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::Real, val_sym::Symbol = :val)
+function assert_nonempty_nonneg_finite_val(val::Number, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
@@ -94,16 +92,14 @@ function assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
               DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::AbstractVector{<:Pair}, val_sym::Symbol = :val)
+function assert_nonempty_finite_val(val::PairVec, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
               DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::Union{<:AbstractVector{<:Real},
-                                               <:AbstractMatrix{<:Real}},
-                                    val_sym::Symbol = :val)
+function assert_nonempty_finite_val(val::Union{<:NumVec, <:NumMat}, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -115,7 +111,7 @@ function assert_nonempty_finite_val(val::Pair, val_sym::Symbol = :val)
               DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::Real, val_sym::Symbol = :val)
+function assert_nonempty_finite_val(val::Number, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     return nothing
@@ -132,8 +128,7 @@ function assert_nonempty_geq0_finite_val(val::AbstractDict, val_sym::Symbol = :v
               DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
     return nothing
 end
-function assert_nonempty_geq0_finite_val(val::AbstractVector{<:Pair},
-                                         val_sym::Symbol = :val)
+function assert_nonempty_geq0_finite_val(val::PairVec, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
@@ -142,8 +137,7 @@ function assert_nonempty_geq0_finite_val(val::AbstractVector{<:Pair},
               DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
     return nothing
 end
-function assert_nonempty_geq0_finite_val(val::Union{<:AbstractVector{<:Real},
-                                                    <:AbstractMatrix{<:Real}},
+function assert_nonempty_geq0_finite_val(val::Union{<:NumVec, <:NumMat},
                                          val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
@@ -160,7 +154,7 @@ function assert_nonempty_geq0_finite_val(val::Pair, val_sym::Symbol = :val)
               DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
     return nothing
 end
-function assert_nonempty_geq0_finite_val(val::Real, val_sym::Symbol = :val)
+function assert_nonempty_geq0_finite_val(val::Number, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
@@ -170,21 +164,20 @@ function assert_nonempty_geq0_finite_val(args...)
     return nothing
 end
 """
-    assert_matrix_issquare(A::AbstractMatrix, A_sym::Symbol = :A)
+    assert_matrix_issquare(A::NumMat, A_sym::Symbol = :A)
 
 Assert that `size(A, 1) == size(A, 2)`.
 """
-function assert_matrix_issquare(A::AbstractMatrix, A_sym::Symbol = :A)
+function assert_matrix_issquare(A::NumMat, A_sym::Symbol = :A)
     @argcheck(size(A, 1) == size(A, 2),
               DimensionMismatch("size($A_sym, 1) == size($A_sym, 2) must hold. Got\nsize($A_sym, 1) => $(size(A, 1))\nsize($A_sym, 2) => $(size(A, 2))."))
 end
 """
-    brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
+    brinson_attribution(X::TimeArray, w::NumVec, wb::NumVec,
                         asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
 """
-function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
-                             asset_classes::DataFrame, col, date0 = nothing,
-                             date1 = nothing)
+function brinson_attribution(X::TimeArray, w::NumVec, wb::NumVec, asset_classes::DataFrame,
+                             col, date0 = nothing, date1 = nothing)
     # Efficient filtering of date range
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)
@@ -232,7 +225,7 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
     return df
 end
 """
-    ⊗(A::AbstractArray, B::AbstractArray)
+    ⊗(A::NumArr, B::NumArr)
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
@@ -245,7 +238,7 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
  6  8
 ```
 """
-⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
+⊗(A::NumArr, B::NumArr) = reshape(kron(B, A), (length(A), length(B)))
 """
     ⊙(A, B)
 
@@ -273,9 +266,9 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 6
 ```
 """
-⊙(A::AbstractArray, B::AbstractArray) = A .* B
-⊙(A::AbstractArray, B) = A * B
-⊙(A, B::AbstractArray) = A * B
+⊙(A::NumArr, B::NumArr) = A .* B
+⊙(A::NumArr, B) = A * B
+⊙(A, B::NumArr) = A * B
 ⊙(A, B) = A * B
 """
     ⊘(A, B)
@@ -304,9 +297,9 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 4.0
 ```
 """
-⊘(A::AbstractArray, B::AbstractArray) = A ./ B
-⊘(A::AbstractArray, B) = A / B
-⊘(A, B::AbstractArray) = A ./ B
+⊘(A::NumArr, B::NumArr) = A ./ B
+⊘(A::NumArr, B) = A / B
+⊘(A, B::NumArr) = A ./ B
 ⊘(A, B) = A / B
 """
     ⊕(A, B)
@@ -335,9 +328,9 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 5
 ```
 """
-⊕(A::AbstractArray, B::AbstractArray) = A .+ B
-⊕(A::AbstractArray, B) = A .+ B
-⊕(A, B::AbstractArray) = A .+ B
+⊕(A::NumArr, B::NumArr) = A .+ B
+⊕(A::NumArr, B) = A .+ B
+⊕(A, B::NumArr) = A .+ B
 ⊕(A, B) = A + B
 """
     ⊖(A, B)
@@ -366,23 +359,23 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 6
 ```
 """
-⊖(A::AbstractArray, B::AbstractArray) = A - B
-⊖(A::AbstractArray, B) = A .- B
-⊖(A, B::AbstractArray) = A .- B
+⊖(A::NumArr, B::NumArr) = A - B
+⊖(A::NumArr, B) = A .- B
+⊖(A, B::NumArr) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Real, b::AbstractVector)
-    dot_scalar(a::AbstractVector, b::Real)
-    dot_scalar(a::AbstractVector, b::AbstractVector)
+    dot_scalar(a::Number, b::NumVec)
+    dot_scalar(a::NumVec, b::Number)
+    dot_scalar(a::NumVec, b::NumVec)
 
 Efficient scalar and vector dot product utility.
 
-  - If one argument is a `Real` and the other an `AbstractVector`, returns the scalar times the sum of the vector.
-  - If both arguments are `AbstractVector`s, returns their `dot` product.
+  - If one argument is a `Number` and the other an `NumVec`, returns the scalar times the sum of the vector.
+  - If both arguments are `NumVec`s, returns their `dot` product.
 
 # Returns
 
-  - `Real`: The resulting scalar.
+  - `Number`: The resulting scalar.
 
 # Examples
 
@@ -423,7 +416,7 @@ Encapsulates a vector and a scalar value, commonly used for storing results that
 
 # Constructors
 
-    VecScalar(; v::AbstractVector, s::Real)
+    VecScalar(; v::NumVec, s::Number)
 
 Arguments correspond to the fields above.
 
@@ -465,10 +458,10 @@ Utility for safely viewing or indexing into possibly `nothing`, scalar, or array
   - `x`: Input value.
 
       + `nothing`: returns `nothing`.
-      + `Real`: returns `x`.
-      + `AbstractVector{<:Real}`: returns `view(x, i)`.
-      + `AbstractVector{<:AbstractVector}`: returns `[view(xi, i) for xi in x]`.
-      + `AbstractArray`: returns `view(x, i, i)`.
+      + `Number`: returns `x`.
+      + `NumVec`: returns `view(x, i)`.
+      + `VecNumVec`: returns `[view(xi, i) for xi in x]`.
+      + `NumArr`: returns `view(x, i, i)`.
 
 # Arguments
 
@@ -498,8 +491,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
  fill(3)
 ```
 """
-function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair,
-                                            <:AbstractVector{<:Pair}, <:Dict}, ::Any)
+function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:PairVec, <:Dict},
+                                   ::Any)
     return x
 end
 function nothing_scalar_array_view(x::NumVec, i)
@@ -508,11 +501,10 @@ end
 function nothing_scalar_array_view(x::VecScalar, i)
     return VecScalar(; v = view(x.v, i), s = x.s)
 end
-function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}},
-                                   i)
+function nothing_scalar_array_view(x::NumVec{<:Union{<:NumVec, <:VecScalar}}, i)
     return [view(xi, i) for xi in x]
 end
-function nothing_scalar_array_view(x::AbstractArray, i)
+function nothing_scalar_array_view(x::NumArr, i)
     return view(x, i, i)
 end
 """
@@ -545,7 +537,7 @@ julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
+function nothing_scalar_array_view_odd_order(x::NumArr, i, j)
     return view(x, i, j)
 end
 """
@@ -557,9 +549,9 @@ Utility for safely indexing into possibly `nothing`, scalar, vector, or array va
   - `x`: Input value.
 
       + `nothing`: returns `nothing`.
-      + `Real`: returns `x`.
-      + `AbstractVector`: returns `x[i]`.
-      + `AbstractMatrix`: returns `x[i, i]` or `x[i, j]`.
+      + `Number`: returns `x`.
+      + `NumVec`: returns `x[i]`.
+      + `NumMat`: returns `x[i, i]` or `x[i, j]`.
 
 # Arguments
 
@@ -588,29 +580,29 @@ julia> PortfolioOptimisers.nothing_scalar_array_getindex([1 2; 3 4], 1, 2)
 2
 ```
 """
-function nothing_scalar_array_getindex(x::Real, ::Any)
+function nothing_scalar_array_getindex(x::Number, ::Any)
     return x
 end
 function nothing_scalar_array_getindex(::Nothing, ::Any)
     return nothing
 end
-function nothing_scalar_array_getindex(x::AbstractVector, i)
+function nothing_scalar_array_getindex(x::NumVec, i)
     return x[i]
 end
-function nothing_scalar_array_getindex(x::AbstractMatrix, i)
+function nothing_scalar_array_getindex(x::NumMat, i)
     return x[i, i]
 end
 function nothing_scalar_array_getindex(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
+function nothing_scalar_array_getindex(x::NumMat, i, j)
     return x[i, j]
 end
 function nothing_scalar_array_getindex(x::VecScalar, i)
     return VecScalar(x.v[i], x.s)
 end
 """
-    fourth_moment_index_factory(N::Integer, i::AbstractVector)
+    fourth_moment_index_factory(N::Integer, i)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
@@ -642,7 +634,7 @@ function fourth_moment_index_factory(N::Integer, i)
     return idx
 end
 """
-    traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:AbstractVector} = nothing)
+    traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:NumVec} = nothing)
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -670,7 +662,7 @@ julia> traverse_concrete_subtypes(MyAbstract)
  MyConcrete2
 ```
 """
-function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
+function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:NumVec} = nothing)
     if isnothing(ctarr)
         ctarr = []
     end
@@ -685,9 +677,9 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} =
     return ctarr
 end
 """
-    concrete_typed_array(A::AbstractArray)
+    concrete_typed_array(A::NumArr)
 
-Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
+Convert an `NumArr` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 
 This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
 
@@ -711,7 +703,7 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
  3
 ```
 """
-function concrete_typed_array(A::AbstractArray)
+function concrete_typed_array(A::NumArr)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 function factory(::Nothing, args...; kwargs...)

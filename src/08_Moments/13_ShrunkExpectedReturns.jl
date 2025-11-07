@@ -282,7 +282,7 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::AbstractArray, sigma::AbstractMatrix;
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::NumArr, sigma::NumMat;
                 kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
@@ -303,7 +303,7 @@ Compute the shrinkage target vector for expected returns estimation.
 
 # Returns
 
-  - `b::AbstractArray`: Target vector for shrinkage estimation.
+  - `b::NumArr`: Target vector for shrinkage estimation.
 
 # Related
 
@@ -312,25 +312,24 @@ Compute the shrinkage target vector for expected returns estimation.
   - [`MeanSquaredError`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
-function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
+function target_mean(::GrandMean, mu::NumArr, sigma::NumMat; kwargs...)
     val = mean(mu)
     return range(val, val; length = length(mu))
 end
-function target_mean(::VolatilityWeighted, mu::AbstractArray, sigma::AbstractMatrix;
-                     isigma = nothing, kwargs...)
+function target_mean(::VolatilityWeighted, mu::NumArr, sigma::NumMat; isigma = nothing,
+                     kwargs...)
     if isnothing(isigma)
         isigma = sigma \ I
     end
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
-function target_mean(::MeanSquaredError, mu::AbstractArray, sigma::AbstractMatrix;
-                     T::Integer, kwargs...)
+function target_mean(::MeanSquaredError, mu::NumArr, sigma::NumMat; T::Integer, kwargs...)
     val = tr(sigma) / T
     return range(val, val; length = length(mu))
 end
 """
-    mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    mean(me::ShrunkExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute shrunk expected returns using the specified estimator.
 
@@ -350,7 +349,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 
 # Returns
 
-  - `mu::AbstractArray`: Shrunk expected returns vector.
+  - `mu::NumArr`: Shrunk expected returns vector.
 
 # Details
 
@@ -372,8 +371,8 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - [`ShrunkExpectedReturns`](@ref)
   - [`target_mean`](@ref)
 """
-function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::NumMat;
+                         dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -387,8 +386,8 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
     alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::NumMat;
+                         dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -403,7 +402,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+                         X::NumMat; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)

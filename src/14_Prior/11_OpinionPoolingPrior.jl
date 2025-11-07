@@ -240,8 +240,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
                                  pe1::Union{Nothing,
                                             <:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
-                                 p::Union{Nothing, <:Real},
-                                 w::Union{Nothing, <:AbstractVector},
+                                 p::Union{Nothing, <:Number}, w::Union{Nothing, <:NumVec},
                                  alg::OpinionPoolingAlgorithm,
                                  threads::FLoops.Transducers.Executor)
         @argcheck(!isempty(pes))
@@ -264,15 +263,15 @@ end
 function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
                              pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                             p::Union{Nothing, <:Real} = nothing,
-                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             p::Union{Nothing, <:Number} = nothing,
+                             w::Union{Nothing, <:NumVec} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
 """
-    robust_probabilities(ow::AbstractVector, args...)
-    robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
+    robust_probabilities(ow::NumVec, args...)
+    robust_probabilities(ow::NumVec, pw::NumMat, p::Number)
 
 Compute robust opinion probabilities for consensus formation in opinion pooling.
 
@@ -286,7 +285,7 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 
 # Returns
 
-  - `ow::AbstractVector`: Opinion probabilities for pooling.
+  - `ow::NumVec`: Opinion probabilities for pooling.
 
 # Details
 
@@ -298,10 +297,10 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 
   - [`OpinionPoolingPrior`](@ref)
 """
-function robust_probabilities(ow::AbstractVector, args...)
+function robust_probabilities(ow::NumVec, args...)
     return ow
 end
-function robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
+function robust_probabilities(ow::NumVec, pw::NumMat, p::Number)
     c = pw * ow
     kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
@@ -309,8 +308,8 @@ function robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
     return ow
 end
 """
-    compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
-    compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
+    compute_pooling(::LinearOpinionPooling, ow::NumVec, pw::NumMat)
+    compute_pooling(::LogarithmicOpinionPooling, ow::NumVec, pw::NumMat)
 
 Compute the consensus posterior return distribution from individual prior distributions using opinion pooling.
 
@@ -338,18 +337,17 @@ Compute the consensus posterior return distribution from individual prior distri
   - [`LinearOpinionPooling`](@ref)
   - [`LogarithmicOpinionPooling`](@ref)
 """
-function compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
+function compute_pooling(::LinearOpinionPooling, ow::NumVec, pw::NumMat)
     return pweights(pw * ow)
 end
-function compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector,
-                         pw::AbstractMatrix)
+function compute_pooling(::LogarithmicOpinionPooling, ow::NumVec, pw::NumMat)
     u = log.(pw) * ow
     lse = logsumexp(u)
     return pweights(vec(exp.(u .- lse)))
 end
 """
-    prior(pe::OpinionPoolingPrior, X::AbstractMatrix;
-          F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+    prior(pe::OpinionPoolingPrior, X::NumMat;
+          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
@@ -392,9 +390,8 @@ Compute opinion pooling prior moments for asset returns.
   - [`compute_pooling`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::OpinionPoolingPrior, X::NumMat, F::Union{Nothing, <:NumMat} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

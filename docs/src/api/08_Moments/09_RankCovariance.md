@@ -2,10 +2,10 @@
 
 ```@docs
 KendallCovariance
-cov(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+cov(::KendallCovariance, X::NumMat; dims::Int = 1, kwargs...)
+cor(::KendallCovariance, X::NumMat; dims::Int = 1, kwargs...)
 SpearmanCovariance
-cov(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+cov(::SpearmanCovariance, X::NumMat; dims::Int = 1, kwargs...)
+cor(::SpearmanCovariance, X::NumMat; dims::Int = 1, kwargs...)
 PortfolioOptimisers.RankCovarianceEstimator
 ```

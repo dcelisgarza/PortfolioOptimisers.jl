@@ -9,23 +9,23 @@ StandardisedGerber1
 StandardisedGerber2
 GerberCovariance
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                        <:PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+                        <:PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm}, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                        <:PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+                        <:PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm}, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
 PortfolioOptimisers.BaseGerberCovariance
 PortfolioOptimisers.GerberCovarianceAlgorithm
 PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm
 PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
-PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix,
-                std_vec::AbstractArray)
+PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::NumMat,
+                std_vec::NumArr)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0},
-                X::AbstractMatrix)
-PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
-                std_vec::AbstractArray)
+                X::NumMat)
+PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::NumMat,
+                std_vec::NumArr)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1},
-                X::AbstractMatrix)
-PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
-                std_vec::AbstractArray)
+                X::NumMat)
+PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::NumMat,
+                std_vec::NumArr)
 PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2},
-                X::AbstractMatrix)
+                X::NumMat)
 ```

@@ -1,17 +1,17 @@
 function calc_risk_constraint_target(::LowOrderMoment{<:Any, <:Any, Nothing, <:Any},
-                                     w::AbstractVector, mu::AbstractVector, args...)
+                                     w::NumVec, mu::NumVec, args...)
     return dot(w, mu)
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:AbstractVector,
-                                                       <:Any}, w::AbstractVector, args...)
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:NumVec, <:Any},
+                                     w::NumVec, args...)
     return dot(w, r.mu)
 end
 function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
-                                     w::AbstractVector, ::Any, k)
+                                     w::NumVec, ::Any, k)
     return dot(w, r.mu.v) + r.mu.s * k
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Real, <:Any}, ::Any,
-                                     ::Any, k)
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Number, <:Any},
+                                     ::Any, ::Any, k)
     return r.mu * k
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -59,12 +59,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return mad_risk
 end
-function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Real,
+function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Number,
                                  second_moment, key::Symbol, args...)
     return model[key] = @expression(model, factor * dot(second_moment, second_moment)),
                         sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Real,
+function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Number,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  args...)
     sc = model[:sc]
@@ -76,11 +76,11 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, fact
     return model[key] = @expression(model, factor * tsecond_moment), sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SquaredSOCRiskExpr, i::Any,
-                                 factor::Real, second_moment, key::Symbol, keyt::Symbol,
+                                 factor::Number, second_moment, key::Symbol, keyt::Symbol,
                                  keyc::Symbol, tsecond_moment::AbstractJuMPScalar)
     return model[key] = @expression(model, factor * tsecond_moment^2), sqrt(factor)
 end
-function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Real,
+function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Number,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  tsecond_moment::AbstractJuMPScalar)
     factor = sqrt(factor)
@@ -88,14 +88,13 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, facto
 end
 """
 """
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Real)
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Number)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::AbstractVector,
-                                 factor::Real)
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::NumVec, factor::Number)
     return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt.(ub))
 end
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::Real, factor::Real)
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::Number, factor::Number)
     return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt(ub))
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)

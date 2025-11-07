@@ -2,7 +2,7 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
-    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Real,
+    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::WeightsType)
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
@@ -12,7 +12,7 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Real = 0.05, w::WeightsType = nothing)
+                                alpha::Number = 0.05, w::WeightsType = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
 function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
@@ -26,7 +26,8 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
     r::T4
     w::T5
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
-                                                          alpha::Real, l::Real, r::Real,
+                                                          alpha::Number, l::Number,
+                                                          r::Number,
                                                           w::Union{Nothing,
                                                                    <:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -41,8 +42,8 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
 end
 function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                      alpha::Real = 0.05, l::Real = 1.0,
-                                                      r::Real = 0.02,
+                                                      alpha::Number = 0.05, l::Number = 1.0,
+                                                      r::Number = 0.02,
                                                       w::WeightsType = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
@@ -55,7 +56,7 @@ function factory(r::DistributionallyRobustConditionalValueatRisk,
 end
 function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
                    <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                  <:Any, Nothing}})(x::AbstractVector)
+                                                                  <:Any, Nothing}})(x::NumVec)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
@@ -67,7 +68,7 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
 end
 function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
                    <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                  <:Any, <:AbstractWeights}})(x::AbstractVector)
+                                                                  <:Any, <:AbstractWeights}})(x::NumVec)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -88,8 +89,8 @@ struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     alpha::T2
     beta::T3
     w::T4
-    function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Real,
-                                         beta::Real, w::WeightsType)
+    function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
+                                         beta::Number, w::WeightsType)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -101,7 +102,7 @@ struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
 end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                     alpha::Real = 0.05, beta::Real = 0.05,
+                                     alpha::Number = 0.05, beta::Number = 0.05,
                                      w::WeightsType = nothing)
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
@@ -122,9 +123,9 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
     r_b::T7
     w::T8
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
-                                                               alpha::Real, l_a::Real,
-                                                               r_a::Real, beta::Real,
-                                                               l_b::Real, r_b::Real,
+                                                               alpha::Number, l_a::Number,
+                                                               r_a::Number, beta::Number,
+                                                               l_b::Number, r_b::Number,
                                                                w::Union{Nothing,
                                                                         <:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -139,12 +140,12 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
 end
 function DistributionallyRobustConditionalValueatRiskRange(;
                                                            settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                                           alpha::Real = 0.05,
-                                                           l_a::Real = 1.0,
-                                                           r_a::Real = 0.02,
-                                                           beta::Real = 0.05,
-                                                           l_b::Real = 1.0,
-                                                           r_b::Real = 0.02,
+                                                           alpha::Number = 0.05,
+                                                           l_a::Number = 1.0,
+                                                           r_a::Number = 0.02,
+                                                           beta::Number = 0.05,
+                                                           l_b::Number = 1.0,
+                                                           r_b::Number = 0.02,
                                                            w::Union{Nothing,
                                                                     <:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
@@ -162,7 +163,7 @@ end
 function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing},
                    <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any, <:Any,
                                                                        <:Any, <:Any, <:Any,
-                                                                       <:Any, Nothing}})(x::AbstractVector)
+                                                                       <:Any, Nothing}})(x::NumVec)
     alpha = r.alpha
     aT = alpha * length(x)
     idx1 = ceil(Int, aT)
@@ -188,7 +189,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
                    <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any, <:Any,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any,
-                                                                       <:AbstractWeights}})(x::AbstractVector)
+                                                                       <:AbstractWeights}})(x::NumVec)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -221,16 +222,16 @@ end
 struct ConditionalDrawdownatRisk{T1, T2} <: RiskMeasure
     settings::T1
     alpha::T2
-    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Real)
+    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number)
         @argcheck(zero(alpha) < alpha < one(alpha))
         return new{typeof(settings), typeof(alpha)}(settings, alpha)
     end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                   alpha::Real = 0.05)
+                                   alpha::Number = 0.05)
     return ConditionalDrawdownatRisk(settings, alpha)
 end
-function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
+function (r::ConditionalDrawdownatRisk)(x::NumVec)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     pushfirst!(x, 1)
@@ -256,17 +257,17 @@ struct RelativeConditionalDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                               alpha::Real)
+                                               alpha::Number)
         @argcheck(zero(alpha) < alpha < one(alpha))
         return new{typeof(settings), typeof(alpha)}(settings, alpha)
     end
 end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                           alpha::Real = 0.05)
+                                           alpha::Number = 0.05)
     return RelativeConditionalDrawdownatRisk(settings, alpha)
 end
-function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)
+function (r::RelativeConditionalDrawdownatRisk)(x::NumVec)
     aT = r.alpha * length(x)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)

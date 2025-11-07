@@ -28,8 +28,7 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:QuadRiskExpr},
                                      opt::RiskJuMPOptimisationEstimator,
-                                     nskew_risk::AbstractJuMPScalar, key::Symbol,
-                                     V::AbstractMatrix)
+                                     nskew_risk::AbstractJuMPScalar, key::Symbol, V::NumMat)
     w = model[:w]
     qnskew_risk = model[Symbol(:qd_, key)] = @expression(model, dot(w, V, w))
     ub = variance_risk_bounds_val(false, r.settings.ub)

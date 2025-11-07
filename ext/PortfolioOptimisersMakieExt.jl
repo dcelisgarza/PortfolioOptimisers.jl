@@ -1,5 +1,5 @@
 #=
-function plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractMatrix,
+function plot_ptf_cumulative_returns(w::NumArr, X::NumMat,
                                      fees::Union{Nothing, <:Fees} = nothing;
                                      ts::AbstractVector = 1:size(X, 1),
                                      f::Union{Nothing, Figure} = Figure(),
@@ -15,7 +15,7 @@ function plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractMatrix,
     axislegend(; legend_kwargs...)
     return f
 end
-function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
+function compute_relevant_assets(w::AbstractVector, M::Number, N::Number)
     abs_w = abs.(w)
     idx = sortperm(abs_w; rev = true)
     abs_w /= sum(abs_w)
@@ -28,11 +28,11 @@ function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
     end
     return N, idx
 end
-function plot_asset_cumulative_returns(w::AbstractVector, X::AbstractMatrix,
+function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
                                        fees::Union{Nothing, <:Fees} = nothing;
                                        ts::AbstractVector = 1:size(X, 1),
                                        nx::AbstractVector = 1:size(X, 2),
-                                       N::Union{Nothing, <:Real} = nothing,
+                                       N::Union{Nothing, <:Number} = nothing,
                                        f::Union{Nothing, Figure} = Figure(),
                                        fpos::Tuple = (1, 1), compound::Bool = false,
                                        ax_kwargs::NamedTuple = (; xlabel = "Date",
@@ -63,8 +63,8 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::AbstractMatrix,
     axislegend(; legend_kwargs...)
     return f
 end
-function plot_composition(w::AbstractVector{<:Real}, nx::AbstractVector = 1:length(w);
-                          N::Union{Nothing, <:Real} = nothing,
+function plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
+                          N::Union{Nothing, <:Number} = nothing,
                           f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
                           ax_kwargs::NamedTuple = (; xlabel = "Asset", ylabel = "Weight",
                                                    title = "Portfolio Composition",
@@ -85,7 +85,7 @@ function plot_composition(w::AbstractVector{<:Real}, nx::AbstractVector = 1:leng
     end
     return f
 end
-function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:size(w, 1);
+function plot_stacked_bar_composition(w::NumArr, nx::AbstractVector = 1:size(w, 1);
                                       f::Union{Nothing, Figure} = Figure(),
                                       fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                       ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
@@ -95,7 +95,7 @@ function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:s
                                                                                         2))),
                                                                title = "Portfolio Composition"),
                                       bar_kwargs::NamedTuple = (; colormap = :viridis))
-    if isa(w, AbstractVector{<:AbstractVector})
+    if isa(w, VecNumVec)
         w = hcat(w...)
     end
     ax = Axis(f[fpos...]; ax_kwargs...)
@@ -115,7 +115,7 @@ function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:s
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
-function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:size(w, 1);
+function plot_stacked_area_composition(w::NumArr, nx::AbstractVector = 1:size(w, 1);
                                        f::Union{Nothing, Figure} = Figure(),
                                        fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                        ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
@@ -125,7 +125,7 @@ function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:
                                                                                          2))),
                                                                 title = "Portfolio Composition"),
                                        band_kwargs::NamedTuple = (; colormap = :viridis))
-    if isa(w, AbstractVector{<:AbstractVector})
+    if isa(w, VecNumVec)
         w = hcat(w...)
     end
     cw = cumsum(w; dims = 1)
@@ -189,7 +189,7 @@ function plot_dendrogram(clr::AbstractClusteringResult,
     ax.xticks = xticks
     return f
 end
-function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
+function plot_clusters(clr::AbstractClusteringResult, X::NumMat,
                        nx::AbstractVector = 1:size(X, 1);
                        f::Union{Nothing, Figure} = Figure(),
                        ax_kwargs::NamedTuple = (; yreversed = true,

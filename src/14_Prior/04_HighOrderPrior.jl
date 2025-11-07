@@ -1,5 +1,5 @@
 """
-    block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
+    block_vec_pq(A::NumMat, p::Integer, q::Integer)
 
 Block vectorisation operator.
 
@@ -37,7 +37,7 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 
   - [`dup_elim_sum_matrices`](@ref)
 """
-function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
+function block_vec_pq(A::NumMat, p::Integer, q::Integer)
     mp, nq = size(A)
     @argcheck(mod(mp, p) == 0)
     @argcheck(mod(nq, q) == 0)
@@ -282,10 +282,10 @@ end
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
-function dup_elim_sum_view(::AbstractMatrix, N)
+function dup_elim_sum_view(::NumMat, N)
     return dup_elim_sum_matrices(N)
 end
-function prior_view(pr::HighOrderPrior, i::AbstractVector)
+function prior_view(pr::HighOrderPrior, i)
     idx = fourth_moment_index_factory(length(pr.mu), i)
     kt = pr.kt
     L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
@@ -440,7 +440,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     end
 end
 """
-    prior(pe::HighOrderPriorEstimator, X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::HighOrderPriorEstimator, X::NumMat, F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
 
 Compute high order prior moments for asset returns using a composite estimator.
 
@@ -468,8 +468,8 @@ Compute high order prior moments for asset returns using a composite estimator.
   - [`HighOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+function prior(pe::HighOrderPriorEstimator, X::NumMat,
+               F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

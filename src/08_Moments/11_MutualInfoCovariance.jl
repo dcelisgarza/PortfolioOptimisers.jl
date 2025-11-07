@@ -68,7 +68,7 @@ function factory(ce::MutualInfoCovariance, w::WeightsType = nothing)
                                 normalise = ce.normalise)
 end
 """
-    cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -83,7 +83,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of mutual information-based correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
 
 # Validation
 
@@ -93,10 +93,9 @@ This method computes the pairwise mutual information correlation matrix for the 
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
-                        kwargs...)
+function Statistics.cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -104,7 +103,7 @@ function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int =
     return mutual_info(X, ce.bins, ce.normalise)
 end
 """
-    cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -119,7 +118,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of mutual information-based covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of mutual information-based covariances.
 
 # Validation
 
@@ -131,10 +130,9 @@ This method computes the pairwise mutual information covariance matrix for the i
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
-                        kwargs...)
+function Statistics.cov(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

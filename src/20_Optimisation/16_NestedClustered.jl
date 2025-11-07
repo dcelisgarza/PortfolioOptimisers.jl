@@ -147,7 +147,7 @@ function assert_external_optimiser(opt::NestedClustered)
     end
     return nothing
 end
-function opt_view(nco::NestedClustered, i::AbstractVector, X::AbstractMatrix)
+function opt_view(nco::NestedClustered, i, X::NumMat)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
@@ -163,7 +163,7 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
                                      sets::Union{Nothing, <:AssetSets},
                                      cwf::WeightFinaliser, strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
-                                     res::OptimisationResult, w::AbstractVector;
+                                     res::OptimisationResult, w::NumVec;
                                      datatype::DataType = Float64)
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
                                    datatype = datatype)

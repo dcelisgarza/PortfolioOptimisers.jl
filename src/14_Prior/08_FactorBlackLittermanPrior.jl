@@ -45,10 +45,10 @@ Factor Black-Litterman prior estimator for asset returns.
                               ve::AbstractVarianceEstimator = SimpleVariance(),
                               views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
                               sets::Union{Nothing, <:AssetSets} = nothing,
-                              views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                              w::WeightsType = nothing, rf::Real = 0.0,
-                              l::Union{Nothing, <:Real} = nothing,
-                              tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
+                              views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                              w::WeightsType = nothing, rf::Number = 0.0,
+                              l::Union{Nothing, <:Number} = nothing,
+                              tau::Union{Nothing, <:Number} = nothing, rsd::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -155,10 +155,10 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                        views::Union{<:LinearConstraintEstimator,
                                                     <:BlackLittermanViews},
                                        sets::Union{Nothing, <:AssetSets},
-                                       views_conf::Union{Nothing, <:Real, <:AbstractVector},
-                                       w::Union{Nothing, <:AbstractVector}, rf::Real,
-                                       l::Union{Nothing, <:Real},
-                                       tau::Union{Nothing, <:Real}, rsd::Bool)
+                                       views_conf::Union{Nothing, <:Number, <:NumVec},
+                                       w::Union{Nothing, <:NumVec}, rf::Number,
+                                       l::Union{Nothing, <:Number},
+                                       tau::Union{Nothing, <:Number}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -181,10 +181,11 @@ function FactorBlackLittermanPrior(;
                                    views::Union{<:LinearConstraintEstimator,
                                                 <:BlackLittermanViews},
                                    sets::Union{Nothing, <:AssetSets} = nothing,
-                                   views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                                   w::Union{Nothing, <:AbstractVector} = nothing,
-                                   rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
-                                   tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
+                                   views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                                   w::Union{Nothing, <:NumVec} = nothing, rf::Number = 0.0,
+                                   l::Union{Nothing, <:Number} = nothing,
+                                   tau::Union{Nothing, <:Number} = nothing,
+                                   rsd::Bool = true)
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
@@ -205,7 +206,7 @@ function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+    prior(pe::FactorBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute factor Black-Litterman prior moments for asset returns.
@@ -254,8 +255,8 @@ Compute factor Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::FactorBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+               strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

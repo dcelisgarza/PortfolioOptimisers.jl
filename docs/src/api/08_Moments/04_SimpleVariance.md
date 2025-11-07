@@ -2,8 +2,8 @@
 
 ```@docs
 SimpleVariance
-std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)
-var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
+std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
+std(ve::SimpleVariance, X::NumVec; dims::Int = 1, mean = nothing, kwargs...)
+var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
+var(ve::SimpleVariance, X::NumVec; mean = nothing)
 ```

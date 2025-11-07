@@ -1,4 +1,4 @@
-function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bool = false)
+function drop_correlated(X::NumMat; threshold::Number = 0.95, absolute::Bool = false)
     N = size(X, 2)
     rho = !absolute ? cor(X) : abs.(cor(X))
     mean_rho = mean(rho; dims = 1)
@@ -18,7 +18,7 @@ function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bo
     end
     return setdiff(1:N, to_remove)
 end
-function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
+function drop_incomplete(X::NumMat, any_missing::Bool = true)
     N = size(X, 2)
     return if any_missing
         to_remove = Vector{Int}(undef, 0)
@@ -33,7 +33,7 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
                                                                                                    :]))]
     end
 end
-function select_kextremes(X::AbstractMatrix) end
+function select_kextremes(X::NumMat) end
 function _check_names_and_returns_matrix(names, mat, names_sym, mat_sym)
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
@@ -74,13 +74,13 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
-                  X::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
-                  nf::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
-                  F::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
+    ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
+                  X::Union{Nothing, <:NumMat} = nothing,
+                  nf::Union{Nothing, <:StrVec} = nothing,
+                  F::Union{Nothing, <:NumMat} = nothing,
                   ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
-                  iv::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
-                  ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                  iv::Union{Nothing, <:NumMat} = nothing,
+                  ivpa::Union{Nothing, <:Number, <:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -119,13 +119,11 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
-    function ReturnsResult(nx::Union{Nothing, <:AbstractVector{<:AbstractString}},
-                           X::Union{Nothing, <:AbstractMatrix{<:Real}},
-                           nf::Union{Nothing, <:AbstractVector{<:AbstractString}},
-                           F::Union{Nothing, <:AbstractMatrix{<:Real}},
+    function ReturnsResult(nx::Union{Nothing, <:StrVec}, X::Union{Nothing, <:NumMat},
+                           nf::Union{Nothing, <:StrVec}, F::Union{Nothing, <:NumMat},
                            ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}},
-                           iv::Union{Nothing, <:AbstractMatrix{<:Real}},
-                           ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+                           iv::Union{Nothing, <:NumMat},
+                           ivpa::Union{Nothing, <:Number, <:NumVec})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
@@ -146,7 +144,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_geq0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
-            if isa(ivpa, AbstractVector)
+            if isa(ivpa, NumVec)
                 @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
             end
         end
@@ -154,16 +152,16 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
-function ReturnsResult(; nx::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
-                       X::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
-                       nf::Union{Nothing, <:AbstractVector{<:AbstractString}} = nothing,
-                       F::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
+function ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
+                       X::Union{Nothing, <:NumMat} = nothing,
+                       nf::Union{Nothing, <:StrVec} = nothing,
+                       F::Union{Nothing, <:NumMat} = nothing,
                        ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
-                       iv::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing,
-                       ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                       iv::Union{Nothing, <:NumMat} = nothing,
+                       ivpa::Union{Nothing, <:Number, <:NumVec} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
-function returns_result_view(rd::ReturnsResult, i::AbstractVector)
+function returns_result_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
@@ -174,10 +172,10 @@ end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
                       iv::Union{Nothing, <:TimeArray} = nothing,
-                      ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                      ivpa::Union{Nothing, <:Number, <:NumVec} = nothing,
                       ret_method::Symbol = :simple, padding::Bool = false,
-                      missing_col_percent::Real = 1.0,
-                      missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                      missing_col_percent::Number = 1.0,
+                      missing_row_percent::Union{Nothing, <:Number} = 1.0,
                       collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
                       join_method::Symbol = :outer,
                       impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
@@ -238,10 +236,10 @@ ReturnsResult
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            iv::Union{Nothing, <:TimeArray} = nothing,
-                           ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                           ivpa::Union{Nothing, <:Number, <:NumVec} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
-                           missing_col_percent::Real = 1.0,
-                           missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                           missing_col_percent::Number = 1.0,
+                           missing_row_percent::Union{Nothing, <:Number} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Union{Nothing, Function} = nothing,
                            join_method::Symbol = :outer,

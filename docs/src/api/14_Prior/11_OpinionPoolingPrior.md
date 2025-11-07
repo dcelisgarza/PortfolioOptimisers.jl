@@ -4,8 +4,8 @@
 LinearOpinionPooling
 LogarithmicOpinionPooling
 OpinionPoolingPrior
-prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
+prior(pe::OpinionPoolingPrior, X::NumMat,
+               F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
 PortfolioOptimisers.OpinionPoolingAlgorithm
 PortfolioOptimisers.robust_probabilities

@@ -114,7 +114,7 @@ LinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`GeneralisedLinearModel`](@ref)
-  - [`StatsAPI.fit(::LinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::NumMat, ::NumVec)`](@ref)
 """
 struct LinearModel{T1} <: AbstractRegressionTarget
     kwargs::T1
@@ -139,7 +139,7 @@ function factory(re::LinearModel, w::WeightsType = nothing)
     return LinearModel(; kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+    StatsAPI.fit(target::LinearModel, X::NumMat, y::NumVec)
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
@@ -160,7 +160,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`LinearModel`](@ref)
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
-function StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+function StatsAPI.fit(target::LinearModel, X::NumMat, y::NumVec)
     return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
 end
 """
@@ -197,7 +197,7 @@ GeneralisedLinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
-  - [`StatsAPI.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::NumMat, ::NumVec)`](@ref)
 """
 struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
     args::T1
@@ -223,7 +223,7 @@ function factory(re::GeneralisedLinearModel, w::WeightsType = nothing)
     return GeneralisedLinearModel(; args = re.args, kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+    StatsAPI.fit(target::GeneralisedLinearModel, X::NumMat, y::NumVec)
 
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
@@ -244,7 +244,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GeneralisedLinearModel`](@ref)
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
-function StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+function StatsAPI.fit(target::GeneralisedLinearModel, X::NumMat, y::NumVec)
     return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
 end
 """
@@ -416,8 +416,8 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
-               b::Union{Nothing, <:AbstractVector} = nothing)
+    Regression(; M::NumMat, L::Union{Nothing, <:NumMat} = nothing,
+               b::Union{Nothing, <:NumVec} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -445,10 +445,9 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
-    function Regression(M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix},
-                        b::Union{Nothing, <:AbstractVector})
+    function Regression(M::NumMat, L::Union{Nothing, <:NumMat}, b::Union{Nothing, <:NumVec})
         @argcheck(!isempty(M), IsEmptyError)
-        if isa(b, AbstractVector)
+        if isa(b, NumVec)
             @argcheck(!isempty(b), IsEmptyError)
             @argcheck(length(b) == size(M, 1), DimensionMismatch)
         end
@@ -458,8 +457,8 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
         return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
     end
 end
-function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
-                    b::Union{Nothing, <:AbstractVector} = nothing)
+function Regression(; M::NumMat, L::Union{Nothing, <:NumMat} = nothing,
+                    b::Union{Nothing, <:NumVec} = nothing)
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
@@ -469,7 +468,7 @@ function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
-function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, <:NumMat, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :L)
     else
@@ -477,7 +476,7 @@ function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::S
     end
 end
 """
-    regression_view(re::Regression, i::AbstractVector)
+    regression_view(re::Regression, i)
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
@@ -512,7 +511,7 @@ Regression
 
   - [`Regression`](@ref)
 """
-function regression_view(re::Regression, i::AbstractVector)
+function regression_view(re::Regression, i)
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
@@ -534,7 +533,7 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
 # Related
 
-  - [`regression_view(::Regression, ::AbstractVector)`](@ref)
+  - [`regression_view(::Regression, ::NumVec)`](@ref)
 """
 function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
     return re

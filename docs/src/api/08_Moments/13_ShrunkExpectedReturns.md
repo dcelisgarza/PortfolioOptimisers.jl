@@ -8,7 +8,7 @@ JamesStein
 BayesStein
 BodnarOkhrinParolya
 ShrunkExpectedReturns
-mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::AbstractMatrix; dims::Int = 1, kwargs...)
+mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::NumMat; dims::Int = 1, kwargs...)
 PortfolioOptimisers.AbstractShrunkExpectedReturnsEstimator
 PortfolioOptimisers.AbstractShrunkExpectedReturnsAlgorithm
 PortfolioOptimisers.AbstractShrunkExpectedReturnsTarget

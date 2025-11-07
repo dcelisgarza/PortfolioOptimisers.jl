@@ -25,7 +25,7 @@ Keyword arguments correspond to the fields above.
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`mean(me::SimpleExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
@@ -38,7 +38,7 @@ function SimpleExpectedReturns(; w::WeightsType = nothing)
     return SimpleExpectedReturns(w)
 end
 """
-    mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    mean(me::SimpleExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
@@ -53,7 +53,7 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Returns
 
-  - `mu::Vector{<:Real}`: The expected returns vector.
+  - `mu::Vector{<:Number}`: The expected returns vector.
 
 # Examples
 
@@ -86,8 +86,7 @@ julia> mean(serw, X)
   - [`SimpleExpectedReturns`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function Statistics.mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1,
-                         kwargs...)
+function Statistics.mean(me::SimpleExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
 function factory(me::SimpleExpectedReturns, w::WeightsType = nothing)

@@ -1,7 +1,7 @@
 function set_number_effective_assets!(args...)
     return nothing
 end
-function set_number_effective_assets!(model::JuMP.Model, val::Real)
+function set_number_effective_assets!(model::JuMP.Model, val::Number)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]

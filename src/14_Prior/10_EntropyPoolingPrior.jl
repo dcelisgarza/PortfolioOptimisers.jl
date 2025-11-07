@@ -236,8 +236,8 @@ end
 
 # Constructor
 
-    OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Real = 1,
-                        sc2::Real = 1e3,
+    OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
+                        sc2::Number = 1e3,
                         alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
 Keyword arguments correspond to the fields above.
@@ -275,7 +275,7 @@ struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimise
     sc1::T3
     sc2::T4
     alg::T5
-    function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Real, sc2::Real,
+    function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
                                  alg::AbstractEntropyPoolingOptAlgorithm)
         @argcheck(sc1 >= zero(sc1))
         return new{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2), typeof(alg)}(args,
@@ -285,8 +285,8 @@ struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimise
                                                                                         alg)
     end
 end
-function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Real = 1,
-                             sc2::Real = 1e3,
+function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
+                             sc2::Number = 1e3,
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
@@ -313,8 +313,8 @@ end
 
 # Constructor
 
-    JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc1::Real = 1,
-                       sc2::Real = 1e5, so::Real = 1,
+    JuMPEntropyPooling(; slv::Union{<:Solver, <:VecSolver}, sc1::Number = 1,
+                       sc2::Number = 1e5, so::Number = 1,
                        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
 Keyword arguments correspond to the fields above.
@@ -359,10 +359,9 @@ struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     sc2::T3
     so::T4
     alg::T5
-    function JuMPEntropyPooling(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc1::Real,
-                                sc2::Real, so::Real,
-                                alg::AbstractEntropyPoolingOptAlgorithm)
-        if isa(slv, AbstractVector)
+    function JuMPEntropyPooling(slv::Union{<:Solver, <:VecSolver}, sc1::Number, sc2::Number,
+                                so::Number, alg::AbstractEntropyPoolingOptAlgorithm)
+        if isa(slv, VecSolver)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc1 >= zero(sc1))
@@ -373,8 +372,8 @@ struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
                                                                                    alg)
     end
 end
-function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                            sc1::Real = 1, sc2::Real = 1e5, so::Real = 1,
+function JuMPEntropyPooling(; slv::Union{<:Solver, <:VecSolver}, sc1::Number = 1,
+                            sc2::Number = 1e5, so::Number = 1,
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
@@ -432,7 +431,7 @@ Entropy pooling prior estimator for asset returns.
                         sk_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                         kt_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                         rho_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
-                        var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
+                        var_alpha::Number = 0.05, cvar_alpha::Number = 0.05,
                         sets::Union{Nothing, <:AssetSets} = nothing,
                         ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
                         dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
@@ -545,8 +544,8 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  sk_views::Union{Nothing, <:LinearConstraintEstimator},
                                  kt_views::Union{Nothing, <:LinearConstraintEstimator},
                                  rho_views::Union{Nothing, <:LinearConstraintEstimator},
-                                 var_alpha::Union{Nothing, <:Real},
-                                 cvar_alpha::Union{Nothing, <:Real},
+                                 var_alpha::Union{Nothing, <:Number},
+                                 cvar_alpha::Union{Nothing, <:Number},
                                  sets::Union{Nothing, <:AssetSets},
                                  ds_opt::Union{Nothing, <:CVaREntropyPooling},
                                  dm_opt::Union{Nothing, <:OptimEntropyPooling},
@@ -613,8 +612,8 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              sk_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              kt_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              rho_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
-                             var_alpha::Union{Nothing, <:Real} = nothing,
-                             cvar_alpha::Union{Nothing, <:Real} = nothing,
+                             var_alpha::Union{Nothing, <:Number} = nothing,
+                             cvar_alpha::Union{Nothing, <:Number} = nothing,
                              sets::Union{Nothing, <:AssetSets} = nothing,
                              ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
                              dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
@@ -645,7 +644,7 @@ function factory(pe::EntropyPoolingPrior, w::WeightsType = nothing)
                                alg = pe.alg)
 end
 """
-    add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector, key::Symbol)
+    add_ep_constraint!(epc::AbstractDict, lhs::NumMat, rhs::NumVec, key::Symbol)
 
 Add an entropy pooling view constraint to the constraint dictionary.
 
@@ -667,8 +666,7 @@ Add an entropy pooling view constraint to the constraint dictionary.
   - [`entropy_pooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector,
-                            key::Symbol)
+function add_ep_constraint!(epc::AbstractDict, lhs::NumMat, rhs::NumVec, key::Symbol)
     sc = norm(lhs)
     lhs /= sc
     rhs /= sc
@@ -681,7 +679,7 @@ function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::Abstrac
 end
 """
     replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                        key::Symbol; alpha::Union{Nothing, <:Real} = nothing,
+                        key::Symbol; alpha::Union{Nothing, <:Number} = nothing,
                         strict::Bool = false)
 
 Replace prior references in view parsing results with their corresponding prior values.
@@ -717,7 +715,7 @@ Replace prior references in view parsing results with their corresponding prior 
   - [`prior`](@ref)
 """
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                             key::Symbol, alpha::Union{Nothing, <:Real} = nothing;
+                             key::Symbol, alpha::Union{Nothing, <:Number} = nothing;
                              strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
     nx = sets.dict[sets.key]
@@ -794,7 +792,7 @@ Extract the mean (expected return) for asset `i` from a prior result.
 
 # Returns
 
-  - `mu::Real`: Mean (expected return) for asset `i`.
+  - `mu::Number`: Mean (expected return) for asset `i`.
 
 # Related
 
@@ -880,7 +878,7 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     return nothing
 end
 """
-    fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+    fix_mu!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
             pr::AbstractPriorResult)
 
 Add constraints to fix the mean of specified assets in entropy pooling.
@@ -908,7 +906,7 @@ Add constraints to fix the mean of specified assets in entropy pooling.
   - [`add_ep_constraint!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+function fix_mu!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
                  pr::AbstractPriorResult)
     fix = to_fix .& .!fixed
     if any(fix)
@@ -918,7 +916,7 @@ function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVecto
     return nothing
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Real)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number)
 
 Extract the Value-at-Risk (VaR) for asset `i` from a prior result.
 
@@ -933,7 +931,7 @@ Extract the Value-at-Risk (VaR) for asset `i` from a prior result.
 
 # Returns
 
-  - `var::Real`: Value-at-Risk for asset `i` at level `alpha`.
+  - `var::Number`: Value-at-Risk for asset `i` at level `alpha`.
 
 # Related
 
@@ -942,7 +940,7 @@ Extract the Value-at-Risk (VaR) for asset `i` from a prior result.
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Real)
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number)
     #! Don't use a view, use a copy, value at risk uses partialsort!
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     return ValueatRisk(; alpha = alpha)(pr.X[:, i])
@@ -974,7 +972,7 @@ function ep_var_views!(var_views::Nothing, args...; kwargs...)
 end
 """
     ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::AssetSets, alpha::Real; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::AssetSets, alpha::Number; strict::Bool = false)
 
 Parse and add variance (VaR) view constraints to the entropy pooling constraint dictionary.
 
@@ -1008,7 +1006,7 @@ Parse and add variance (VaR) view constraints to the entropy pooling constraint 
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::AssetSets, alpha::Real;
+                       pr::AbstractPriorResult, sets::AssetSets, alpha::Number;
                        strict::Bool = false)
     var_views = parse_equation(var_views.val; ops1 = ("==", ">="),
                                ops2 = (:call, :(==), :(>=)), datatype = eltype(pr.X))
@@ -1048,7 +1046,7 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     return nothing
 end
 """
-    entropy_pooling(w::AbstractVector, epc::AbstractDict, opt::OptimEntropyPooling)
+    entropy_pooling(w::NumVec, epc::AbstractDict, opt::OptimEntropyPooling)
 
 Solve the dual of the exponential entropy pooling formulation using Optim.jl.
 
@@ -1081,7 +1079,7 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
   - [`EntropyPoolingPrior`](@ref)
   - [`JuMPEntropyPooling`](@ref)
 """
-function entropy_pooling(w::AbstractVector, epc::AbstractDict,
+function entropy_pooling(w::NumVec, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                   <:ExpEntropyPooling})
     T = length(w)
@@ -1131,7 +1129,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     x = Optim.minimizer(result)
     return pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
 end
-function entropy_pooling(w::AbstractVector, epc::AbstractDict,
+function entropy_pooling(w::NumVec, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                   <:LogEntropyPooling})
     T = length(w)
@@ -1185,7 +1183,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 """
-    entropy_pooling(w::AbstractVector, epc::AbstractDict, opt::JuMPEntropyPooling)
+    entropy_pooling(w::NumVec, epc::AbstractDict, opt::JuMPEntropyPooling)
 
 Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
 
@@ -1218,7 +1216,7 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
   - [`EntropyPoolingPrior`](@ref)
   - [`OptimEntropyPooling`](@ref)
 """
-function entropy_pooling(w::AbstractVector, epc::AbstractDict,
+function entropy_pooling(w::NumVec, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                  <:ExpEntropyPooling})
     (; sc1, sc2, so, slv) = opt
@@ -1264,7 +1262,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     return pweights(value.(x))
 end
-function entropy_pooling(w::AbstractVector, epc::AbstractDict,
+function entropy_pooling(w::NumVec, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                  <:LogEntropyPooling})
     (; sc1, sc2, so, slv) = opt
@@ -1315,7 +1313,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     return pweights(value.(x))
 end
 """
-    ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
+    ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Number,
                          w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
                          kwargs...)
 
@@ -1354,7 +1352,7 @@ function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::A
     return entropy_pooling(w, epc, opt)
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number)
 
 Compute the Conditional Value-at-Risk (CVaR) for asset `i` from a prior result.
 
@@ -1369,7 +1367,7 @@ Compute the Conditional Value-at-Risk (CVaR) for asset `i` from a prior result.
 
 # Returns
 
-  - `cvar::Real`: Conditional Value-at-Risk for asset `i` at level `alpha`.
+  - `cvar::Number`: Conditional Value-at-Risk for asset `i` at level `alpha`.
 
 # Related
 
@@ -1378,14 +1376,14 @@ Compute the Conditional Value-at-Risk (CVaR) for asset `i` from a prior result.
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number)
     #! Don't use a view, use a copy, value at risk uses partialsort!
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
 end
 """
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                         pr::AbstractPriorResult, sets::AssetSets, alpha::Real,
+                         pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
                          w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
                          ds_opt::Union{Nothing, <:CVaREntropyPooling},
                          dm_opt::Union{Nothing, <:OptimEntropyPooling}; strict::Bool = false)
@@ -1428,7 +1426,7 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
   - [`entropy_pooling`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
-                              pr::AbstractPriorResult, sets::AssetSets, alpha::Real,
+                              pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
                               w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Union{Nothing, <:CVaREntropyPooling},
                               dm_opt::Union{Nothing, <:OptimEntropyPooling};
@@ -1516,7 +1514,7 @@ Extract the variance for asset `i` from a prior result.
 
 # Returns
 
-  - `sigma::Real`: Variance for asset `i`.
+  - `sigma::Number`: Variance for asset `i`.
 
 # Related
 
@@ -1581,7 +1579,7 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
     return to_fix
 end
 """
-    fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+    fix_sigma!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
                pr::AbstractPriorResult)
 
 Add constraints to fix the variance of specified assets in entropy pooling.
@@ -1609,7 +1607,7 @@ Add constraints to fix the variance of specified assets in entropy pooling.
   - [`add_ep_constraint!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+function fix_sigma!(epc::AbstractDict, fixed::BitVector, to_fix::BitVector,
                     pr::AbstractPriorResult)
     sigma = diag(pr.sigma)
     fix = to_fix .& .!fixed
@@ -1756,7 +1754,7 @@ Extract the prior correlation value between assets `i` and `j` from a prior resu
 
 # Returns
 
-  - `rho::Real`: Correlation coefficient between assets `i` and `j`.
+  - `rho::Number`: Correlation coefficient between assets `i` and `j`.
 
 # Related
 
@@ -1768,8 +1766,7 @@ Extract the prior correlation value between assets `i` and `j` from a prior resu
 function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
     return cov2cor(pr.sigma)[i, j]
 end
-function get_pr_value(pr::AbstractPriorResult, i::AbstractVector{<:Integer},
-                      j::AbstractVector{<:Integer}, args...)
+function get_pr_value(pr::AbstractPriorResult, i::IntVec, j::IntVec, args...)
     return norm(cov2cor(pr.sigma)[i, j]) / length(i)
 end
 """
@@ -1850,7 +1847,7 @@ Extract the skewness for asset `i` from a prior result.
 
 # Returns
 
-  - `skew::Real`: Skewness for asset `i`.
+  - `skew::Number`: Skewness for asset `i`.
 
 # Related
 
@@ -1932,7 +1929,7 @@ Extract the kurtosis for asset `i` from a prior result.
 
 # Returns
 
-  - `kurtosis::Real`: Kurtosis for asset `i`.
+  - `kurtosis::Number`: Kurtosis for asset `i`.
 
 # Related
 
@@ -2010,7 +2007,7 @@ end
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-          X::AbstractMatrix; F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1,
+          X::NumMat; F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute entropy pooling prior moments for asset returns with iterative constraint enforcement.
@@ -2066,8 +2063,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any,
                                        <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-               X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+               X::NumMat, F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1,
+               strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -2084,7 +2081,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pe.w
     end
     fixed = falses(N, 2)
-    epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
+    epc = Dict{Symbol, Tuple{<:NumMat, <:NumVec}}()
 
     # mu and VaR
     pe = factory(pe, w0)
@@ -2142,8 +2139,8 @@ end
 """
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:H0_EntropyPooling}, X::AbstractMatrix;
-          F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+                                  <:H0_EntropyPooling}, X::NumMat;
+          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
@@ -2191,9 +2188,9 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
 """
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:H0_EntropyPooling}, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+                                       <:Any, <:H0_EntropyPooling}, X::NumMat,
+               F::Union{Nothing, <:NumMat} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -2209,7 +2206,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         @argcheck(length(pe.w) == T)
         pe.w
     end
-    epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
+    epc = Dict{Symbol, Tuple{<:NumMat, <:NumVec}}()
     # mu and VaR
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)

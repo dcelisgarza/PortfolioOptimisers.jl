@@ -37,8 +37,7 @@ function HierarchicalEqualRiskContribution(;
                                            fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fb)
 end
-function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
-                  X::AbstractMatrix)
+function opt_view(hec::HierarchicalEqualRiskContribution, i, X::NumMat)
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro
@@ -53,10 +52,9 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
                                              sceo = hec.sceo, threads = hec.threads,
                                              fb = hec.fb)
 end
-function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::AbstractVector,
-                                 rkbo::AbstractVector, cl::AbstractVector,
-                                 ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_o!(::SumScalariser, wk::NumVec, roku::NumVec, rkbo::NumVec,
+                                 cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::NumMat, fees::Union{Nothing, <:Fees})
     crisk = zero(eltype(X))
     for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -66,10 +64,9 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::Abst
     end
     return crisk
 end
-function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::AbstractMatrix,
-                                 rkbo::AbstractVector, cl::AbstractVector,
-                                 ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_o!(::SumScalariser, wk::NumVec, roku::NumMat, rkbo::NumVec,
+                                 cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::NumMat, fees::Union{Nothing, <:Fees})
     crisk = zero(eltype(X))
     for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
@@ -78,10 +75,9 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::Abst
     end
     return crisk
 end
-function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, roku::AbstractVector,
-                                 rkbo::AbstractVector, cl::AbstractVector,
-                                 ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_o!(::MaxScalariser, wk::NumVec, roku::NumVec, rkbo::NumVec,
+                                 cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::NumMat, fees::Union{Nothing, <:Fees})
     crisk = typemin(eltype(X))
     for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -94,10 +90,9 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, roku::Abst
     end
     return crisk
 end
-function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, roku::AbstractMatrix,
-                                 rkbo::AbstractVector, cl::AbstractVector,
-                                 ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_o!(::MaxScalariser, wk::NumVec, roku::NumMat, rkbo::NumVec,
+                                 cl::IntVec, ros::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::NumMat, fees::Union{Nothing, <:Fees})
     crisk = typemin(eltype(X))
     for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
@@ -109,11 +104,10 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, roku::Abst
     end
     return crisk
 end
-function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::AbstractVector,
-                                 roku::AbstractVector, rkbo::AbstractVector,
-                                 cl::AbstractVector,
-                                 ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::NumVec, roku::NumVec,
+                                 rkbo::NumVec, cl::IntVec,
+                                 ros::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                                 fees::Union{Nothing, <:Fees})
     crisk = Vector{eltype(X)}(undef, length(ros))
     for (i, ro) in enumerate(ros)
         unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -123,11 +117,10 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::AbstractVector,
     end
     return logsumexp(crisk) / sce.gamma
 end
-function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::AbstractVector,
-                                 roku::AbstractMatrix, rkbo::AbstractVector,
-                                 cl::AbstractVector,
-                                 ros::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::NumVec, roku::NumMat,
+                                 rkbo::NumVec, cl::IntVec,
+                                 ros::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                                 fees::Union{Nothing, <:Fees})
     crisk = Vector{eltype(X)}(undef, length(ros))
     for (i, ro) in enumerate(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
@@ -136,10 +129,9 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::AbstractVector,
     end
     return logsumexp(crisk) / sce.gamma
 end
-function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::AbstractVector,
-                                 cl::AbstractVector,
-                                 ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_i!(::SumScalariser, wk::NumVec, riku::NumVec, cl::IntVec,
+                                 ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                                 fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
@@ -149,10 +141,9 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::Abst
     end
     return view(risk, :, 2)
 end
-function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::AbstractMatrix,
-                                 cl::AbstractVector,
-                                 ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_i!(::SumScalariser, wk::NumVec, riku::NumMat, cl::IntVec,
+                                 ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                                 fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
@@ -162,10 +153,9 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::Abst
     end
     return view(risk, :, 2)
 end
-function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::AbstractVector,
-                                 cl::AbstractVector,
-                                 ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_i!(::MaxScalariser, wk::NumVec, riku::NumVec, cl::IntVec,
+                                 ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                                 fees::Union{Nothing, <:Fees})
     risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
@@ -180,10 +170,9 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::Abst
     end
     return view(risk, :, 2)
 end
-function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::AbstractMatrix,
-                                 cl::AbstractVector,
-                                 ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_i!(::MaxScalariser, wk::NumVec, riku::NumMat, cl::IntVec,
+                                 ris::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                                 fees::Union{Nothing, <:Fees})
     risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
@@ -198,10 +187,9 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::Abst
     end
     return view(risk, :, 2)
 end
-function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
-                                 riku::AbstractVector, cl::AbstractVector,
-                                 ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::NumVec, riku::NumVec,
+                                 cl::IntVec, ris::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::NumMat, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
@@ -211,10 +199,9 @@ function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
     end
     return log.(exp.(view(risk, :, 2))) / sce.gamma
 end
-function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
-                                 riku::AbstractMatrix, cl::AbstractVector,
-                                 ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::NumVec, riku::NumMat,
+                                 cl::IntVec, ris::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::NumMat, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
@@ -227,7 +214,7 @@ end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -259,7 +246,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -291,7 +278,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
         ro = ri
@@ -322,7 +309,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
         ro = ri
@@ -351,7 +338,7 @@ end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -374,7 +361,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:Any, <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
                             datatype = eltype(pr.X))
@@ -398,7 +385,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:SequentialEx},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
@@ -423,7 +410,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any,
                                                           <:FLoops.Transducers.Executor},
-                   pr::AbstractPriorResult, cls::AbstractVector)
+                   pr::AbstractPriorResult, cls::IntVec)
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,

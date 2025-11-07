@@ -117,7 +117,7 @@ function Base.getproperty(obj::FactorPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1, kwargs...)
+    prior(pe::FactorPrior, X::NumMat, F::NumMat; dims::Int = 1, kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -146,8 +146,7 @@ Compute factor-based prior moments for asset returns using a factor model.
   - [`EmpiricalPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
-               kwargs...)
+function prior(pe::FactorPrior, X::NumMat, F::NumMat; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

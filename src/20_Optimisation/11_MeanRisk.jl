@@ -6,12 +6,12 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     fb::T5
     function MeanRisk(opt::JuMPOptimiser,
                       r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                      obj::ObjectiveFunction, wi::Union{Nothing, <:AbstractVector{<:Real}},
+                      obj::ObjectiveFunction, wi::Union{Nothing, <:NumVec},
                       fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
-        if isa(wi, AbstractVector)
+        if !isnothing(wi)
             @argcheck(!isempty(wi))
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
@@ -21,11 +21,11 @@ end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
                   r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(),
-                  wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                  wi::Union{Nothing, <:NumVec} = nothing,
                   fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
 end
-function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
+function opt_view(mr::MeanRisk, i, X::NumMat)
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
@@ -37,7 +37,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
-function compute_ret_lbs(lbs::AbstractVector, args...)
+function compute_ret_lbs(lbs::NumVec, args...)
     return lbs
 end
 function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
@@ -79,9 +79,8 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     return retcodes, sols
 end
 function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                r::RiskMeasure, risk_frontier::AbstractVector,
-                                w_min::AbstractVector, w_max::AbstractVector,
-                                i::Integer = 1)
+                                r::RiskMeasure, risk_frontier::NumVec, w_min::NumVec,
+                                w_max::NumVec, i::Integer = 1)
     (; N, factor, flag) = risk_frontier[i].second[2]
     rk_min = expected_risk(r, w_min, pr.X, fees)
     rk_max = expected_risk(r, w_max, pr.X, fees)
@@ -96,8 +95,8 @@ end
 function rebuild_risk_frontier(model::JuMP.Model,
                                mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
                                ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
-                               fees::Union{Nothing, <:Fees}, risk_frontier::AbstractVector,
-                               idx::AbstractVector)
+                               fees::Union{Nothing, <:Fees}, risk_frontier::NumVec,
+                               idx::IntVec)
     risk_frontier = copy(risk_frontier)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
@@ -116,8 +115,7 @@ function rebuild_risk_frontier(model::JuMP.Model,
 end
 function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:Any, <:Any},
                                ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
-                               fees::Union{Nothing, <:Fees}, risk_frontier::AbstractVector,
-                               args...)
+                               fees::Union{Nothing, <:Fees}, risk_frontier::NumVec, args...)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
@@ -134,7 +132,7 @@ function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     risk_frontier = model[:risk_frontier]
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)
-        if !isa(rkf.second[2], AbstractVector)
+        if !isa(rkf.second[2], NumVec)
             push!(idx, i)
         end
     end

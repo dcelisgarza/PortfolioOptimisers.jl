@@ -48,7 +48,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
     SemiDefinitePhylogenyEstimator(;
                                    pe::Union{<:AbstractPhylogenyEstimator,
                                              <:AbstractClusteringResult} = NetworkEstimator(),
-                                   p::Real = 0.05)
+                                   p::Number = 0.05)
 
 ## Validation
 
@@ -95,7 +95,8 @@ struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEsti
     pe::T1
     p::T2
     function SemiDefinitePhylogenyEstimator(pe::Union{<:AbstractPhylogenyEstimator,
-                                                      <:AbstractClusteringResult}, p::Real)
+                                                      <:AbstractClusteringResult},
+                                            p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pe), typeof(p)}(pe, p)
     end
@@ -103,7 +104,7 @@ end
 function SemiDefinitePhylogenyEstimator(;
                                         pe::Union{<:AbstractPhylogenyEstimator,
                                                   <:AbstractClusteringResult} = NetworkEstimator(),
-                                        p::Real = 0.05)
+                                        p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
 """
@@ -124,8 +125,8 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 # Constructor
 
     SemiDefinitePhylogeny(;
-                          A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
-                                   <:AbstractMatrix{<:Real}}, p::Real = 0.05)
+                          A::Union{<:PhylogenyResult{<:NumMat},
+                                   <:NumMat}, p::Number = 0.05)
 
 ## Validation
 
@@ -150,24 +151,23 @@ SemiDefinitePhylogeny
 struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
-    function SemiDefinitePhylogeny(A::AbstractMatrix{<:Real}, p::Real)
+    function SemiDefinitePhylogeny(A::NumMat, p::Number)
         @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         @argcheck(p >= zero(p))
         return new{typeof(A), typeof(p)}(A, p)
     end
 end
-function SemiDefinitePhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}}, p::Real)
+function SemiDefinitePhylogeny(A::PhylogenyResult{<:NumMat}, p::Number)
     return SemiDefinitePhylogeny(A.X, p)
 end
-function SemiDefinitePhylogeny(;
-                               A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
-                                        <:AbstractMatrix{<:Real}}, p::Real = 0.05)
+function SemiDefinitePhylogeny(; A::Union{<:PhylogenyResult{<:NumMat}, <:NumMat},
+                               p::Number = 0.05)
     return SemiDefinitePhylogeny(A, p)
 end
 """
     _validate_length_integer_phylogeny_constraint_B(alg::Union{Nothing, <:Integer},
-                                                    B::AbstractVector)
+                                                    B::NumVec)
 
 Validate that the length of the vector `B` does not exceed the integer value `alg`.
 
@@ -200,7 +200,7 @@ This function is used internally to ensure that the number of groups or allocati
   - [`validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::AbstractVector)
+function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::NumVec)
     @argcheck(length(B) <= alg,
               DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
     return nothing
@@ -209,7 +209,7 @@ function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator, B::AbstractVector)
+    validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator, B::NumVec)
     validate_length_integer_phylogeny_constraint_B(args...)
 
 Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pe`.
@@ -240,8 +240,7 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator,
-                                                        B::AbstractVector)
+function validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator, B::NumVec)
     if !isnothing(pe.onc.max_k)
         @argcheck(length(B) <= pe.onc.max_k,
                   DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
@@ -274,8 +273,8 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
     IntegerPhylogenyEstimator(;
                               pe::Union{<:AbstractPhylogenyEstimator,
                                         <:AbstractClusteringResult} = NetworkEstimator(),
-                              B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                              scale::Real = 100_000.0)
+                              B::Union{<:Integer, <:IntVec} = 1,
+                              scale::Number = 100_000.0)
 
 ## Validation
 
@@ -327,10 +326,9 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
     scale::T3
     function IntegerPhylogenyEstimator(pe::Union{<:AbstractPhylogenyEstimator,
                                                  <:AbstractClusteringResult},
-                                       B::Union{<:Integer, <:AbstractVector{<:Integer}},
-                                       scale::Real)
+                                       B::Union{<:Integer, <:IntVec}, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
-        if isa(B, AbstractVector)
+        if isa(B, IntVec)
             validate_length_integer_phylogeny_constraint_B(pe, B)
         end
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
@@ -339,8 +337,8 @@ end
 function IntegerPhylogenyEstimator(;
                                    pe::Union{<:AbstractPhylogenyEstimator,
                                              <:AbstractClusteringResult} = NetworkEstimator(),
-                                   B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                                   scale::Real = 100_000.0)
+                                   B::Union{<:Integer, <:IntVec} = 1,
+                                   scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
 """
@@ -363,10 +361,10 @@ Container for the result of integer phylogeny-based constraint generation.
 # Constructor
 
     IntegerPhylogeny(;
-                     A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
-                              <:AbstractMatrix{<:Real}},
-                     B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                     scale::Real = 100_000.0)
+                     A::Union{<:PhylogenyResult{<:NumMat},
+                              <:NumMat},
+                     B::Union{<:Integer, <:IntVec} = 1,
+                     scale::Number = 100_000.0)
 
 ## Validation
 
@@ -396,33 +394,29 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     A::T1
     B::T2
     scale::T3
-    function IntegerPhylogeny(A::AbstractMatrix{<:Real},
-                              B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
+    function IntegerPhylogeny(A::NumMat, B::Union{<:Integer, <:IntVec}, scale::Number)
         @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
         assert_nonempty_nonneg_finite_val(B, :B)
-        if isa(B, AbstractVector)
+        if isa(B, IntVec)
             @argcheck(size(A, 1) == length(B))
         end
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}},
-                          B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
+function IntegerPhylogeny(A::PhylogenyResult{<:NumMat}, B::Union{<:Integer, <:IntVec},
+                          scale::Number)
     return IntegerPhylogeny(A.X, B, scale)
 end
-function IntegerPhylogeny(;
-                          A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
-                                   <:AbstractMatrix{<:Real}},
-                          B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                          scale::Real = 100_000.0)
+function IntegerPhylogeny(; A::Union{<:PhylogenyResult{<:NumMat}, <:NumMat},
+                          B::Union{<:Integer, <:IntVec} = 1, scale::Number = 100_000.0)
     return IntegerPhylogeny(A, B, scale)
 end
 """
     phylogeny_constraints(est::Union{<:SemiDefinitePhylogenyEstimator,
                                      <:IntegerPhylogenyEstimator, <:SemiDefinitePhylogeny,
-                                     <:IntegerPhylogeny, Nothing}, X::AbstractMatrix;
+                                     <:IntegerPhylogeny, Nothing}, X::NumMat;
                           dims::Int = 1, kwargs...)
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
@@ -459,13 +453,13 @@ Generate phylogeny-based portfolio constraints from an estimator or result.
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::AbstractMatrix;
+function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::NumMat;
                                dims::Int = 1, kwargs...)
     return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
                                  p = plc.p)
 end
-function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::AbstractMatrix;
-                               dims::Int = 1, kwargs...)
+function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::NumMat; dims::Int = 1,
+                               kwargs...)
     return IntegerPhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
                             B = plc.B, scale = plc.scale)
 end
@@ -588,7 +582,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
 """
 struct MaxValue <: VectorToRealMeasure end
 """
-    vec_to_real_measure(measure::Union{<:VectorToRealMeasure, <:Real}, val::AbstractVector)
+    vec_to_real_measure(measure::Union{<:VectorToRealMeasure, <:Number}, val::NumVec)
 
 Reduce a vector of real values to a single real value using a specified measure.
 
@@ -597,11 +591,11 @@ Reduce a vector of real values to a single real value using a specified measure.
 # Arguments
 
   - `measure`: An instance of a concrete subtype of [`VectorToRealMeasure`](@ref), or the predefined value to return.
-  - `val`: A vector of real values to be reduced (ignored if `measure` is a `Real`).
+  - `val`: A vector of real values to be reduced (ignored if `measure` is a `Number`).
 
 # Returns
 
-  - `score::Real`: computed value according to `measure`.
+  - `score::Number`: computed value according to `measure`.
 
 # Examples
 
@@ -621,19 +615,19 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
   - [`MedianValue`](@ref)
   - [`MaxValue`](@ref)
 """
-function vec_to_real_measure(::MinValue, val::AbstractVector)
+function vec_to_real_measure(::MinValue, val::NumVec)
     return minimum(val)
 end
-function vec_to_real_measure(::MeanValue, val::AbstractVector)
+function vec_to_real_measure(::MeanValue, val::NumVec)
     return mean(val)
 end
-function vec_to_real_measure(::MedianValue, val::AbstractVector)
+function vec_to_real_measure(::MedianValue, val::NumVec)
     return median(val)
 end
-function vec_to_real_measure(::MaxValue, val::AbstractVector)
+function vec_to_real_measure(::MaxValue, val::NumVec)
     return maximum(val)
 end
-function vec_to_real_measure(val::Real, ::AbstractVector)
+function vec_to_real_measure(val::Number, ::NumVec)
     return val
 end
 """
@@ -650,13 +644,13 @@ Estimator for generating centrality-based portfolio constraints.
 # Fields
 
   - `A`: Centrality estimator.
-  - `B`: Real value or reduction measure.
+  - `B`: Number value or reduction measure.
   - `comp`: Comparison operator.
 
 # Constructor
 
     CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                         B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
+                         B::Union{<:Number, <:VectorToRealMeasure} = MinValue(),
                          comp::ComparisonOperator = LEQ())
 
 # Examples
@@ -706,20 +700,20 @@ struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
     B::T2
     comp::T3
     function CentralityConstraint(A::CentralityEstimator,
-                                  B::Union{<:Real, <:VectorToRealMeasure},
+                                  B::Union{<:Number, <:VectorToRealMeasure},
                                   comp::ComparisonOperator)
         return new{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
     end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                              B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
+                              B::Union{<:Number, <:VectorToRealMeasure} = MinValue(),
                               comp::ComparisonOperator = LEQ())
     return CentralityConstraint(A, B, comp)
 end
 """
     centrality_constraints(ccs::Union{<:CentralityConstraint,
                                       <:AbstractVector{<:CentralityConstraint}},
-                           X::AbstractMatrix; dims::Int = 1, kwargs...)
+                           X::NumMat; dims::Int = 1, kwargs...)
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
 
@@ -752,7 +746,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 """
 function centrality_constraints(ccs::Union{<:CentralityConstraint,
                                            <:AbstractVector{<:CentralityConstraint}},
-                                X::AbstractMatrix; dims::Int = 1, kwargs...)
+                                X::NumMat; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs))
     end

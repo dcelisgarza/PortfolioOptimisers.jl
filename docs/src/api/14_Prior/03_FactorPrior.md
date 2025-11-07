@@ -2,6 +2,6 @@
 
 ```@docs
 FactorPrior
-prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+prior(pe::FactorPrior, X::NumMat, F::NumMat; dims::Int = 1,
                kwargs...)
 ```

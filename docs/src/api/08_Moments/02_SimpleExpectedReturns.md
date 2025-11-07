@@ -2,5 +2,5 @@
 
 ```@docs
 SimpleExpectedReturns
-mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+mean(me::SimpleExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
 ```

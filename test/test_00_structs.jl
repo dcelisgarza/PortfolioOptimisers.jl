@@ -185,9 +185,9 @@
         @test_throws DomainError TurnoverEstimator(; w = [1], val = Dict("a" => Inf))
 
         @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
-                                                    val = Dict{String, Real}())
+                                                    val = Dict{String, Number}())
         @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
-                                                    val = Pair{String, Real}[])
+                                                    val = Pair{String, Number}[])
 
         @test_throws DomainError TurnoverEstimator(; w = [1], val =  val = "a" => 1 ,
                                                    dval = -eps())
@@ -219,8 +219,8 @@
         @test_throws DomainError FeesEstimator(; l = ["a" => Inf])
         @test_throws DomainError FeesEstimator(; l = Dict("a" => -1))
         @test_throws DomainError FeesEstimator(; l = Dict("a" => Inf))
-        @test_throws IsEmptyError FeesEstimator(; l = Dict{String, Real}())
-        @test_throws IsEmptyError FeesEstimator(; l = Pair{String, Real}[])
+        @test_throws IsEmptyError FeesEstimator(; l = Dict{String, Number}())
+        @test_throws IsEmptyError FeesEstimator(; l = Pair{String, Number}[])
 
         @test_throws DomainError FeesEstimator(; s = "a" => -1)
         @test_throws DomainError FeesEstimator(; s = "a" => Inf)
@@ -228,8 +228,8 @@
         @test_throws DomainError FeesEstimator(; s = ["a" => Inf])
         @test_throws DomainError FeesEstimator(; s = Dict("a" => -1))
         @test_throws DomainError FeesEstimator(; s = Dict("a" => Inf))
-        @test_throws IsEmptyError FeesEstimator(; s = Dict{String, Real}())
-        @test_throws IsEmptyError FeesEstimator(; s = Pair{String, Real}[])
+        @test_throws IsEmptyError FeesEstimator(; s = Dict{String, Number}())
+        @test_throws IsEmptyError FeesEstimator(; s = Pair{String, Number}[])
 
         @test_throws DomainError FeesEstimator(; fl = "a" => -1)
         @test_throws DomainError FeesEstimator(; fl = "a" => Inf)
@@ -237,8 +237,8 @@
         @test_throws DomainError FeesEstimator(; fl = ["a" => Inf])
         @test_throws DomainError FeesEstimator(; fl = Dict("a" => -1))
         @test_throws DomainError FeesEstimator(; fl = Dict("a" => Inf))
-        @test_throws IsEmptyError FeesEstimator(; fl = Dict{String, Real}())
-        @test_throws IsEmptyError FeesEstimator(; fl = Pair{String, Real}[])
+        @test_throws IsEmptyError FeesEstimator(; fl = Dict{String, Number}())
+        @test_throws IsEmptyError FeesEstimator(; fl = Pair{String, Number}[])
 
         @test_throws DomainError FeesEstimator(; fs = "a" => -1)
         @test_throws DomainError FeesEstimator(; fs = "a" => Inf)
@@ -246,8 +246,8 @@
         @test_throws DomainError FeesEstimator(; fs = ["a" => Inf])
         @test_throws DomainError FeesEstimator(; fs = Dict("a" => -1))
         @test_throws DomainError FeesEstimator(; fs = Dict("a" => Inf))
-        @test_throws IsEmptyError FeesEstimator(; fs = Dict{String, Real}())
-        @test_throws IsEmptyError FeesEstimator(; fs = Pair{String, Real}[])
+        @test_throws IsEmptyError FeesEstimator(; fs = Dict{String, Number}())
+        @test_throws IsEmptyError FeesEstimator(; fs = Pair{String, Number}[])
 
         f = FeesEstimator(; l = "a" => 1, s = ["a" => 1], fl = Dict("a" => 1), fs = 1)
     end

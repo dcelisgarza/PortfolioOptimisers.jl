@@ -31,8 +31,8 @@ Black-Litterman prior estimator for asset returns.
                         mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                         views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
                         sets::Union{Nothing, <:AssetSets} = nothing,
-                        views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                        rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
+                        views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                        rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -120,9 +120,8 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
                                  views::Union{<:LinearConstraintEstimator,
                                               <:BlackLittermanViews},
                                  sets::Union{Nothing, <:AssetSets},
-                                 views_conf::Union{Nothing, <:Real,
-                                                   <:AbstractVector{<:Real}}, rf::Real,
-                                 tau::Union{Nothing, <:Real})
+                                 views_conf::Union{Nothing, <:Number, <:NumVec}, rf::Number,
+                                 tau::Union{Nothing, <:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -141,8 +140,8 @@ function BlackLittermanPrior(;
                              views::Union{<:LinearConstraintEstimator,
                                           <:BlackLittermanViews},
                              sets::Union{Nothing, <:AssetSets} = nothing,
-                             views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                             rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
+                             views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                             rf::Number = 0.0, tau::Union{Nothing, <:Number} = nothing)
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
@@ -160,8 +159,8 @@ function factory(pe::BlackLittermanPrior, w::WeightsType = nothing)
                                tau = pe.tau)
 end
 """
-    calc_omega(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, P::AbstractMatrix,
-               sigma::AbstractMatrix)
+    calc_omega(views_conf::Union{Nothing, <:Number, <:NumVec}, P::NumMat,
+               sigma::NumMat)
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.
 
@@ -172,8 +171,8 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
   - `views_conf`:
 
       + `::Nothing`: Indicates no view confidence is specified, `Diagonal(P * sigma * transpose(P))`.
-      + `::Real`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
-      + `::AbstractVector{<:Real}`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
+      + `::Number`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
+      + `::NumVec`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
 
   - `P`: The view matrix (views × assets).
   - `sigma`: The prior covariance matrix (assets × assets).
@@ -187,21 +186,21 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
   - [`BlackLittermanPrior`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function calc_omega(::Nothing, P::AbstractMatrix, sigma::AbstractMatrix)
+function calc_omega(::Nothing, P::NumMat, sigma::NumMat)
     return Diagonal(P * sigma * transpose(P))
 end
-function calc_omega(views_conf::Real, P::AbstractMatrix, sigma::AbstractMatrix)
+function calc_omega(views_conf::Number, P::NumMat, sigma::NumMat)
     alphas = inv(views_conf) - one(eltype(views_conf))
     return Diagonal(alphas .* P * sigma * transpose(P))
 end
-function calc_omega(views_conf::AbstractVector, P::AbstractMatrix, sigma::AbstractMatrix)
+function calc_omega(views_conf::NumVec, P::NumMat, sigma::NumMat)
     alphas = inv.(views_conf) .- one(eltype(views_conf))
     return Diagonal(alphas .* P * sigma * transpose(P))
 end
 """
-    vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
-                       prior_sigma::AbstractMatrix, omega::AbstractMatrix, P::AbstractMatrix,
-                       Q::AbstractVector)
+    vanilla_posteriors(tau::Number, rf::Number, prior_mu::NumVec,
+                       prior_sigma::NumMat, omega::NumMat, P::NumMat,
+                       Q::NumVec)
 
 Compute the Black-Litterman posterior mean and covariance for asset returns.
 
@@ -219,17 +218,16 @@ Compute the Black-Litterman posterior mean and covariance for asset returns.
 
 # Returns
 
-  - `posterior_mu::Vector{<:Real}`: Posterior mean vector of asset returns.
-  - `posterior_sigma::Matrix{<:Real}`: Posterior covariance matrix of asset returns.
+  - `posterior_mu::Vector{<:Number}`: Posterior mean vector of asset returns.
+  - `posterior_sigma::Matrix{<:Number}`: Posterior covariance matrix of asset returns.
 
 # Related
 
   - [`BlackLittermanPrior`](@ref)
   - [`calc_omega`](@ref)
 """
-function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
-                            prior_sigma::AbstractMatrix, omega::AbstractMatrix,
-                            P::AbstractMatrix, Q::AbstractVector)
+function vanilla_posteriors(tau::Number, rf::Number, prior_mu::NumVec, prior_sigma::NumMat,
+                            omega::NumMat, P::NumMat, Q::NumVec)
     v1 = tau * prior_sigma * transpose(P)
     v2 = P * v1 + omega
     v3 = Q - P * prior_mu
@@ -238,8 +236,8 @@ function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
     return posterior_mu, posterior_sigma
 end
 """
-    prior(pe::BlackLittermanPrior, X::AbstractMatrix;
-          F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+    prior(pe::BlackLittermanPrior, X::NumMat;
+          F::Union{Nothing, <:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute the Black-Litterman prior moments for asset returns.
@@ -250,7 +248,7 @@ Compute the Black-Litterman prior moments for asset returns.
 
   - `pe`: Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
-  - `F{Nothing, <:AbstractMatrix}`: Optional factor matrix (default: `nothing`).
+  - `F{Nothing, <:NumMat}`: Optional factor matrix (default: `nothing`).
   - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
@@ -282,9 +280,8 @@ Compute the Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::BlackLittermanPrior, X::NumMat, F::Union{Nothing, <:NumMat} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

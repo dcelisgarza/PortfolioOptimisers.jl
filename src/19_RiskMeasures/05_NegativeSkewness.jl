@@ -6,8 +6,7 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     alg::T5
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator,
-                              sk::Union{Nothing, <:AbstractMatrix},
-                              V::Union{Nothing, <:AbstractMatrix},
+                              sk::Union{Nothing, <:NumMat}, V::Union{Nothing, <:NumMat},
                               alg::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr,
                                          <:SOCRiskExpr})
         sk_flag = isnothing(sk)
@@ -28,16 +27,16 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                          sk::Union{Nothing, <:AbstractMatrix} = nothing,
-                          V::Union{Nothing, <:AbstractMatrix} = nothing,
+                          sk::Union{Nothing, <:NumMat} = nothing,
+                          V::Union{Nothing, <:NumMat} = nothing,
                           alg::Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr} = SOCRiskExpr())
     return NegativeSkewness(settings, mp, sk, V, alg)
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::AbstractVector)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::NumVec)
     return sqrt(dot(w, r.V, w))
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                              <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::AbstractVector)
+                              <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::NumVec)
     return dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, prior::HighOrderPrior, args...; kwargs...)
@@ -52,9 +51,8 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any
                            args...)
     return r
 end
-function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:AbstractMatrix,
-                                               <:AbstractMatrix, <:Any}, i::AbstractVector,
-                           X::AbstractMatrix)
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:NumMat, <:NumMat, <:Any}, i,
+                           X::NumMat)
     sk = r.sk
     idx = fourth_moment_index_factory(size(sk, 1), i)
     sk = view(r.sk, i, idx)

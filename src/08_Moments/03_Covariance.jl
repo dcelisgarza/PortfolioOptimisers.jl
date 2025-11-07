@@ -49,7 +49,7 @@ GeneralCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
@@ -66,7 +66,7 @@ function GeneralCovariance(;
     return GeneralCovariance(ce, w)
 end
 """
-    cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
 
@@ -82,15 +82,15 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
 
 # Returns
 
-  - `sigma::AbstractMatrix{<:Real}`: Covariance matrix.
+  - `sigma::NumMat`: Covariance matrix.
 
 # Related
 
   - [`robust_cov`](@ref)
-  - [`cor(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cor(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1,
-                        mean = nothing, kwargs...)
+function Statistics.cov(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing,
+                        kwargs...)
     return if isnothing(ce.w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
@@ -98,7 +98,7 @@ function Statistics.cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1,
     end
 end
 """
-    cor(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
 
@@ -114,15 +114,15 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
 
 # Returns
 
-  - `rho::AbstractMatrix{<:Real}`: Correlation matrix.
+  - `rho::NumMat`: Correlation matrix.
 
 # Related
 
   - [`robust_cor`](@ref)
-  - [`cov(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::GeneralCovariance, X::AbstractMatrix; dims::Int = 1,
-                        mean = nothing, kwargs...)
+function Statistics.cor(ce::GeneralCovariance, X::NumMat; dims::Int = 1, mean = nothing,
+                        kwargs...)
     if isnothing(ce.w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
@@ -196,7 +196,7 @@ function factory(ce::Covariance, w::WeightsType = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """
-    cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::Covariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
@@ -214,7 +214,7 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Returns
 
-  - `sigma::AbstractMatrix{<:Real}`: Covariance matrix.
+  - `sigma::NumMat`: Covariance matrix.
 
 # Related
 
@@ -223,21 +223,21 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
   - [`GeneralCovariance`](@ref)
   - [`Full`](@ref)
   - [`Semi`](@ref)
-  - [`cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cor(ce::Covariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
-                        dims::Int = 1, mean = nothing, kwargs...)
+function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::NumMat; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
-function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
-                        dims::Int = 1, mean = nothing, kwargs...)
+function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::NumMat; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 """
-    cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::Covariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
@@ -255,7 +255,7 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Returns
 
-  - `rho::AbstractMatrix{<:Real}`: Correlation matrix.
+  - `rho::NumMat`: Correlation matrix.
 
 # Related
 
@@ -264,15 +264,15 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
   - [`GeneralCovariance`](@ref)
   - [`Full`](@ref)
   - [`Semi`](@ref)
-  - [`cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::Covariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
-                        dims::Int = 1, mean = nothing, kwargs...)
+function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::NumMat; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
-                        dims::Int = 1, mean = nothing, kwargs...)
+function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::NumMat; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)

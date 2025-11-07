@@ -30,7 +30,7 @@ for r in traverse_concrete_subtypes(RiskMeasure)
                           NamedTuple{pnames}(getproperty.(r, pnames))...)
                  end
              end
-             function bounds_risk_measure(r::$(r), ub::Real)
+             function bounds_risk_measure(r::$(r), ub::Number)
                  pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,

@@ -82,8 +82,8 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                           D::AbstractMatrix, k::Integer)
+    HierarchicalClustering(; clustering::Clustering.Hclust, S::NumMat,
+                           D::NumMat, k::Integer)
 
 Keyword arguments correspond to the fields above.
 
@@ -104,8 +104,8 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     S::T2
     D::T3
     k::T4
-    function HierarchicalClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
-                                    D::AbstractMatrix, k::Integer)
+    function HierarchicalClustering(clustering::Clustering.Hclust, S::NumMat, D::NumMat,
+                                    k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
         @argcheck(size(S) == size(D), DimensionMismatch)
@@ -113,8 +113,8 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
         return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
     end
 end
-function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                                D::AbstractMatrix, k::Integer)
+function HierarchicalClustering(; clustering::Clustering.Hclust, S::NumMat, D::NumMat,
+                                k::Integer)
     return HierarchicalClustering(clustering, S, D, k)
 end
 """

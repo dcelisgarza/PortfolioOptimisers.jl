@@ -53,11 +53,11 @@ Augmented Black-Litterman prior estimator for asset returns.
                                                 <:BlackLittermanViews},
                                  a_sets::Union{Nothing, <:AssetSets} = nothing,
                                  f_sets::Union{Nothing, <:AssetSets} = nothing,
-                                 a_views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                                 f_views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                                 w::Union{Nothing, <:AbstractVector} = nothing, rf::Real = 0.0,
-                                 l::Union{Nothing, <:Real} = nothing,
-                                 tau::Union{Nothing, <:Real} = nothing)
+                                 a_views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                                 f_views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                                 w::Union{Nothing, <:NumVec} = nothing, rf::Number = 0.0,
+                                 l::Union{Nothing, <:Number} = nothing,
+                                 tau::Union{Nothing, <:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -193,13 +193,11 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
                                                          <:BlackLittermanViews},
                                           a_sets::Union{Nothing, <:AssetSets},
                                           f_sets::Union{Nothing, <:AssetSets},
-                                          a_views_conf::Union{Nothing, <:Real,
-                                                              <:AbstractVector},
-                                          f_views_conf::Union{Nothing, <:Real,
-                                                              <:AbstractVector},
-                                          w::Union{Nothing, <:AbstractVector}, rf::Real,
-                                          l::Union{Nothing, <:Real},
-                                          tau::Union{Nothing, <:Real})
+                                          a_views_conf::Union{Nothing, <:Number, <:NumVec},
+                                          f_views_conf::Union{Nothing, <:Number, <:NumVec},
+                                          w::Union{Nothing, <:NumVec}, rf::Number,
+                                          l::Union{Nothing, <:Number},
+                                          tau::Union{Nothing, <:Number})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -234,18 +232,16 @@ function AugmentedBlackLittermanPrior(;
                                                      <:BlackLittermanViews},
                                       a_sets::Union{Nothing, <:AssetSets} = nothing,
                                       f_sets::Union{Nothing, <:AssetSets} = nothing,
-                                      a_views_conf::Union{Nothing, <:Real,
-                                                          <:AbstractVector} = nothing,
-                                      f_views_conf::Union{Nothing, <:Real,
-                                                          <:AbstractVector} = nothing,
-                                      w::Union{Nothing, <:AbstractVector} = nothing,
-                                      rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
-                                      tau::Union{Nothing, <:Real} = nothing)
+                                      a_views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                                      f_views_conf::Union{Nothing, <:Number, <:NumVec} = nothing,
+                                      w::Union{Nothing, <:NumVec} = nothing,
+                                      rf::Number = 0.0,
+                                      l::Union{Nothing, <:Number} = nothing,
+                                      tau::Union{Nothing, <:Number} = nothing)
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior,
-                 w::Union{Nothing, <:AbstractVector} = nothing)
+function factory(pe::AugmentedBlackLittermanPrior, w::Union{Nothing, <:NumVec} = nothing)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), ve = factory(pe.ve, w),
@@ -269,7 +265,7 @@ function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+    prior(pe::AugmentedBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute augmented Black-Litterman prior moments for asset returns.
@@ -318,8 +314,8 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::AugmentedBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+               strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

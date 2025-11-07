@@ -1,21 +1,21 @@
-function w_neg_flag(wb::Real)
+function w_neg_flag(wb::Number)
     return wb < zero(wb)
 end
-function w_neg_flag(wb::AbstractVector)
+function w_neg_flag(wb::NumVec)
     return any(x -> x < zero(x), wb)
 end
-function w_finite_flag(wb::Real)
+function w_finite_flag(wb::Number)
     return isfinite(wb)
 end
-function w_finite_flag(wb::AbstractVector)
+function w_finite_flag(wb::NumVec)
     return any(isfinite, wb)
 end
 function set_weight_constraints!(args...)
     return nothing
 end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                 bgt::Union{Nothing, <:Real, <:BudgetRange},
-                                 sbgt::Union{Nothing, <:Real, <:BudgetRange},
+                                 bgt::Union{Nothing, <:Number, <:BudgetRange},
+                                 sbgt::Union{Nothing, <:Number, <:BudgetRange},
                                  long::Bool = false)
     lb = wb.lb
     ub = wb.ub
@@ -50,10 +50,10 @@ end
 function non_zero_real_or_vec(::Nothing)
     return false
 end
-function non_zero_real_or_vec(x::Real)
+function non_zero_real_or_vec(x::Number)
     return !iszero(x)
 end
-function non_zero_real_or_vec(x::AbstractVector{<:Real})
+function non_zero_real_or_vec(x::NumVec)
     return any(!iszero, x)
 end
 function set_linear_weight_constraints!(args...)
