@@ -5,7 +5,7 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     lb::T2
     function ArithmeticReturn(ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                          <:AbstractUncertaintySetEstimator},
-                              lb::Option{<:URkRtBounds})
+                              lb::Option{<:RkRtUBounds})
         if isa(ucs, EllipseUncertaintySet)
             @argcheck(isa(ucs,
                           EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
@@ -22,7 +22,7 @@ end
 function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator} = nothing,
-                          lb::Option{<:URkRtBounds} = nothing)
+                          lb::Option{<:RkRtUBounds} = nothing)
     return ArithmeticReturn(ucs, lb)
 end
 function jump_returns_view(r::ArithmeticReturn, i, args...)
@@ -37,7 +37,7 @@ end
 struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
-    function KellyReturn(w::Option{<:AbstractWeights}, lb::Option{<:URkRtBounds})
+    function KellyReturn(w::Option{<:AbstractWeights}, lb::Option{<:RkRtUBounds})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -51,7 +51,7 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     end
 end
 function KellyReturn(; w::Option{<:AbstractWeights} = nothing,
-                     lb::Option{<:URkRtBounds} = nothing)
+                     lb::Option{<:RkRtUBounds} = nothing)
     return KellyReturn(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)

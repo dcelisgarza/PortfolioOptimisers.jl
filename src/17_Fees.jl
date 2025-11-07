@@ -153,10 +153,10 @@ Container for portfolio transaction fee constraints.
 # Constructor
 
     Fees(; tn::Option{<:Turnover} = nothing,
-         l::Option{<:UNumNumVec} = nothing,
-         s::Option{<:UNumNumVec} = nothing,
-         fl::Option{<:UNumNumVec} = nothing,
-         fs::Option{<:UNumNumVec} = nothing,
+         l::Option{<:NumUNumVec} = nothing,
+         s::Option{<:NumUNumVec} = nothing,
+         fl::Option{<:NumUNumVec} = nothing,
+         fs::Option{<:NumUNumVec} = nothing,
          kwargs::NamedTuple = (; atol = 1e-8))
 
 ## Validation
@@ -196,8 +196,8 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
     fl::T4
     fs::T5
     kwargs::T6
-    function Fees(tn::Option{<:Turnover}, l::Option{<:UNumNumVec}, s::Option{<:UNumNumVec},
-                  fl::Option{<:UNumNumVec}, fs::Option{<:UNumNumVec},
+    function Fees(tn::Option{<:Turnover}, l::Option{<:NumUNumVec}, s::Option{<:NumUNumVec},
+                  fl::Option{<:NumUNumVec}, fs::Option{<:NumUNumVec},
                   kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -207,9 +207,9 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
-function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:UNumNumVec} = nothing,
-              s::Option{<:UNumNumVec} = nothing, fl::Option{<:UNumNumVec} = nothing,
-              fs::Option{<:UNumNumVec} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:NumUNumVec} = nothing,
+              s::Option{<:NumUNumVec} = nothing, fl::Option{<:NumUNumVec} = nothing,
+              fs::Option{<:NumUNumVec} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
     return Fees(tn, l, s, fl, fs, kwargs)
 end
 """

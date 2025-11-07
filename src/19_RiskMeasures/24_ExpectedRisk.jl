@@ -102,7 +102,7 @@ end
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
                                   X::Union{<:NumMat, <:AbstractPriorResult},
                                   fees::Option{<:Fees} = nothing;
-                                  re::URegRegEst = StepwiseRegression(),
+                                  re::RegURegE = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)

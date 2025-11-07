@@ -17,13 +17,13 @@ struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
     flag::T3
-    function FactorRiskBudgeting(re::URegRegEst,
+    function FactorRiskBudgeting(re::RegURegE,
                                  rkb::Union{Nothing, <:RiskBudgetEstimator,
                                             <:RiskBudgetResult}, flag::Bool)
         return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
     end
 end
-function FactorRiskBudgeting(; re::URegRegEst = StepwiseRegression(),
+function FactorRiskBudgeting(; re::RegURegE = StepwiseRegression(),
                              rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing,
                              flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, flag)

@@ -122,7 +122,7 @@ Container for turnover portfolio constraints.
 
 # Constructor
 
-    Turnover(; w::NumVec, val::UNumNumVec = 0.0)
+    Turnover(; w::NumVec, val::NumUNumVec = 0.0)
 
 ## Validation
 
@@ -156,7 +156,7 @@ Turnover
 struct Turnover{T1, T2} <: AbstractResult
     w::T1
     val::T2
-    function Turnover(w::NumVec, val::UNumNumVec)
+    function Turnover(w::NumVec, val::NumUNumVec)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if isa(val, NumVec)
@@ -165,7 +165,7 @@ struct Turnover{T1, T2} <: AbstractResult
         return new{typeof(w), typeof(val)}(w, val)
     end
 end
-function Turnover(; w::NumVec, val::UNumNumVec = 0.0)
+function Turnover(; w::NumVec, val::NumUNumVec = 0.0)
     return Turnover(w, val)
 end
 """

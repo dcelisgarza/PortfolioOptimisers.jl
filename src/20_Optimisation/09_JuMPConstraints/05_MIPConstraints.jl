@@ -39,8 +39,8 @@ end
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          lt::Option{<:BuyInThreshold},
                                          st::Option{<:BuyInThreshold},
-                                         ffl::Option{<:UNumNumVec},
-                                         ffs::Option{<:UNumNumVec}, ss::Option{<:Number},
+                                         ffl::Option{<:NumUNumVec},
+                                         ffs::Option{<:NumUNumVec}, ss::Option{<:Number},
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
                                          ffs_flag::Bool)
     w = model[:w]
@@ -94,7 +94,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     end
     return i_mip
 end
-function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:UNumNumVec},
+function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:NumUNumVec},
                          lt::Option{<:BuyInThreshold}, ss::Option{<:Number}, lt_flag::Bool,
                          ffl_flag::Bool)
     w = model[:w]
@@ -497,11 +497,11 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     return nothing
 end
 function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                               card::Union{Nothing, <:UIntegerIntVec},
+                               card::Union{Nothing, <:IntUIntVec},
                                gcard::Union{Nothing, <:LinearConstraint,
                                             <:AbstractVector{<:LinearConstraint}},
-                               smtx::Option{<:UNumMatVecNumMat},
-                               sgmtx::Option{<:UNumMatVecNumMat},
+                               smtx::Option{<:NumMatUVecNumMat},
+                               sgmtx::Option{<:NumMatUVecNumMat},
                                lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
                                glt::Option{<:BuyInThreshold}, gst::Option{<:BuyInThreshold},
                                ss::Option{<:Number})

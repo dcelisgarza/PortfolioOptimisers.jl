@@ -53,8 +53,8 @@ Augmented Black-Litterman prior estimator for asset returns.
                                                 <:BlackLittermanViews},
                                  a_sets::Option{<:AssetSets} = nothing,
                                  f_sets::Option{<:AssetSets} = nothing,
-                                 a_views_conf::Option{<:UNumNumVec} = nothing,
-                                 f_views_conf::Option{<:UNumNumVec} = nothing,
+                                 a_views_conf::Option{<:NumUNumVec} = nothing,
+                                 f_views_conf::Option{<:NumUNumVec} = nothing,
                                  w::Option{<:NumVec} = nothing, rf::Number = 0.0,
                                  l::Option{<:Number} = nothing,
                                  tau::Option{<:Number} = nothing)
@@ -193,8 +193,8 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
                                                          <:BlackLittermanViews},
                                           a_sets::Option{<:AssetSets},
                                           f_sets::Option{<:AssetSets},
-                                          a_views_conf::Option{<:UNumNumVec},
-                                          f_views_conf::Option{<:UNumNumVec},
+                                          a_views_conf::Option{<:NumUNumVec},
+                                          f_views_conf::Option{<:NumUNumVec},
                                           w::Option{<:NumVec}, rf::Number,
                                           l::Option{<:Number}, tau::Option{<:Number})
         if !isnothing(w)
@@ -231,8 +231,8 @@ function AugmentedBlackLittermanPrior(;
                                                      <:BlackLittermanViews},
                                       a_sets::Option{<:AssetSets} = nothing,
                                       f_sets::Option{<:AssetSets} = nothing,
-                                      a_views_conf::Option{<:UNumNumVec} = nothing,
-                                      f_views_conf::Option{<:UNumNumVec} = nothing,
+                                      a_views_conf::Option{<:NumUNumVec} = nothing,
+                                      f_views_conf::Option{<:NumUNumVec} = nothing,
                                       w::Option{<:NumVec} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
                                       tau::Option{<:Number} = nothing)

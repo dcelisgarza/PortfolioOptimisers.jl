@@ -9,7 +9,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     wi::T7
     flag::T8
     fb::T9
-    function FactorRiskContribution(opt::JuMPOptimiser, re::URegRegEst,
+    function FactorRiskContribution(opt::JuMPOptimiser, re::RegURegE,
                                     r::Union{<:RiskMeasure,
                                              <:AbstractVector{<:RiskMeasure}},
                                     obj::ObjectiveFunction,
@@ -32,7 +32,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
-                                re::URegRegEst = StepwiseRegression(),
+                                re::RegURegE = StepwiseRegression(),
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 plg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,

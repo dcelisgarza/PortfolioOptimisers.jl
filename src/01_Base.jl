@@ -307,8 +307,8 @@ const NumVec = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
 const IntVec = AbstractVector{<:Integer}
 const NumMat = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
 const NumArr = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
-const UNumNumVec = Union{<:Number, <:NumVec}
-const EstValType = Union{<:UNumNumVec, <:Pair{<:AbstractString, <:Number},
+const NumUNumVec = Union{<:Number, <:NumVec}
+const EstValType = Union{<:NumUNumVec, <:Pair{<:AbstractString, <:Number},
                          <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
                          <:AbstractDict{<:AbstractString, <:Number}}
 const StrExprVec = AbstractVector{<:Union{<:AbstractString, Expr}}
@@ -320,9 +320,9 @@ const StrVec = AbstractVector{<:AbstractString}
 const PairVec = AbstractVector{<:Pair}
 const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
 const Option{T} = Union{Nothing, T}
-const UNumMatVecNumMat = Union{<:NumMat, <:VecNumMat}
-const UIntegerIntVec = Union{<:Integer, <:IntVec}
+const NumMatUVecNumMat = Union{<:NumMat, <:VecNumMat}
+const IntUIntVec = Union{<:Integer, <:IntVec}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
        NumMat, NumArr, EstValType, StrExprVec, EqnType, VecNumVec, VecIntVec, VecNumMat,
-       StrVec, PairVec, VecJuMPScalar, Option, UNumNumVec, UNumMatVecNumMat, UIntegerIntVec
+       StrVec, PairVec, VecJuMPScalar, Option, NumUNumVec, NumMatUVecNumMat, IntUIntVec
