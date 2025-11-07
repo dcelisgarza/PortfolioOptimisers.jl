@@ -5,23 +5,11 @@ on:
     branches:
       - main
       - dev*
-    paths:
-      - "docs/**"
-      - "src/**"
-      - "ext/**"
-      - "examples/**"
-      - "*.toml"
     tags: ["*"]
   pull_request:
     branches:
       - main
       - dev*
-    paths:
-      - "docs/**"
-      - "src/**"
-      - "ext/**"
-      - "examples/**"
-      - "*.toml"
     types: [opened, synchronize, reopened]
 
 concurrency:
