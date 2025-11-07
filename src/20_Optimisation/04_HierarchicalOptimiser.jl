@@ -29,9 +29,8 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                    slv::Union{Nothing, <:Solver, <:VecSolver},
                                    fees::Union{Nothing, <:FeesEstimator, <:Fees},
                                    wb::Union{Nothing, <:WeightBoundsEstimator,
-                                             <:WeightBounds},
-                                   sets::Union{Nothing, <:AssetSets}, cwf::WeightFinaliser,
-                                   strict::Bool)
+                                             <:WeightBounds}, sets::Option{<:AssetSets},
+                                   cwf::WeightFinaliser, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -47,7 +46,7 @@ function HierarchicalOptimiser(;
                                slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
                                fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
                                wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
-                               sets::Union{Nothing, <:AssetSets} = nothing,
+                               sets::Option{<:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)

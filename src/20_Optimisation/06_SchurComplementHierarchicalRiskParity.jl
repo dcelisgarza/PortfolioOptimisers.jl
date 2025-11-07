@@ -39,8 +39,8 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     alg::T4
     flag::T5
     function SchurComplementParams(r::Union{<:StandardDeviation, <:Variance}, gamma::Number,
-                                   pdm::Union{Nothing, <:Posdef},
-                                   alg::SchurComplementAlgorithm, flag::Bool)
+                                   pdm::Option{<:Posdef}, alg::SchurComplementAlgorithm,
+                                   flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma))
         return new{typeof(r), typeof(gamma), typeof(pdm), typeof(alg), typeof(flag)}(r,
                                                                                      gamma,
@@ -50,8 +50,7 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     end
 end
 function SchurComplementParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                               gamma::Number = 0.5,
-                               pdm::Union{Nothing, <:Posdef} = Posdef(),
+                               gamma::Number = 0.5, pdm::Option{<:Posdef} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)

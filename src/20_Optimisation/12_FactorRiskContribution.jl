@@ -19,7 +19,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
                                                <:AbstractPhylogenyConstraintResult,
                                                <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                        <:AbstractPhylogenyConstraintResult}},
-                                    sets::Union{Nothing, <:AssetSets}, wi::Option{<:NumVec},
+                                    sets::Option{<:AssetSets}, wi::Option{<:NumVec},
                                     flag::Bool, fb::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
@@ -40,7 +40,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                            <:AbstractPhylogenyConstraintResult,
                                            <:Union{<:AbstractPhylogenyConstraintEstimator,
                                                    <:AbstractPhylogenyConstraintResult}} = nothing,
-                                sets::Union{Nothing, <:AssetSets} = nothing,
+                                sets::Option{<:AssetSets} = nothing,
                                 wi::Option{<:NumVec} = nothing, flag::Bool = true,
                                 fb::Union{Nothing, <:OptimisationEstimator} = nothing)
     return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fb)

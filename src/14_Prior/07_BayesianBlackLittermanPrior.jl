@@ -33,7 +33,7 @@ Bayesian Black-Litterman prior estimator for asset returns.
                                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                 views::Union{<:LinearConstraintEstimator,
                                              <:BlackLittermanViews},
-                                sets::Union{Nothing, <:AssetSets} = nothing,
+                                sets::Option{<:AssetSets} = nothing,
                                 views_conf::Option{<:UNumVec} = nothing,
                                 rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
@@ -145,7 +145,7 @@ struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Union{<:LinearConstraintEstimator,
                                                       <:BlackLittermanViews},
-                                         sets::Union{Nothing, <:AssetSets},
+                                         sets::Option{<:AssetSets},
                                          views_conf::Option{<:UNumVec}, rf::Number,
                                          tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
@@ -166,7 +166,7 @@ function BayesianBlackLittermanPrior(;
                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                      views::Union{<:LinearConstraintEstimator,
                                                   <:BlackLittermanViews},
-                                     sets::Union{Nothing, <:AssetSets} = nothing,
+                                     sets::Option{<:AssetSets} = nothing,
                                      views_conf::Option{<:UNumVec} = nothing,
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)

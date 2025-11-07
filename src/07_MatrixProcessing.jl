@@ -83,7 +83,7 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
+    DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
                             denoise::Union{Nothing, <:Denoise} = nothing,
                             detone::Union{Nothing, <:Detone} = nothing,
                             alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
@@ -129,7 +129,7 @@ struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstima
     denoise::T2
     detone::T3
     alg::T4
-    function DefaultMatrixProcessing(pdm::Union{Nothing, <:Posdef},
+    function DefaultMatrixProcessing(pdm::Option{<:Posdef},
                                      denoise::Union{Nothing, <:Denoise},
                                      detone::Union{Nothing, <:Detone},
                                      alg::Union{Nothing,
@@ -138,7 +138,7 @@ struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstima
                                                                               detone, alg)
     end
 end
-function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
+function DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
                                  denoise::Union{Nothing, <:Denoise} = nothing,
                                  detone::Union{Nothing, <:Detone} = nothing,
                                  alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)

@@ -98,7 +98,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     function NestedClustered(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                              cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                              wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
-                             sets::Union{Nothing, <:AssetSets}, opti::OptimisationEstimator,
+                             sets::Option{<:AssetSets}, opti::OptimisationEstimator,
                              opto::OptimisationEstimator,
                              cv::Union{Nothing, <:CrossValidationEstimator},
                              cwf::WeightFinaliser, strict::Bool,
@@ -120,8 +120,8 @@ function NestedClustered(;
                          pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                          cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
                          wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                         sets::Union{Nothing, <:AssetSets} = nothing,
-                         opti::OptimisationEstimator, opto::OptimisationEstimator,
+                         sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,
+                         opto::OptimisationEstimator,
                          cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
@@ -159,8 +159,7 @@ function opt_view(nco::NestedClustered, i, X::NumMat)
                            threads = nco.threads, fb = nco.fb)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
-                                               <:WeightBounds},
-                                     sets::Union{Nothing, <:AssetSets},
+                                               <:WeightBounds}, sets::Option{<:AssetSets},
                                      cwf::WeightFinaliser, strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
                                      res::OptimisationResult, w::NumVec;

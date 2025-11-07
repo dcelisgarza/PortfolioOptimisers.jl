@@ -1918,7 +1918,7 @@ function LoGo_dist_assert(args...)
     return nothing
 end
 """
-    logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat, X::NumMat;
+    logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat, X::NumMat;
           dims::Int = 1, kwargs...)
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
@@ -1962,8 +1962,8 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - [`dbht_similarity`](@ref)
   - [`Posdef`](@ref)
 """
-function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat, X::NumMat;
-               dims::Int = 1, kwargs...)
+function logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat, X::NumMat; dims::Int = 1,
+               kwargs...)
     assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -1982,7 +1982,7 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat, X::NumMat
     return nothing
 end
 """
-    matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::NumMat,
+    matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat,
                                  X::NumMat; dims::Int = 1, kwargs...)
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
@@ -2014,8 +2014,8 @@ This method provides a standard interface for applying the LoGo algorithm to a c
   - [`Posdef`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
 """
-function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
-                                      sigma::NumMat, X::NumMat; dims::Int = 1, kwargs...)
+function matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef}, sigma::NumMat,
+                                      X::NumMat; dims::Int = 1, kwargs...)
     return logo!(je, pdm, sigma, X; dims = dims, kwargs...)
 end
 
