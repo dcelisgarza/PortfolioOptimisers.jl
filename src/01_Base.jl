@@ -322,6 +322,7 @@ const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
 const Option{T} = Union{Nothing, T}
 const UNumMatVecNumMat = Union{<:NumMat, <:VecNumMat}
 const UIntegerIntVec = Union{<:Integer, <:IntVec}
+const UNumVecVecNumVec = Union{<:NumVec, <:VecNumVec}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
        NumMat, NumArr, EstValType, StrExprVec, EqnType, VecNumVec, VecIntVec, VecNumMat,

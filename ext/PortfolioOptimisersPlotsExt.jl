@@ -107,7 +107,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     end
     return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
 end
-function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:NumVec, <:VecNumVec},
+function PortfolioOptimisers.plot_stacked_bar_composition(w::UNumVecVecNumVec,
                                                           nx::AbstractVector = 1:size(w, 1);
                                                           kwargs::NamedTuple = (;
                                                                                 xlabel = "Portfolios",
@@ -123,7 +123,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:NumVec, <:V
     return groupedbar(transpose(w); xticks = (1:M, 1:M), bar_position = :stack, group = ctg,
                       kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:NumVec, <:VecNumVec},
+function PortfolioOptimisers.plot_stacked_area_composition(w::UNumVecVecNumVec,
                                                            nx::AbstractVector = 1:size(w, 1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
@@ -301,7 +301,7 @@ function PortfolioOptimisers.plot_drawdowns(w::NumArr, X::NumMat, slv::USolverVe
     f_ret = plot(ts, cret; color = colours[1], ret_kwargs...)
     return plot(f_ret, f_dd; layout = (2, 1), f_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
+function PortfolioOptimisers.plot_measures(w::UNumVecVecNumVec,
                                            pr::PortfolioOptimisers.AbstractPriorResult,
                                            fees::Option{<:Fees} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
@@ -312,7 +312,7 @@ function PortfolioOptimisers.plot_measures(w::Union{<:NumVec, <:VecNumVec},
                                                                                                              rk = x,
                                                                                                              rt = ArithmeticReturn(),
                                                                                                              rf = 0),
-                                           slv::Union{Nothing, <:Solver, <:VecSolver} = nothing,
+                                           slv::Option{<:USolverVecSolver} = nothing,
                                            flag::Bool = true,
                                            kwargs::NamedTuple = (title = "Pareto Frontier",
                                                                  xlabel = "X", ylabel = "Y",

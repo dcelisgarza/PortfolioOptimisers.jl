@@ -185,8 +185,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l2::T34
     strict::T35
     function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                           slv::USolverVecSolver,
-                           wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
+                           slv::USolverVecSolver, wb::Option{<:UWbWbEst},
                            bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator},
                            sbgt::Union{Nothing, <:Number, <:BudgetRange},
                            lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold},
@@ -237,7 +236,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ccnt::Option{<:CustomJuMPConstraint},
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::Option{<:Number}, card::Option{<:Integer},
-                           scard::Union{Nothing, <:UIntegerIntVec}, nea::Option{<:Number},
+                           scard::Option{<:UIntegerIntVec}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number}, strict::Bool)
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
@@ -408,8 +407,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                       slv::USolverVecSolver,
-                       wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
+                       slv::USolverVecSolver, wb::Option{<:UWbWbEst} = WeightBounds(),
                        bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Number, <:BudgetRange} = nothing,
                        lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold} = nothing,
@@ -460,7 +458,7 @@ function JuMPOptimiser(;
                        cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
                        so::Number = 1, ss::Option{<:Number} = nothing,
                        card::Option{<:Integer} = nothing,
-                       scard::Union{Nothing, <:UIntegerIntVec} = nothing,
+                       scard::Option{<:UIntegerIntVec} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,
