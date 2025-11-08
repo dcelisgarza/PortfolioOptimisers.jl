@@ -272,8 +272,8 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
   - `A::SparseMatrixCSC{<:Number, Int}`: Adjacency matrix of the PMFG with weights.
   - `tri::Matrix{Int}`: List of triangles (triangular faces) in the PMFG.
   - `clique3::Matrix{Int}`: List of 3-cliques that are not triangular faces; all 3-cliques are given by `[tri; clique3]`.
-  - `cliques::Union{Nothing, Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
-  - `cliqueTree::Union{Nothing, SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
+  - `cliques::Option{Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
+  - `cliqueTree::Option{SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
 
 # Related
 

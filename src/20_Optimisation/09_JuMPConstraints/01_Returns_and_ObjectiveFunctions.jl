@@ -245,7 +245,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Number)
     @constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, lb::Union{<:NumVec, <:Frontier})
+function set_return_bounds!(model::JuMP.Model, lb::NumVecUFront)
     @expression(model, ret_frontier, lb)
     return nothing
 end
@@ -321,11 +321,9 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
     add_market_impact_cost!(model, ret)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model,
-                                 pret::ArithmeticReturn{<:Union{<:AbstractUncertaintySetResult,
-                                                                <:AbstractUncertaintySetEstimator},
-                                                        <:Any}, obj::ObjectiveFunction,
-                                 pr::AbstractPriorResult; rd::ReturnsResult, kwargs...)
+function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:UcUUcE, <:Any},
+                                 obj::ObjectiveFunction, pr::AbstractPriorResult;
+                                 rd::ReturnsResult, kwargs...)
     lb = pret.lb
     ucs = pret.ucs
     mu = pr.mu

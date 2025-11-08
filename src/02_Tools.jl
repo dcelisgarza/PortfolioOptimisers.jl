@@ -59,8 +59,7 @@ function assert_nonempty_nonneg_finite_val(val::PairVec, val_sym::Symbol = :val)
               DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::Union{<:NumVec, <:NumMat},
-                                           val_sym::Symbol = :val)
+function assert_nonempty_nonneg_finite_val(val::NumArr, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -99,7 +98,7 @@ function assert_nonempty_finite_val(val::PairVec, val_sym::Symbol = :val)
               DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::Union{<:NumVec, <:NumMat}, val_sym::Symbol = :val)
+function assert_nonempty_finite_val(val::NumArr, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -137,8 +136,7 @@ function assert_nonempty_geq0_finite_val(val::PairVec, val_sym::Symbol = :val)
               DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
     return nothing
 end
-function assert_nonempty_geq0_finite_val(val::Union{<:NumVec, <:NumMat},
-                                         val_sym::Symbol = :val)
+function assert_nonempty_geq0_finite_val(val::NumArr, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),

@@ -341,8 +341,7 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
     return threshold
 end
 """
-    _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                              <:AbstractMaxValStepwiseRegressionCriteria},
+    _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
                                       <:Forward}, x::NumVec, F::NumMat)
 
 Perform forward stepwise regression using a general criterion (minimization or maximization).
@@ -374,8 +373,7 @@ This method implements forward selection for stepwise regression, where variable
   - [`Forward`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                    <:AbstractMaxValStepwiseRegressionCriteria},
+function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
                                             <:Forward}, x::NumVec, F::NumMat)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
@@ -538,8 +536,7 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, valu
     return threshold
 end
 """
-    _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                              <:AbstractMaxValStepwiseRegressionCriteria},
+    _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
                                       <:Backward}, x::NumVec, F::NumMat)
 
 Perform backward stepwise regression using a general criterion (minimization or maximization).
@@ -572,8 +569,7 @@ This method implements backward elimination for stepwise regression, where all v
   - [`Backward`](@ref)
   - [`get_backward_reg_incl!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                    <:AbstractMaxValStepwiseRegressionCriteria},
+function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
                                             <:Backward}, x::NumVec, F::NumMat)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)

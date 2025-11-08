@@ -248,8 +248,22 @@ function StatsAPI.fit(target::GeneralisedLinearModel, X::NumMat, y::NumVec)
     return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
 end
 """
+    abstract type AbstractMinMaxValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end
+
+Abstract supertype for all stepwise regression criteria in PortfolioOptimisers.jl where model fit is evaluated by either minimising or maximising the criterion value.
+
+All concrete types representing stepwise regression criteria (such as AIC, BIC, R², or Adjusted R²) should subtype `AbstractMinMaxValStepwiseRegressionCriterion`. This enables unified dispatch and extension for stepwise regression algorithms that select variables based on criterion values.
+
+# Related Types
+
+  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+"""
+abstract type AbstractMinMaxValStepwiseRegressionCriterion <:
+              AbstractStepwiseRegressionCriterion end
+"""
     abstract type AbstractMinValStepwiseRegressionCriterion <:
-                  AbstractStepwiseRegressionCriterion end
+                  AbstractMinMaxValStepwiseRegressionCriterion end
 
 Abstract supertype for all stepwise regression criteria where lower values indicate better model fit in PortfolioOptimisers.jl.
 
@@ -257,16 +271,16 @@ All concrete types implementing minimisation-based stepwise regression criteria 
 
 # Related
 
-  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref)
   - [`AIC`](@ref)
   - [`AICC`](@ref)
   - [`BIC`](@ref)
 """
 abstract type AbstractMinValStepwiseRegressionCriterion <:
-              AbstractStepwiseRegressionCriterion end
+              AbstractMinMaxValStepwiseRegressionCriterion end
 """
     abstract type AbstractMaxValStepwiseRegressionCriteria <:
-                  AbstractStepwiseRegressionCriterion end
+                  AbstractMinMaxValStepwiseRegressionCriterion end
 
 Abstract supertype for all stepwise regression criteria where higher values indicate better model fit in PortfolioOptimisers.jl.
 
@@ -274,12 +288,12 @@ All concrete types implementing maximisation-based stepwise regression criteria 
 
 # Related
 
-  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref)
   - [`RSquared`](@ref)
   - [`AdjustedRSquared`](@ref)
 """
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
-              AbstractStepwiseRegressionCriterion end
+              AbstractMinMaxValStepwiseRegressionCriterion end
 """
     struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 

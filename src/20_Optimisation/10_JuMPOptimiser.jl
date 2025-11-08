@@ -184,11 +184,9 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l1::T33
     l2::T34
     strict::T35
-    function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                           slv::SlvUVecSlv, wb::Option{<:WbUWbE},
-                           bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator},
-                           sbgt::Option{<:NumUBgtRg}, lt::Option{<:BtUBtE},
-                           st::Option{<:BtUBtE},
+    function JuMPOptimiser(pe::PrEUPr, slv::SlvUVecSlv, wb::Option{<:WbUWbE},
+                           bgt::Option{<:NumBgCE}, sbgt::Option{<:NumUBgtRg},
+                           lt::Option{<:BtUBtE}, st::Option{<:BtUBtE},
                            lcs::Option{<:Union{<:LcULcE, <:VecLcULcE}},
                            cent::Option{<:Union{<:CCUVecCC, <:LinearConstraint}},
                            gcard::Option{<:LcULcE},
@@ -203,8 +201,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                        <:AbstractVector{<:Option{<:BtUBtE}}},
                            sgst::Union{<:Option{<:BtUBtE},
                                        <:AbstractVector{<:Option{<:BtUBtE}}},
-                           sets::Option{<:AssetSets},
-                           plg::Union{Nothing, <:PhCUPhCE, <:AbstractVector{<:PhCUPhCE}},
+                           sets::Option{<:AssetSets}, plg::Option{<:PhCUPhCEUVecPhCUPhCE},
                            tn::Option{<:Union{<:TnUTnE, <:VecTnUTnE}},
                            te::Option{<:Union{<:AbstractTracking, <:VecTr}},
                            fees::Option{<:FeesUFeesE}, ret::JuMPReturnsEstimator,
@@ -313,8 +310,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
            isa(lcs, LinearConstraintEstimator) ||
            isa(cent, LinearConstraintEstimator) ||
            isa(gcard, LinearConstraintEstimator) ||
-           !isa(sgcard,
-                Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint}}) ||
+           !isa(sgcard, Option{<:VecLcULc}) ||
            !isnothing(scard) ||
            isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets))
@@ -374,10 +370,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                                                                        strict)
     end
 end
-function JuMPOptimiser(;
-                       pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                       slv::SlvUVecSlv, wb::Option{<:WbUWbE} = WeightBounds(),
-                       bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator} = 1.0,
+function JuMPOptimiser(; pe::PrEUPr = EmpiricalPrior(), slv::SlvUVecSlv,
+                       wb::Option{<:WbUWbE} = WeightBounds(), bgt::Option{<:NumBgCE} = 1.0,
                        sbgt::Option{<:NumUBgtRg} = nothing, lt::Option{<:BtUBtE} = nothing,
                        st::Option{<:BtUBtE} = nothing,
                        lcs::Option{<:Union{<:LcULcE, <:VecLcULcE}} = nothing,
@@ -393,7 +387,7 @@ function JuMPOptimiser(;
                        sgst::Union{<:Option{<:BtUBtE},
                                    <:AbstractVector{<:Option{<:BtUBtE}}} = nothing,
                        sets::Option{<:AssetSets} = nothing,
-                       plg::Option{<:Union{<:PhCUPhCE, <:VecPhCUPhCE}} = nothing,
+                       plg::Option{<:PhCUPhCEUVecPhCUPhCE} = nothing,
                        tn::Option{<:Union{<:TnUTnE, <:VecTnUTnE}} = nothing,
                        te::Option{<:Union{<:AbstractTracking, <:VecTr}} = nothing,
                        fees::Option{<:FeesUFeesE} = nothing,

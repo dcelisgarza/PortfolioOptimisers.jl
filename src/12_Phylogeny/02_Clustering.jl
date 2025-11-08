@@ -48,6 +48,7 @@ All concrete types implementing specific algorithms for determining the optimal 
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+const IntUONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
     abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
@@ -214,7 +215,7 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 # Constructor
 
     OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                          alg::Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
+                          alg::IntUONC = SecondOrderDifference())
 
 Keyword arguments correspond to the fields above.
 
@@ -240,9 +241,7 @@ OptimalNumberClusters
 struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     max_k::T1
     alg::T2
-    function OptimalNumberClusters(max_k::Option{<:Integer},
-                                   alg::Union{<:Integer,
-                                              <:AbstractOptimalNumberClustersAlgorithm})
+    function OptimalNumberClusters(max_k::Option{<:Integer}, alg::IntUONC)
         if !isnothing(max_k)
             @argcheck(one(max_k) <= max_k, DomainError)
         end
@@ -253,8 +252,7 @@ struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     end
 end
 function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                               alg::Union{<:Integer,
-                                          <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
+                               alg::IntUONC = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)
 end
 """

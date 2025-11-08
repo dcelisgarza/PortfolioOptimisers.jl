@@ -170,6 +170,8 @@ function Turnover(; w::NumVec, val::NumUNumVec = 0.0)
 end
 const TnUTnE = Union{<:Turnover, <:TurnoverEstimator}
 const VecTnUTnE = AbstractVector{<:TnUTnE}
+const VecTn = AbstractVector{<:Turnover}
+const TnVecTn = Union{<:Turnover, <:VecTn}
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
 
@@ -233,7 +235,7 @@ function turnover_view(tn::Turnover, i)
     val = nothing_scalar_array_view(tn.val, i)
     return Turnover(; w = w, val = val)
 end
-function turnover_view(tn::AbstractVector{<:Turnover}, i)
+function turnover_view(tn::VecTn, i)
     return [turnover_view(tni, i) for tni in tn]
 end
 function factory(tn::Turnover, w::NumVec)

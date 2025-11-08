@@ -55,9 +55,8 @@ Subtypes implement specific methods for generating the scaling parameter, which 
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """
-    ucs(uc::Union{Nothing,
-                  <:Tuple{<:Option{<:AbstractUncertaintySetResult},
-                          <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
+    ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
+                           <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
 Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is provided.
 

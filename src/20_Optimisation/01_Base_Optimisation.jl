@@ -5,6 +5,7 @@ abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
 abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
+const OptEUOptR = Union{<:OptimisationEstimator, <:OptimisationResult}
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end

@@ -35,19 +35,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, key)
     return sd_risk
 end
-function sdp_rc_variance_flag!(::JuMP.Model,
-                               ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                               ::Nothing)
+function sdp_rc_variance_flag!(::JuMP.Model, ::RkJuMPOpt, ::Nothing)
     return false
 end
-function sdp_rc_variance_flag!(::JuMP.Model,
-                               ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                               ::LinearConstraint)
+function sdp_rc_variance_flag!(::JuMP.Model, ::RkJuMPOpt, ::LinearConstraint)
     return true
 end
-function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
-                            plg::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                                <:VecPhC}})
+function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, plg::Option{<:PhCUVecPhC})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
               isa(plg, SemiDefinitePhylogeny) ||
@@ -144,8 +138,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
     end
     return nothing
 end
-function set_risk!(model::JuMP.Model, i::Any, r::Variance,
-                   opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
+function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
                    pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC}, args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
@@ -159,8 +152,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
-                               plg::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                                   <:VecPhC}}, args...; kwargs...)
+                               plg::Option{<:PhCUVecPhC}, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end

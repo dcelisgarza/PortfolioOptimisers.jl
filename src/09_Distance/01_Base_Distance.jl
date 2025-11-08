@@ -134,7 +134,7 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
 
 # Constructor
 
-    VariationInfoDistance(; bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+    VariationInfoDistance(; bins::BinUInt = HacineGharbiRavier(),
                           normalise::Bool = true)
 
 Keyword arguments correspond to the fields above.
@@ -161,15 +161,14 @@ VariationInfoDistance
 struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
     bins::T1
     normalise::T2
-    function VariationInfoDistance(bins::Union{<:AbstractBins, <:Integer}, normalise::Bool)
+    function VariationInfoDistance(bins::BinUInt, normalise::Bool)
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins, DomainError)
         end
         return new{typeof(bins), typeof(normalise)}(bins, normalise)
     end
 end
-function VariationInfoDistance(;
-                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+function VariationInfoDistance(; bins::BinUInt = HacineGharbiRavier(),
                                normalise::Bool = true)
     return VariationInfoDistance(bins, normalise)
 end

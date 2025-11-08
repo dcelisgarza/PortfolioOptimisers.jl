@@ -58,10 +58,8 @@ end
 function set_linear_weight_constraints!(args...)
     return nothing
 end
-function set_linear_weight_constraints!(model::JuMP.Model,
-                                        lcms::Union{<:LinearConstraint,
-                                                    <:AbstractVector{<:LinearConstraint}},
-                                        key_ineq::Symbol, key_eq::Symbol)
+function set_linear_weight_constraints!(model::JuMP.Model, lcms::VecLcULc, key_ineq::Symbol,
+                                        key_eq::Symbol)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]

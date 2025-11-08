@@ -112,6 +112,8 @@ function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
                           eq::Option{<:PartialLinearConstraint} = nothing)
     return LinearConstraint(ineq, eq)
 end
+const VecLc = AbstractVector{<:LinearConstraint}
+const VecLcULc = Union{<:LinearConstraint, <:VecLc}
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
         isnothing(obj.ineq) ? nothing : obj.ineq.A
@@ -1244,6 +1246,7 @@ function LinearConstraintEstimator(; val::EqnType)
 end
 const LcULcE = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 const VecLcULcE = AbstractVector{<:LcULcE}
+const VecLcE = AbstractVector{<:LinearConstraintEstimator}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
@@ -1336,7 +1339,7 @@ function linear_constraints(eqn::EqnType, sets::AssetSets; ops1::Tuple = ("==", 
 end
 """
     linear_constraints(lcs::Union{<:LinearConstraintEstimator,
-                                  <:AbstractVector{<:LinearConstraintEstimator}},
+                                  <:VecLcE},
                        sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false)
 
@@ -1358,8 +1361,7 @@ function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
     return linear_constraints(lcs.val, sets; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
-function linear_constraints(lcs::AbstractVector{<:LinearConstraintEstimator},
-                            sets::AssetSets; datatype::DataType = Float64,
+function linear_constraints(lcs::VecLcE, sets::AssetSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag) for lc in lcs]
@@ -1809,4 +1811,4 @@ export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEst
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
        linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, VecLcULcE,
-       RkbURkbE, VecMatUASMatE, MatUASMatEUVecMatUASMatE
+       RkbURkbE, VecMatUASMatE, MatUASMatEUVecMatUASMatE, VecLc

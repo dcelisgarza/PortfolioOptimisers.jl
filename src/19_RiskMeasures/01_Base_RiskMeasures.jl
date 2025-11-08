@@ -148,6 +148,7 @@ function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
     return Frontier(N, factor, flag)
 end
 const RkRtUBounds = Union{<:NumUNumVec, <:Frontier}
+const NumVecUFront = Union{<:NumVec, <:Frontier}
 """
     struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
         scale::T1
@@ -461,4 +462,4 @@ function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure, RkRtUBounds
+       HierarchicalRiskMeasure, RkRtUBounds, NumVecUFront

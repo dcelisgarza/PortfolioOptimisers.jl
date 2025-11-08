@@ -50,8 +50,7 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.plg))
     return nothing
 end
-function assert_internal_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
-                                                               <:OptimisationResult}})
+function assert_internal_optimiser(opt::AbstractVector{<:OptEUOptR})
     assert_internal_optimiser.(opt)
     return nothing
 end
@@ -75,8 +74,7 @@ function assert_external_optimiser(opt::FactorRiskContribution)
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
-                                                               <:OptimisationResult}})
+function assert_external_optimiser(opt::AbstractVector{<:OptEUOptR})
     assert_external_optimiser.(opt)
     return nothing
 end
@@ -95,7 +93,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     strict::T9
     threads::T10
     fb::T11
-    function NestedClustered(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
+    function NestedClustered(pe::PrEUPr,
                              cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                              wb::Option{<:WbUWbE}, sets::Option{<:AssetSets},
                              opti::OptimisationEstimator, opto::OptimisationEstimator,
@@ -114,8 +112,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                    typeof(fb)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
     end
 end
-function NestedClustered(;
-                         pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
+function NestedClustered(; pe::PrEUPr = EmpiricalPrior(),
                          cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
                          wb::Option{<:WbUWbE} = nothing,
                          sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,

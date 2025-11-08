@@ -444,8 +444,8 @@ Generate phylogeny-based portfolio constraints from an estimator or result.
 
   - `est`:
 
-      + `Union{<:SemiDefinitePhylogenyEstimator, <:IntegerPhylogenyEstimator}`: computes the phylogeny matrix using the estimator.
-      + `Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny}`: returns it unchanged.
+      + `AbstractPhylogenyConstraintEstimator`: computes the phylogeny matrix using the estimator.
+      + `Option{<:AbstractPhylogenyConstraintResult}`: returns it unchanged.
 
 # Related
 
@@ -471,7 +471,7 @@ function phylogeny_constraints(plc::Union{<:SemiDefinitePhylogeny, <:IntegerPhyl
                                           Nothing}, args...; kwargs...)
     return plc
 end
-function phylogeny_constraints(plcs::AbstractVector{<:PhCUPhCE}, args...; kwargs...)
+function phylogeny_constraints(plcs::VecPhCUPhCE, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """

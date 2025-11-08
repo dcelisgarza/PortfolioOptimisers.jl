@@ -1,4 +1,5 @@
 abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
+const NumBgCE = Union{<:Number, <:BudgetConstraintEstimator}
 abstract type BudgetEstimator <: BudgetConstraintEstimator end
 abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 function set_budget_costs!(args...)

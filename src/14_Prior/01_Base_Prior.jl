@@ -152,6 +152,7 @@ Abstract supertype for all prior result types.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractPriorResult <: AbstractResult end
+const PrEUPr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 
@@ -722,4 +723,4 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:NumMat} = nothin
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
 
-export prior, LowOrderPrior, HighOrderPrior
+export prior, LowOrderPrior, HighOrderPrior, PrEUPr

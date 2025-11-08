@@ -66,8 +66,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::Union{<:SchurComplementParams,
                                                                  <:AbstractVector{<:SchurComplementParams}},
-                                                   fb::Union{Nothing,
-                                                             <:OptimisationEstimator})
+                                                   fb::Option{<:OptimisationEstimator})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params))
         end

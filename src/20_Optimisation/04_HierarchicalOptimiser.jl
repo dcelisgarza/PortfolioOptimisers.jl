@@ -22,8 +22,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sets::T6
     cwf::T7
     strict::T8
-    function HierarchicalOptimiser(pe::Union{<:AbstractPriorEstimator,
-                                             <:AbstractPriorResult},
+    function HierarchicalOptimiser(pe::PrEUPr,
                                    cle::Union{<:ClusteringEstimator,
                                               <:AbstractClusteringResult},
                                    slv::Option{<:SlvUVecSlv}, fees::Option{<:FeesUFeesE},
@@ -37,8 +36,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                                               cwf, strict)
     end
 end
-function HierarchicalOptimiser(;
-                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
+function HierarchicalOptimiser(; pe::PrEUPr = EmpiricalPrior(),
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
                                slv::Option{<:SlvUVecSlv} = nothing,
