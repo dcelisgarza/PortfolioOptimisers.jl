@@ -131,8 +131,7 @@ struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstima
     alg::T4
     function DefaultMatrixProcessing(pdm::Option{<:Posdef}, denoise::Option{<:Denoise},
                                      detone::Option{<:Detone},
-                                     alg::Union{Nothing,
-                                                <:AbstractMatrixProcessingAlgorithm})
+                                     alg::Option{<:AbstractMatrixProcessingAlgorithm})
         return new{typeof(pdm), typeof(denoise), typeof(detone), typeof(alg)}(pdm, denoise,
                                                                               detone, alg)
     end

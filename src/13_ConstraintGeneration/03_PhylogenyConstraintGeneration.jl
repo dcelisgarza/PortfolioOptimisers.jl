@@ -32,6 +32,7 @@ const PhCUPhCE = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
 const VecPhCUPhCE = AbstractVector{<:PhCUPhCE}
 const VecPhC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+const PhCUVecPhC = Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
         pe::T1
@@ -826,4 +827,4 @@ end
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
        phylogeny_constraints, centrality_constraints, PhCUPhCE, VecPhCUPhCE, VecPhC, VecCC,
-       CCUVecCC
+       CCUVecCC, PhCUVecPhC

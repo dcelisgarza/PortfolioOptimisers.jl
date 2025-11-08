@@ -62,10 +62,8 @@ function set_risk_tr_constraints!(key::Any, model::JuMP.Model,
 end
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult,
-                                    plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                               <:VecPhC}, fees::Option{<:Fees}, args...;
-                                    kwargs...)
+                                    pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC},
+                                    fees::Option{<:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
     W = haskey(model, :W)
@@ -416,10 +414,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult,
-                                    plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                               <:VecPhC}, fees::Option{<:Fees}, args...;
-                                    kwargs...)
+                                    pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC},
+                                    fees::Option{<:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
     W = haskey(model, :W)

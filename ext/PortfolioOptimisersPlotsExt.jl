@@ -306,8 +306,7 @@ function PortfolioOptimisers.plot_measures(w::NumVecUVecNumVec,
                                            fees::Option{<:Fees} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
-                                           z::Union{Nothing,
-                                                    <:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
+                                           z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
                                            c::PortfolioOptimisers.AbstractBaseRiskMeasure = RatioRiskMeasure(;
                                                                                                              rk = x,
                                                                                                              rt = ArithmeticReturn(),

@@ -1677,6 +1677,7 @@ function AssetSetsMatrixEstimator(; val::AbstractString)
 end
 const MatUASMatE = Union{<:AssetSetsMatrixEstimator, <:NumMat}
 const VecMatUASMatE = AbstractVector{<:MatUASMatE}
+const MatUASMatEUVecMatUASMatE = Union{<:MatUASMatE, <:VecMatUASMatE}
 """
     asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
 
@@ -1808,4 +1809,4 @@ export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEst
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
        linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, VecLcULcE,
-       RkbURkbE
+       RkbURkbE, VecMatUASMatE, MatUASMatEUVecMatUASMatE

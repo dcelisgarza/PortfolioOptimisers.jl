@@ -8,8 +8,7 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,
-                                                  ub::Union{Nothing, <:NumUNumVec,
-                                                            <:Frontier}, key::Symbol,
+                                                  ub::Option{<:RkRtUBounds}, key::Symbol,
                                                   r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
@@ -147,9 +146,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
 end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance,
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult,
-                   plg::Option{<:Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}},
-                   args...; kwargs...)
+                   pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC}, args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)

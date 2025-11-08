@@ -29,8 +29,7 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
                                                           r::Number,
-                                                          w::Union{Nothing,
-                                                                   <:AbstractWeights})
+                                                          w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -127,8 +126,7 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
                                                                alpha::Number, l_a::Number,
                                                                r_a::Number, beta::Number,
                                                                l_b::Number, r_b::Number,
-                                                               w::Union{Nothing,
-                                                                        <:AbstractWeights})
+                                                               w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -147,8 +145,7 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            beta::Number = 0.05,
                                                            l_b::Number = 1.0,
                                                            r_b::Number = 0.02,
-                                                           w::Union{Nothing,
-                                                                    <:AbstractWeights} = nothing)
+                                                           w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
