@@ -45,6 +45,8 @@ All concrete risk measures that can be used as objectives or constraints in opti
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+const VecOptRM = AbstractVector{<:OptimisationRiskMeasure}
+const OptRMUVecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
 """
     abstract type RiskMeasure <: OptimisationRiskMeasure end
 
@@ -58,6 +60,8 @@ Subtype `RiskMeasure` to implement concrete risk measures that quantify portfoli
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
+const VecRM = AbstractVector{<:RiskMeasure}
+const RMUVecRM = Union{<:RiskMeasure, <:VecRM}
 """
     abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 
@@ -462,4 +466,4 @@ function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure, RkRtUBounds, NumVecUFront
+       HierarchicalRiskMeasure, RkRtUBounds, NumVecUFront, VecRM, RMUVecRM

@@ -42,8 +42,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     ucs_flag::T11
     alg::T12
     fb::T13
-    function NearOptimalCentering(opt::JuMPOptimiser,
-                                  r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+    function NearOptimalCentering(opt::JuMPOptimiser, r::RMUVecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
                                   w_min::Option{<:NumVec}, w_min_ini::Option{<:NumVec},
                                   w_opt::Option{<:NumVecUVecNumVec},
@@ -97,7 +96,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     end
 end
 function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
-                              r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
+                              r::RMUVecRM = StandardDeviation(),
                               obj::Option{<:ObjectiveFunction} = MinimumRisk(),
                               bins::Option{<:Number} = nothing,
                               w_min::Option{<:NumVec} = nothing,
@@ -137,9 +136,8 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
     risk_max = expected_risk(r, w_max, X, fees) * scale
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
-                                      pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::SlvUVecSlv, w_min::NumVec,
+function near_optimal_centering_risks(::SumScalariser, rs::VecRM, pr::AbstractPriorResult,
+                                      fees::Option{<:Fees}, slv::SlvUVecSlv, w_min::NumVec,
                                       w_opt::NumVecUVecNumVec, w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)
@@ -156,8 +154,7 @@ function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:Risk
     end
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
-                                      rs::AbstractVector{<:RiskMeasure},
+function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::VecRM,
                                       pr::AbstractPriorResult, fees::Option{<:Fees},
                                       slv::SlvUVecSlv, w_min::NumVec,
                                       w_opt::NumVecUVecNumVec, w_max::NumVec)
@@ -182,10 +179,9 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     risk_max = log(risk_max) * igamma
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
-                                      pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::Option{<:SlvUVecSlv}, w_min::NumVec,
-                                      w_opt::NumVecUVecNumVec, w_max::NumVec)
+function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPriorResult,
+                                      fees::Option{<:Fees}, slv::Option{<:SlvUVecSlv},
+                                      w_min::NumVec, w_opt::NumVecUVecNumVec, w_max::NumVec)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)

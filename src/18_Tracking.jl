@@ -14,6 +14,7 @@ All concrete types representing tracking error or tracking constraint results sh
 """
 abstract type AbstractTracking <: AbstractResult end
 const VecTr = AbstractVector{<:AbstractTracking}
+const TrUVecTr = Union{<:AbstractTracking, <:VecTr}
 """
     abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 

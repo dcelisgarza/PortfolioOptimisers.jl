@@ -1247,6 +1247,7 @@ end
 const LcULcE = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 const VecLcULcE = AbstractVector{<:LcULcE}
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
+const LcULcEUVecLcULcE = Union{<:LcULcE, <:VecLcULcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 

@@ -26,6 +26,7 @@ All concrete types representing the output of regression-based moment estimation
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
+const RegURegE = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
     abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 
@@ -489,7 +490,6 @@ function Base.getproperty(re::Regression{<:Any, <:NumMat, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
-const RegURegE = Union{<:Regression, <:AbstractRegressionEstimator}
 """
     regression_view(re::Regression, i)
 

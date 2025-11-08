@@ -22,12 +22,10 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sets::T6
     cwf::T7
     strict::T8
-    function HierarchicalOptimiser(pe::PrEUPr,
-                                   cle::Union{<:ClusteringEstimator,
-                                              <:AbstractClusteringResult},
-                                   slv::Option{<:SlvUVecSlv}, fees::Option{<:FeesUFeesE},
-                                   wb::Option{<:WbUWbE}, sets::Option{<:AssetSets},
-                                   cwf::WeightFinaliser, strict::Bool)
+    function HierarchicalOptimiser(pe::PrEUPr, cle::ClRUClE, slv::Option{<:SlvUVecSlv},
+                                   fees::Option{<:FeesUFeesE}, wb::Option{<:WbUWbE},
+                                   sets::Option{<:AssetSets}, cwf::WeightFinaliser,
+                                   strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end

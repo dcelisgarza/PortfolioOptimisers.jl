@@ -107,8 +107,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                         tres::Union{<:AbstractTracking, <:VecTr}, args...;
-                                         kwargs...)
+                                         tres::TrUVecTr, args...; kwargs...)
     for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...; kwargs...)
     end

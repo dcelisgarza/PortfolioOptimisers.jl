@@ -149,10 +149,9 @@ function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
     rc_variance_constraints!(model, i, rc, variance_risk)
     return variance_risk, sdp_flag
 end
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgeting}, pr::AbstractPriorResult,
-                               plg::Option{<:PhCUVecPhC}, args...; kwargs...)
+function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
+                               pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC}, args...;
+                               kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end

@@ -968,7 +968,7 @@ function phylogeny_matrix(ne::AbstractNetworkEstimator, X::NumMat; dims::Int = 1
     return PhylogenyResult(; X = P)
 end
 """
-    phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult},
+    phylogeny_matrix(cle::ClRUClE,
                      X::NumMat; branchorder::Symbol = :optimal, dims::Int = 1,
                      kwargs...)
 
@@ -994,9 +994,8 @@ This function clusterises the data, cuts the tree into the optimal number of clu
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator,
-                                     <:AbstractClusteringResult}, X::NumMat;
-                          branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+function phylogeny_matrix(cle::ClRUClE, X::NumMat; branchorder::Symbol = :optimal,
+                          dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = cutree(res.clustering; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
@@ -1007,8 +1006,7 @@ function phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator,
     return PhylogenyResult(; X = P * transpose(P) - I)
 end
 """
-    centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
-                                <:AbstractClusteringResult}, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE}, cent::AbstractCentralityAlgorithm,
                       X::NumMat; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
@@ -1033,9 +1031,7 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`CentralityEstimator`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
-                                     <:AbstractClusteringEstimator,
-                                     <:AbstractClusteringResult},
+function centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE},
                            cent::AbstractCentralityAlgorithm, X::NumMat; dims::Int = 1,
                            kwargs...)
     P = phylogeny_matrix(ne, X; dims = dims, kwargs...)

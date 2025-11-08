@@ -715,6 +715,7 @@ function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
 end
 const VecCC = AbstractVector{<:CentralityConstraint}
 const CCUVecCC = Union{<:CentralityConstraint, <:VecCC}
+const CCUVecCCULc = Union{<:CCUVecCC, <:LinearConstraint}
 """
     centrality_constraints(ccs::Union{<:CentralityConstraint,
                                       <:VecCC},
@@ -826,4 +827,4 @@ end
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
        phylogeny_constraints, centrality_constraints, PhCUPhCE, VecPhCUPhCE, VecPhC, VecCC,
-       CCUVecCC, PhCUVecPhC, PhCUPhCEUVecPhCUPhCE
+       CCUVecCC, PhCUVecPhC, PhCUPhCEUVecPhCUPhCE, CCUVecCCULc

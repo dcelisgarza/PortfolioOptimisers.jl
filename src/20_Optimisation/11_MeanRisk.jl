@@ -4,10 +4,8 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     obj::T3
     wi::T4
     fb::T5
-    function MeanRisk(opt::JuMPOptimiser,
-                      r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                      obj::ObjectiveFunction, wi::Option{<:NumVec},
-                      fb::Option{<:OptimisationEstimator})
+    function MeanRisk(opt::JuMPOptimiser, r::RMUVecRM, obj::ObjectiveFunction,
+                      wi::Option{<:NumVec}, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -18,8 +16,7 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
                                                                                 wi, fb)
     end
 end
-function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
-                  r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
+function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RMUVecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:NumVec} = nothing,
                   fb::Option{<:OptimisationEstimator} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)

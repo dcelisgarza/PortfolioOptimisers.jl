@@ -172,6 +172,7 @@ const TnUTnE = Union{<:Turnover, <:TurnoverEstimator}
 const VecTnUTnE = AbstractVector{<:TnUTnE}
 const VecTn = AbstractVector{<:Turnover}
 const TnVecTn = Union{<:Turnover, <:VecTn}
+const TnUTnEUVecTnUTnE = Union{<:TnUTnE, <:VecTnUTnE}
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
 
@@ -242,4 +243,5 @@ function factory(tn::Turnover, w::NumVec)
     return Turnover(; w = w, val = tn.val)
 end
 
-export TurnoverEstimator, Turnover, turnover_constraints, TnUTnE, VecTnUTnE
+export TurnoverEstimator, Turnover, turnover_constraints, TnUTnE, VecTnUTnE,
+       TnUTnEUVecTnUTnE

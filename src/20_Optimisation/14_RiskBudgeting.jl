@@ -33,10 +33,8 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     rba::T3
     wi::T4
     fb::T5
-    function RiskBudgeting(opt::JuMPOptimiser,
-                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                           rba::RiskBudgetingAlgorithm, wi::Option{<:NumVec},
-                           fb::Option{<:OptimisationEstimator})
+    function RiskBudgeting(opt::JuMPOptimiser, r::RMUVecRM, rba::RiskBudgetingAlgorithm,
+                           wi::Option{<:NumVec}, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -50,8 +48,7 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
                                                                                 wi, fb)
     end
 end
-function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
-                       r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
+function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RMUVecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:NumVec} = nothing,
                        fb::Option{<:OptimisationEstimator} = nothing)

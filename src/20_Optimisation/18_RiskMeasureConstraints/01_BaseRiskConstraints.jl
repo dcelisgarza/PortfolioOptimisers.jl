@@ -51,10 +51,9 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
     set_risk_constraints!(model, 1, r, opt, pr, plg, fees, args...; kwargs...)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
-                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Option{<:PhCUVecPhC}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisationEstimator,
+                               pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC},
+                               fees::Option{<:Fees}, args...; kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, plg, fees, args...; kwargs...)
     end

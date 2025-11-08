@@ -3,9 +3,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     r::T2
     sce::T3
     fb::T4
-    function HierarchicalRiskParity(opt::HierarchicalOptimiser,
-                                    r::Union{<:OptimisationRiskMeasure,
-                                             <:AbstractVector{<:OptimisationRiskMeasure}},
+    function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRMUVecOptRM,
                                     sce::Scalariser, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
@@ -14,8 +12,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                r::Union{<:OptimisationRiskMeasure,
-                                         <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
+                                r::OptRMUVecOptRM = Variance(),
                                 sce::Scalariser = SumScalariser(),
                                 fb::Option{<:OptimisationEstimator} = nothing)
     return HierarchicalRiskParity(opt, r, sce, fb)
@@ -81,8 +78,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
 function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec,
-                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             lc::NumVec, rc::NumVec, rs::VecOptRM, X::NumMat,
                              fees::Option{<:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
@@ -99,8 +95,7 @@ function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVe
     return lrisk, rrisk
 end
 function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec,
-                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             lc::NumVec, rc::NumVec, rs::VecOptRM, X::NumMat,
                              fees::Option{<:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
@@ -124,8 +119,7 @@ function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVe
     return lrisk, rrisk
 end
 function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec,
-                             rs::AbstractVector{<:OptimisationRiskMeasure}, X::NumMat,
+                             lc::NumVec, rc::NumVec, rs::VecOptRM, X::NumMat,
                              fees::Option{<:Fees})
     lrisk = Vector{eltype(X)}(undef, length(rs))
     rrisk = Vector{eltype(X)}(undef, length(rs))
@@ -142,8 +136,7 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, r
     end
     return logsumexp(lrisk) / sce.gamma, logsumexp(rrisk) / sce.gamma
 end
-function _optimise(hrp::HierarchicalRiskParity{<:Any,
-                                               <:AbstractVector{<:OptimisationRiskMeasure}},
+function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)

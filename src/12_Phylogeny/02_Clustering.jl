@@ -62,6 +62,7 @@ All concrete types representing the result of a clustering estimation should sub
   - [`AbstractClusteringAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+const ClRUClE = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
 """
     struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
         clustering::T1
@@ -382,4 +383,4 @@ end
 
 export HierarchicalClustering, clusterise, SecondOrderDifference,
        StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
-       ClusteringEstimator
+       ClusteringEstimator, ClRUClE
