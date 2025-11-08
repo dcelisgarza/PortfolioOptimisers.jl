@@ -131,7 +131,7 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
     end
 end
 """
-    black_litterman_views(views::Union{Nothing, <:BlackLittermanViews}, args...; kwargs...)
+    black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
     black_litterman_views(views::EqnType,
                           sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
     black_litterman_views(views::LinearConstraintEstimator, sets::AssetSets;
@@ -183,8 +183,7 @@ BlackLittermanViews
   - [`AssetSets`](@ref)
   - [`LinearConstraintEstimator`](@ref)
 """
-function black_litterman_views(views::Union{Nothing, <:BlackLittermanViews}, args...;
-                               kwargs...)
+function black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
     return views
 end
 function black_litterman_views(eqn::EqnType, sets::AssetSets; datatype::DataType = Float64,

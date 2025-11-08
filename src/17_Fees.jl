@@ -31,7 +31,7 @@ Estimator for portfolio transaction fees constraints.
 
 # Constructor
 
-    FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
+    FeesEstimator(; tn::Option{<:TnUTnE} = nothing,
                     l::Option{<:EstValType} = nothing,
                     s::Option{<:EstValType} = nothing,
                     fl::Option{<:EstValType} = nothing,
@@ -89,11 +89,11 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimat
     dfl::T8
     dfs::T9
     kwargs::T10
-    function FeesEstimator(tn::Union{Nothing, <:TurnoverEstimator, <:Turnover},
-                           l::Option{<:EstValType}, s::Option{<:EstValType},
-                           fl::Option{<:EstValType}, fs::Option{<:EstValType},
-                           dl::Option{<:Number} = nothing, ds::Option{<:Number} = nothing,
-                           dfl::Option{<:Number} = nothing, dfs::Option{<:Number} = nothing,
+    function FeesEstimator(tn::Option{<:TnUTnE}, l::Option{<:EstValType},
+                           s::Option{<:EstValType}, fl::Option{<:EstValType},
+                           fs::Option{<:EstValType}, dl::Option{<:Number} = nothing,
+                           ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
+                           dfs::Option{<:Number} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -109,8 +109,8 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimat
                                                                          kwargs)
     end
 end
-function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                       l::Option{<:EstValType} = nothing, s::Option{<:EstValType} = nothing,
+function FeesEstimator(; tn::Option{<:TnUTnE} = nothing, l::Option{<:EstValType} = nothing,
+                       s::Option{<:EstValType} = nothing,
                        fl::Option{<:EstValType} = nothing,
                        fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
                        ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
@@ -212,6 +212,7 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:NumUNumVec} = noth
               fs::Option{<:NumUNumVec} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
     return Fees(tn, l, s, fl, fs, kwargs)
 end
+const FeesUFeesE = Union{<:Fees, <:FeesEstimator}
 """
     fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
                      strict::Bool = false)
@@ -1177,4 +1178,4 @@ end
 
 export FeesEstimator, Fees, fees_constraints, calc_fees, calc_fixed_fees, calc_asset_fees,
        calc_asset_fixed_fees, calc_net_returns, calc_net_asset_returns, cumulative_returns,
-       drawdowns
+       drawdowns, FeesUFeesE

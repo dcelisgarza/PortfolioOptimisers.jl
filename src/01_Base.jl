@@ -323,8 +323,9 @@ const Option{T} = Union{Nothing, T}
 const NumMatUVecNumMat = Union{<:NumMat, <:VecNumMat}
 const IntUIntVec = Union{<:Integer, <:IntVec}
 const NumVecUVecNumVec = Union{<:NumVec, <:VecNumVec}
+const DateVec = AbstractVector{<:Dates.AbstractTime}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
        NumMat, NumArr, EstValType, StrExprVec, EqnType, VecNumVec, VecIntVec, VecNumMat,
        StrVec, PairVec, VecJuMPScalar, Option, NumUNumVec, NumMatUVecNumMat, IntUIntVec,
-       NumVecUVecNumVec
+       NumVecUVecNumVec, DateVec

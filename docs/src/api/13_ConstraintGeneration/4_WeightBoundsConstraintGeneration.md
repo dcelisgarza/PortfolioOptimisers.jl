@@ -5,6 +5,6 @@ WeightBounds
 UniformlyDistributedBounds
 WeightBoundsEstimator
 weight_bounds_constraints
-PortfolioOptimisers.CustomWeightBoundsConstraint
+PortfolioOptimisers.CustomWeightBoundsAlgorithm
 PortfolioOptimisers.weight_bounds_constraints_side
 ```

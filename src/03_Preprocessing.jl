@@ -74,11 +74,11 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
+    ReturnsResult(; nx::Option{<:StrVec} = nothing,
                   X::Option{<:NumMat} = nothing,
-                  nf::Union{Nothing, <:StrVec} = nothing,
+                  nf::Option{<:StrVec} = nothing,
                   F::Option{<:NumMat} = nothing,
-                  ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
+                  ts::Option{<:DateVec} = nothing,
                   iv::Option{<:NumMat} = nothing,
                   ivpa::Option{<:NumUNumVec} = nothing)
 
@@ -119,10 +119,9 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
-    function ReturnsResult(nx::Union{Nothing, <:StrVec}, X::Option{<:NumMat},
-                           nf::Union{Nothing, <:StrVec}, F::Option{<:NumMat},
-                           ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}},
-                           iv::Option{<:NumMat}, ivpa::Option{<:NumUNumVec})
+    function ReturnsResult(nx::Option{<:StrVec}, X::Option{<:NumMat}, nf::Option{<:StrVec},
+                           F::Option{<:NumMat}, ts::Option{<:DateVec}, iv::Option{<:NumMat},
+                           ivpa::Option{<:NumUNumVec})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
@@ -151,12 +150,10 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
-function ReturnsResult(; nx::Union{Nothing, <:StrVec} = nothing,
-                       X::Option{<:NumMat} = nothing,
-                       nf::Union{Nothing, <:StrVec} = nothing,
-                       F::Option{<:NumMat} = nothing,
-                       ts::Union{Nothing, <:AbstractVector{<:Dates.AbstractTime}} = nothing,
-                       iv::Option{<:NumMat} = nothing, ivpa::Option{<:NumUNumVec} = nothing)
+function ReturnsResult(; nx::Option{<:StrVec} = nothing, X::Option{<:NumMat} = nothing,
+                       nf::Option{<:StrVec} = nothing, F::Option{<:NumMat} = nothing,
+                       ts::Option{<:DateVec} = nothing, iv::Option{<:NumMat} = nothing,
+                       ivpa::Option{<:NumUNumVec} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i)

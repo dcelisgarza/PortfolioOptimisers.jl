@@ -156,8 +156,7 @@ function opt_view(nco::NestedClustered, i, X::NumMat)
                            opto = opto, cv = nco.cv, cwf = nco.cwf, strict = nco.strict,
                            threads = nco.threads, fb = nco.fb)
 end
-function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
-                                               <:WeightBounds}, sets::Option{<:AssetSets},
+function nested_clustering_finaliser(wb::Option{<:WbUWbE}, sets::Option{<:AssetSets},
                                      cwf::WeightFinaliser, strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
                                      res::OptimisationResult, w::NumVec;

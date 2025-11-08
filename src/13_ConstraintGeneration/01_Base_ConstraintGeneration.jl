@@ -24,6 +24,7 @@ All concrete types implementing constraint generation or estimation algorithms s
   - [`AbstractEstimator`](@ref)
 """
 abstract type AbstractConstraintEstimator <: AbstractEstimator end
+abstract type AbstractConstraintAlgorithm <: AbstractAlgorithm end
 """
     abstract type ComparisonOperator end
 

@@ -168,6 +168,7 @@ end
 function Turnover(; w::NumVec, val::NumUNumVec = 0.0)
     return Turnover(w, val)
 end
+const TnUTnE = Union{<:Turnover, <:TurnoverEstimator}
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
 
@@ -206,16 +207,15 @@ function turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
     return tn
 end
 """
-    turnover_constraints(tn::AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}},
+    turnover_constraints(tn::AbstractVector{<:TnUTnE},
                          sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
-function turnover_constraints(tn::AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}},
-                              sets::AssetSets; datatype::DataType = Float64,
-                              strict::Bool = false)
+function turnover_constraints(tn::AbstractVector{<:TnUTnE}, sets::AssetSets;
+                              datatype::DataType = Float64, strict::Bool = false)
     return [turnover_constraints(tni, sets; datatype = datatype, strict = strict)
             for tni in tn]
 end
@@ -239,4 +239,4 @@ function factory(tn::Turnover, w::NumVec)
     return Turnover(; w = w, val = tn.val)
 end
 
-export TurnoverEstimator, Turnover, turnover_constraints
+export TurnoverEstimator, Turnover, turnover_constraints, TnUTnE

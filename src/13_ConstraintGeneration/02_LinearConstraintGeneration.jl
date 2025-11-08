@@ -1243,7 +1243,7 @@ function LinearConstraintEstimator(; val::EqnType)
     return LinearConstraintEstimator(val)
 end
 """
-    linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
+    linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
 No-op fallback for returning an existing `LinearConstraint` object or `nothing`.
 
@@ -1265,7 +1265,7 @@ This method is used to pass through an already constructed [`LinearConstraint`](
   - [`PartialLinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
+function linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
     return lcs
 end
 """

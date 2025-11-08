@@ -18,7 +18,7 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 # Constructor
 
     SimpleVariance(;
-                   me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+                   me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                    w::Option{<:AbstractWeights} = nothing, corrected::Bool = true)
 
 Keyword arguments correspond to the fields above.
@@ -64,14 +64,14 @@ struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     me::T1
     w::T2
     corrected::T3
-    function SimpleVariance(me::Union{Nothing, <:AbstractExpectedReturnsEstimator},
+    function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:AbstractWeights}, corrected::Bool)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
     end
 end
 function SimpleVariance(;
-                        me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+                        me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                         w::Option{<:AbstractWeights} = nothing, corrected::Bool = true)
     return SimpleVariance(me, w, corrected)
 end

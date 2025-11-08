@@ -261,7 +261,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
     end
 end
 function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
-                             pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+                             pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              p::Option{<:Number} = nothing, w::Option{<:NumVec} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),

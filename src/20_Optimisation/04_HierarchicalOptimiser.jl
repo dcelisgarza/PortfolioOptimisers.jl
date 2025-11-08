@@ -26,10 +26,8 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                              <:AbstractPriorResult},
                                    cle::Union{<:ClusteringEstimator,
                                               <:AbstractClusteringResult},
-                                   slv::Option{<:SlvUVecSlv},
-                                   fees::Union{Nothing, <:FeesEstimator, <:Fees},
-                                   wb::Union{Nothing, <:WeightBoundsEstimator,
-                                             <:WeightBounds}, sets::Option{<:AssetSets},
+                                   slv::Option{<:SlvUVecSlv}, fees::Option{<:FeesUFeesE},
+                                   wb::Option{<:WbUWbE}, sets::Option{<:AssetSets},
                                    cwf::WeightFinaliser, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -44,7 +42,7 @@ function HierarchicalOptimiser(;
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
                                slv::Option{<:SlvUVecSlv} = nothing,
-                               fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
+                               fees::Option{<:FeesUFeesE} = nothing,
                                wb::Option{<:WbUWbE} = WeightBounds(),
                                sets::Option{<:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),

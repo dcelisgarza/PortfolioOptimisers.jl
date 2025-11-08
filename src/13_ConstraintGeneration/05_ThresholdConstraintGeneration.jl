@@ -59,16 +59,13 @@ BuyInThresholdEstimator
 struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
     dval::T2
-    function BuyInThresholdEstimator(val::Union{<:EstValType,
-                                                <:CustomWeightBoundsConstraint},
-                                     dval::Option{<:Number} = nothing)
+    function BuyInThresholdEstimator(val::EstValTypeUCWbA, dval::Option{<:Number} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function BuyInThresholdEstimator(; val::Union{<:EstValType, <:CustomWeightBoundsConstraint},
-                                 dval::Option{<:Number} = nothing)
+function BuyInThresholdEstimator(; val::EstValTypeUCWbA, dval::Option{<:Number} = nothing)
     return BuyInThresholdEstimator(val, dval)
 end
 """
