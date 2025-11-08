@@ -1242,6 +1242,7 @@ end
 function LinearConstraintEstimator(; val::EqnType)
     return LinearConstraintEstimator(val)
 end
+const LcULcE = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
@@ -1469,6 +1470,7 @@ end
 function RiskBudgetEstimator(; val::EstValType)
     return RiskBudgetEstimator(val)
 end
+const RkbURkbE = Union{<:RiskBudgetEstimator, <:RiskBudgetResult}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
 end
@@ -1802,4 +1804,4 @@ end
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
-       linear_constraints, risk_budget_constraints, asset_sets_matrix
+       linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, RkbURkbE

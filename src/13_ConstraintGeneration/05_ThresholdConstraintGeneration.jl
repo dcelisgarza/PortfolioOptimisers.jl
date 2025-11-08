@@ -128,8 +128,7 @@ end
 function threshold_view(t::BuyInThreshold, i)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
 end
-function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
-                                                  <:BuyInThresholdEstimator}}, i)
+function threshold_view(t::AbstractVector{<:Option{<:BtUBtE}}, i)
     return [threshold_view(ti, i) for ti in t]
 end
 """
@@ -219,17 +218,15 @@ function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                                                  strict = strict))
 end
 """
-    threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
-                                                    <:BuyInThreshold}}, sets::AssetSets;
+    threshold_constraints(t::AbstractVector{<:Option{<:BtUBtE}}, sets::AssetSets;
                           kwargs...)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
-function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
-                                                         <:BuyInThreshold}},
-                               sets::AssetSets; kwargs...)
+function threshold_constraints(t::AbstractVector{<:Option{<:BtUBtE}}, sets::AssetSets;
+                               kwargs...)
     return [threshold_constraints(ti, sets; kwargs...) for ti in t]
 end
 

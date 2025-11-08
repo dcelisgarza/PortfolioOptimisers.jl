@@ -393,11 +393,9 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::In
                                    gcard::AbstractVector{<:LinearConstraint},
                                    smtx::VecNumMat,
                                    lt::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThreshold}}},
+                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
                                    st::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThreshold}}},
+                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
                                    ss::Option{<:Number})
     for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
         lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
@@ -431,11 +429,9 @@ end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::IntVec,
                                    smtx::VecNumMat,
                                    lt::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThreshold}}},
+                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
                                    st::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThreshold}}},
+                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
                                    ss::Option{<:Number})
     for (i, (c, s)) in enumerate(zip(card, smtx))
         lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]

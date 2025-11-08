@@ -1,13 +1,11 @@
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
     rkb::T1
-    function AssetRiskBudgeting(rkb::Union{Nothing, <:RiskBudgetEstimator,
-                                           <:RiskBudgetResult})
+    function AssetRiskBudgeting(rkb::Option{<:RkbURkbE})
         return new{typeof(rkb)}(rkb)
     end
 end
-function AssetRiskBudgeting(;
-                            rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing)
+function AssetRiskBudgeting(; rkb::Option{<:RkbURkbE} = nothing)
     return AssetRiskBudgeting(rkb)
 end
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
@@ -17,15 +15,12 @@ struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
     flag::T3
-    function FactorRiskBudgeting(re::RegURegE,
-                                 rkb::Union{Nothing, <:RiskBudgetEstimator,
-                                            <:RiskBudgetResult}, flag::Bool)
+    function FactorRiskBudgeting(re::RegURegE, rkb::Option{<:RkbURkbE}, flag::Bool)
         return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
     end
 end
 function FactorRiskBudgeting(; re::RegURegE = StepwiseRegression(),
-                             rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing,
-                             flag::Bool = true)
+                             rkb::Option{<:RkbURkbE} = nothing, flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, flag)
 end
 function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)

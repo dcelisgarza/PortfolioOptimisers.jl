@@ -126,7 +126,7 @@ Represents the portfolio variance using a covariance matrix.
 
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              sigma::Option{<:NumMat} = nothing,
-             rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
+             rc::Option{<:LcULcE} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
 Keyword arguments correspond to the fields above.
@@ -232,8 +232,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     rc::T3
     alg::T4
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:NumMat},
-                      rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
-                      alg::VarianceFormulation)
+                      rc::Option{<:LcULcE}, alg::VarianceFormulation)
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -243,8 +242,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:NumMat} = nothing,
-                  rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
+                  sigma::Option{<:NumMat} = nothing, rc::Option{<:LcULcE} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end

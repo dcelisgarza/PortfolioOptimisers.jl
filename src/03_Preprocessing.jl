@@ -166,14 +166,14 @@ function returns_result_view(rd::ReturnsResult, i)
 end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
-                      iv::Union{Nothing, <:TimeArray} = nothing,
+                      iv::Option{<:TimeArray} = nothing,
                       ivpa::Option{<:NumUNumVec} = nothing,
                       ret_method::Symbol = :simple, padding::Bool = false,
                       missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0,
-                      collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
+                      collapse_args::Tuple = (), map_func::Option{<:Function} = nothing,
                       join_method::Symbol = :outer,
-                      impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+                      impute_method::Option{<:Impute.Imputor} = nothing)
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
@@ -230,15 +230,15 @@ ReturnsResult
   - [`ReturnsResult`](@ref)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                           iv::Union{Nothing, <:TimeArray} = nothing,
+                           iv::Option{<:TimeArray} = nothing,
                            ivpa::Option{<:NumUNumVec} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Number = 1.0,
                            missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
-                           map_func::Union{Nothing, Function} = nothing,
+                           map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer,
-                           impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+                           impute_method::Option{<:Impute.Imputor} = nothing)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError("0 < missing_col_percent <= 1 must hold. Got\nmissing_col_percent => $missing_col_percent"))
     if !isnothing(missing_row_percent)
