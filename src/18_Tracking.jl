@@ -13,6 +13,7 @@ All concrete types representing tracking error or tracking constraint results sh
   - [`ReturnsTracking`](@ref)
 """
 abstract type AbstractTracking <: AbstractResult end
+const VecTr = AbstractVector{<:AbstractTracking}
 """
     abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 
@@ -474,7 +475,7 @@ function tracking_view(tracking::TrackingError, i, args...)
     return TrackingError(; tracking = tracking_view(tracking.tracking, i),
                          err = tracking.err, alg = tracking.alg)
 end
-function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
+function tracking_view(tracking::VecTr, args...)
     return [tracking_view(t, args...) for t in tracking]
 end
 function factory(tracking::TrackingError, w::NumVec)
@@ -482,4 +483,4 @@ function factory(tracking::TrackingError, w::NumVec)
                          alg = tracking.alg)
 end
 
-export WeightsTracking, ReturnsTracking, TrackingError
+export WeightsTracking, ReturnsTracking, TrackingError, VecTr

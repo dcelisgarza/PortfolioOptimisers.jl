@@ -438,8 +438,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 # Constructors
 
     UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                      <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
+                           ucs::Option{<:UcUUcE} = NormalUncertaintySet(),
                            sigma::Option{<:NumMat} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -603,9 +602,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
-    function UncertaintySetVariance(settings::RiskMeasureSettings,
-                                    ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                               <:AbstractUncertaintySetEstimator},
+    function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcUUcE},
                                     sigma::Option{<:NumMat})
         if isa(sigma, NumMat)
             @argcheck(!isempty(sigma))
@@ -614,8 +611,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     end
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                           <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
+                                ucs::Option{<:UcUUcE} = NormalUncertaintySet(),
                                 sigma::Option{<:NumMat} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
@@ -637,8 +633,7 @@ function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
 end
 """
     factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-            ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                       <:AbstractUncertaintySetEstimator} = nothing, args...;
+            ucs::Option{<:UcUUcE} = nothing, args...;
             kwargs...)
 
 Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertainty set and covariance matrix from the risk-measure instance or falling back to the prior result.
@@ -671,9 +666,7 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
   - [`nothing_scalar_array_factory`](@ref)
 """
 function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                            <:AbstractUncertaintySetEstimator} = nothing, args...;
-                 kwargs...)
+                 ucs::Option{<:UcUUcE} = nothing, args...; kwargs...)
     ucs = ucs_factory(r.ucs, ucs)
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)

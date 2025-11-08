@@ -90,16 +90,14 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
 end
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:IndependentVariableTracking})(w::NumVec, X::NumMat,
-                                                                     fees::Union{Nothing,
-                                                                                 <:Fees} = nothing)
+                                                                     fees::Option{<:Fees} = nothing)
     wb = r.tracking.w
     wd = w - wb
     return expected_risk(r.r, wd, X, fees)
 end
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:DependentVariableTracking})(w::NumVec, X::NumMat,
-                                                                   fees::Union{Nothing,
-                                                                               <:Fees} = nothing)
+                                                                   fees::Option{<:Fees} = nothing)
     wb = r.tracking.w
     r1 = expected_risk(r.r, w, X, fees)
     r2 = expected_risk(r.r, wb, X, fees)

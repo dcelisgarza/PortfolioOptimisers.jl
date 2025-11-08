@@ -48,7 +48,7 @@ function sdp_rc_variance_flag!(::JuMP.Model,
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
                             plg::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                                <:AbstractVector{<:AbstractPhylogenyConstraintResult}}})
+                                                <:VecPhC}})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
               isa(plg, SemiDefinitePhylogeny) ||
@@ -148,8 +148,7 @@ end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance,
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
                    pr::AbstractPriorResult,
-                   plg::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                       <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+                   plg::Option{<:Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}},
                    args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
@@ -164,8 +163,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                plg::Option{<:Union{<:AbstractPhylogenyConstraintResult,
-                                                   <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                               args...; kwargs...)
+                                                   <:VecPhC}}, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end

@@ -189,17 +189,12 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator},
                            sbgt::Option{<:NumUBgtRg}, lt::Option{<:BtUBtE},
                            st::Option{<:BtUBtE},
-                           lcs::Option{<:Union{<:LcULcE, <:AbstractVector{<:LcULcE}}},
-                           cent::Union{Nothing, <:CentralityConstraint,
-                                       <:AbstractVector{<:CentralityConstraint},
-                                       <:LinearConstraint}, gcard::Option{<:LcULcE},
-                           sgcard::Option{<:Union{<:LcULcE, <:AbstractVector{<:LcULcE}}},
-                           smtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:NumMat,
-                                       <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
-                                                                <:NumMat}}},
-                           sgmtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:NumMat,
-                                        <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
-                                                                 <:NumMat}}},
+                           lcs::Option{<:Union{<:LcULcE, <:VecLcULcE}},
+                           cent::Option{<:Union{<:CCUVecCC, <:LinearConstraint}},
+                           gcard::Option{<:LcULcE},
+                           sgcard::Option{<:Union{<:LcULcE, <:VecLcULcE}},
+                           smtx::Option{<:Union{<:MatUASMatE, <:VecMatUASMatE}},
+                           sgmtx::Option{<:Union{<:MatUASMatE, <:VecMatUASMatE}},
                            slt::Union{<:Option{<:BtUBtE},
                                       <:AbstractVector{<:Option{<:BtUBtE}}},
                            sst::Union{<:Option{<:BtUBtE},
@@ -213,9 +208,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                       <:AbstractPhylogenyConstraintResult,
                                       <:AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
                                                                <:AbstractPhylogenyConstraintResult}}},
-                           tn::Option{<:Union{<:TnUTnE, <:AbstractVector{<:TnUTnE}}},
-                           te::Union{Nothing, <:AbstractTracking,
-                                     <:AbstractVector{<:AbstractTracking}},
+                           tn::Option{<:Union{<:TnUTnE, <:VecTnUTnE}},
+                           te::Option{<:Union{<:AbstractTracking, <:VecTr}},
                            fees::Option{<:FeesUFeesE}, ret::JuMPReturnsEstimator,
                            sce::Scalariser, ccnt::Option{<:CustomJuMPConstraint},
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
@@ -241,7 +235,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if isa(scard, Integer)
             @argcheck(isfinite(scard))
             @argcheck(scard > 0)
-            @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
+            @argcheck(isa(smtx, MatUASMatE))
             @argcheck(isa(slt, Option{<:BtUBtE}))
             @argcheck(isa(sst, Option{<:BtUBtE}))
         elseif isa(scard, IntVec)
@@ -259,7 +253,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                 @argcheck(length(scard) == length(sst))
             end
         elseif isnothing(scard) && (isa(slt, BtUBtE) || isa(sst, BtUBtE))
-            @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
+            @argcheck(isa(smtx, MatUASMatE))
         elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
             @argcheck(isa(smtx, AbstractVector))
             @argcheck(!isempty(smtx))
@@ -273,7 +267,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             end
         end
         if isa(sgcard, LcULcE)
-            @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
+            @argcheck(isa(sgmtx, MatUASMatE))
             @argcheck(isa(sglt, Option{<:BtUBtE}))
             @argcheck(isa(sgst, Option{<:BtUBtE}))
             if isa(sgcard, LinearConstraint) && isa(smtx, NumMat)
@@ -303,7 +297,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                 end
             end
         elseif isnothing(sgcard) && (isa(sglt, BtUBtE) || isa(sgst, BtUBtE))
-            @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:NumMat}))
+            @argcheck(isa(sgmtx, MatUASMatE))
         elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
             @argcheck(isa(sgmtx, AbstractVector))
             @argcheck(!isempty(sgmtx))
@@ -389,18 +383,12 @@ function JuMPOptimiser(;
                        bgt::Union{Nothing, <:Number, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Option{<:NumUBgtRg} = nothing, lt::Option{<:BtUBtE} = nothing,
                        st::Option{<:BtUBtE} = nothing,
-                       lcs::Option{<:Union{<:LcULcE, <:AbstractVector{<:LcULcE}}} = nothing,
-                       cent::Union{Nothing, <:CentralityConstraint,
-                                   <:AbstractVector{<:CentralityConstraint},
-                                   <:LinearConstraint} = nothing,
+                       lcs::Option{<:Union{<:LcULcE, <:VecLcULcE}} = nothing,
+                       cent::Option{<:Union{<:CCUVecCC, <:LinearConstraint}} = nothing,
                        gcard::Option{<:LcULcE} = nothing,
-                       sgcard::Option{<:Union{<:LcULcE, <:AbstractVector{<:LcULcE}}} = nothing,
-                       smtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:NumMat,
-                                   <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
-                                                            <:NumMat}}} = nothing,
-                       sgmtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:NumMat,
-                                    <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
-                                                             <:NumMat}}} = nothing,
+                       sgcard::Option{<:Union{<:LcULcE, <:VecLcULcE}} = nothing,
+                       smtx::Union{Nothing, <:MatUASMatE, <:AbstractVector{<:MatUASMatE}} = nothing,
+                       sgmtx::Union{Nothing, <:MatUASMatE, <:AbstractVector{<:MatUASMatE}} = nothing,
                        slt::Union{<:Option{<:BtUBtE}, <:AbstractVector{<:Option{<:BtUBtE}}} = nothing,
                        sst::Union{<:Option{<:BtUBtE}, <:AbstractVector{<:Option{<:BtUBtE}}} = nothing,
                        sglt::Union{<:Option{<:BtUBtE},
@@ -408,13 +396,9 @@ function JuMPOptimiser(;
                        sgst::Union{<:Option{<:BtUBtE},
                                    <:AbstractVector{<:Option{<:BtUBtE}}} = nothing,
                        sets::Option{<:AssetSets} = nothing,
-                       plg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,
-                                  <:AbstractPhylogenyConstraintResult,
-                                  <:AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
-                                                           <:AbstractPhylogenyConstraintResult}}} = nothing,
-                       tn::Option{<:Union{<:TnUTnE, <:AbstractVector{<:TnUTnE}}} = nothing,
-                       te::Union{Nothing, <:AbstractTracking,
-                                 <:AbstractVector{<:AbstractTracking}} = nothing,
+                       plg::Option{<:Union{<:PhCUPhCE, <:VecPhCUPhCE}} = nothing,
+                       tn::Option{<:Union{<:TnUTnE, <:VecTnUTnE}} = nothing,
+                       te::Option{<:Union{<:AbstractTracking, <:VecTr}} = nothing,
                        fees::Option{<:FeesUFeesE} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),

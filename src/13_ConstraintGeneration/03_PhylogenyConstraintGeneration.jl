@@ -28,6 +28,10 @@ All concrete types representing the results of phylogeny-based constraint genera
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+const PhCUPhCE = Union{<:AbstractPhylogenyConstraintEstimator,
+                       <:AbstractPhylogenyConstraintResult}
+const VecPhCUPhCE = AbstractVector{<:PhCUPhCE}
+const VecPhC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
         pe::T1
@@ -628,8 +632,9 @@ end
 function vec_to_real_measure(val::Number, ::NumVec)
     return val
 end
+abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
-    struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+    struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
         A::T1
         B::T2
         comp::T3
@@ -693,7 +698,7 @@ CentralityConstraint
   - [`ComparisonOperator`](@ref)
   - [`centrality_constraints`](@ref)
 """
-struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
     A::T1
     B::T2
     comp::T3
@@ -708,9 +713,11 @@ function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
                               comp::ComparisonOperator = LEQ())
     return CentralityConstraint(A, B, comp)
 end
+const VecCC = AbstractVector{<:CentralityConstraint}
+const CCUVecCC = Union{<:CentralityConstraint, <:VecCC}
 """
     centrality_constraints(ccs::Union{<:CentralityConstraint,
-                                      <:AbstractVector{<:CentralityConstraint}},
+                                      <:VecCC},
                            X::NumMat; dims::Int = 1, kwargs...)
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
@@ -742,9 +749,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
   - [`PartialLinearConstraint`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_constraints(ccs::Union{<:CentralityConstraint,
-                                           <:AbstractVector{<:CentralityConstraint}},
-                                X::NumMat; dims::Int = 1, kwargs...)
+function centrality_constraints(ccs::CCUVecCC, X::NumMat; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs))
     end
@@ -820,4 +825,5 @@ end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
-       phylogeny_constraints, centrality_constraints
+       phylogeny_constraints, centrality_constraints, PhCUPhCE, VecPhCUPhCE, VecPhC, VecCC,
+       CCUVecCC

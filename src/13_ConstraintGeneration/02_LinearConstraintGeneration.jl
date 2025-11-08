@@ -1243,6 +1243,7 @@ function LinearConstraintEstimator(; val::EqnType)
     return LinearConstraintEstimator(val)
 end
 const LcULcE = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+const VecLcULcE = AbstractVector{<:LcULcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
@@ -1674,6 +1675,8 @@ end
 function AssetSetsMatrixEstimator(; val::AbstractString)
     return AssetSetsMatrixEstimator(val)
 end
+const MatUASMatE = Union{<:AssetSetsMatrixEstimator, <:NumMat}
+const VecMatUASMatE = AbstractVector{<:MatUASMatE}
 """
     asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
 
@@ -1804,4 +1807,5 @@ end
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
-       linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, RkbURkbE
+       linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, VecLcULcE,
+       RkbURkbE

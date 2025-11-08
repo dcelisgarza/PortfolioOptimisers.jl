@@ -125,8 +125,7 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:NumU
     return ib
 end
 function set_iplg_constraints!(model::JuMP.Model,
-                               plgs::Union{<:AbstractPhylogenyConstraintResult,
-                                           <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
+                               plgs::Union{<:AbstractPhylogenyConstraintResult, <:VecPhC})
     ib = model[:ib]
     sc = model[:sc]
     for (i, plg) in enumerate(plgs)
@@ -142,9 +141,9 @@ end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
                               gcard::Option{<:LinearConstraint},
                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
-                                         <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                              lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
-                              fees::Option{<:Fees}, ss::Option{<:Number})
+                                         <:VecPhC}, lt::Option{<:BuyInThreshold},
+                              st::Option{<:BuyInThreshold}, fees::Option{<:Fees},
+                              ss::Option{<:Number})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(plg, IntegerPhylogeny) ||

@@ -58,8 +58,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          opt::JuMPOptimisationEstimator,
                                          plg::Union{Nothing,
                                                     <:AbstractPhylogenyConstraintResult,
-                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                                         fees::Option{<:Fees}, args...; kwargs...)
+                                                    <:VecPhC}, fees::Option{<:Fees},
+                                         args...; kwargs...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -85,8 +85,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          opt::JuMPOptimisationEstimator,
                                          plg::Union{Nothing,
                                                     <:AbstractPhylogenyConstraintResult,
-                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                                         fees::Option{<:Fees}, args...; kwargs...)
+                                                    <:VecPhC}, fees::Option{<:Fees},
+                                         args...; kwargs...)
     ri = te.r
     wb = te.tracking.w
     err = te.err
@@ -111,9 +111,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                         tres::Union{<:AbstractTracking,
-                                                     <:AbstractVector{<:AbstractTracking}},
-                                         args...; kwargs...)
+                                         tres::Union{<:AbstractTracking, <:VecTr}, args...;
+                                         kwargs...)
     for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...; kwargs...)
     end

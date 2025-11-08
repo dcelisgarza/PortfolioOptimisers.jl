@@ -39,6 +39,7 @@ Represents the interface for all result types that encode uncertainty sets for r
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
+const UcUUcE = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
 """
     abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 
@@ -163,9 +164,7 @@ function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator}, ::Any)
     return risk_ucs
 end
-function ucs_factory(::Nothing,
-                     prior_ucs::Union{<:AbstractUncertaintySetResult,
-                                      <:AbstractUncertaintySetEstimator})
+function ucs_factory(::Nothing, prior_ucs::Union{<:UcUUcE})
     return prior_ucs
 end
 function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
@@ -634,4 +633,4 @@ end
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet,
-       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet
+       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet, UcUUcE

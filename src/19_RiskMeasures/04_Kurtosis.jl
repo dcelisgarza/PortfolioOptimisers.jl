@@ -164,16 +164,14 @@ function calc_deviations_vec(r::Kurtosis, w::NumVec, X::NumMat,
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})(w::NumVec,
                                                                                  X::NumMat,
-                                                                                 fees::Union{Nothing,
-                                                                                             <:Fees} = nothing)
+                                                                                 fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::NumVec,
                                                                                  X::NumMat,
-                                                                                 fees::Union{Nothing,
-                                                                                             <:Fees} = nothing)
+                                                                                 fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))

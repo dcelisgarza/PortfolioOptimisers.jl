@@ -34,9 +34,9 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 # Constructor
 
     Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-           settings::Union{Nothing, <:AbstractDict{<:AbstractString, <:Any},
+           settings::Option{<:Union{<:AbstractDict{<:AbstractString, <:Any},
                            <:Pair{<:AbstractString, <:Any},
-                           <:AbstractVector{<:Pair{<:AbstractString, <:Any}}} = nothing,
+                           <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}} = nothing,
            check_sol::NamedTuple = (;), add_bridges::Bool = true)
 
 Keyword arguments correspond to the fields above.
@@ -70,9 +70,10 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     check_sol::T4
     add_bridges::T5
     function Solver(name::Union{Symbol, <:AbstractString}, solver::Any,
-                    settings::Union{Nothing, <:AbstractDict{<:AbstractString, <:Any},
-                                    <:Pair{<:AbstractString, <:Any},
-                                    <:AbstractVector{<:Pair{<:AbstractString, <:Any}}},
+                    settings::Option{<:Union{<:AbstractDict{<:AbstractString, <:Any},
+                                             <:Pair{<:AbstractString, <:Any},
+                                             <:AbstractVector{<:Pair{<:AbstractString,
+                                                                     <:Any}}}},
                     check_sol::NamedTuple, add_bridges::Bool)
         if isa(settings, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(settings), IsEmptyError)
@@ -82,9 +83,9 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     end
 end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-                settings::Union{Nothing, <:AbstractDict{<:AbstractString, <:Any},
-                                <:Pair{<:AbstractString, <:Any},
-                                <:AbstractVector{<:Pair{<:AbstractString, <:Any}}} = nothing,
+                settings::Option{<:Union{<:AbstractDict{<:AbstractString, <:Any},
+                                         <:Pair{<:AbstractString, <:Any},
+                                         <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
