@@ -31,6 +31,7 @@ abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
 const PhCUPhCE = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
 const VecPhCUPhCE = AbstractVector{<:PhCUPhCE}
+const PhCUPhCEUVecPhCUPhCE = Union{<:PhCUPhCE, <:VecPhCUPhCE}
 const VecPhC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 const PhCUVecPhC = Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}
 """
@@ -470,9 +471,7 @@ function phylogeny_constraints(plc::Union{<:SemiDefinitePhylogeny, <:IntegerPhyl
                                           Nothing}, args...; kwargs...)
     return plc
 end
-function phylogeny_constraints(plcs::AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
-                                                            <:AbstractPhylogenyConstraintResult}},
-                               args...; kwargs...)
+function phylogeny_constraints(plcs::AbstractVector{<:PhCUPhCE}, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """
@@ -827,4 +826,4 @@ end
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
        phylogeny_constraints, centrality_constraints, PhCUPhCE, VecPhCUPhCE, VecPhC, VecCC,
-       CCUVecCC, PhCUVecPhC
+       CCUVecCC, PhCUVecPhC, PhCUPhCEUVecPhCUPhCE

@@ -237,8 +237,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
     alg::T6
     threads::T7
     function OpinionPoolingPrior(pes::AbstractVector{<:EntropyPoolingPrior},
-                                 pe1::Union{Nothing,
-                                            <:AbstractLowOrderPriorEstimator_A_F_AF},
+                                 pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
                                  p::Option{<:Number}, w::Option{<:NumVec},
                                  alg::OpinionPoolingAlgorithm,

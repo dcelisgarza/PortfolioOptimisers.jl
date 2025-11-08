@@ -48,9 +48,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhCUVe
     return nothing
 end
 function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
-                                            plgs::Union{Nothing,
-                                                        <:AbstractPhylogenyConstraintResult,
-                                                        <:VecPhC})
+                                            plgs::Option{<:PhCUPhCEUVecPhCUPhCE})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing

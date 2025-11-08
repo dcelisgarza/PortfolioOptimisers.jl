@@ -160,8 +160,7 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 function ucs_factory(::Nothing, ::Nothing)
     return nothing
 end
-function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult,
-                                     <:AbstractUncertaintySetEstimator}, ::Any)
+function ucs_factory(risk_ucs::Union{<:UcUUcE}, ::Any)
     return risk_ucs
 end
 function ucs_factory(::Nothing, prior_ucs::Union{<:UcUUcE})

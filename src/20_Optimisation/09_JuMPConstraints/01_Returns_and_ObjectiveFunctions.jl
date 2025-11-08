@@ -3,9 +3,7 @@
 struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     ucs::T1
     lb::T2
-    function ArithmeticReturn(ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                         <:AbstractUncertaintySetEstimator},
-                              lb::Option{<:RkRtUBounds})
+    function ArithmeticReturn(ucs::Option{<:UcUUcE}, lb::Option{<:RkRtUBounds})
         if isa(ucs, EllipseUncertaintySet)
             @argcheck(isa(ucs,
                           EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
@@ -19,9 +17,7 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
         return new{typeof(ucs), typeof(lb)}(ucs, lb)
     end
 end
-function ArithmeticReturn(;
-                          ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                     <:AbstractUncertaintySetEstimator} = nothing,
+function ArithmeticReturn(; ucs::Option{<:UcUUcE} = nothing,
                           lb::Option{<:RkRtUBounds} = nothing)
     return ArithmeticReturn(ucs, lb)
 end

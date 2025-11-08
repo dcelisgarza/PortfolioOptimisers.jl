@@ -387,12 +387,8 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
 end
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::IntVec,
                                    gcard::AbstractVector{<:LinearConstraint},
-                                   smtx::VecNumMat,
-                                   lt::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
-                                   st::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
-                                   ss::Option{<:Number})
+                                   smtx::VecNumMat, lt::Option{<:BtUVecBt},
+                                   st::Option{<:BtUVecBt}, ss::Option{<:Number})
     for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
         lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
         sti = isa(st, Option{<:BuyInThreshold}) ? st : st[i]
@@ -423,12 +419,8 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     return nothing
 end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::IntVec,
-                                   smtx::VecNumMat,
-                                   lt::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
-                                   st::Union{Nothing, <:BuyInThreshold,
-                                             <:AbstractVector{<:Option{<:BuyInThreshold}}},
-                                   ss::Option{<:Number})
+                                   smtx::VecNumMat, lt::Option{<:BtUVecBt},
+                                   st::Option{<:BtUVecBt}, ss::Option{<:Number})
     for (i, (c, s)) in enumerate(zip(card, smtx))
         lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
         sti = isa(st, Option{<:BuyInThreshold}) ? st : st[i]
@@ -473,14 +465,8 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
 end
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                     gcard::AbstractVector{<:LinearConstraint},
-                                    smtx::VecNumMat,
-                                    lt::Union{Nothing, <:BuyInThreshold,
-                                              <:AbstractVector{<:Union{Nothing,
-                                                                       <:BuyInThreshold}}},
-                                    st::Union{Nothing, <:BuyInThreshold,
-                                              <:AbstractVector{<:Union{Nothing,
-                                                                       <:BuyInThreshold}}},
-                                    ss::Option{<:Number})
+                                    smtx::VecNumMat, lt::Option{<:BtUVecBt},
+                                    st::Option{<:BtUVecBt}, ss::Option{<:Number})
     for (i, (gc, s)) in enumerate(zip(gcard, smtx))
         lti = isa(lt, Option{<:BuyInThreshold}) ? lt : lt[i]
         sti = isa(st, Option{<:BuyInThreshold}) ? st : st[i]

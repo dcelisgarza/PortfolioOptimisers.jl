@@ -118,6 +118,8 @@ function BuyInThreshold(; val::NumUNumVec)
     return BuyInThreshold(val)
 end
 const BtUBtE = Union{<:BuyInThreshold, <:BuyInThresholdEstimator}
+const VecBt = AbstractVector{<:Option{<:BuyInThreshold}}
+const BtUVecBt = Union{<:BuyInThreshold, <:VecBt}
 function threshold_view(::Nothing, ::Any)
     return nothing
 end
@@ -230,4 +232,5 @@ function threshold_constraints(t::AbstractVector{<:Option{<:BtUBtE}}, sets::Asse
     return [threshold_constraints(ti, sets; kwargs...) for ti in t]
 end
 
-export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints, BtUBtE
+export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints, BtUBtE, VecBt,
+       BtUVecBt
