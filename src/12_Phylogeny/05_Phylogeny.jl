@@ -725,6 +725,7 @@ All concrete types implementing network-based estimation algorithms should subty
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
+const NwEUClRUClE = Union{<:AbstractNetworkEstimator, <:ClRUClE}
 """
     struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
         ce::T1
@@ -1000,7 +1001,7 @@ function phylogeny_matrix(cle::ClRUClE, X::MatNum; branchorder::Symbol = :optima
     return PhylogenyResult(; X = P * transpose(P) - I)
 end
 """
-    centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE}, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::NwEUClRUClE, cent::AbstractCentralityAlgorithm,
                       X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
@@ -1025,9 +1026,8 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`CentralityEstimator`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE},
-                           cent::AbstractCentralityAlgorithm, X::MatNum; dims::Int = 1,
-                           kwargs...)
+function centrality_vector(ne::NwEUClRUClE, cent::AbstractCentralityAlgorithm, X::MatNum;
+                           dims::Int = 1, kwargs...)
     P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
     return centrality_vector(P, cent; dims = dims, kwargs...)
 end
@@ -1205,4 +1205,4 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        EigenvectorCentrality, KatzCentrality, Pagerank, RadialityCentrality,
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
-       CentralityEstimator, centrality_vector, SimMatUTree
+       CentralityEstimator, centrality_vector, SimMatUTree, NwEUClRUClE

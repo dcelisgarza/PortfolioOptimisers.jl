@@ -134,8 +134,8 @@ function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs..
 end
 """
     ucs_factory(risk_ucs::Nothing, prior_ucs::Nothing)
-    ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}, prior_ucs::Any)
-    ucs_factory(risk_ucs::Nothing, prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator})
+    ucs_factory(risk_ucs::UcUUcE, prior_ucs::Any)
+    ucs_factory(risk_ucs::Nothing, prior_ucs::UcUUcE)
 
 Factory function for selecting uncertainty sets from risk measure or prior result instances.
 
@@ -147,8 +147,8 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 # Returns
 
   - `nothing`: If both `risk_ucs` and `prior_ucs` are `nothing`.
-  - `risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is not `nothing`.
-  - `prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
+  - `risk_ucs::UcUUcE`: If `risk_ucs` is not `nothing`.
+  - `prior_ucs::UcUUcE`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
 
 # Related
 
@@ -159,10 +159,10 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 function ucs_factory(::Nothing, ::Nothing)
     return nothing
 end
-function ucs_factory(risk_ucs::Union{<:UcUUcE}, ::Any)
+function ucs_factory(risk_ucs::UcUUcE, ::Any)
     return risk_ucs
 end
-function ucs_factory(::Nothing, prior_ucs::Union{<:UcUUcE})
+function ucs_factory(::Nothing, prior_ucs::UcUUcE)
     return prior_ucs
 end
 function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)

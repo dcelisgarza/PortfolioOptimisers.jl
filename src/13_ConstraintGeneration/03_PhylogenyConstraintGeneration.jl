@@ -52,8 +52,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pe::Union{<:AbstractPhylogenyEstimator,
-                                             <:AbstractClusteringResult} = NetworkEstimator(),
+                                   pe::PhEUClR = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -100,16 +99,12 @@ SemiDefinitePhylogenyEstimator
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pe::Union{<:AbstractPhylogenyEstimator,
-                                                      <:AbstractClusteringResult},
-                                            p::Number)
+    function SemiDefinitePhylogenyEstimator(pe::PhEUClR, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pe), typeof(p)}(pe, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(;
-                                        pe::Union{<:AbstractPhylogenyEstimator,
-                                                  <:AbstractClusteringResult} = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pe::PhEUClR = NetworkEstimator(),
                                         p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
@@ -340,10 +335,8 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(;
-                                   pe::Union{<:AbstractPhylogenyEstimator,
-                                             <:AbstractClusteringResult} = NetworkEstimator(),
-                                   B::IntUVecInt = 1, scale::Number = 100_000.0)
+function IntegerPhylogenyEstimator(; pe::PhEUClR = NetworkEstimator(), B::IntUVecInt = 1,
+                                   scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
 """
@@ -475,11 +468,11 @@ function phylogeny_constraints(plcs::VecPhCUPhCE, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """
-    abstract type VectorToRealMeasure <: AbstractAlgorithm end
+    abstract type VectorToScalarMeasure <: AbstractAlgorithm end
 
 Abstract supertype for algorithms mapping a vector of real values to a single real value.
 
-`VectorToRealMeasure` provides a unified interface for algorithms that reduce a vector of real numbers to a scalar, such as minimum, mean, median, or maximum. These are used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
+`VectorToScalarMeasure` provides a unified interface for algorithms that reduce a vector of real numbers to a scalar, such as minimum, mean, median, or maximum. These are used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
 
 # Related
 
@@ -490,13 +483,14 @@ Abstract supertype for algorithms mapping a vector of real values to a single re
   - [`CentralityConstraint`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-abstract type VectorToRealMeasure <: AbstractAlgorithm end
+abstract type VectorToScalarMeasure <: AbstractAlgorithm end
+const NumUVecToScaM = Union{<:Number, <:VectorToScalarMeasure}
 """
-    struct MinValue <: VectorToRealMeasure end
+    struct MinValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its minimum.
 
-`MinValue` is a concrete subtype of [`VectorToRealMeasure`](@ref) that returns the minimum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their minimum.
+`MinValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the minimum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their minimum.
 
 # Examples
 
@@ -507,19 +501,19 @@ julia> PortfolioOptimisers.vec_to_real_measure(MinValue(), [1.2, 3.4, 0.7])
 
 # Related
 
-  - [`VectorToRealMeasure`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`MeanValue`](@ref)
   - [`MedianValue`](@ref)
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MinValue <: VectorToRealMeasure end
+struct MinValue <: VectorToScalarMeasure end
 """
-    struct MeanValue <: VectorToRealMeasure end
+    struct MeanValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its mean.
 
-`MeanValue` is a concrete subtype of [`VectorToRealMeasure`](@ref) that returns the mean (average) value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mean.
+`MeanValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean (average) value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mean.
 
 # Examples
 
@@ -530,19 +524,19 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
 
 # Related
 
-  - [`VectorToRealMeasure`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`MinValue`](@ref)
   - [`MedianValue`](@ref)
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MeanValue <: VectorToRealMeasure end
+struct MeanValue <: VectorToScalarMeasure end
 """
-    struct MedianValue <: VectorToRealMeasure end
+    struct MedianValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its median.
 
-`MedianValue` is a concrete subtype of [`VectorToRealMeasure`](@ref) that returns the median value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their median.
+`MedianValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the median value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their median.
 
 # Examples
 
@@ -553,19 +547,19 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
 
 # Related
 
-  - [`VectorToRealMeasure`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`MinValue`](@ref)
   - [`MeanValue`](@ref)
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MedianValue <: VectorToRealMeasure end
+struct MedianValue <: VectorToScalarMeasure end
 """
-    struct MaxValue <: VectorToRealMeasure end
+    struct MaxValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its maximum.
 
-`MaxValue` is a concrete subtype of [`VectorToRealMeasure`](@ref) that returns the maximum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their maximum.
+`MaxValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the maximum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their maximum.
 
 # Examples
 
@@ -576,23 +570,23 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
 
 # Related
 
-  - [`VectorToRealMeasure`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`MinValue`](@ref)
   - [`MeanValue`](@ref)
   - [`MedianValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MaxValue <: VectorToRealMeasure end
+struct MaxValue <: VectorToScalarMeasure end
 """
-    vec_to_real_measure(measure::Union{<:VectorToRealMeasure, <:Number}, val::VecNum)
+    vec_to_real_measure(measure::Union{<:VectorToScalarMeasure, <:Number}, val::VecNum)
 
 Reduce a vector of real values to a single real value using a specified measure.
 
-`vec_to_real_measure` applies a reduction algorithm (such as minimum, mean, median, or maximum) to a vector of real numbers, as specified by the concrete subtype of [`VectorToRealMeasure`](@ref). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
+`vec_to_real_measure` applies a reduction algorithm (such as minimum, mean, median, or maximum) to a vector of real numbers, as specified by the concrete subtype of [`VectorToScalarMeasure`](@ref). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
 
 # Arguments
 
-  - `measure`: An instance of a concrete subtype of [`VectorToRealMeasure`](@ref), or the predefined value to return.
+  - `measure`: An instance of a concrete subtype of [`VectorToScalarMeasure`](@ref), or the predefined value to return.
   - `val`: A vector of real values to be reduced (ignored if `measure` is a `Number`).
 
 # Returns
@@ -611,7 +605,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
 
 # Related
 
-  - [`VectorToRealMeasure`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`MinValue`](@ref)
   - [`MeanValue`](@ref)
   - [`MedianValue`](@ref)
@@ -642,7 +636,7 @@ abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 
 Estimator for generating centrality-based portfolio constraints.
 
-`CentralityConstraint` constructs constraints based on asset centrality measures within a phylogeny or network structure. It wraps a centrality estimator `A`, a [`VectorToRealMeasure`](@ref) measure or threshold `B`, and a comparison operator `comp` [`ComparisonOperator`](@ref). This enables flexible constraint generation based on asset centrality, supporting both inequality and equality forms.
+`CentralityConstraint` constructs constraints based on asset centrality measures within a phylogeny or network structure. It wraps a centrality estimator `A`, a [`VectorToScalarMeasure`](@ref) measure or threshold `B`, and a comparison operator `comp` [`ComparisonOperator`](@ref). This enables flexible constraint generation based on asset centrality, supporting both inequality and equality forms.
 
 # Fields
 
@@ -653,7 +647,7 @@ Estimator for generating centrality-based portfolio constraints.
 # Constructor
 
     CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                         B::Union{<:Number, <:VectorToRealMeasure} = MinValue(),
+                         B::NumUVecToScaM = MinValue(),
                          comp::ComparisonOperator = LEQ())
 
 # Examples
@@ -694,7 +688,7 @@ CentralityConstraint
 # Related
 
   - [`CentralityEstimator`](@ref)
-  - [`VectorToRealMeasure`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`ComparisonOperator`](@ref)
   - [`centrality_constraints`](@ref)
 """
@@ -702,14 +696,13 @@ struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
     A::T1
     B::T2
     comp::T3
-    function CentralityConstraint(A::CentralityEstimator,
-                                  B::Union{<:Number, <:VectorToRealMeasure},
+    function CentralityConstraint(A::CentralityEstimator, B::NumUVecToScaM,
                                   comp::ComparisonOperator)
         return new{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
     end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                              B::Union{<:Number, <:VectorToRealMeasure} = MinValue(),
+                              B::NumUVecToScaM = MinValue(),
                               comp::ComparisonOperator = LEQ())
     return CentralityConstraint(A, B, comp)
 end

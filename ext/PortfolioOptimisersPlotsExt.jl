@@ -86,9 +86,7 @@ function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:
     end
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                    w::VecNum,
-                                                    X::Union{<:MatNum,
-                                                             <:PortfolioOptimisers.AbstractPriorResult},
+                                                    w::VecNum, X::MatNumUPrR,
                                                     fees::Option{<:Fees} = nothing;
                                                     nx::AbstractVector = 1:length(w),
                                                     N::Option{<:Number} = nothing,
@@ -168,10 +166,7 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
     end
     return plot(dend1; fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_clusters(pe::Union{<:PortfolioOptimisers.AbstractPriorEstimator,
-                                                     <:PortfolioOptimisers.AbstractPriorResult},
-                                           cle::Union{<:PortfolioOptimisers.AbstractClusteringEstimator,
-                                                      <:PortfolioOptimisers.AbstractClusteringResult},
+function PortfolioOptimisers.plot_clusters(pe::PrEUPr, cle::ClRUClE,
                                            rd::PortfolioOptimisers.ReturnsResult = ReturnsResult();
                                            dims::Integer = 1,
                                            color_func = x -> if any(x .< zero(eltype(x)))

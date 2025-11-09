@@ -1,3 +1,4 @@
+const SdUVar = Union{<:StandardDeviation, <:Variance}
 struct SchurComplementHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
@@ -37,9 +38,8 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     pdm::T3
     alg::T4
     flag::T5
-    function SchurComplementParams(r::Union{<:StandardDeviation, <:Variance}, gamma::Number,
-                                   pdm::Option{<:Posdef}, alg::SchurComplementAlgorithm,
-                                   flag::Bool)
+    function SchurComplementParams(r::SdUVar, gamma::Number, pdm::Option{<:Posdef},
+                                   alg::SchurComplementAlgorithm, flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma))
         return new{typeof(r), typeof(gamma), typeof(pdm), typeof(alg), typeof(flag)}(r,
                                                                                      gamma,
@@ -48,12 +48,14 @@ struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
                                                                                      flag)
     end
 end
-function SchurComplementParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                               gamma::Number = 0.5, pdm::Option{<:Posdef} = Posdef(),
+function SchurComplementParams(; r::SdUVar = Variance(), gamma::Number = 0.5,
+                               pdm::Option{<:Posdef} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)
 end
+const VecScP = AbstractVector{<:SchurComplementParams}
+const ScPUVecScP = Union{<:SchurComplementParams, <:VecScP}
 function schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
     r = risk_measure_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
@@ -64,8 +66,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
     params::T2
     fb::T3
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
-                                                   params::Union{<:SchurComplementParams,
-                                                                 <:AbstractVector{<:SchurComplementParams}},
+                                                   params::ScPUVecScP,
                                                    fb::Option{<:OptimisationEstimator})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params))
@@ -75,8 +76,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
 end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                               params::Union{<:SchurComplementParams,
-                                                             <:AbstractVector{<:SchurComplementParams}} = SchurComplementParams(),
+                                               params::ScPUVecScP = SchurComplementParams(),
                                                fb::Option{<:OptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
@@ -292,4 +292,4 @@ end
 
 export SchurComplementHierarchicalRiskParityOptimisation, SchurComplementParams,
        SchurComplementHierarchicalRiskParity, NonMonotonicSchurComplement,
-       MonotonicSchurComplement
+       MonotonicSchurComplement, VecScP, ScPUVecScP, SdUVar

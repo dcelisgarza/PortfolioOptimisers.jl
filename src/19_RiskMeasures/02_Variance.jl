@@ -104,7 +104,8 @@ Second-order cone risk expression optimisation formulation for applicable risk m
   - [`RSOCRiskExpr`](@ref)
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
-const QuadSecondMomentFormulations = Union{QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr}
+const QuadSecondMomentFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr,
+                                           <:RSOCRiskExpr}
 """
     struct Variance{T1, T2, T3, T4} <: RiskMeasure
         settings::T1

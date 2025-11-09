@@ -64,6 +64,7 @@ Uses the previous step's probabilities to optimise the next step's probabilities
   - [`H1_EntropyPooling`](@ref)
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 """
     abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 
@@ -111,7 +112,7 @@ Exponential entropy pooling optimisation algorithm.
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
-    get_epw(alg::Union{<:H0_EntropyPooling, <:H1_EntropyPooling}, w0::AbstractWeights,
+    get_epw(alg::StagedEP, w0::AbstractWeights,
             wi::AbstractWeights)
 
 Select entropy pooling weights according to the specified algorithm.
@@ -377,6 +378,7 @@ function JuMPEntropyPooling(; slv::SlvUVecSlv, sc1::Number = 1, sc2::Number = 1e
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
+const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
 """
     struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
                                T16} <: AbstractLowOrderPriorEstimator_AF
@@ -435,7 +437,7 @@ Entropy pooling prior estimator for asset returns.
                         sets::Option{<:AssetSets} = nothing,
                         ds_opt::Option{<:CVaREntropyPooling} = nothing,
                         dm_opt::Option{<:OptimEntropyPooling} = nothing,
-                        opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
+                        opt::NonCVaREP = OptimEntropyPooling(),
                         w::Option{<:ProbabilityWeights} = nothing,
                         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
 
@@ -547,8 +549,7 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  var_alpha::Option{<:Number}, cvar_alpha::Option{<:Number},
                                  sets::Option{<:AssetSets},
                                  ds_opt::Option{<:CVaREntropyPooling},
-                                 dm_opt::Option{<:OptimEntropyPooling},
-                                 opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
+                                 dm_opt::Option{<:OptimEntropyPooling}, opt::NonCVaREP,
                                  w::Option{<:ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
         if !isnothing(w)
@@ -616,7 +617,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              sets::Option{<:AssetSets} = nothing,
                              ds_opt::Option{<:CVaREntropyPooling} = nothing,
                              dm_opt::Option{<:OptimEntropyPooling} = nothing,
-                             opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
+                             opt::NonCVaREP = OptimEntropyPooling(),
                              w::Option{<:ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
@@ -2004,7 +2005,7 @@ end
 """
     prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                   <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                  <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
+                                  <:StagedEP},
           X::MatNum; F::Option{<:MatNum} = nothing, dims::Int = 1,
           strict::Bool = false, kwargs...)
 
@@ -2059,10 +2060,9 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
 """
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any,
-                                       <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-               X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+                                       <:Any, <:StagedEP}, X::MatNum,
+               F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
+               kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -2241,4 +2241,4 @@ end
 
 export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior, H0_EntropyPooling,
        H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling,
-       CVaREntropyPooling
+       CVaREntropyPooling, StagedEP, NonCVaREP

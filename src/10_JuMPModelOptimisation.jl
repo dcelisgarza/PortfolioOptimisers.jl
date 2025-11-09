@@ -10,6 +10,9 @@ All concrete types representing the result of a JuMP model optimisation should s
   - [`JuMPResult`](@ref)
 """
 abstract type AbstractJuMPResult <: AbstractResult end
+const SlvSettings = Union{<:AbstractDict{<:AbstractString, <:Any},
+                          <:Pair{<:AbstractString, <:Any},
+                          <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
 """
     struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
         name::T1
@@ -34,9 +37,7 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 # Constructor
 
     Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-           settings::Option{<:Union{<:AbstractDict{<:AbstractString, <:Any},
-                           <:Pair{<:AbstractString, <:Any},
-                           <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}} = nothing,
+           settings::Option{<:SlvSettings} = nothing,
            check_sol::NamedTuple = (;), add_bridges::Bool = true)
 
 Keyword arguments correspond to the fields above.
@@ -70,11 +71,8 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     check_sol::T4
     add_bridges::T5
     function Solver(name::Union{Symbol, <:AbstractString}, solver::Any,
-                    settings::Option{<:Union{<:AbstractDict{<:AbstractString, <:Any},
-                                             <:Pair{<:AbstractString, <:Any},
-                                             <:AbstractVector{<:Pair{<:AbstractString,
-                                                                     <:Any}}}},
-                    check_sol::NamedTuple, add_bridges::Bool)
+                    settings::Option{<:SlvSettings}, check_sol::NamedTuple,
+                    add_bridges::Bool)
         if isa(settings, Union{<:AbstractDict, <:AbstractVector})
             @argcheck(!isempty(settings), IsEmptyError)
         end
@@ -83,10 +81,8 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     end
 end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-                settings::Option{<:Union{<:AbstractDict{<:AbstractString, <:Any},
-                                         <:Pair{<:AbstractString, <:Any},
-                                         <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}} = nothing,
-                check_sol::NamedTuple = (;), add_bridges::Bool = true)
+                settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
+                add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
 const VecSlv = AbstractVector{<:Solver}
@@ -158,7 +154,9 @@ function set_solver_attributes(args...)
 end
 """
     set_solver_attributes(model::JuMP.Model,
-                          settings::Union{<:AbstractDict, <:VecPair})
+                          settings::Union{<:AbstractDict{<:AbstractString, <:Any},
+                                          <:AbstractVector{<:Pair{<:AbstractString,
+                                                                  <:Any}}})
 
 Set multiple solver attributes on a JuMP model.
 
@@ -174,7 +172,9 @@ Iterates over the provided settings and applies each as a solver attribute.
   - `nothing`
 """
 function set_solver_attributes(model::JuMP.Model,
-                               settings::Union{<:AbstractDict, <:VecPair})
+                               settings::Union{<:AbstractDict{<:AbstractString, <:Any},
+                                               <:AbstractVector{<:Pair{<:AbstractString,
+                                                                       <:Any}}})
     for (k, v) in settings
         set_attribute(model, k, v)
     end
@@ -249,4 +249,4 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::SlvUVecSlv)
     return JuMPResult(; trials = trials, success = success)
 end
 
-export Solver, JuMPResult, VecSlv, SlvUVecSlv
+export Solver, JuMPResult, VecSlv, SlvUVecSlv, SlvSettings

@@ -292,7 +292,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE}, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::NwEUClRUClE, cent::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -317,9 +317,8 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE},
-                           cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;
-                           kwargs...)
+function centrality_vector(ne::NwEUClRUClE, cent::AbstractCentralityAlgorithm,
+                           pr::AbstractPriorResult; kwargs...)
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end
 """
