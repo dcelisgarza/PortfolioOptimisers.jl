@@ -1,6 +1,6 @@
-function ERM(x::NumVec, slv::SlvUVecSlv, alpha::Number = 0.05,
+function ERM(x::VecNum, slv::SlvUVecSlv, alpha::Number = 0.05,
              w::Option{<:AbstractWeights} = nothing)
-    if isa(slv, SlvVec)
+    if isa(slv, VecSlv)
         @argcheck(!isempty(slv))
     end
     model = JuMP.Model()
@@ -39,7 +39,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     w::T4
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:SlvUVecSlv},
                                  alpha::Number, w::Option{<:AbstractWeights})
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -55,7 +55,7 @@ function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettin
                              w::Option{<:AbstractWeights} = nothing)
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
-function (r::EntropicValueatRisk)(x::NumVec)
+function (r::EntropicValueatRisk)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w)
 end
 function factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
@@ -73,7 +73,7 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:SlvUVecSlv}, alpha::Number,
                                       beta::Number, w::Option{<:AbstractWeights})
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -94,7 +94,7 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   w::Option{<:AbstractWeights} = nothing)
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
-function (r::EntropicValueatRiskRange)(x::NumVec)
+function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
 function factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
@@ -110,7 +110,7 @@ struct EntropicDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     alpha::T3
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:SlvUVecSlv}, alpha::Number)
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -121,7 +121,7 @@ function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 slv::Option{<:SlvUVecSlv} = nothing, alpha::Number = 0.05)
     return EntropicDrawdownatRisk(settings, slv, alpha)
 end
-function (r::EntropicDrawdownatRisk)(x::NumVec)
+function (r::EntropicDrawdownatRisk)(x::VecNum)
     pushfirst!(x, 1)
     cs = cumsum(x)
     peak = typemin(eltype(x))
@@ -142,7 +142,7 @@ struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     alpha::T3
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:SlvUVecSlv}, alpha::Number)
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -155,7 +155,7 @@ function RelativeEntropicDrawdownatRisk(;
                                         alpha::Number = 0.05)
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
 end
-function (r::RelativeEntropicDrawdownatRisk)(x::NumVec)
+function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     peak = typemin(eltype(x))

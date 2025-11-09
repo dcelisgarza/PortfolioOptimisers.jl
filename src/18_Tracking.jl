@@ -234,7 +234,7 @@ Asset weights-based tracking algorithm.
 
 # Constructor
 
-    WeightsTracking(; fees::Option{<:Fees} = nothing, w::NumVec)
+    WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum)
 
 ## Validation
 
@@ -260,15 +260,15 @@ WeightsTracking
 struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
-    function WeightsTracking(fees::Option{<:Fees}, w::NumVec)
+    function WeightsTracking(fees::Option{<:Fees}, w::VecNum)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w)}(fees, w)
     end
 end
-function WeightsTracking(; fees::Option{<:Fees} = nothing, w::NumVec)
+function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum)
     return WeightsTracking(fees, w)
 end
-function factory(tracking::WeightsTracking, w::NumVec)
+function factory(tracking::WeightsTracking, w::VecNum)
     return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
 end
 function tracking_view(tracking::WeightsTracking, i)
@@ -277,7 +277,7 @@ function tracking_view(tracking::WeightsTracking, i)
     return WeightsTracking(; fees = fees, w = w)
 end
 """
-    tracking_benchmark(tracking::WeightsTracking, X::NumMat)
+    tracking_benchmark(tracking::WeightsTracking, X::MatNum)
 
 Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
@@ -316,7 +316,7 @@ julia> PortfolioOptimisers.tracking_benchmark(tracking, X)
   - [`calc_net_returns`](@ref)
   - [`tracking_benchmark`](@ref)
 """
-function tracking_benchmark(tracking::WeightsTracking, X::NumMat)
+function tracking_benchmark(tracking::WeightsTracking, X::MatNum)
     return calc_net_returns(tracking.w, X, tracking.fees)
 end
 """
@@ -334,7 +334,7 @@ Returns-based tracking algorithm.
 
 # Constructor
 
-    ReturnsTracking(; w::NumVec)
+    ReturnsTracking(; w::VecNum)
 
 ## Validation
 
@@ -357,12 +357,12 @@ ReturnsTracking
 """
 struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
-    function ReturnsTracking(w::NumVec)
+    function ReturnsTracking(w::VecNum)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function ReturnsTracking(; w::NumVec)
+function ReturnsTracking(; w::VecNum)
     return ReturnsTracking(w)
 end
 function tracking_view(tracking::ReturnsTracking, ::Any)
@@ -479,7 +479,7 @@ end
 function tracking_view(tracking::VecTr, args...)
     return [tracking_view(t, args...) for t in tracking]
 end
-function factory(tracking::TrackingError, w::NumVec)
+function factory(tracking::TrackingError, w::VecNum)
     return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,
                          alg = tracking.alg)
 end

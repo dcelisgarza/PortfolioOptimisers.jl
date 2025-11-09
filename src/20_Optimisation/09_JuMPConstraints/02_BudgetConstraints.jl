@@ -41,28 +41,28 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
     vn::T4
     up::T5
     un::T6
-    function BudgetCosts(bgt::NumUBgtRg, w::NumVec, vp::NumUNumVec, vn::NumUNumVec,
-                         up::NumUNumVec, un::NumUNumVec)
+    function BudgetCosts(bgt::NumUBgtRg, w::VecNum, vp::NumUVecNum, vn::NumUVecNum,
+                         up::NumUVecNum, un::NumUVecNum)
         @argcheck(!isempty(w))
-        if isa(vp, NumVec)
+        if isa(vp, VecNum)
             @argcheck(!isempty(vp))
             @argcheck(all(x -> zero(x) <= x, vp))
         else
             @argcheck(vp >= zero(vp))
         end
-        if isa(vn, NumVec)
+        if isa(vn, VecNum)
             @argcheck(!isempty(vn))
             @argcheck(all(x -> zero(x) <= x, vn))
         else
             @argcheck(vn >= zero(vn))
         end
-        if isa(up, NumVec)
+        if isa(up, VecNum)
             @argcheck(!isempty(up))
             @argcheck(all(x -> zero(x) <= x, up))
         else
             @argcheck(up >= zero(up))
         end
-        if isa(un, NumVec)
+        if isa(un, VecNum)
             @argcheck(!isempty(un))
             @argcheck(all(x -> zero(x) <= x, un))
         else
@@ -76,8 +76,8 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
                                                                                            un)
     end
 end
-function BudgetCosts(; bgt::NumUBgtRg = 1.0, w::NumVec, vp::NumUNumVec = 1.0,
-                     vn::NumUNumVec = 1.0, up::NumUNumVec = 1.0, un::NumUNumVec = 1.0)
+function BudgetCosts(; bgt::NumUBgtRg = 1.0, w::VecNum, vp::NumUVecNum = 1.0,
+                     vn::NumUVecNum = 1.0, up::NumUVecNum = 1.0, un::NumUVecNum = 1.0)
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
 function budget_view(bgt::BudgetCosts, i)
@@ -96,28 +96,28 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
     up::T5
     un::T6
     beta::T7
-    function BudgetMarketImpact(bgt::NumUBgtRg, w::NumVec, vp::NumUNumVec, vn::NumUNumVec,
-                                up::NumUNumVec, un::NumUNumVec, beta::Number)
+    function BudgetMarketImpact(bgt::NumUBgtRg, w::VecNum, vp::NumUVecNum, vn::NumUVecNum,
+                                up::NumUVecNum, un::NumUVecNum, beta::Number)
         @argcheck(!isempty(w))
-        if isa(vp, NumVec)
+        if isa(vp, VecNum)
             @argcheck(!isempty(vp))
             @argcheck(all(x -> zero(x) <= x, vp))
         else
             @argcheck(vp >= zero(vp))
         end
-        if isa(vn, NumVec)
+        if isa(vn, VecNum)
             @argcheck(!isempty(vn))
             @argcheck(all(x -> zero(x) <= x, vn))
         else
             @argcheck(vn >= zero(vn))
         end
-        if isa(up, NumVec)
+        if isa(up, VecNum)
             @argcheck(!isempty(up))
             @argcheck(all(x -> zero(x) <= x, up))
         else
             @argcheck(up >= zero(up))
         end
-        if isa(un, NumVec)
+        if isa(un, VecNum)
             @argcheck(!isempty(un))
             @argcheck(all(x -> zero(x) <= x, un))
         else
@@ -131,9 +131,9 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
                    typeof(beta)}(bgt, w, vp, vn, up, un, beta)
     end
 end
-function BudgetMarketImpact(; bgt::NumUBgtRg = 1.0, w::NumVec, vp::NumUNumVec = 1.0,
-                            vn::NumUNumVec = 1.0, up::NumUNumVec = 1.0,
-                            un::NumUNumVec = 1.0, beta::Number = 2 / 3)
+function BudgetMarketImpact(; bgt::NumUBgtRg = 1.0, w::VecNum, vp::NumUVecNum = 1.0,
+                            vn::NumUVecNum = 1.0, up::NumUVecNum = 1.0,
+                            un::NumUVecNum = 1.0, beta::Number = 2 / 3)
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i)
@@ -145,13 +145,13 @@ function budget_view(bgt::BudgetMarketImpact, i)
     return BudgetMarketImpact(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un,
                               beta = bgt.beta)
 end
-function set_budget_constraints!(model::JuMP.Model, val::Number, w::NumVec)
+function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
     k = model[:k]
     sc = model[:sc]
     @constraint(model, bgt, sc * (sum(w) - k * val) == 0)
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::NumVec)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
     k = model[:k]
     sc = model[:sc]
     lb = bgt.lb
@@ -295,8 +295,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     end
     return nothing
 end
-function set_cost_budget_constraints!(model::JuMP.Model, vp::NumUNumVec, vn::NumUNumVec,
-                                      val::Number, w::NumVec)
+function set_cost_budget_constraints!(model::JuMP.Model, vp::NumUVecNum, vn::NumUVecNum,
+                                      val::Number, w::VecNum)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]
@@ -305,8 +305,8 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::NumUNumVec, vn::Num
     @constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
 end
-function set_cost_budget_constraints!(model::JuMP.Model, vp::NumUNumVec, vn::NumUNumVec,
-                                      bgt::BudgetRange, w::NumVec)
+function set_cost_budget_constraints!(model::JuMP.Model, vp::NumUVecNum, vn::NumUVecNum,
+                                      bgt::BudgetRange, w::VecNum)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]
@@ -322,7 +322,7 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::NumUNumVec, vn::Num
     end
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::NumVec)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
     wb = bgt.w
     up = bgt.up
     un = bgt.un
@@ -340,7 +340,7 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::NumVec)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::NumVec)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum)
     wb = bgt.w
     up = bgt.up
     un = bgt.un

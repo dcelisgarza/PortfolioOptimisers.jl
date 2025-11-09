@@ -98,7 +98,7 @@ function assert_finite_nonnegative_real_or_vec(val::Number)
     @argcheck(val > zero(val))
     return nothing
 end
-function assert_finite_nonnegative_real_or_vec(val::NumVec)
+function assert_finite_nonnegative_real_or_vec(val::VecNum)
     @argcheck(any(isfinite, val))
     @argcheck(any(x -> x > zero(x), val))
     @argcheck(all(x -> zero(x) <= x, val))
@@ -201,7 +201,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            sce::Scalariser, ccnt::Option{<:CustomJuMPConstraint},
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::Option{<:Number}, card::Option{<:Integer},
-                           scard::Option{<:IntUIntVec}, nea::Option{<:Number},
+                           scard::Option{<:IntUVecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number}, strict::Bool)
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
@@ -225,7 +225,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isa(smtx, MatUASMatE))
             @argcheck(isa(slt, Option{<:BtUBtE}))
             @argcheck(isa(sst, Option{<:BtUBtE}))
-        elseif isa(scard, IntVec)
+        elseif isa(scard, VecInt)
             @argcheck(!isempty(scard))
             @argcheck(all(isfinite, scard))
             @argcheck(all(x -> x > 0, scard))
@@ -257,7 +257,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(isa(sgmtx, MatUASMatE))
             @argcheck(isa(sglt, Option{<:BtUBtE}))
             @argcheck(isa(sgst, Option{<:BtUBtE}))
-            if isa(sgcard, LinearConstraint) && isa(smtx, NumMat)
+            if isa(sgcard, LinearConstraint) && isa(smtx, MatNum)
                 N = size(smtx, 1)
                 N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
                 N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
@@ -276,7 +276,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                 @argcheck(length(sgcard) == length(sgst))
             end
             for (sgc, smt) in zip(sgcard, sgmtx)
-                if isa(sgc, LinearConstraint) && isa(smt, NumMat)
+                if isa(sgc, LinearConstraint) && isa(smt, MatNum)
                     N = size(smt, 1)
                     N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
                     N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
@@ -317,7 +317,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if !isnothing(nea)
             @argcheck(nea > zero(nea))
         end
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
@@ -388,14 +388,14 @@ function JuMPOptimiser(; pe::PrEUPr = EmpiricalPrior(), slv::SlvUVecSlv,
                        cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
                        so::Number = 1, ss::Option{<:Number} = nothing,
                        card::Option{<:Integer} = nothing,
-                       scard::Option{<:IntUIntVec} = nothing,
+                       scard::Option{<:IntUVecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sce,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
 end
-function opt_view(opt::JuMPOptimiser, i, X::NumMat)
+function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)

@@ -40,7 +40,7 @@ end
 function factory(ce::ImpliedVolatility, w::Option{<:AbstractWeights} = nothing)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
-function realised_vol(ce::AbstractVarianceEstimator, X::NumMat, ws::Integer,
+function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
                       chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
                       N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
@@ -51,7 +51,7 @@ function realised_vol(ce::AbstractVarianceEstimator, X::NumMat, ws::Integer,
                                    reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk,
                                            N); dims = 1); dims = 1)
 end
-function implied_vol(X::NumMat, ws::Integer, chunk::Option{<:Integer} = nothing,
+function implied_vol(X::MatNum, ws::Integer, chunk::Option{<:Integer} = nothing,
                      T::Option{<:Integer} = nothing, N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
         T, N = size(X)
@@ -59,14 +59,14 @@ function implied_vol(X::NumMat, ws::Integer, chunk::Option{<:Integer} = nothing,
     end
     return view(X, (T - (chunk - 1) * ws):ws:T, :)
 end
-function predict_realised_vols(::ImpliedVolatilityPremium, iv::NumMat, ::Any, ivpa::Nothing)
-    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Number` or `<:NumVec`"))
+function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any, ivpa::Nothing)
+    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Number` or `<:VecNum`"))
 end
-function predict_realised_vols(::ImpliedVolatilityPremium, iv::NumMat, ::Any,
-                               ivpa::NumUNumVec)
+function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,
+                               ivpa::NumUVecNum)
     return view(iv, size(iv, 1), :) ⊘ ivpa
 end
-function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::NumMat, X::NumMat,
+function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::MatNum,
                                ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
@@ -101,8 +101,8 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::NumMat, X::
     #, Regression(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, fr
     return rv_p
 end
-function Statistics.cov(ce::ImpliedVolatility, X::NumMat; dims::Int = 1, mean = nothing,
-                        iv::NumMat, ivpa::Option{<:NumUNumVec} = nothing, kwargs...)
+function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
+                        iv::MatNum, ivpa::Option{<:NumUVecNum} = nothing, kwargs...)
     sigma = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
@@ -110,8 +110,8 @@ function Statistics.cov(ce::ImpliedVolatility, X::NumMat; dims::Int = 1, mean = 
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
-function Statistics.cor(ce::ImpliedVolatility, X::NumMat; dims::Int = 1, mean = nothing,
-                        iv::NumMat, ivpa::Option{<:NumUNumVec} = nothing, kwargs...)
+function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
+                        iv::MatNum, ivpa::Option{<:NumUVecNum} = nothing, kwargs...)
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)

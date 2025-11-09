@@ -7,7 +7,7 @@ end
 function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return UlcerIndex(settings)
 end
-function (::UlcerIndex)(x::NumVec)
+function (::UlcerIndex)(x::VecNum)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
@@ -34,7 +34,7 @@ function RelativeUlcerIndex(;
                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
     return RelativeUlcerIndex(settings)
 end
-function (::RelativeUlcerIndex)(x::NumVec)
+function (::RelativeUlcerIndex)(x::VecNum)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))

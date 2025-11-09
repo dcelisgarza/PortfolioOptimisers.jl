@@ -16,7 +16,7 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:RelativeRelativisticDrawdownatRisk, <:Range,
                                 <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                                 <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
-                                <:MeanReturn}, w::NumVec, X::NumMat,
+                                <:MeanReturn}, w::VecNum, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
@@ -36,45 +36,45 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:RelativeRelativisticDrawdownatRisk, <:Range,
                                 <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                                 <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
-                                <:MeanReturn}, w::NumVec, pr::AbstractPriorResult,
+                                <:MeanReturn}, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, pr.X, fees))
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
-                                <:Skewness, <:MedianAbsoluteDeviation}, w::NumVec,
-                       X::NumMat, fees::Option{<:Fees} = nothing; kwargs...)
+                                <:Skewness, <:MedianAbsoluteDeviation}, w::VecNum,
+                       X::MatNum, fees::Option{<:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
-                                <:Skewness, <:MedianAbsoluteDeviation}, w::NumVec,
+                                <:Skewness, <:MedianAbsoluteDeviation}, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
     return r(w, pr.X, fees)
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
                                 <:TurnoverRiskMeasure, <:Variance, <:UncertaintySetVariance,
-                                <:EqualRiskMeasure}, w::NumVec, args...; kwargs...)
+                                <:EqualRiskMeasure}, w::VecNum, args...; kwargs...)
     return r(w)
 end
-function expected_risk(r::RiskRatioRiskMeasure, w::NumVec, X::NumMat,
+function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, X, fees; kwargs...) /
            expected_risk(r.r2, w, X, fees; kwargs...)
 end
-function expected_risk(r::RiskRatioRiskMeasure, w::NumVec, pr::AbstractPriorResult,
+function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, pr.X, fees; kwargs...) /
            expected_risk(r.r2, w, pr.X, fees; kwargs...)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, w::VecNumVec, args...; kwargs...)
+function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
-function number_effective_assets(w::NumVec)
+function number_effective_assets(w::VecNum)
     return inv(dot(w, w))
 end
-function risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
-                           X::Union{<:NumMat, <:AbstractPriorResult},
+function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum,
+                           X::Union{<:MatNum, <:AbstractPriorResult},
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
     N = length(w)
@@ -99,8 +99,8 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
     end
     return rc
 end
-function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::NumVec,
-                                  X::Union{<:NumMat, <:AbstractPriorResult},
+function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum,
+                                  X::Union{<:MatNum, <:AbstractPriorResult},
                                   fees::Option{<:Fees} = nothing;
                                   re::RegURegE = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,

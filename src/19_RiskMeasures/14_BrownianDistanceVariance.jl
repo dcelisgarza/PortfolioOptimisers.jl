@@ -16,7 +16,7 @@ function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureS
                                   algc::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
     return BrownianDistanceVariance(settings, alg, algc)
 end
-function (::BrownianDistanceVariance)(x::NumVec)
+function (::BrownianDistanceVariance)(x::VecNum)
     T = length(x)
     iT2 = inv(T^2)
     D = Matrix{eltype(x)}(undef, T, T)

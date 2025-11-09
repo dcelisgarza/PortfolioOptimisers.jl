@@ -73,7 +73,7 @@ function assert_internal_optimiser(opt::Stacking)
     end
     return nothing
 end
-function opt_view(st::Stacking, i, X::NumMat)
+function opt_view(st::Stacking, i, X::MatNum)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = prior_view(st.pe, i)
     wb = weight_bounds_view(st.wb, i)

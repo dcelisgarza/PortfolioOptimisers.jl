@@ -10,7 +10,7 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
         end
         if isa(lb, Number)
             @argcheck(isfinite(lb))
-        elseif isa(lb, NumVec)
+        elseif isa(lb, VecNum)
             @argcheck(!isempty(lb))
             @argcheck(all(isfinite, lb))
         end
@@ -39,7 +39,7 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
         end
         if isa(lb, Number)
             @argcheck(isfinite(lb))
-        elseif isa(lb, NumVec)
+        elseif isa(lb, VecNum)
             @argcheck(!isempty(lb))
             @argcheck(all(isfinite, lb))
         end
@@ -56,11 +56,11 @@ end
 #=
 mutable struct AKelly <: RetType
     formulation::VarianceFormulation
-    a_rc::Union{<:NumMat, Nothing}
+    a_rc::Union{<:MatNum, Nothing}
     b_rc::Union{<:AbstractVector, Nothing}
 end
 function AKelly(; formulation::VarianceFormulation = SOC(),
-                a_rc::Union{<:NumMat, Nothing} = nothing,
+                a_rc::Union{<:MatNum, Nothing} = nothing,
                 b_rc::Union{<:AbstractVector, Nothing} = nothing)
     if !isnothing(a_rc) && !isnothing(b_rc) && !isempty(a_rc) && !isempty(b_rc)
         @smart_assert(size(a_rc, 1) == length(b_rc))
@@ -219,7 +219,7 @@ function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
     return MaximumRatio(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end
-function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::NumVec,
+function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::VecNum,
                                              obj::MaximumRatio)
     ohf = if isnothing(obj.ohf)
         min(1e3, max(1e-3, mean(abs.(mu))))
@@ -252,7 +252,7 @@ end
 function set_max_ratio_return_constraints!(args...)
     return nothing
 end
-function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, mu::NumVec)
+function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, mu::VecNum)
     sc = model[:sc]
     k = model[:k]
     ohf = model[:ohf]
@@ -295,7 +295,7 @@ function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothi
     set_return_bounds!(model, lb)
     return nothing
 end
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet, mu::NumVec)
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet, mu::VecNum)
     sc = model[:sc]
     w = model[:w]
     N = length(w)
@@ -308,7 +308,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet, 
     return nothing
 end
 function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
-                                     mu::NumVec)
+                                     mu::VecNum)
     sc = model[:sc]
     w = model[:w]
     G = cholesky(ucs.sigma).U

@@ -54,7 +54,7 @@ function SchurComplementParams(; r::Union{<:StandardDeviation, <:Variance} = Var
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)
 end
-function schur_complement_params_view(sp::SchurComplementParams, i, X::NumMat)
+function schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
     r = risk_measure_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
@@ -80,7 +80,7 @@ function SchurComplementHierarchicalRiskParity(;
                                                fb::Option{<:OptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
-function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::NumMat)
+function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_complement_params_view(sh.params, i, X)
@@ -104,7 +104,7 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     end
     return m
 end
-function schur_augmentation(A::NumMat, B::NumMat, C::NumMat, gamma::Number)
+function schur_augmentation(A::MatNum, B::MatNum, C::MatNum, gamma::Number)
     Na = size(A, 1)
     Nc = size(C, 1)
     if iszero(gamma) || isone(Na) || isone(Nc)
@@ -116,17 +116,17 @@ function schur_augmentation(A::NumMat, B::NumMat, C::NumMat, gamma::Number)
     A_aug = r \ A_aug
     return (A_aug + transpose(A_aug)) / 2
 end
-function naive_portfolio_risk(::Variance, sigma::NumMat)
+function naive_portfolio_risk(::Variance, sigma::MatNum)
     w = inv.(diag(sigma))
     w ./= sum(w)
     return dot(w, sigma, w)
 end
-function naive_portfolio_risk(::StandardDeviation, sigma::NumMat)
+function naive_portfolio_risk(::StandardDeviation, sigma::MatNum)
     w = inv.(diag(sigma))
     w ./= sum(w)
     return sqrt(dot(w, sigma, w))
 end
-function schur_complement_weights(pr::AbstractPriorResult, items::VecIntVec,
+function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                   wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:NonMonotonicSchurComplement,
@@ -209,7 +209,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
     strict ? throw(ArgumentError(msg)) : @warn(msg)
     return w, lgamma
 end
-function schur_complement_weights(pr::AbstractPriorResult, items::VecIntVec,
+function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                   wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
                                                                 <:MonotonicSchurComplement,

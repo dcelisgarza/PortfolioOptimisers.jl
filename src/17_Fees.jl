@@ -153,10 +153,10 @@ Container for portfolio transaction fee constraints.
 # Constructor
 
     Fees(; tn::Option{<:Turnover} = nothing,
-         l::Option{<:NumUNumVec} = nothing,
-         s::Option{<:NumUNumVec} = nothing,
-         fl::Option{<:NumUNumVec} = nothing,
-         fs::Option{<:NumUNumVec} = nothing,
+         l::Option{<:NumUVecNum} = nothing,
+         s::Option{<:NumUVecNum} = nothing,
+         fl::Option{<:NumUVecNum} = nothing,
+         fs::Option{<:NumUVecNum} = nothing,
          kwargs::NamedTuple = (; atol = 1e-8))
 
 ## Validation
@@ -196,8 +196,8 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
     fl::T4
     fs::T5
     kwargs::T6
-    function Fees(tn::Option{<:Turnover}, l::Option{<:NumUNumVec}, s::Option{<:NumUNumVec},
-                  fl::Option{<:NumUNumVec}, fs::Option{<:NumUNumVec},
+    function Fees(tn::Option{<:Turnover}, l::Option{<:NumUVecNum}, s::Option{<:NumUVecNum},
+                  fl::Option{<:NumUVecNum}, fs::Option{<:NumUVecNum},
                   kwargs::NamedTuple = (; atol = 1e-8))
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
@@ -207,9 +207,9 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
-function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:NumUNumVec} = nothing,
-              s::Option{<:NumUNumVec} = nothing, fl::Option{<:NumUNumVec} = nothing,
-              fs::Option{<:NumUNumVec} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:NumUVecNum} = nothing,
+              s::Option{<:NumUVecNum} = nothing, fl::Option{<:NumUVecNum} = nothing,
+              fs::Option{<:NumUVecNum} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
     return Fees(tn, l, s, fl, fs, kwargs)
 end
 const FeesUFeesE = Union{<:Fees, <:FeesEstimator}
@@ -336,14 +336,14 @@ function fees_view(fees::Fees, i)
     fs = nothing_scalar_array_view(fees.fs, i)
     return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
 end
-function factory(fees::Fees, w::NumVec)
+function factory(fees::Fees, w::VecNum)
     return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
                 fs = fees.fs, kwargs = fees.kwargs)
 end
 """
-    calc_fees(w::NumVec, p::NumVec, ::Nothing, ::Function)
-    calc_fees(w::NumVec, p::NumVec, fees::Number, op::Function)
-    calc_fees(w::NumVec, p::NumVec, fees::NumVec, op::Function)
+    calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
+    calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
+    calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
 
 Compute the actual proportional fees for portfolio weights and prices.
 
@@ -356,7 +356,7 @@ Compute the actual proportional fees for portfolio weights and prices.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
-      + `NumVec`: Vector of fee values per asset.
+      + `VecNum`: Vector of fee values per asset.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -378,20 +378,20 @@ julia> calc_fees([0.1, 0.2], [100, 200], 0.01, .>=)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fees(w::NumVec, p::NumVec, ::Nothing, ::Function)
+function calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
     return zero(promote_type(eltype(w), eltype(p)))
 end
-function calc_fees(w::NumVec, p::NumVec, fees::Number, op::Function)
+function calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
     return dot_scalar(fees * w[idx], p[idx])
 end
-function calc_fees(w::NumVec, p::NumVec, fees::NumVec, op::Function)
+function calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
     return dot(fees[idx], w[idx] .* p[idx])
 end
 """
-    calc_fees(w::NumVec, p::NumVec, ::Nothing)
-    calc_fees(w::NumVec, p::NumVec, tn::Turnover)
+    calc_fees(w::VecNum, p::VecNum, ::Nothing)
+    calc_fees(w::VecNum, p::VecNum, tn::Turnover)
 
 Compute the actual turnover fees for portfolio weights and prices.
 
@@ -404,7 +404,7 @@ Compute the actual turnover fees for portfolio weights and prices.
 
       + `nothing`: No turnover fee, returns zero.
       + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::NumVec`: vector of turnover fees per asset.
+      + `tn.val::VecNum`: vector of turnover fees per asset.
 
 # Returns
 
@@ -425,17 +425,17 @@ julia> calc_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fees(w::NumVec, p::NumVec, ::Nothing)
+function calc_fees(w::VecNum, p::VecNum, ::Nothing)
     return zero(promote_type(eltype(w), eltype(p)))
 end
-function calc_fees(w::NumVec, p::NumVec, tn::Turnover{<:Any, <:Number})
+function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:Number})
     return dot_scalar(tn.val * abs.(w - tn.w), p)
 end
-function calc_fees(w::NumVec, p::NumVec, tn::Turnover{<:Any, <:NumVec})
+function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
     return dot(tn.val, abs.(w - tn.w) .* p)
 end
 """
-    calc_fees(w::NumVec, p::NumVec, fees::Fees)
+    calc_fees(w::VecNum, p::VecNum, fees::Fees)
 
 Compute total actual fees for portfolio weights and prices.
 
@@ -469,7 +469,7 @@ julia> calc_fees([0.1, -0.2], [100, 200], fees)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fees(w::NumVec, p::NumVec, fees::Fees)
+function calc_fees(w::VecNum, p::VecNum, fees::Fees)
     fees_long = calc_fees(w, p, fees.l, .>=)
     fees_short = -calc_fees(w, p, fees.s, .<)
     fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.kwargs, .>=)
@@ -478,9 +478,9 @@ function calc_fees(w::NumVec, p::NumVec, fees::Fees)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 """
-    calc_fees(w::NumVec, ::Nothing, ::Function)
-    calc_fees(w::NumVec, fees::Number, op::Function)
-    calc_fees(w::NumVec, fees::NumVec, op::Function)
+    calc_fees(w::VecNum, ::Nothing, ::Function)
+    calc_fees(w::VecNum, fees::Number, op::Function)
+    calc_fees(w::VecNum, fees::VecNum, op::Function)
 
 Compute the proportional fees for portfolio weights and prices.
 
@@ -492,7 +492,7 @@ Compute the proportional fees for portfolio weights and prices.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
-      + `NumVec`: Vector of fee values per asset.
+      + `VecNum`: Vector of fee values per asset.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -514,20 +514,20 @@ julia> calc_fees([0.1, 0.2], 0.01, .>=)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fees(w::NumVec, ::Nothing, ::Function)
+function calc_fees(w::VecNum, ::Nothing, ::Function)
     return zero(eltype(w))
 end
-function calc_fees(w::NumVec, fees::Number, op::Function)
+function calc_fees(w::VecNum, fees::Number, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
     return sum(fees * w[idx])
 end
-function calc_fees(w::NumVec, fees::NumVec, op::Function)
+function calc_fees(w::VecNum, fees::VecNum, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
     return dot(fees[idx], w[idx])
 end
 """
-    calc_fees(w::NumVec, ::Nothing)
-    calc_fees(w::NumVec, tn::Turnover)
+    calc_fees(w::VecNum, ::Nothing)
+    calc_fees(w::VecNum, tn::Turnover)
 
 Compute the turnover fees for portfolio weights and prices.
 
@@ -539,7 +539,7 @@ Compute the turnover fees for portfolio weights and prices.
 
       + `nothing`: No turnover fee, returns zero.
       + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::NumVec`: vector of turnover fees per asset.
+      + `tn.val::VecNum`: vector of turnover fees per asset.
 
 # Returns
 
@@ -560,19 +560,19 @@ julia> calc_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fees(w::NumVec, ::Nothing)
+function calc_fees(w::VecNum, ::Nothing)
     return zero(eltype(w))
 end
-function calc_fees(w::NumVec, tn::Turnover{<:Any, <:Number})
+function calc_fees(w::VecNum, tn::Turnover{<:Any, <:Number})
     return sum(tn.val * abs.(w - tn.w))
 end
-function calc_fees(w::NumVec, tn::Turnover{<:Any, <:NumVec})
+function calc_fees(w::VecNum, tn::Turnover{<:Any, <:VecNum})
     return dot(tn.val, abs.(w - tn.w))
 end
 """
-    calc_fixed_fees(w::NumVec, ::Nothing, kwargs::NamedTuple, ::Function)
-    calc_fixed_fees(w::NumVec, fees::Number, kwargs::NamedTuple, op::Function)
-    calc_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::Function)
+    calc_fixed_fees(w::VecNum, ::Nothing, kwargs::NamedTuple, ::Function)
+    calc_fixed_fees(w::VecNum, fees::Number, kwargs::NamedTuple, op::Function)
+    calc_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Function)
 
 Compute the fixed portfolio fees for assets that have been allocated.
 
@@ -584,7 +584,7 @@ Compute the fixed portfolio fees for assets that have been allocated.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
-      + `NumVec`: Vector of fee values per asset.
+      + `VecNum`: Vector of fee values per asset.
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
@@ -607,21 +607,21 @@ julia> calc_fixed_fees([0.1, 0.2], 0.01, (; atol = 1e-6), .>=)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fixed_fees(w::NumVec, ::Nothing, kwargs::NamedTuple, op::Function)
+function calc_fixed_fees(w::VecNum, ::Nothing, kwargs::NamedTuple, op::Function)
     return zero(eltype(w))
 end
-function calc_fixed_fees(w::NumVec, fees::Number, kwargs::NamedTuple, op::Function)
+function calc_fixed_fees(w::VecNum, fees::Number, kwargs::NamedTuple, op::Function)
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     return fees * sum(idx2)
 end
-function calc_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::Function)
+function calc_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Function)
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     return sum(fees[idx1][idx2])
 end
 """
-    calc_fees(w::NumVec, fees::Fees)
+    calc_fees(w::VecNum, fees::Fees)
 
 Compute total fees for portfolio weights and prices.
 
@@ -653,7 +653,7 @@ julia> calc_fees([0.1, -0.2], fees)
   - [`calc_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_fees(w::NumVec, fees::Fees)
+function calc_fees(w::VecNum, fees::Fees)
     fees_long = calc_fees(w, fees.l, .>=)
     fees_short = -calc_fees(w, fees.s, .<)
     fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.kwargs, .>=)
@@ -662,9 +662,9 @@ function calc_fees(w::NumVec, fees::Fees)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 """
-    calc_asset_fees(w::NumVec, p::NumVec, ::Nothing, ::Function)
-    calc_asset_fees(w::NumVec, p::NumVec, fees::Number, op::Function)
-    calc_asset_fees(w::NumVec, p::NumVec, fees::NumVec, op::Function)
+    calc_asset_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
+    calc_asset_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
+    calc_asset_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
 
 Compute the actual proportional per asset fees for portfolio weights and prices.
 
@@ -677,12 +677,12 @@ Compute the actual proportional per asset fees for portfolio weights and prices.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
-      + `NumVec`: Vector of fee values per asset.
+      + `VecNum`: Vector of fee values per asset.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
 
-  - `val::NumVec`: Total actual proportional per asset fee.
+  - `val::VecNum`: Total actual proportional per asset fee.
 
 # Examples
 
@@ -701,24 +701,24 @@ julia> calc_asset_fees([0.1, 0.2], [100, 200], 0.01, .>=)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fees(w::NumVec, p::NumVec, ::Nothing, ::Function)
+function calc_asset_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
     return zeros(promote_type(eltype(w), eltype(p)), length(w))
 end
-function calc_asset_fees(w::NumVec, p::NumVec, fees::Number, op::Function)
+function calc_asset_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
     fees_w[idx] = fees * w[idx] ⊙ p[idx]
     return fees_w
 end
-function calc_asset_fees(w::NumVec, p::NumVec, fees::NumVec, op::Function)
+function calc_asset_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
     fees_w[idx] = fees[idx] ⊙ w[idx] ⊙ p[idx]
     return fees_w
 end
 """
-    calc_asset_fees(w::NumVec, p::NumVec, ::Nothing)
-    calc_asset_fees(w::NumVec, p::NumVec, tn::Turnover)
+    calc_asset_fees(w::VecNum, p::VecNum, ::Nothing)
+    calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover)
 
 Compute the actual per asset turnover fees for portfolio weights and prices.
 
@@ -731,7 +731,7 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
 
       + `nothing`: No turnover fee, returns zero.
       + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::NumVec`: vector of turnover fees per asset.
+      + `tn.val::VecNum`: vector of turnover fees per asset.
 
 # Returns
 
@@ -754,17 +754,17 @@ julia> calc_asset_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fees(w::NumVec, p::NumVec, ::Nothing)
+function calc_asset_fees(w::VecNum, p::VecNum, ::Nothing)
     return zeros(promote_type(eltype(w), eltype(p)), length(w))
 end
-function calc_asset_fees(w::NumVec, p::NumVec, tn::Turnover{<:Any, <:Number})
+function calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:Number})
     return tn.val * abs.(w - tn.w) ⊙ p
 end
-function calc_asset_fees(w::NumVec, p::NumVec, tn::Turnover{<:Any, <:NumVec})
+function calc_asset_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
     return tn.val ⊙ abs.(w - tn.w) ⊙ p
 end
 """
-    calc_asset_fees(w::NumVec, p::NumVec, fees::Fees)
+    calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)
 
 Compute total actual per asset fees for portfolio weights and prices.
 
@@ -798,7 +798,7 @@ julia> calc_asset_fees([0.1, -0.2], [100, 200], fees)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fees(w::NumVec, p::NumVec, fees::Fees)
+function calc_asset_fees(w::VecNum, p::VecNum, fees::Fees)
     fees_long = calc_asset_fees(w, p, fees.l, .>=)
     fees_short = -calc_asset_fees(w, p, fees.s, .<)
     fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=)
@@ -807,9 +807,9 @@ function calc_asset_fees(w::NumVec, p::NumVec, fees::Fees)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 """
-    calc_asset_fees(w::NumVec, ::Nothing, ::Function)
-    calc_asset_fees(w::NumVec, fees::Number, op::Function)
-    calc_asset_fees(w::NumVec, fees::NumVec, op::Function)
+    calc_asset_fees(w::VecNum, ::Nothing, ::Function)
+    calc_asset_fees(w::VecNum, fees::Number, op::Function)
+    calc_asset_fees(w::VecNum, fees::VecNum, op::Function)
 
 Compute the proportional per asset fees for portfolio weights and prices.
 
@@ -821,7 +821,7 @@ Compute the proportional per asset fees for portfolio weights and prices.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
-      + `NumVec`: Vector of fee values per asset.
+      + `VecNum`: Vector of fee values per asset.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -845,24 +845,24 @@ julia> calc_asset_fees([0.1, 0.2], 0.01, .>=)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fees(w::NumVec, ::Nothing, ::Function)
+function calc_asset_fees(w::VecNum, ::Nothing, ::Function)
     return zeros(eltype(w), length(w))
 end
-function calc_asset_fees(w::NumVec, fees::Number, op::Function)
+function calc_asset_fees(w::VecNum, fees::Number, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
     fees_w[idx] = fees * w[idx]
     return fees_w
 end
-function calc_asset_fees(w::NumVec, fees::NumVec, op::Function)
+function calc_asset_fees(w::VecNum, fees::VecNum, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
     fees_w[idx] = fees[idx] ⊙ w[idx]
     return fees_w
 end
 """
-    calc_asset_fees(w::NumVec, ::Nothing)
-    calc_asset_fees(w::NumVec, tn::Turnover)
+    calc_asset_fees(w::VecNum, ::Nothing)
+    calc_asset_fees(w::VecNum, tn::Turnover)
 
 Compute the per asset turnover fees for portfolio weights and prices.
 
@@ -874,7 +874,7 @@ Compute the per asset turnover fees for portfolio weights and prices.
 
       + `nothing`: No turnover fee, returns zero.
       + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::NumVec`: vector of turnover fees per asset.
+      + `tn.val::VecNum`: vector of turnover fees per asset.
 
 # Returns
 
@@ -897,19 +897,19 @@ julia> calc_asset_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fees(w::NumVec, ::Nothing)
+function calc_asset_fees(w::VecNum, ::Nothing)
     return zeros(eltype(w), length(w))
 end
-function calc_asset_fees(w::NumVec, tn::Turnover{<:Any, <:Number})
+function calc_asset_fees(w::VecNum, tn::Turnover{<:Any, <:Number})
     return tn.val * abs.(w - tn.w)
 end
-function calc_asset_fees(w::NumVec, tn::Turnover{<:Any, <:NumVec})
+function calc_asset_fees(w::VecNum, tn::Turnover{<:Any, <:VecNum})
     return tn.val ⊙ abs.(w - tn.w)
 end
 """
-    calc_asset_fixed_fees(w::NumVec, ::Nothing, kwargs::NamedTuple, ::Function)
-    calc_asset_fixed_fees(w::NumVec, fees::Number, kwargs::NamedTuple, op::Function)
-    calc_asset_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::Function)
+    calc_asset_fixed_fees(w::VecNum, ::Nothing, kwargs::NamedTuple, ::Function)
+    calc_asset_fixed_fees(w::VecNum, fees::Number, kwargs::NamedTuple, op::Function)
+    calc_asset_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Function)
 
 Compute the per asset fixed portfolio fees for assets that have been allocated.
 
@@ -921,7 +921,7 @@ Compute the per asset fixed portfolio fees for assets that have been allocated.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
-      + `NumVec`: Vector of fee values per asset.
+      + `VecNum`: Vector of fee values per asset.
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
@@ -946,17 +946,17 @@ julia> calc_asset_fixed_fees([0.1, 0.2], 0.01, (; atol = 1e-6), .>=)
   - [`calc_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fixed_fees(w::NumVec, ::Nothing, ::NamedTuple, ::Function)
+function calc_asset_fixed_fees(w::VecNum, ::Nothing, ::NamedTuple, ::Function)
     return zeros(eltype(w), length(w))
 end
-function calc_asset_fixed_fees(w::NumVec, fees::Number, kwargs::NamedTuple, op::Function)
+function calc_asset_fixed_fees(w::VecNum, fees::Number, kwargs::NamedTuple, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     fees_w[idx1] = fees * idx2
     return fees_w
 end
-function calc_asset_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::Function)
+function calc_asset_fixed_fees(w::VecNum, fees::VecNum, kwargs::NamedTuple, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
@@ -964,7 +964,7 @@ function calc_asset_fixed_fees(w::NumVec, fees::NumVec, kwargs::NamedTuple, op::
     return fees_w
 end
 """
-    calc_asset_fees(w::NumVec, fees::Fees)
+    calc_asset_fees(w::VecNum, fees::Fees)
 
 Compute total per asset fees for portfolio weights and prices.
 
@@ -998,7 +998,7 @@ julia> calc_asset_fees([0.1, -0.2], fees)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_asset_fees(w::NumVec, fees::Fees)
+function calc_asset_fees(w::VecNum, fees::Fees)
     fees_long = calc_asset_fees(w, fees.l, .>=)
     fees_short = -calc_asset_fees(w, fees.s, .<)
     fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=)
@@ -1007,8 +1007,8 @@ function calc_asset_fees(w::NumVec, fees::Fees)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 """
-    calc_net_returns(w::NumVec, X::NumMat, args...)
-    calc_net_returns(w::NumVec, X::NumMat, fees::Fees)
+    calc_net_returns(w::VecNum, X::MatNum, args...)
+    calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
 
 Compute the net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
 
@@ -1039,15 +1039,15 @@ julia> calc_net_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
   - [`calc_net_asset_returns`](@ref)
   - [`calc_fees`](@ref)
 """
-function calc_net_returns(w::NumVec, X::NumMat, args...)
+function calc_net_returns(w::VecNum, X::MatNum, args...)
     return X * w
 end
-function calc_net_returns(w::NumVec, X::NumMat, fees::Fees)
+function calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
     return X * w .- calc_fees(w, fees)
 end
 """
-    calc_net_asset_returns(w::NumVec, X::NumMat, args...)
-    calc_net_asset_returns(w::NumVec, X::NumMat, fees::Fees)
+    calc_net_asset_returns(w::VecNum, X::MatNum, args...)
+    calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
 
 Compute the per asset net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
 
@@ -1078,14 +1078,14 @@ julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
   - [`calc_net_returns`](@ref)
   - [`calc_fees`](@ref)
 """
-function calc_net_asset_returns(w::NumVec, X::NumMat, args...)
+function calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     return X ⊙ transpose(w)
 end
-function calc_net_asset_returns(w::NumVec, X::NumMat, fees::Fees)
+function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 """
-    cumulative_returns(X::NumArr; compound::Bool = false, dims::Int = 1)
+    cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
 
 Compute simple or compounded cumulative returns along a specified dimension.
 
@@ -1099,7 +1099,7 @@ Compute simple or compounded cumulative returns along a specified dimension.
 
 # Returns
 
-  - `ret::NumArr`: Array of cumulative returns, same shape as `X`.
+  - `ret::ArrNum`: Array of cumulative returns, same shape as `X`.
 
 # Examples
 
@@ -1121,7 +1121,7 @@ julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
 
   - [`drawdowns`](@ref)
 """
-function cumulative_returns(X::NumArr; compound::Bool = false, dims::Int = 1)
+function cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
     return if compound
         cumprod(one(eltype(X)) .+ X; dims = dims)
     else
@@ -1129,7 +1129,7 @@ function cumulative_returns(X::NumArr; compound::Bool = false, dims::Int = 1)
     end
 end
 """
-    drawdowns(X::NumArr; cX::Bool = false, compound::Bool = false, dims::Int = 1)
+    drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)
 
 Compute simple or compounded drawdowns along a specified dimension.
 
@@ -1144,7 +1144,7 @@ Compute simple or compounded drawdowns along a specified dimension.
 
 # Returns
 
-  - `dd::NumArr`: Array of drawdowns, same shape as `X`.
+  - `dd::ArrNum`: Array of drawdowns, same shape as `X`.
 
 # Examples
 
@@ -1166,7 +1166,7 @@ julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
 
   - [`cumulative_returns`](@ref)
 """
-function drawdowns(X::NumArr; cX::Bool = false, compound::Bool = false, dims::Int = 1)
+function drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)
     cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
     if compound
         return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))

@@ -47,15 +47,13 @@ Augmented Black-Litterman prior estimator for asset returns.
                                  mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                  re::AbstractRegressionEstimator = StepwiseRegression(),
                                  ve::AbstractVarianceEstimator = SimpleVariance(),
-                                 a_views::Union{<:LinearConstraintEstimator,
-                                                <:BlackLittermanViews},
-                                 f_views::Union{<:LinearConstraintEstimator,
-                                                <:BlackLittermanViews},
+                                 a_views::LcUBlV,
+                                 f_views::LcUBlV,
                                  a_sets::Option{<:AssetSets} = nothing,
                                  f_sets::Option{<:AssetSets} = nothing,
-                                 a_views_conf::Option{<:NumUNumVec} = nothing,
-                                 f_views_conf::Option{<:NumUNumVec} = nothing,
-                                 w::Option{<:NumVec} = nothing, rf::Number = 0.0,
+                                 a_views_conf::Option{<:NumUVecNum} = nothing,
+                                 f_views_conf::Option{<:NumUVecNum} = nothing,
+                                 w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                  l::Option{<:Number} = nothing,
                                  tau::Option{<:Number} = nothing)
 
@@ -186,16 +184,12 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
                                           re::AbstractRegressionEstimator,
-                                          ve::AbstractVarianceEstimator,
-                                          a_views::Union{<:LinearConstraintEstimator,
-                                                         <:BlackLittermanViews},
-                                          f_views::Union{<:LinearConstraintEstimator,
-                                                         <:BlackLittermanViews},
-                                          a_sets::Option{<:AssetSets},
+                                          ve::AbstractVarianceEstimator, a_views::LcUBlV,
+                                          f_views::LcUBlV, a_sets::Option{<:AssetSets},
                                           f_sets::Option{<:AssetSets},
-                                          a_views_conf::Option{<:NumUNumVec},
-                                          f_views_conf::Option{<:NumUNumVec},
-                                          w::Option{<:NumVec}, rf::Number,
+                                          a_views_conf::Option{<:NumUVecNum},
+                                          f_views_conf::Option{<:NumUVecNum},
+                                          w::Option{<:VecNum}, rf::Number,
                                           l::Option{<:Number}, tau::Option{<:Number})
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -225,21 +219,18 @@ function AugmentedBlackLittermanPrior(;
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
-                                      a_views::Union{<:LinearConstraintEstimator,
-                                                     <:BlackLittermanViews},
-                                      f_views::Union{<:LinearConstraintEstimator,
-                                                     <:BlackLittermanViews},
+                                      a_views::LcUBlV, f_views::LcUBlV,
                                       a_sets::Option{<:AssetSets} = nothing,
                                       f_sets::Option{<:AssetSets} = nothing,
-                                      a_views_conf::Option{<:NumUNumVec} = nothing,
-                                      f_views_conf::Option{<:NumUNumVec} = nothing,
-                                      w::Option{<:NumVec} = nothing, rf::Number = 0.0,
+                                      a_views_conf::Option{<:NumUVecNum} = nothing,
+                                      f_views_conf::Option{<:NumUVecNum} = nothing,
+                                      w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
                                       tau::Option{<:Number} = nothing)
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior, w::Option{<:NumVec} = nothing)
+function factory(pe::AugmentedBlackLittermanPrior, w::Option{<:VecNum} = nothing)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), ve = factory(pe.ve, w),
@@ -263,7 +254,7 @@ function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::AugmentedBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+    prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute augmented Black-Litterman prior moments for asset returns.
@@ -312,7 +303,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::AugmentedBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

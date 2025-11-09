@@ -18,9 +18,9 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     alg::T4
     fb::T5
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
-                                  wi::Option{<:NumVec}, alg::RelaxedRiskBudgetingAlgorithm,
+                                  wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Option{<:OptimisationEstimator})
-        if isa(wi, NumVec)
+        if isa(wi, VecNum)
             @argcheck(!isempty(wi))
         end
         if isa(rba.rkb, RiskBudgetEstimator)
@@ -33,12 +33,12 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                              wi::Option{<:NumVec} = nothing,
+                              wi::Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
                               fb::Option{<:OptimisationEstimator} = nothing)
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
-function opt_view(rrb::RelaxedRiskBudgeting, i, X::NumMat)
+function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rba = risk_budgeting_algorithm_view(rrb.rba, i)
@@ -47,7 +47,7 @@ function opt_view(rrb::RelaxedRiskBudgeting, i, X::NumMat)
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::NumMat)
+                                                     sigma::MatNum)
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
@@ -56,7 +56,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::NumMat)
+                                                     sigma::MatNum)
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
@@ -73,7 +73,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
 end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::NumMat)
+                                                     sigma::MatNum)
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
@@ -94,7 +94,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
 end
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   rrb::RelaxedRiskBudgeting,
-                                                  w::VecJuMPScalar, sigma::NumMat)
+                                                  w::VecJuMPScalar, sigma::MatNum)
     N = length(w)
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val

@@ -43,9 +43,9 @@ Factor Black-Litterman prior estimator for asset returns.
                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                               re::AbstractRegressionEstimator = StepwiseRegression(),
                               ve::AbstractVarianceEstimator = SimpleVariance(),
-                              views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
+                              views::LcUBlV,
                               sets::Option{<:AssetSets} = nothing,
-                              views_conf::Option{<:NumUNumVec} = nothing,
+                              views_conf::Option{<:NumUVecNum} = nothing,
                               w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
                               l::Option{<:Number} = nothing,
                               tau::Option{<:Number} = nothing, rsd::Bool = true)
@@ -151,12 +151,10 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractRegressionEstimator,
-                                       ve::AbstractVarianceEstimator,
-                                       views::Union{<:LinearConstraintEstimator,
-                                                    <:BlackLittermanViews},
+                                       ve::AbstractVarianceEstimator, views::LcUBlV,
                                        sets::Option{<:AssetSets},
-                                       views_conf::Option{<:NumUNumVec},
-                                       w::Option{<:NumVec}, rf::Number, l::Option{<:Number},
+                                       views_conf::Option{<:NumUVecNum},
+                                       w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
@@ -177,11 +175,9 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::Union{<:LinearConstraintEstimator,
-                                                <:BlackLittermanViews},
-                                   sets::Option{<:AssetSets} = nothing,
-                                   views_conf::Option{<:NumUNumVec} = nothing,
-                                   w::Option{<:NumVec} = nothing, rf::Number = 0.0,
+                                   views::LcUBlV, sets::Option{<:AssetSets} = nothing,
+                                   views_conf::Option{<:NumUVecNum} = nothing,
+                                   w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
                                    tau::Option{<:Number} = nothing, rsd::Bool = true)
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
@@ -204,7 +200,7 @@ function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::FactorBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+    prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute factor Black-Litterman prior moments for asset returns.
@@ -253,7 +249,7 @@ Compute factor Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::FactorBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

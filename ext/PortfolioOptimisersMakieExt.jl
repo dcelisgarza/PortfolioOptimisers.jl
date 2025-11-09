@@ -1,5 +1,5 @@
 #=
-function plot_ptf_cumulative_returns(w::NumArr, X::NumMat,
+function plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                      fees::Option{<:Fees} = nothing;
                                      ts::AbstractVector = 1:size(X, 1),
                                      f::Option{<:Figure} = Figure(),
@@ -28,7 +28,7 @@ function compute_relevant_assets(w::AbstractVector, M::Number, N::Number)
     end
     return N, idx
 end
-function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
+function plot_asset_cumulative_returns(w::AbstractVector, X::MatNum,
                                        fees::Option{<:Fees} = nothing;
                                        ts::AbstractVector = 1:size(X, 1),
                                        nx::AbstractVector = 1:size(X, 2),
@@ -63,7 +63,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::NumMat,
     axislegend(; legend_kwargs...)
     return f
 end
-function plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
+function plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
                           N::Option{<:Number} = nothing,
                           f::Option{<:Figure} = Figure(), fpos::Tuple = (1, 1),
                           ax_kwargs::NamedTuple = (; xlabel = "Asset", ylabel = "Weight",
@@ -85,7 +85,7 @@ function plot_composition(w::NumVec, nx::AbstractVector = 1:length(w);
     end
     return f
 end
-function plot_stacked_bar_composition(w::NumArr, nx::AbstractVector = 1:size(w, 1);
+function plot_stacked_bar_composition(w::ArrNum, nx::AbstractVector = 1:size(w, 1);
                                       f::Option{<:Figure} = Figure(),
                                       fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                       ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
@@ -95,7 +95,7 @@ function plot_stacked_bar_composition(w::NumArr, nx::AbstractVector = 1:size(w, 
                                                                                         2))),
                                                                title = "Portfolio Composition"),
                                       bar_kwargs::NamedTuple = (; colormap = :viridis))
-    if isa(w, VecNumVec)
+    if isa(w, VecVecNum)
         w = hcat(w...)
     end
     ax = Axis(f[fpos...]; ax_kwargs...)
@@ -115,7 +115,7 @@ function plot_stacked_bar_composition(w::NumArr, nx::AbstractVector = 1:size(w, 
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
-function plot_stacked_area_composition(w::NumArr, nx::AbstractVector = 1:size(w, 1);
+function plot_stacked_area_composition(w::ArrNum, nx::AbstractVector = 1:size(w, 1);
                                        f::Option{<:Figure} = Figure(),
                                        fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                        ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
@@ -125,7 +125,7 @@ function plot_stacked_area_composition(w::NumArr, nx::AbstractVector = 1:size(w,
                                                                                          2))),
                                                                 title = "Portfolio Composition"),
                                        band_kwargs::NamedTuple = (; colormap = :viridis))
-    if isa(w, VecNumVec)
+    if isa(w, VecVecNum)
         w = hcat(w...)
     end
     cw = cumsum(w; dims = 1)
@@ -189,7 +189,7 @@ function plot_dendrogram(clr::AbstractClusteringResult,
     ax.xticks = xticks
     return f
 end
-function plot_clusters(clr::AbstractClusteringResult, X::NumMat,
+function plot_clusters(clr::AbstractClusteringResult, X::MatNum,
                        nx::AbstractVector = 1:size(X, 1);
                        f::Option{<:Figure} = Figure(),
                        ax_kwargs::NamedTuple = (; yreversed = true,

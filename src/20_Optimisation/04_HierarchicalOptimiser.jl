@@ -35,8 +35,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     end
 end
 function HierarchicalOptimiser(; pe::PrEUPr = EmpiricalPrior(),
-                               cle::Union{<:ClusteringEstimator,
-                                          <:AbstractClusteringResult} = ClusteringEstimator(),
+                               cle::ClRUClE = ClusteringEstimator(),
                                slv::Option{<:SlvUVecSlv} = nothing,
                                fees::Option{<:FeesUFeesE} = nothing,
                                wb::Option{<:WbUWbE} = WeightBounds(),
@@ -53,7 +52,7 @@ function opt_view(hco::HierarchicalOptimiser, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, fees = fees, slv = hco.slv,
                                  wb = wb, cwf = hco.cwf, sets = sets, strict = hco.strict)
 end
-function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
+function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
@@ -64,8 +63,8 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::NumMat,
     end
     return rk
 end
-function unitary_expected_risks!(wk::NumVec, rk::NumVec, r::OptimisationRiskMeasure,
-                                 X::NumMat, fees::Option{<:Fees} = nothing)
+function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
+                                 X::MatNum, fees::Option{<:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
     for i in eachindex(wk)
         wk[i] = one(eltype(X))

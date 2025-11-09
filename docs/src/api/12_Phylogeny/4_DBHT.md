@@ -10,7 +10,7 @@ DBHT
 LoGo
 DBHTClustering
 clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
-                    X::NumMat; branchorder::Symbol = :optimal,
+                    X::MatNum; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
 PortfolioOptimisers.DBHTRootMethod
 PortfolioOptimisers.AbstractSimilarityMatrixAlgorithm
@@ -40,6 +40,6 @@ PortfolioOptimisers.J_LoGo
 PortfolioOptimisers.LoGo_dist_assert
 PortfolioOptimisers.logo!
 PortfolioOptimisers.matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef},
-                                      sigma::NumMat, X::NumMat;
+                                      sigma::MatNum, X::MatNum;
                                       dims::Int = 1, kwargs...)
 ```

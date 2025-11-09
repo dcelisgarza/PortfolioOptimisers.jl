@@ -83,7 +83,7 @@ function factory(pe::EmpiricalPrior, w::Option{<:AbstractWeights} = nothing)
                           horizon = pe.horizon)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::NumMat, args...; dims::Int = 1,
+    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
           kwargs...)
 
 Compute empirical prior moments for asset returns (no horizon adjustment).
@@ -112,7 +112,7 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::NumMat, args...; dims::Int = 1,
+function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
                kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -123,7 +123,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::NumMat, args...; di
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 """
-    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::NumMat, args...; dims::Int = 1,
+    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...; dims::Int = 1,
           kwargs...)
 
 Compute empirical prior moments for asset returns with investment horizon adjustment.
@@ -152,7 +152,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::NumMat, args...;
+function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
                dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

@@ -31,10 +31,9 @@ Bayesian Black-Litterman prior estimator for asset returns.
                                                                                       pe = EmpiricalPrior(;
                                                                                                           me = EquilibriumExpectedReturns())),
                                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                views::Union{<:LinearConstraintEstimator,
-                                             <:BlackLittermanViews},
+                                views::LcUBlV,
                                 sets::Option{<:AssetSets} = nothing,
-                                views_conf::Option{<:NumUNumVec} = nothing,
+                                views_conf::Option{<:NumUVecNum} = nothing,
                                 rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -143,10 +142,8 @@ struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
     tau::T7
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          mp::AbstractMatrixProcessingEstimator,
-                                         views::Union{<:LinearConstraintEstimator,
-                                                      <:BlackLittermanViews},
-                                         sets::Option{<:AssetSets},
-                                         views_conf::Option{<:NumUNumVec}, rf::Number,
+                                         views::LcUBlV, sets::Option{<:AssetSets},
+                                         views_conf::Option{<:NumUVecNum}, rf::Number,
                                          tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
@@ -164,10 +161,8 @@ function BayesianBlackLittermanPrior(;
                                                                                            pe = EmpiricalPrior(;
                                                                                                                me = EquilibriumExpectedReturns())),
                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                     views::Union{<:LinearConstraintEstimator,
-                                                  <:BlackLittermanViews},
-                                     sets::Option{<:AssetSets} = nothing,
-                                     views_conf::Option{<:NumUNumVec} = nothing,
+                                     views::LcUBlV, sets::Option{<:AssetSets} = nothing,
+                                     views_conf::Option{<:NumUVecNum} = nothing,
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
@@ -186,7 +181,7 @@ function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::BayesianBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+    prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute Bayesian Black-Litterman prior moments for asset returns.
@@ -229,7 +224,7 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
   - [`prior`](@ref)
   - [`calc_omega`](@ref)
 """
-function prior(pe::BayesianBlackLittermanPrior, X::NumMat, F::NumMat; dims::Int = 1,
+function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

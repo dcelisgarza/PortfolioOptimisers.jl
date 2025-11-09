@@ -14,12 +14,12 @@ prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any,
                                        <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-               X::NumMat, F::Option{<:NumMat} = nothing;
+               X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:H0_EntropyPooling}, X::NumMat;
-      F::Option{<:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
+                              <:H0_EntropyPooling}, X::MatNum;
+      F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
       kwargs...)
 PortfolioOptimisers.AbstractEntropyPoolingOptimiser
 PortfolioOptimisers.AbstractEntropyPoolingAlgorithm

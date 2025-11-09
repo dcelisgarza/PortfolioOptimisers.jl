@@ -151,8 +151,8 @@ end
 function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
     return Frontier(N, factor, flag)
 end
-const RkRtUBounds = Union{<:NumUNumVec, <:Frontier}
-const NumVecUFront = Union{<:NumVec, <:Frontier}
+const RkRtUBounds = Union{<:NumUVecNum, <:Frontier}
+const NumVecUFront = Union{<:VecNum, <:Frontier}
 """
     struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
         scale::T1
@@ -269,7 +269,7 @@ end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
-function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i, X::NumMat)
+function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i, X::MatNum)
     return [risk_measure_view(r, i, X) for r in rs]
 end
 """
@@ -411,10 +411,10 @@ function LogSumExpScalariser(; gamma::Number = 1.0)
 end
 """
     nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_factory(risk_variable::Union{<:Number, <:NumArr, <:VecScalar},
+    nothing_scalar_array_factory(risk_variable::Union{<:Number, <:ArrNum, <:VecScalar},
                                  ::Any)
     nothing_scalar_array_factory(risk_variable::Nothing,
-                                 prior_variable::Union{<:Number, <:NumArr, <:VecScalar})
+                                 prior_variable::Union{<:Number, <:ArrNum, <:VecScalar})
 
 Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
@@ -432,23 +432,23 @@ Utility to select a non-nothing value when provided by a risk measure, or fall b
 function nothing_scalar_array_factory(::Nothing, ::Nothing)
     return nothing
 end
-function nothing_scalar_array_factory(risk_variable::Union{<:Number, <:NumArr, <:VecScalar},
+function nothing_scalar_array_factory(risk_variable::Union{<:Number, <:ArrNum, <:VecScalar},
                                       ::Any)
     return risk_variable
 end
 function nothing_scalar_array_factory(::Nothing,
-                                      prior_variable::Union{<:Number, <:NumArr,
+                                      prior_variable::Union{<:Number, <:ArrNum,
                                                             <:VecScalar})
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
-function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Number, <:NumArr},
+function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Number, <:ArrNum},
                                                 ::Any, i)
     return nothing_scalar_array_view(risk_variable, i)
 end
-function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::NumArr, i)
+function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::ArrNum, i)
     return nothing_scalar_array_view(prior_variable, i)
 end
 function solver_factory(risk_solvers::SlvUVecSlv, ::Any)

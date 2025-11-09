@@ -10,7 +10,7 @@ end
 function MeanReturn(; w::Option{<:AbstractWeights} = nothing)
     return MeanReturn(w)
 end
-function (r::MeanReturn)(x::NumVec)
+function (r::MeanReturn)(x::VecNum)
     return isnothing(r.w) ? mean(x) : mean(x, r.w)
 end
 function factory(r::MeanReturn, prior::AbstractPriorResult, args...)
@@ -24,18 +24,18 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     w::T1
     mu::T2
     function ThirdCentralMoment(w::Option{<:AbstractWeights},
-                                mu::Option{<:NumUNumVecUVecScalar})
+                                mu::Option{<:NumUVecNumUVecScalar})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        if isa(mu, NumVec)
+        if isa(mu, VecNum)
             @argcheck(!isempty(mu))
         end
         return new{typeof(w), typeof(mu)}(w, mu)
     end
 end
 function ThirdCentralMoment(; w::Option{<:AbstractWeights} = nothing,
-                            mu::Option{<:NumUNumVecUVecScalar} = nothing)
+                            mu::Option{<:NumUVecNumUVecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
 struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
@@ -43,11 +43,11 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     w::T2
     mu::T3
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:AbstractWeights},
-                      mu::Option{<:NumUNumVecUVecScalar})
+                      mu::Option{<:NumUVecNumUVecScalar})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        if isa(mu, NumVec)
+        if isa(mu, VecNum)
             @argcheck(!isempty(mu))
         end
         return new{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
@@ -55,24 +55,24 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Option{<:AbstractWeights} = nothing,
-                  mu::Option{<:NumUNumVecUVecScalar} = nothing)
+                  mu::Option{<:NumUVecNumUVecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},
-                                    <:Skewness{<:Any, Nothing, Nothing}}, ::Any, x::NumVec)
+                                    <:Skewness{<:Any, Nothing, Nothing}}, ::Any, x::VecNum)
     return mean(x)
 end
 function calc_moment_target(r::Union{<:ThirdCentralMoment{<:AbstractWeights, Nothing},
                                      <:Skewness{<:Any, <:AbstractWeights, Nothing}}, ::Any,
-                            x::NumVec)
+                            x::VecNum)
     return mean(x, r.w)
 end
-function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:NumVec},
-                                     <:Skewness{<:Any, <:Any, <:NumVec}}, w::NumVec, ::Any)
+function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:VecNum},
+                                     <:Skewness{<:Any, <:Any, <:VecNum}}, w::VecNum, ::Any)
     return dot(w, r.mu)
 end
 function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:VecScalar},
-                                     <:Skewness{<:Any, <:Any, <:VecScalar}}, w::NumVec,
+                                     <:Skewness{<:Any, <:Any, <:VecScalar}}, w::VecNum,
                             ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
@@ -80,8 +80,8 @@ function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Number},
                                      <:Skewness{<:Any, <:Any, <:Number}}, ::Any, ::Any)
     return r.mu
 end
-function calc_deviations_vec(r::Union{<:ThirdCentralMoment, <:Skewness}, w::NumVec,
-                             X::NumMat, fees::Option{<:Fees} = nothing)
+function calc_deviations_vec(r::Union{<:ThirdCentralMoment, <:Skewness}, w::VecNum,
+                             X::MatNum, fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -95,7 +95,7 @@ function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
-function (r::ThirdCentralMoment)(w::NumVec, X::NumMat, fees::Option{<:Fees} = nothing)
+function (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 3
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
@@ -109,7 +109,7 @@ function risk_measure_view(r::Skewness, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, w = r.w, mu = mu)
 end
-function (r::Skewness)(w::NumVec, X::NumMat, fees::Option{<:Fees} = nothing)
+function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3

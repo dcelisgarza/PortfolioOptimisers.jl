@@ -17,14 +17,14 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                 fb::Option{<:OptimisationEstimator} = nothing)
     return HierarchicalRiskParity(opt, r, sce, fb)
 end
-function opt_view(hrp::HierarchicalRiskParity, i, X::NumMat)
+function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce, fb = hrp.fb)
 end
-function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::NumVec,
-                                         lc::NumVec, rc::NumVec)
+function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
+                                         lc::VecNum, rc::VecNum)
     lb = wb.lb
     ub = wb.ub
     wlc = w[lc[1]]
@@ -77,8 +77,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
     return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
-function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec, rs::VecOptRM, X::NumMat,
+function hrp_scalarised_risk(::SumScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
@@ -94,8 +94,8 @@ function hrp_scalarised_risk(::SumScalariser, wu::NumMat, wk::NumVec, rku::NumVe
     end
     return lrisk, rrisk
 end
-function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec, rs::VecOptRM, X::NumMat,
+function hrp_scalarised_risk(::MaxScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
@@ -118,8 +118,8 @@ function hrp_scalarised_risk(::MaxScalariser, wu::NumMat, wk::NumVec, rku::NumVe
     end
     return lrisk, rrisk
 end
-function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::NumMat, wk::NumVec, rku::NumVec,
-                             lc::NumVec, rc::NumVec, rs::VecOptRM, X::NumMat,
+function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
     lrisk = Vector{eltype(X)}(undef, length(rs))
     rrisk = Vector{eltype(X)}(undef, length(rs))

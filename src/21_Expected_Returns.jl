@@ -1,9 +1,9 @@
 """
-    expected_return(ret::ArithmeticReturn, w::NumVec, pr::AbstractPriorResult;
+    expected_return(ret::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
-    expected_return(ret::KellyReturn, w::NumVec, pr::AbstractPriorResult;
+    expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
-    expected_return(ret::JuMPReturnsEstimator, w::VecNumVec,
+    expected_return(ret::JuMPReturnsEstimator, w::VecVecNum,
                     pr::AbstractPriorResult; fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected portfolio return using the specified return estimator.
@@ -20,7 +20,7 @@ Compute the expected portfolio return using the specified return estimator.
 
 # Returns
 
-  - `rt::Union{<:Number, <:NumVec}`: Expected portfolio return(s), net of fees if provided.
+  - `rt::Union{<:Number, <:VecNum}`: Expected portfolio return(s), net of fees if provided.
 
 # Details
 
@@ -38,24 +38,24 @@ Compute the expected portfolio return using the specified return estimator.
   - [`expected_risk_ret_sric`](@ref)
   - [`calc_fees`](@ref)
 """
-function expected_return(::ArithmeticReturn, w::NumVec, pr::AbstractPriorResult,
+function expected_return(::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     mu = pr.mu
     return dot(w, mu) - calc_fees(w, fees)
 end
-function expected_return(ret::KellyReturn, w::NumVec, pr::AbstractPriorResult,
+function expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     rw = ret.w
     X = pr.X
     kret = isnothing(rw) ? mean(log1p.(X * w)) : mean(log1p.(X * w), rw)
     return kret - calc_fees(w, fees)
 end
-function expected_return(ret::JuMPReturnsEstimator, w::VecNumVec, pr::AbstractPriorResult,
+function expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     return [expected_return(ret, wi, pr, fees; kwargs...) for wi in w]
 end
 """
-    expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
+    expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::VecNum,
                    pr::AbstractPriorResult; fees::Option{<:Fees} = nothing, rf::Number = 0,
                    kwargs...)
 
@@ -84,7 +84,7 @@ Compute the expected risk-adjusted return ratio for a portfolio.
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_sric`](@ref)
 """
-function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
+function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::VecNum,
                         pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                         rf::Number = 0, kwargs...)
     rk = expected_risk(r, w, pr.X, fees; kwargs...)
@@ -93,7 +93,7 @@ function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w
 end
 """
     expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                            w::NumVec, pr::AbstractPriorResult;
+                            w::VecNum, pr::AbstractPriorResult;
                             fees::Option{<:Fees} = nothing, rf::Number = 0, kwargs...)
 
 Compute expected risk, expected return, and risk-adjusted return ratio for a portfolio.
@@ -122,14 +122,14 @@ Compute expected risk, expected return, and risk-adjusted return ratio for a por
   - [`expected_sric`](@ref)
 """
 function expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                                 w::NumVec, pr::AbstractPriorResult,
+                                 w::VecNum, pr::AbstractPriorResult,
                                  fees::Option{<:Fees} = nothing; rf::Number = 0, kwargs...)
     rk = expected_risk(r, w, pr.X, fees; kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return rk, rt, (rt - rf) / rk
 end
 """
-    expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
+    expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::VecNum,
                   pr::AbstractPriorResult; fees::Option{<:Fees} = nothing, rf::Number = 0,
                   kwargs...)
 
@@ -158,7 +158,7 @@ Compute the risk-adjusted ratio information criterion (SRIC) for a portfolio.
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_risk_ret_sric`](@ref)
 """
-function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::NumVec,
+function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                        rf::Number = 0, kwargs...)
     T, N = size(pr.X)
@@ -167,7 +167,7 @@ function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w:
 end
 """
     expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                           w::NumVec, pr::AbstractPriorResult;
+                           w::VecNum, pr::AbstractPriorResult;
                            fees::Option{<:Fees} = nothing, rf::Number = 0, kwargs...)
 
 Compute expected risk, expected return, and SRIC for a portfolio.
@@ -196,7 +196,7 @@ Compute expected risk, expected return, and SRIC for a portfolio.
   - [`expected_risk_ret_ratio`](@ref)
 """
 function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                                w::NumVec, pr::AbstractPriorResult,
+                                w::VecNum, pr::AbstractPriorResult,
                                 fees::Option{<:Fees} = nothing; rf::Number = 0, kwargs...)
     T, N = size(pr.X)
     rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr; fees = fees, rf = rf, kwargs...)
@@ -253,7 +253,7 @@ function factory(r::ReturnRiskMeasure, args...; kwargs...)
     return r
 end
 """
-    expected_risk(r::ReturnRiskMeasure, w::NumVec, pr::AbstractPriorResult;
+    expected_risk(r::ReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected risk for a portfolio using a return-based risk measure.
@@ -278,7 +278,7 @@ Compute the expected risk for a portfolio using a return-based risk measure.
   - [`expected_return`](@ref)
   - [`expected_ratio`](@ref)
 """
-function expected_risk(r::ReturnRiskMeasure, w::NumVec, pr::AbstractPriorResult,
+function expected_risk(r::ReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_return(r.rt, w, pr, fees)
 end
@@ -348,11 +348,11 @@ function factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwarg
     rk = factory(r.rk, prior, args...; kwargs...)
     return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
 end
-function factory(r::RatioRiskMeasure, w::NumVec)
+function factory(r::RatioRiskMeasure, w::VecNum)
     return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 """
-    expected_risk(r::RatioRiskMeasure, w::NumVec, pr::AbstractPriorResult;
+    expected_risk(r::RatioRiskMeasure, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected risk for a portfolio using a ratio-based risk measure.
@@ -377,7 +377,7 @@ Compute the expected risk for a portfolio using a ratio-based risk measure.
   - [`expected_ratio`](@ref)
   - [`expected_return`](@ref)
 """
-function expected_risk(r::RatioRiskMeasure, w::NumVec, pr::AbstractPriorResult,
+function expected_risk(r::RatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
 end

@@ -24,7 +24,7 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
     fb::T4
     function DiscreteAllocation(slv::SlvUVecSlv, sc::Number, so::Number,
                                 fb::Option{<:FiniteAllocationOptimisationEstimator})
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc > zero(sc))
@@ -36,7 +36,7 @@ function DiscreteAllocation(; slv::SlvUVecSlv, sc::Number = 1, so::Number = 1,
                             fb::Option{<:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, fb)
 end
-function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,
+function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                da::DiscreteAllocation, str_names::Bool = false)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
@@ -81,7 +81,7 @@ function finite_sub_allocation(w::NumVec, p::NumVec, cash::Number, bgt::Number,
     acash = value(r)
     return shares, cost, aw, acash, res, model
 end
-function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 1e6,
+function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 1e6,
                    T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing;
                    str_names::Bool = false, save::Bool = true, kwargs...)
     @argcheck(!isempty(w))
@@ -125,8 +125,8 @@ function _optimise(da::DiscreteAllocation, w::NumVec, p::NumVec, cash::Number = 
                                           ifelse(save, smodel, nothing),
                                           ifelse(save, lmodel, nothing), lcash, nothing)
 end
-function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::NumVec,
-                  p::NumVec, cash::Number = 1e6, T::Option{<:Number} = nothing,
+function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
+                  p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,
                   fees::Option{<:Fees} = nothing; str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)

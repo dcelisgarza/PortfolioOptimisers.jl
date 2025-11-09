@@ -2,9 +2,9 @@
 
 ```@docs
 LinearModel
-PortfolioOptimisers.fit(target::LinearModel, X::NumMat, y::NumVec)
+PortfolioOptimisers.fit(target::LinearModel, X::MatNum, y::VecNum)
 GeneralisedLinearModel
-PortfolioOptimisers.fit(target::GeneralisedLinearModel, X::NumMat, y::NumVec)
+PortfolioOptimisers.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
 AIC
 AICC
 BIC

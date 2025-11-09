@@ -60,7 +60,7 @@ struct Full <: AbstractMomentAlgorithm end
 """
 struct Semi <: AbstractMomentAlgorithm end
 """
-    robust_cov(ce::StatsBase.CovarianceEstimator, X::NumMat, [w::AbstractWeights];
+    robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::AbstractWeights];
                dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
@@ -78,14 +78,14 @@ This function attempts to compute the weighted covariance matrix using the provi
 
 # Returns
 
-  - `sigma::NumMat`: Covariance matrix.
+  - `sigma::MatNum`: Covariance matrix.
 
 # Related
 
   - [`robust_cor`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function robust_cov(ce::StatsBase.CovarianceEstimator, X::NumMat; dims::Int = 1,
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
         cov(ce, X; dims = dims, mean = mean, kwargs...)
@@ -93,7 +93,7 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::NumMat; dims::Int = 1,
         cov(ce, X; dims = dims, mean = mean)
     end
 end
-function robust_cov(ce::StatsBase.CovarianceEstimator, X::NumMat, w::AbstractWeights;
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWeights;
                     dims::Int = 1, mean = nothing, kwargs...)
     return try
         cov(ce, X, w; dims = dims, mean = mean, kwargs...)
@@ -102,7 +102,7 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::NumMat, w::AbstractWei
     end
 end
 """
-    robust_cor(ce::StatsBase.CovarianceEstimator, X::NumMat, [w::AbstractWeights];
+    robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::AbstractWeights];
                dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
@@ -120,14 +120,14 @@ This function attempts to compute the weighted correlation matrix using the prov
 
 # Returns
 
-  - `rho::NumMat`: Correlation matrix.
+  - `rho::MatNum`: Correlation matrix.
 
 # Related
 
   - [`robust_cov`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function robust_cor(ce::StatsBase.CovarianceEstimator, X::NumMat; dims::Int = 1,
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
         try
@@ -145,7 +145,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::NumMat; dims::Int = 1,
         sigma
     end
 end
-function robust_cor(ce::StatsBase.CovarianceEstimator, X::NumMat, w::AbstractWeights;
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWeights;
                     dims::Int = 1, mean = nothing, kwargs...)
     return try
         try

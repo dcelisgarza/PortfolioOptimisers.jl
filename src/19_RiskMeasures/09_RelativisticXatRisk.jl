@@ -1,6 +1,6 @@
-function RRM(x::NumVec, slv::SlvUVecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
+function RRM(x::VecNum, slv::SlvUVecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
              w::Option{<:AbstractWeights} = nothing)
-    if isa(slv, SlvVec)
+    if isa(slv, VecSlv)
         @argcheck(!isempty(slv))
     end
     T = length(x)
@@ -84,7 +84,7 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:SlvUVecSlv}, alpha::Number,
                                      kappa::Number, w::Option{<:AbstractWeights})
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -112,7 +112,7 @@ function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
                                    kappa = r.kappa, slv = slv, w = w)
 end
-function (r::RelativisticValueatRisk)(x::NumVec)
+function (r::RelativisticValueatRisk)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
 struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
@@ -127,7 +127,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
                                           slv::Option{<:SlvUVecSlv}, alpha::Number,
                                           kappa_a::Number, beta::Number, kappa_b::Number,
                                           w::Option{<:AbstractWeights})
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -150,7 +150,7 @@ function RelativisticValueatRiskRange(;
                                       w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
-function (r::RelativisticValueatRiskRange)(x::NumVec)
+function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
 function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
@@ -167,7 +167,7 @@ struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     kappa::T4
     function RelativisticDrawdownatRisk(settings, slv::Option{<:SlvUVecSlv}, alpha::Number,
                                         kappa::Number)
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -182,7 +182,7 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
                                     alpha::Number = 0.05, kappa::Number = 0.3)
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
-function (r::RelativisticDrawdownatRisk)(x::NumVec)
+function (r::RelativisticDrawdownatRisk)(x::VecNum)
     pushfirst!(x, 1)
     cs = cumsum(x)
     peak = typemin(eltype(x))
@@ -205,7 +205,7 @@ struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMea
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:SlvUVecSlv}, alpha::Number,
                                                 kappa::Number)
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -221,7 +221,7 @@ function RelativeRelativisticDrawdownatRisk(;
                                             alpha::Number = 0.05, kappa::Number = 0.3)
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
-function (r::RelativeRelativisticDrawdownatRisk)(x::NumVec)
+function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     peak = typemin(eltype(x))

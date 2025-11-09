@@ -111,7 +111,7 @@ function set_risk_bounds_and_expression!(model::JuMP.Model,
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
-function set_drawdown_constraints!(model::JuMP.Model, X::NumMat)
+function set_drawdown_constraints!(model::JuMP.Model, X::MatNum)
     if haskey(model, :dd)
         return model[:dd]
     end

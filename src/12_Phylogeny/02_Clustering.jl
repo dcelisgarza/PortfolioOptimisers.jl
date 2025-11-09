@@ -63,6 +63,7 @@ All concrete types representing the result of a clustering estimation should sub
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 const ClRUClE = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
+const PhEUClR = Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult}
 """
     struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
         clustering::T1
@@ -84,8 +85,8 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HierarchicalClustering(; clustering::Clustering.Hclust, S::NumMat,
-                           D::NumMat, k::Integer)
+    HierarchicalClustering(; clustering::Clustering.Hclust, S::MatNum,
+                           D::MatNum, k::Integer)
 
 Keyword arguments correspond to the fields above.
 
@@ -106,7 +107,7 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     S::T2
     D::T3
     k::T4
-    function HierarchicalClustering(clustering::Clustering.Hclust, S::NumMat, D::NumMat,
+    function HierarchicalClustering(clustering::Clustering.Hclust, S::MatNum, D::MatNum,
                                     k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
@@ -115,7 +116,7 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
         return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
     end
 end
-function HierarchicalClustering(; clustering::Clustering.Hclust, S::NumMat, D::NumMat,
+function HierarchicalClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum,
                                 k::Integer)
     return HierarchicalClustering(clustering, S, D, k)
 end
@@ -383,4 +384,4 @@ end
 
 export HierarchicalClustering, clusterise, SecondOrderDifference,
        StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
-       ClusteringEstimator, ClRUClE
+       ClusteringEstimator, IntUONC, ClRUClE, PhEUClR

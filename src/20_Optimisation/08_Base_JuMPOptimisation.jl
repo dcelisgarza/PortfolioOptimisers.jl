@@ -34,12 +34,12 @@ function add_custom_constraint!(args...; kwargs...)
 end
 struct JuMPOptimisationSolution{T1} <: OptimisationModelResult
     w::T1
-    function JuMPOptimisationSolution(w::NumArr)
+    function JuMPOptimisationSolution(w::ArrNum)
         @argcheck(!isempty(w))
         return new{typeof(w)}(w)
     end
 end
-function JuMPOptimisationSolution(; w::NumArr)
+function JuMPOptimisationSolution(; w::ArrNum)
     return JuMPOptimisationSolution(w)
 end
 function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
@@ -52,12 +52,12 @@ end
 function set_initial_w!(args...)
     return nothing
 end
-function set_initial_w!(w::NumVec, wi::NumVec)
+function set_initial_w!(w::VecNum, wi::VecNum)
     @argcheck(length(wi) == length(w))
     set_start_value.(w, wi)
     return nothing
 end
-function set_w!(model::JuMP.Model, X::NumMat, wi::Option{<:NumVecUVecNumVec})
+function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNumUVecVecNum})
     @variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing
@@ -113,7 +113,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     end
     return retcode, process_model(model, opt)
 end
-function set_portfolio_returns!(model::JuMP.Model, X::NumMat)
+function set_portfolio_returns!(model::JuMP.Model, X::MatNum)
     if haskey(model, :X)
         return model[:X]
     end
@@ -121,7 +121,7 @@ function set_portfolio_returns!(model::JuMP.Model, X::NumMat)
     @expression(model, X, X * w)
     return X
 end
-function set_net_portfolio_returns!(model::JuMP.Model, X::NumMat)
+function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
     if haskey(model, :net_X)
         return model[:net_X]
     end
@@ -134,7 +134,7 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::NumMat)
     end
     return net_X
 end
-function set_portfolio_returns_plus_one!(model::JuMP.Model, X::NumMat)
+function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
     if haskey(model, :Xap1)
         return model[:Xap1]
     end

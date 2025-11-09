@@ -64,7 +64,7 @@ function assert_external_optimiser(::OptimisationResult)
     return nothing
 end
 function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
-                                         pr::AbstractPriorResult, wi::NumMat,
+                                         pr::AbstractPriorResult, wi::MatNum,
                                          resi::AbstractVector{<:OptimisationResult};
                                          kwargs...)
     iv = isnothing(rd.iv) ? nothing : rd.iv * wi

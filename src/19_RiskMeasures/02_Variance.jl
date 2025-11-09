@@ -125,7 +125,7 @@ Represents the portfolio variance using a covariance matrix.
 # Constructors
 
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             sigma::Option{<:NumMat} = nothing,
+             sigma::Option{<:MatNum} = nothing,
              rc::Option{<:LcULcE} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
@@ -174,7 +174,7 @@ Where:
 
 # Functor
 
-    (r::Variance)(w::NumVec)
+    (r::Variance)(w::VecNum)
 
 Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
 
@@ -191,7 +191,7 @@ Where:
 
 ## Arguments
 
-  - `w::NumVec`: Asset weights.
+  - `w::VecNum`: Asset weights.
 
 # Examples
 
@@ -231,9 +231,9 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     sigma::T2
     rc::T3
     alg::T4
-    function Variance(settings::RiskMeasureSettings, sigma::Option{<:NumMat},
+    function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                       rc::Option{<:LcULcE}, alg::VarianceFormulation)
-        if isa(sigma, NumMat)
+        if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
@@ -242,11 +242,11 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:NumMat} = nothing, rc::Option{<:LcULcE} = nothing,
+                  sigma::Option{<:MatNum} = nothing, rc::Option{<:LcULcE} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end
-function (r::Variance)(w::NumVec)
+function (r::Variance)(w::VecNum)
     return dot(w, r.sigma, w)
 end
 """
@@ -301,7 +301,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 # Constructors
 
     StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       sigma::Option{<:NumMat} = nothing)
+                       sigma::Option{<:MatNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -327,7 +327,7 @@ Where:
 
 # Functor
 
-    (r::StandardDeviation)(w::NumVec)
+    (r::StandardDeviation)(w::VecNum)
 
 Computes the standard deviation risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
 
@@ -344,7 +344,7 @@ Where:
 
 ## Arguments
 
-  - `w::NumVec`: Asset weights.
+  - `w::VecNum`: Asset weights.
 
 # Examples
 
@@ -375,8 +375,8 @@ julia> r(w)
 struct StandardDeviation{T1, T2} <: RiskMeasure
     settings::T1
     sigma::T2
-    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:NumMat})
-        if isa(sigma, NumMat)
+    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum})
+        if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
@@ -384,10 +384,10 @@ struct StandardDeviation{T1, T2} <: RiskMeasure
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Option{<:NumMat} = nothing)
+                           sigma::Option{<:MatNum} = nothing)
     return StandardDeviation(settings, sigma)
 end
-function (r::StandardDeviation)(w::NumVec)
+function (r::StandardDeviation)(w::VecNum)
     return sqrt(dot(w, r.sigma, w))
 end
 """
@@ -439,7 +439,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
     UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            ucs::Option{<:UcUUcE} = NormalUncertaintySet(),
-                           sigma::Option{<:NumMat} = nothing)
+                           sigma::Option{<:MatNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -526,7 +526,7 @@ Where:
 
 # Functor
 
-    (r::UncertaintySetVariance)(w::NumVec)
+    (r::UncertaintySetVariance)(w::VecNum)
 
 Computes the variance risk of a portfolio with weights `w` using the covariance matrix `r.sigma`.
 
@@ -543,7 +543,7 @@ Where:
 
 ## Arguments
 
-  - `w::NumVec`: Asset weights.
+  - `w::VecNum`: Asset weights.
 
 # Examples
 
@@ -603,8 +603,8 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     ucs::T2
     sigma::T3
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcUUcE},
-                                    sigma::Option{<:NumMat})
-        if isa(sigma, NumMat)
+                                    sigma::Option{<:MatNum})
+        if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
         end
         return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
@@ -612,10 +612,10 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Option{<:UcUUcE} = NormalUncertaintySet(),
-                                sigma::Option{<:NumMat} = nothing)
+                                sigma::Option{<:MatNum} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
-function (r::UncertaintySetVariance)(w::NumVec)
+function (r::UncertaintySetVariance)(w::VecNum)
     return dot(w, r.sigma, w)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)

@@ -55,10 +55,10 @@ SimpleVariance
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::NumVec; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumVec; mean = nothing)`](@ref)
+  - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     me::T1
@@ -76,7 +76,7 @@ function SimpleVariance(;
     return SimpleVariance(me, w, corrected)
 end
 """
-    std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
+    std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -115,12 +115,12 @@ julia> std(sv, Xmat; dims = 1)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.std`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.std)
-  - [`std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::NumVec; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumVec; mean = nothing)`](@ref)
+  - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
-function Statistics.std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing,
+function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
@@ -130,7 +130,7 @@ function Statistics.std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = not
     end
 end
 """
-    std(ve::SimpleVariance, X::NumVec; mean = nothing)
+    std(ve::SimpleVariance, X::VecNum; mean = nothing)
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
 
@@ -180,11 +180,11 @@ julia> std(svw, X)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.std`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.std)
-  - [`std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumVec; mean = nothing)`](@ref)
+  - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
-function Statistics.std(ve::SimpleVariance, X::NumVec; mean = nothing)
+function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
     return if isnothing(ve.w)
         std(X; corrected = ve.corrected, mean = mean)
     else
@@ -192,7 +192,7 @@ function Statistics.std(ve::SimpleVariance, X::NumVec; mean = nothing)
     end
 end
 """
-    var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)
+    var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -231,11 +231,11 @@ julia> var(sv, Xmat; dims = 1)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.var`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.var)
-  - [`std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::NumVec; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumVec; mean = nothing)`](@ref)
+  - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
-function Statistics.var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing,
+function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
@@ -245,7 +245,7 @@ function Statistics.var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = not
     end
 end
 """
-    var(ve::SimpleVariance, X::NumVec; mean = nothing)
+    var(ve::SimpleVariance, X::VecNum; mean = nothing)
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 
@@ -295,11 +295,11 @@ julia> var(svw, X)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.var`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.var)
-  - [`std(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::NumVec; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::NumMat; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.var(ve::SimpleVariance, X::NumVec; mean = nothing)
+function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
     return if isnothing(ve.w)
         var(X; corrected = ve.corrected, mean = mean)
     else

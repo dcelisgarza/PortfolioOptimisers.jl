@@ -303,29 +303,29 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError())
 end
-const NumVec = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
-const IntVec = AbstractVector{<:Integer}
-const NumMat = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
-const NumArr = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
-const NumUNumVec = Union{<:Number, <:NumVec}
-const EstValType = Union{<:NumUNumVec, <:Pair{<:AbstractString, <:Number},
+const VecNum = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
+const VecInt = AbstractVector{<:Integer}
+const MatNum = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
+const ArrNum = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
+const NumUVecNum = Union{<:Number, <:VecNum}
+const EstValType = Union{<:NumUVecNum, <:Pair{<:AbstractString, <:Number},
                          <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
                          <:AbstractDict{<:AbstractString, <:Number}}
-const StrExprVec = AbstractVector{<:Union{<:AbstractString, Expr}}
-const EqnType = Union{<:AbstractString, Expr, <:StrExprVec}
-const VecNumVec = AbstractVector{<:NumVec}
-const VecIntVec = AbstractVector{<:IntVec}
-const VecNumMat = AbstractVector{<:NumMat}
-const StrVec = AbstractVector{<:AbstractString}
-const PairVec = AbstractVector{<:Pair}
+const VecStrUExpr = AbstractVector{<:Union{<:AbstractString, Expr}}
+const EqnType = Union{<:AbstractString, Expr, <:VecStrUExpr}
+const VecVecNum = AbstractVector{<:VecNum}
+const VecVecInt = AbstractVector{<:VecInt}
+const VecMatNum = AbstractVector{<:MatNum}
+const VecStr = AbstractVector{<:AbstractString}
+const VecPair = AbstractVector{<:Pair}
 const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
 const Option{T} = Union{Nothing, T}
-const NumMatUVecNumMat = Union{<:NumMat, <:VecNumMat}
-const IntUIntVec = Union{<:Integer, <:IntVec}
-const NumVecUVecNumVec = Union{<:NumVec, <:VecNumVec}
-const DateVec = AbstractVector{<:Dates.AbstractTime}
+const MatNumUVecMatNum = Union{<:MatNum, <:VecMatNum}
+const IntUVecInt = Union{<:Integer, <:VecInt}
+const VecNumUVecVecNum = Union{<:VecNum, <:VecVecNum}
+const VecDate = AbstractVector{<:Dates.AbstractTime}
 
-export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, NumVec, IntVec,
-       NumMat, NumArr, EstValType, StrExprVec, EqnType, VecNumVec, VecIntVec, VecNumMat,
-       StrVec, PairVec, VecJuMPScalar, Option, NumUNumVec, NumMatUVecNumMat, IntUIntVec,
-       NumVecUVecNumVec, DateVec
+export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, VecNum, VecInt,
+       MatNum, ArrNum, EstValType, VecStrUExpr, EqnType, VecVecNum, VecVecInt, VecMatNum,
+       VecStr, VecPair, VecJuMPScalar, Option, NumUVecNum, MatNumUVecMatNum, IntUVecInt,
+       VecNumUVecVecNum, VecDate

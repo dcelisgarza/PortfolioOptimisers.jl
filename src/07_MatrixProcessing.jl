@@ -143,8 +143,8 @@ function DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::NumMat,
-                       X::NumMat, args...; kwargs...)
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
+                       X::MatNum, args...; kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
 
 In-place processing of a covariance or correlation matrix.
@@ -230,7 +230,7 @@ julia> sigma
 function matrix_processing!(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing!(mp::DefaultMatrixProcessing, sigma::NumMat, X::NumMat, args...;
+function matrix_processing!(mp::DefaultMatrixProcessing, sigma::MatNum, X::MatNum, args...;
                             kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
@@ -240,8 +240,8 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::NumMat, X::NumMa
     return nothing
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::NumMat,
-                      X::NumMat, args...; kwargs...)
+    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
+                      X::MatNum, args...; kwargs...)
     matrix_processing(::Nothing, args...; kwargs...)
 
 Out-of-place version of [`matrix_processing!`](@ref).
@@ -258,7 +258,7 @@ Out-of-place version of [`matrix_processing!`](@ref).
 function matrix_processing(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing(mp::DefaultMatrixProcessing, sigma::NumMat, X::NumMat, args...;
+function matrix_processing(mp::DefaultMatrixProcessing, sigma::MatNum, X::MatNum, args...;
                            kwargs...)
     sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)

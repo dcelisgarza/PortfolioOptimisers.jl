@@ -1,13 +1,13 @@
 function calc_risk_constraint_target(::LowOrderMoment{<:Any, <:Any, Nothing, <:Any},
-                                     w::NumVec, mu::NumVec, args...)
+                                     w::VecNum, mu::VecNum, args...)
     return dot(w, mu)
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:NumVec, <:Any},
-                                     w::NumVec, args...)
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
+                                     w::VecNum, args...)
     return dot(w, r.mu)
 end
 function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
-                                     w::NumVec, ::Any, k)
+                                     w::VecNum, ::Any, k)
     return dot(w, r.mu.v) + r.mu.s * k
 end
 function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Number, <:Any},
@@ -91,7 +91,7 @@ end
 function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Number)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::NumVec, factor::Number)
+function second_moment_bound_val(alg::SecondMomentFormulation, ub::VecNum, factor::Number)
     return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt.(ub))
 end
 function second_moment_bound_val(alg::SecondMomentFormulation, ub::Number, factor::Number)

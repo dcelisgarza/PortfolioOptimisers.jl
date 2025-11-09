@@ -89,8 +89,8 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
-const SlvVec = AbstractVector{<:Solver}
-const SlvUVecSlv = Union{<:Solver, <:SlvVec}
+const VecSlv = AbstractVector{<:Solver}
+const SlvUVecSlv = Union{<:Solver, <:VecSlv}
 """
     struct JuMPResult{T1, T2} <: AbstractJuMPResult
         trials::T1
@@ -158,7 +158,7 @@ function set_solver_attributes(args...)
 end
 """
     set_solver_attributes(model::JuMP.Model,
-                          settings::Union{<:AbstractDict, <:PairVec})
+                          settings::Union{<:AbstractDict, <:VecPair})
 
 Set multiple solver attributes on a JuMP model.
 
@@ -174,7 +174,7 @@ Iterates over the provided settings and applies each as a solver attribute.
   - `nothing`
 """
 function set_solver_attributes(model::JuMP.Model,
-                               settings::Union{<:AbstractDict, <:PairVec})
+                               settings::Union{<:AbstractDict, <:VecPair})
     for (k, v) in settings
         set_attribute(model, k, v)
     end
@@ -249,4 +249,4 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::SlvUVecSlv)
     return JuMPResult(; trials = trials, success = success)
 end
 
-export Solver, JuMPResult, SlvVec, SlvUVecSlv
+export Solver, JuMPResult, VecSlv, SlvUVecSlv

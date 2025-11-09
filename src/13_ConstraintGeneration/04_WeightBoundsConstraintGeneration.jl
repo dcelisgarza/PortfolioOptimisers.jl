@@ -2,28 +2,28 @@ function validate_bounds(lb::Number, ub::Number)
     @argcheck(lb <= ub)
     return nothing
 end
-function validate_bounds(lb::NumVec, ub::Number)
+function validate_bounds(lb::VecNum, ub::Number)
     @argcheck(!isempty(lb))
     @argcheck(all(x -> x <= ub, lb))
     return nothing
 end
-function validate_bounds(lb::Number, ub::NumVec)
+function validate_bounds(lb::Number, ub::VecNum)
     @argcheck(!isempty(ub))
     @argcheck(all(x -> lb <= x, ub))
     return nothing
 end
-function validate_bounds(lb::NumVec, ub::NumVec)
+function validate_bounds(lb::VecNum, ub::VecNum)
     @argcheck(!isempty(lb))
     @argcheck(!isempty(ub))
     @argcheck(length(lb) == length(ub))
     @argcheck(all(map((x, y) -> x <= y, lb, ub)))
     return nothing
 end
-function validate_bounds(lb::NumVec, ::Any)
+function validate_bounds(lb::VecNum, ::Any)
     @argcheck(!isempty(lb))
     return nothing
 end
-function validate_bounds(::Any, ub::NumVec)
+function validate_bounds(::Any, ub::VecNum)
     @argcheck(!isempty(ub))
     return nothing
 end
@@ -50,8 +50,8 @@ Container for lower and upper portfolio weight bounds.
 
 # Constructor
 
-    WeightBounds(lb::Option{<:NumUNumVec},
-                 ub::Option{<:NumUNumVec})
+    WeightBounds(lb::Option{<:NumUVecNum},
+                 ub::Option{<:NumUVecNum})
 
 ## Validation
 
@@ -84,12 +84,12 @@ WeightBounds
 struct WeightBounds{T1, T2} <: AbstractConstraintResult
     lb::T1
     ub::T2
-    function WeightBounds(lb::Option{<:NumUNumVec}, ub::Option{<:NumUNumVec})
+    function WeightBounds(lb::Option{<:NumUVecNum}, ub::Option{<:NumUVecNum})
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function WeightBounds(; lb::Option{<:NumUNumVec} = 0.0, ub::Option{<:NumUNumVec} = 1.0)
+function WeightBounds(; lb::Option{<:NumUVecNum} = 0.0, ub::Option{<:NumUVecNum} = 1.0)
     return WeightBounds(lb, ub)
 end
 function weight_bounds_view(wb::WeightBounds, i)
@@ -371,7 +371,7 @@ function weight_bounds_constraints_side(wb::Number, N::Integer, val::Number)
     end
 end
 """
-    weight_bounds_constraints_side(wb::NumVec, args...)
+    weight_bounds_constraints_side(wb::VecNum, args...)
 
 Propagate asset-specific portfolio weight bounds from a vector.
 
@@ -402,7 +402,7 @@ julia> PortfolioOptimisers.weight_bounds_constraints_side([0.1, 0.2, 0.3])
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints_side`](@ref)
 """
-function weight_bounds_constraints_side(wb::NumVec, args...)
+function weight_bounds_constraints_side(wb::VecNum, args...)
     return wb
 end
 """
@@ -455,7 +455,7 @@ function weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::I
                         ub = weight_bounds_constraints_side(wb.ub, N, Inf))
 end
 """
-    weight_bounds_constraints(wb::WeightBounds{<:NumVec, <:NumVec}, args...;
+    weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...;
                               kwargs...)
 
 Propagate asset-specific portfolio weight bounds constraints from a `WeightBounds` object with vector bounds.
@@ -488,7 +488,7 @@ WeightBounds
   - [`weight_bounds_constraints_side`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-function weight_bounds_constraints(wb::WeightBounds{<:NumVec, <:NumVec}, args...; kwargs...)
+function weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...; kwargs...)
     return wb
 end
 """

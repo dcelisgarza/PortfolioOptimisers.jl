@@ -67,7 +67,7 @@ function factory(ce::MutualInfoCovariance, w::Option{<:AbstractWeights} = nothin
                                 normalise = ce.normalise)
 end
 """
-    cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
+    cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -92,9 +92,9 @@ This method computes the pairwise mutual information correlation matrix for the 
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cov(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
+function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -102,7 +102,7 @@ function Statistics.cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwar
     return mutual_info(X, ce.bins, ce.normalise)
 end
 """
-    cov(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
+    cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -129,9 +129,9 @@ This method computes the pairwise mutual information covariance matrix for the i
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cor(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)`](@ref)
+  - [`cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::MutualInfoCovariance, X::NumMat; dims::Int = 1, kwargs...)
+function Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

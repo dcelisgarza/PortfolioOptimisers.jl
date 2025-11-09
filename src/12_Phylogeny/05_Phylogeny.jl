@@ -13,7 +13,7 @@ Container type for phylogeny matrix or vector results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    PhylogenyResult(; X::NumArr)
+    PhylogenyResult(; X::ArrNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -21,7 +21,7 @@ Keyword arguments correspond to the fields above.
 
   - `!isempty(X)`.
 
-  - If `X` is a `NumMat`:
+  - If `X` is a `MatNum`:
 
       + Must be symmetric, `issymmetric(X) == true`.
       + Must have zero diagonal, `all(iszero, diag(X)) == true`.
@@ -46,20 +46,20 @@ PhylogenyResult
 """
 struct PhylogenyResult{T} <: AbstractPhylogenyResult
     X::T
-    function PhylogenyResult(X::NumArr)
+    function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
-        if isa(X, NumMat)
+        if isa(X, MatNum)
             @argcheck(issymmetric(X))
             @argcheck(all(iszero, diag(X)))
         end
         return new{typeof(X)}(X)
     end
 end
-function PhylogenyResult(; X::NumArr)
+function PhylogenyResult(; X::ArrNum)
     return PhylogenyResult(X)
 end
 """
-    phylogeny_matrix(ph::PhylogenyResult{<:NumMat}, args...; kwargs...)
+    phylogeny_matrix(ph::PhylogenyResult{<:MatNum}, args...; kwargs...)
 
 Fallback no-op for returning a validated phylogeny matrix result as-is.
 
@@ -67,7 +67,7 @@ This method provides a generic interface for handling precomputed phylogeny matr
 
 # Arguments
 
-  - `ph::PhylogenyResult{<:NumMat}`: Phylogeny matrix result object.
+  - `ph::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -90,11 +90,11 @@ PhylogenyResult
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(ph::PhylogenyResult{<:NumMat}, args...; kwargs...)
+function phylogeny_matrix(ph::PhylogenyResult{<:MatNum}, args...; kwargs...)
     return ph
 end
 """
-    centrality_vector(ph::PhylogenyResult{<:NumVec}, args...; kwargs...)
+    centrality_vector(ph::PhylogenyResult{<:VecNum}, args...; kwargs...)
 
 Fallback no-op for returning a validated centrality vector result as-is.
 
@@ -102,7 +102,7 @@ This method provides a generic interface for handling precomputed centrality vec
 
 # Arguments
 
-  - `ph::PhylogenyResult{<:NumVec}`: Centrality vector result object.
+  - `ph::PhylogenyResult{<:VecNum}`: Centrality vector result object.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -125,7 +125,7 @@ PhylogenyResult
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ph::PhylogenyResult{<:NumVec}, args...; kwargs...)
+function centrality_vector(ph::PhylogenyResult{<:VecNum}, args...; kwargs...)
     return ph
 end
 """
@@ -148,7 +148,7 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
-function centrality_vector(ph::PhylogenyResult{<:NumMat}, cent::AbstractCentralityAlgorithm,
+function centrality_vector(ph::PhylogenyResult{<:MatNum}, cent::AbstractCentralityAlgorithm,
                            args...; kwargs...)
     G = SimpleGraph(ph.X)
     return PhylogenyResult(; X = calc_centrality(cent, G))
@@ -540,6 +540,7 @@ All concrete types implementing specific MST algorithms (e.g., Kruskal, Boruvka,
   - [`PrimTree`](@ref)
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
+const SimMatUTree = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
 """
     struct KruskalTree{T1, T2} <: AbstractTreeType
         args::T1
@@ -747,7 +748,7 @@ Estimator type for network-based phylogeny analysis in PortfolioOptimisers.jl.
 
     NetworkEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                      de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                     alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
+                     alg::SimMatUTree = KruskalTree(),
                      n::Integer = 1)
 
 Keyword arguments correspond to the fields above.
@@ -792,9 +793,7 @@ struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
     alg::T3
     n::T4
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
-                              de::AbstractDistanceEstimator,
-                              alg::Union{<:AbstractSimilarityMatrixAlgorithm,
-                                         <:AbstractTreeType}, n::Integer)
+                              de::AbstractDistanceEstimator, alg::SimMatUTree, n::Integer)
         return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
     end
 end
@@ -802,12 +801,11 @@ function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                           de::AbstractDistanceEstimator = Distance(;
                                                                    alg = CanonicalDistance()),
-                          alg::Union{<:AbstractSimilarityMatrixAlgorithm,
-                                     <:AbstractTreeType} = KruskalTree(), n::Integer = 1)
+                          alg::SimMatUTree = KruskalTree(), n::Integer = 1)
     return NetworkEstimator(ce, de, alg, n)
 end
 """
-    abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
+    abstract type AbstractCentralityEstimator <: AbstractEstimator end
 
 Abstract supertype for all centrality estimator types in PortfolioOptimisers.jl.
 
@@ -818,7 +816,7 @@ All concrete types implementing centrality-based estimation algorithms should su
   - [`CentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
+abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
     struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
         ne::T1
@@ -837,7 +835,7 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 # Constructor
 
     CentralityEstimator(;
-                        ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult} = NetworkEstimator(),
+                        ne::PhEUPhR = NetworkEstimator(),
                         cent::AbstractCentralityAlgorithm = DegreeCentrality())
 
 Keyword arguments correspond to the fields above.
@@ -882,20 +880,16 @@ CentralityEstimator
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
-    function CentralityEstimator(ne::Union{<:AbstractPhylogenyEstimator,
-                                           <:AbstractPhylogenyResult},
-                                 cent::AbstractCentralityAlgorithm)
+    function CentralityEstimator(ne::PhEUPhR, cent::AbstractCentralityAlgorithm)
         return new{typeof(ne), typeof(cent)}(ne, cent)
     end
 end
-function CentralityEstimator(;
-                             ne::Union{<:AbstractPhylogenyEstimator,
-                                       <:AbstractPhylogenyResult} = NetworkEstimator(),
+function CentralityEstimator(; ne::PhEUPhR = NetworkEstimator(),
                              cent::AbstractCentralityAlgorithm = DegreeCentrality())
     return CentralityEstimator(ne, cent)
 end
 """
-    calc_adjacency(ne::NetworkEstimator, X::NumMat; dims::Int = 1, kwargs...)
+    calc_adjacency(ne::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the adjacency matrix for a network estimator.
 
@@ -921,7 +915,7 @@ Compute the adjacency matrix for a network estimator.
   - [`PMFG_T2s`](@ref)
 """
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
-                        X::NumMat; dims::Int = 1, kwargs...)
+                        X::MatNum; dims::Int = 1, kwargs...)
     D = distance(ne.de, ne.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
@@ -929,14 +923,14 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
-                        X::NumMat; dims::Int = 1, kwargs...)
+                        X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(ne.de, ne.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
 """
-    phylogeny_matrix(ne::AbstractNetworkEstimator, X::NumMat; dims::Int = 1, kwargs...)
+    phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the phylogeny matrix for a network estimator.
 
@@ -958,7 +952,7 @@ This function constructs the adjacency matrix for the network, then computes the
   - [`NetworkEstimator`](@ref)
   - [`calc_adjacency`](@ref)
 """
-function phylogeny_matrix(ne::AbstractNetworkEstimator, X::NumMat; dims::Int = 1, kwargs...)
+function phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
     A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
     for i in 0:(ne.n)
@@ -969,7 +963,7 @@ function phylogeny_matrix(ne::AbstractNetworkEstimator, X::NumMat; dims::Int = 1
 end
 """
     phylogeny_matrix(cle::ClRUClE,
-                     X::NumMat; branchorder::Symbol = :optimal, dims::Int = 1,
+                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                      kwargs...)
 
 Compute the phylogeny matrix for a clustering estimator or result.
@@ -994,7 +988,7 @@ This function clusterises the data, cuts the tree into the optimal number of clu
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::ClRUClE, X::NumMat; branchorder::Symbol = :optimal,
+function phylogeny_matrix(cle::ClRUClE, X::MatNum; branchorder::Symbol = :optimal,
                           dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = cutree(res.clustering; k = res.k)
@@ -1007,7 +1001,7 @@ function phylogeny_matrix(cle::ClRUClE, X::NumMat; branchorder::Symbol = :optima
 end
 """
     centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE}, cent::AbstractCentralityAlgorithm,
-                      X::NumMat; dims::Int = 1, kwargs...)
+                      X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
 
@@ -1032,13 +1026,13 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`calc_centrality`](@ref)
 """
 function centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:ClRUClE},
-                           cent::AbstractCentralityAlgorithm, X::NumMat; dims::Int = 1,
+                           cent::AbstractCentralityAlgorithm, X::MatNum; dims::Int = 1,
                            kwargs...)
     P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
     return centrality_vector(P, cent; dims = dims, kwargs...)
 end
 """
-    centrality_vector(cte::CentralityEstimator, X::NumMat; dims::Int = 1, kwargs...)
+    centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a centrality estimator.
 
@@ -1060,12 +1054,12 @@ This function applies the centrality algorithm in the estimator to the network c
   - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(cte::CentralityEstimator, X::NumMat; dims::Int = 1, kwargs...)
+function centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)
     return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
 end
 """
-    average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
-                       cent::AbstractCentralityAlgorithm, w::NumVec, X::NumMat;
+    average_centrality(ne::PhEUPhR,
+                       cent::AbstractCentralityAlgorithm, w::VecNum, X::MatNum;
                        dims::Int = 1, kwargs...)
 
 Compute the weighted average centrality for a network and centrality algorithm.
@@ -1091,14 +1085,12 @@ This function computes the centrality vector and returns the weighted average us
   - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
-                                      <:AbstractPhylogenyResult},
-                            cent::AbstractCentralityAlgorithm, w::NumVec, X::NumMat;
-                            dims::Int = 1, kwargs...)
+function average_centrality(ne::PhEUPhR, cent::AbstractCentralityAlgorithm, w::VecNum,
+                            X::MatNum; dims::Int = 1, kwargs...)
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
 """
-    average_centrality(cte::CentralityEstimator, w::NumVec, X::NumMat;
+    average_centrality(cte::CentralityEstimator, w::VecNum, X::MatNum;
                        dims::Int = 1, kwargs...)
 
 Compute the weighted average centrality for a centrality estimator.
@@ -1122,12 +1114,12 @@ This function applies the centrality algorithm in the estimator to the network a
   - [`CentralityEstimator`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(cte::CentralityEstimator, w::NumVec, X::NumMat; dims::Int = 1,
+function average_centrality(cte::CentralityEstimator, w::VecNum, X::MatNum; dims::Int = 1,
                             kwargs...)
     return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
 end
 """
-    asset_phylogeny(w::NumVec, X::NumMat)
+    asset_phylogeny(w::VecNum, X::MatNum)
 
 Compute the asset phylogeny score for a set of weights and a phylogeny matrix.
 
@@ -1147,14 +1139,14 @@ This function computes the weighted sum of the phylogeny matrix, normalised by t
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(w::NumVec, X::NumMat)
+function asset_phylogeny(w::VecNum, X::MatNum)
     aw = abs.(w * transpose(w))
     c = dot(X, aw)
     c /= sum(aw)
     return c
 end
 """
-    asset_phylogeny(ph::PhylogenyResult{<:NumMat}, w::NumVec, args...;
+    asset_phylogeny(ph::PhylogenyResult{<:MatNum}, w::VecNum, args...;
                     kwargs...)
 
 Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
@@ -1163,8 +1155,8 @@ This method provides compatibility with workflows that pass extra positional or 
 
 # Arguments
 
-  - `ph::PhylogenyResult{<:NumMat}`: Phylogeny matrix result object.
-  - `w::NumVec`: Portfolio weights vector.
+  - `ph::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
+  - `w::VecNum`: Portfolio weights vector.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -1177,12 +1169,12 @@ This method provides compatibility with workflows that pass extra positional or 
   - [`PhylogenyResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(ph::PhylogenyResult{<:NumMat}, w::NumVec, args...; kwargs...)
+function asset_phylogeny(ph::PhylogenyResult{<:MatNum}, w::VecNum, args...; kwargs...)
     return asset_phylogeny(w, ph.X)
 end
 """
-    asset_phylogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator}, w::NumVec,
-                    X::NumMat; dims::Int = 1, kwargs...)
+    asset_phylogeny(cle::PhEUClR,
+                    w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a set of weights and a network or clustering estimator.
 
@@ -1205,9 +1197,7 @@ This function computes the phylogeny matrix using the estimator and data, then c
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
-                                    <:AbstractClusteringResult}, w::NumVec, X::NumMat;
-                         dims::Int = 1, kwargs...)
+function asset_phylogeny(cle::PhEUClR, w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
     return asset_phylogeny(phylogeny_matrix(cle, X; dims = dims, kwargs...), w)
 end
 
@@ -1215,4 +1205,4 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        EigenvectorCentrality, KatzCentrality, Pagerank, RadialityCentrality,
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
-       CentralityEstimator, centrality_vector
+       CentralityEstimator, centrality_vector, SimMatUTree

@@ -239,7 +239,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
     function OpinionPoolingPrior(pes::AbstractVector{<:EntropyPoolingPrior},
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
-                                 p::Option{<:Number}, w::Option{<:NumVec},
+                                 p::Option{<:Number}, w::Option{<:VecNum},
                                  alg::OpinionPoolingAlgorithm,
                                  threads::FLoops.Transducers.Executor)
         @argcheck(!isempty(pes))
@@ -262,14 +262,14 @@ end
 function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
                              pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                             p::Option{<:Number} = nothing, w::Option{<:NumVec} = nothing,
+                             p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
 """
-    robust_probabilities(ow::NumVec, args...)
-    robust_probabilities(ow::NumVec, pw::NumMat, p::Number)
+    robust_probabilities(ow::VecNum, args...)
+    robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
 
 Compute robust opinion probabilities for consensus formation in opinion pooling.
 
@@ -283,7 +283,7 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 
 # Returns
 
-  - `ow::NumVec`: Opinion probabilities for pooling.
+  - `ow::VecNum`: Opinion probabilities for pooling.
 
 # Details
 
@@ -295,10 +295,10 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 
   - [`OpinionPoolingPrior`](@ref)
 """
-function robust_probabilities(ow::NumVec, args...)
+function robust_probabilities(ow::VecNum, args...)
     return ow
 end
-function robust_probabilities(ow::NumVec, pw::NumMat, p::Number)
+function robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
     c = pw * ow
     kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
@@ -306,8 +306,8 @@ function robust_probabilities(ow::NumVec, pw::NumMat, p::Number)
     return ow
 end
 """
-    compute_pooling(::LinearOpinionPooling, ow::NumVec, pw::NumMat)
-    compute_pooling(::LogarithmicOpinionPooling, ow::NumVec, pw::NumMat)
+    compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
+    compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
 
 Compute the consensus posterior return distribution from individual prior distributions using opinion pooling.
 
@@ -335,17 +335,17 @@ Compute the consensus posterior return distribution from individual prior distri
   - [`LinearOpinionPooling`](@ref)
   - [`LogarithmicOpinionPooling`](@ref)
 """
-function compute_pooling(::LinearOpinionPooling, ow::NumVec, pw::NumMat)
+function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
     return pweights(pw * ow)
 end
-function compute_pooling(::LogarithmicOpinionPooling, ow::NumVec, pw::NumMat)
+function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     u = log.(pw) * ow
     lse = logsumexp(u)
     return pweights(vec(exp.(u .- lse)))
 end
 """
-    prior(pe::OpinionPoolingPrior, X::NumMat;
-          F::Option{<:NumMat} = nothing, dims::Int = 1, strict::Bool = false,
+    prior(pe::OpinionPoolingPrior, X::MatNum;
+          F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
@@ -388,7 +388,7 @@ Compute opinion pooling prior moments for asset returns.
   - [`compute_pooling`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::OpinionPoolingPrior, X::NumMat, F::Option{<:NumMat} = nothing;
+function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

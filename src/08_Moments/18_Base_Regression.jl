@@ -115,7 +115,7 @@ LinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`GeneralisedLinearModel`](@ref)
-  - [`StatsAPI.fit(::LinearModel, ::NumMat, ::NumVec)`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 struct LinearModel{T1} <: AbstractRegressionTarget
     kwargs::T1
@@ -140,7 +140,7 @@ function factory(re::LinearModel, w::Option{<:AbstractWeights} = nothing)
     return LinearModel(; kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::LinearModel, X::NumMat, y::NumVec)
+    StatsAPI.fit(target::LinearModel, X::MatNum, y::VecNum)
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
@@ -161,7 +161,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`LinearModel`](@ref)
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
-function StatsAPI.fit(target::LinearModel, X::NumMat, y::NumVec)
+function StatsAPI.fit(target::LinearModel, X::MatNum, y::VecNum)
     return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
 end
 """
@@ -198,7 +198,7 @@ GeneralisedLinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
-  - [`StatsAPI.fit(::GeneralisedLinearModel, ::NumMat, ::NumVec)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
     args::T1
@@ -224,7 +224,7 @@ function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = noth
     return GeneralisedLinearModel(; args = re.args, kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::GeneralisedLinearModel, X::NumMat, y::NumVec)
+    StatsAPI.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
 
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
@@ -245,7 +245,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GeneralisedLinearModel`](@ref)
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
-function StatsAPI.fit(target::GeneralisedLinearModel, X::NumMat, y::NumVec)
+function StatsAPI.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
     return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
 end
 """
@@ -431,8 +431,8 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Regression(; M::NumMat, L::Option{<:NumMat} = nothing,
-               b::Option{<:NumVec} = nothing)
+    Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
+               b::Option{<:VecNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -460,9 +460,9 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
-    function Regression(M::NumMat, L::Option{<:NumMat}, b::Option{<:NumVec})
+    function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
         @argcheck(!isempty(M), IsEmptyError)
-        if isa(b, NumVec)
+        if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError)
             @argcheck(length(b) == size(M, 1), DimensionMismatch)
         end
@@ -472,8 +472,8 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
         return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
     end
 end
-function Regression(; M::NumMat, L::Option{<:NumMat} = nothing,
-                    b::Option{<:NumVec} = nothing)
+function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
+                    b::Option{<:VecNum} = nothing)
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
@@ -483,7 +483,7 @@ function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
-function Base.getproperty(re::Regression{<:Any, <:NumMat, <:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :L)
     else
@@ -548,7 +548,7 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
 # Related
 
-  - [`regression_view(::Regression, ::NumVec)`](@ref)
+  - [`regression_view(::Regression, ::VecNum)`](@ref)
 """
 function regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
     return re

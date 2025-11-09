@@ -197,8 +197,8 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise(alg, args, kwargs, kernel, m, n)
 end
 """
-    _denoise!(alg::AbstractDenoiseAlgorithm, X::NumMat, vals::NumVec,
-              vecs::NumMat, num_factors::Integer)
+    _denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum,
+              vecs::MatNum, num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
 
@@ -229,19 +229,19 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
 """
-function _denoise!(::SpectralDenoise, X::NumMat, vals::NumVec, vecs::NumMat,
+function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= zero(eltype(X))
     X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(::FixedDenoise, X::NumMat, vals::NumVec, vecs::NumMat,
+function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
     X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(de::ShrunkDenoise, X::NumMat, vals::NumVec, vecs::NumMat,
+function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
@@ -258,7 +258,7 @@ function _denoise!(de::ShrunkDenoise, X::NumMat, vals::NumVec, vecs::NumMat,
     return nothing
 end
 """
-    errPDF(x::Number, vals::NumVec, q::Number;
+    errPDF(x::Number, vals::VecNum, q::Number;
            kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
            n::Integer = 1000)
 
@@ -284,7 +284,7 @@ This function is used internally to fit the MP distribution to the observed spec
   - [`find_max_eval`](@ref)
   - [`Denoise`](@ref)
 """
-function errPDF(x::Number, vals::NumVec, q::Number;
+function errPDF(x::Number, vals::VecNum, q::Number;
                 kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                 n::Integer = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
@@ -299,7 +299,7 @@ function errPDF(x::Number, vals::NumVec, q::Number;
     return sse
 end
 """
-    find_max_eval(vals::NumVec, q::Number;
+    find_max_eval(vals::VecNum, q::Number;
                   kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                   n::Integer = 1000, args::Tuple = (), kwargs::NamedTuple = (;))
 
@@ -326,7 +326,7 @@ This function fits the MP distribution to the observed spectrum by minimizing th
   - [`errPDF`](@ref)
   - [`Denoise`](@ref)
 """
-function find_max_eval(vals::NumVec, q::Number;
+function find_max_eval(vals::VecNum, q::Number;
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
                        m::Integer = 10, n::Integer = 1000, args::Tuple = (),
                        kwargs::NamedTuple = (;))
@@ -337,7 +337,7 @@ function find_max_eval(vals::NumVec, q::Number;
     return e_max, x
 end
 """
-    denoise!(de::Denoise, X::NumMat, q::Number; pdm::Option{<:Posdef} = Posdef())
+    denoise!(de::Denoise, X::MatNum, q::Number; pdm::Option{<:Posdef} = Posdef())
     denoise!(::Nothing, args...)
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
@@ -399,7 +399,7 @@ julia> X
 function denoise!(::Nothing, args...)
     return nothing
 end
-function denoise!(de::Denoise, X::NumMat, q::Number, pdm::Option{<:Posdef} = Posdef())
+function denoise!(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Posdef())
     assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
@@ -419,7 +419,7 @@ function denoise!(de::Denoise, X::NumMat, q::Number, pdm::Option{<:Posdef} = Pos
     return nothing
 end
 """
-    denoise(de::Denoise, X::NumMat, q::Number; pdm::Option{<:Posdef} = Posdef())
+    denoise(de::Denoise, X::MatNum, q::Number; pdm::Option{<:Posdef} = Posdef())
     denoise(::Nothing, args...)
 
 Out-of-place version of [`denoise!`](@ref).
@@ -436,7 +436,7 @@ Out-of-place version of [`denoise!`](@ref).
 function denoise(::Nothing, args...)
     return nothing
 end
-function denoise(de::Denoise, X::NumMat, q::Number, pdm::Option{<:Posdef} = Posdef())
+function denoise(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Posdef())
     X = copy(X)
     denoise!(de, X, q, pdm)
     return X

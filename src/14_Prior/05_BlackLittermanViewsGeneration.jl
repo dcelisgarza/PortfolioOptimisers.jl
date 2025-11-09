@@ -15,7 +15,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Constructor
 
-    BlackLittermanViews(; P::NumMat, Q::NumVec)
+    BlackLittermanViews(; P::MatNum, Q::VecNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -40,16 +40,17 @@ BlackLittermanViews
 struct BlackLittermanViews{T1, T2} <: AbstractResult
     P::T1
     Q::T2
-    function BlackLittermanViews(P::NumMat, Q::NumVec)
+    function BlackLittermanViews(P::MatNum, Q::VecNum)
         @argcheck(!isempty(P))
         @argcheck(!isempty(Q))
         @argcheck(size(P, 1) == length(Q))
         return new{typeof(P), typeof(Q)}(P, Q)
     end
 end
-function BlackLittermanViews(; P::NumMat, Q::NumVec)
+function BlackLittermanViews(; P::MatNum, Q::VecNum)
     return BlackLittermanViews(P, Q)
 end
+const LcUBlV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
     get_black_litterman_views(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
                               sets::AssetSets; datatype::DataType = Float64,
@@ -198,7 +199,7 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
 end
 """
     assert_bl_views_conf(::Nothing, args...)
-    assert_bl_views_conf(views_conf::Option{<:NumUNumVec},
+    assert_bl_views_conf(views_conf::Option{<:NumUVecNum},
                          views::Union{<:EqnType, <:LinearConstraintEstimator, <:BlackLittermanViews})
 
 Validate Black-Litterman view confidence specification.
@@ -220,7 +221,7 @@ Validate Black-Litterman view confidence specification.
 
       + `::Nothing`, no-op.
       + `::Number`, `0 < views_conf < 1`.
-      + `::NumVec`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
+      + `::VecNum`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
 
   - `views`:
 
@@ -240,7 +241,7 @@ function assert_bl_views_conf(views_conf::Number, ::EqnType)
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::NumVec, val::EqnType)
+function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
     if isa(val, AbstractVector)
         @argcheck(length(val) == length(views_conf))
     else
@@ -249,10 +250,10 @@ function assert_bl_views_conf(views_conf::NumVec, val::EqnType)
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::NumUNumVec, views::LinearConstraintEstimator)
+function assert_bl_views_conf(views_conf::NumUVecNum, views::LinearConstraintEstimator)
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::NumUNumVec, views::BlackLittermanViews)
+function assert_bl_views_conf(views_conf::NumUVecNum, views::BlackLittermanViews)
     return @argcheck(length(views_conf) == length(views.Q))
 end
 

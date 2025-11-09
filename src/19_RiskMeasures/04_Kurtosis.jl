@@ -27,8 +27,8 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 
     Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                        w::Option{<:AbstractWeights} = nothing,
-                       mu::Option{<:NumUNumVecUVecScalar} = nothing,
-                       kt::Option{<:NumMat} = nothing,
+                       mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                       kt::Option{<:MatNum} = nothing,
                        N::Option{<:Integer} = nothing,
                        alg1::AbstractMomentAlgorithm = Full(),
                        alg2::VarianceFormulation = SOCRiskExpr())
@@ -40,7 +40,7 @@ Keyword arguments correspond to the fields above.
   - If `mu` is not `nothing`:
 
       + `::Number`: `isfinite(mu)`.
-      + `::NumVec`: `!isempty(mu)` and `all(isfinite, mu)`.
+      + `::VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
 
   - If `w` is not `nothing`, `!isempty(w)`.
   - If `kt` is not `nothing`:
@@ -49,7 +49,7 @@ Keyword arguments correspond to the fields above.
 
       + If `mu` is not `nothing`:
 
-          * `::NumVec`: `length(mu)^2 == size(kt, 1)`.
+          * `::VecNum`: `length(mu)^2 == size(kt, 1)`.
           * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
   - If `N` is provided: must be positive.
 
@@ -98,11 +98,11 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     alg1::T6
     alg2::T7
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                      mu::Option{<:NumUNumVecUVecScalar}, kt::Option{<:NumMat},
+                      mu::Option{<:NumUVecNumUVecScalar}, kt::Option{<:MatNum},
                       N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,
                       alg2::SecondMomentFormulation)
-        mu_flag = isa(mu, NumVec)
-        kt_flag = isa(kt, NumMat)
+        mu_flag = isa(mu, VecNum)
+        kt_flag = isa(kt, MatNum)
         if mu_flag
             @argcheck(!isempty(mu))
             @argcheck(all(isfinite, mu))
@@ -130,61 +130,61 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   w::Option{<:AbstractWeights} = nothing,
-                  mu::Option{<:NumUNumVecUVecScalar} = nothing,
-                  kt::Option{<:NumMat} = nothing, N::Option{<:Integer} = nothing,
+                  mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                  kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
                   alg2::SecondMomentFormulation = SOCRiskExpr())
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
 end
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
-                            ::Any, x::NumVec)
+                            ::Any, x::VecNum)
     return mean(x)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:AbstractWeights, Nothing, <:Any, <:Any,
-                                        <:Any, <:Any}, ::Any, x::NumVec)
+                                        <:Any, <:Any}, ::Any, x::VecNum)
     return mean(x, r.w)
 end
-function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:NumVec, <:Any, <:Any, <:Any, <:Any},
-                            w::NumVec, ::Any)
+function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, <:Any, <:Any, <:Any, <:Any},
+                            w::VecNum, ::Any)
     return dot(w, r.mu)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, <:Any, <:Any, <:Any,
-                                        <:Any}, w::NumVec, ::Any)
+                                        <:Any}, w::VecNum, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, <:Any, <:Any, <:Any, <:Any},
                             ::Any, ::Any)
     return r.mu
 end
-function calc_deviations_vec(r::Kurtosis, w::NumVec, X::NumMat,
+function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
 end
-function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})(w::NumVec,
-                                                                                 X::NumMat,
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})(w::VecNum,
+                                                                                 X::MatNum,
                                                                                  fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
-function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::NumVec,
-                                                                                 X::NumMat,
+function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::VecNum,
+                                                                                 X::MatNum,
                                                                                  fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
-                      <:QuadSecondMomentFormulations})(w::NumVec, X::NumMat,
+                      <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
                                                        fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
-                      <:QuadSecondMomentFormulations})(w::NumVec, X::NumMat,
+                      <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
                                                        fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
@@ -207,9 +207,9 @@ end
 function risk_measure_view(r::Kurtosis, i, args...)
     mu = r.mu
     kt = r.kt
-    j = if isa(mu, NumVec)
+    j = if isa(mu, VecNum)
         length(mu)
-    elseif isa(kt, NumMat)
+    elseif isa(kt, MatNum)
         isqrt(size(kt, 1))
     else
         nothing

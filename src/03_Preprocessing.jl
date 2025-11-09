@@ -1,4 +1,4 @@
-function drop_correlated(X::NumMat; threshold::Number = 0.95, absolute::Bool = false)
+function drop_correlated(X::MatNum; threshold::Number = 0.95, absolute::Bool = false)
     N = size(X, 2)
     rho = !absolute ? cor(X) : abs.(cor(X))
     mean_rho = mean(rho; dims = 1)
@@ -18,7 +18,7 @@ function drop_correlated(X::NumMat; threshold::Number = 0.95, absolute::Bool = f
     end
     return setdiff(1:N, to_remove)
 end
-function drop_incomplete(X::NumMat, any_missing::Bool = true)
+function drop_incomplete(X::MatNum, any_missing::Bool = true)
     N = size(X, 2)
     return if any_missing
         to_remove = Vector{Int}(undef, 0)
@@ -33,7 +33,7 @@ function drop_incomplete(X::NumMat, any_missing::Bool = true)
                                                                                                    :]))]
     end
 end
-function select_kextremes(X::NumMat) end
+function select_kextremes(X::MatNum) end
 function _check_names_and_returns_matrix(names, mat, names_sym, mat_sym)
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
@@ -74,13 +74,13 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Option{<:StrVec} = nothing,
-                  X::Option{<:NumMat} = nothing,
-                  nf::Option{<:StrVec} = nothing,
-                  F::Option{<:NumMat} = nothing,
-                  ts::Option{<:DateVec} = nothing,
-                  iv::Option{<:NumMat} = nothing,
-                  ivpa::Option{<:NumUNumVec} = nothing)
+    ReturnsResult(; nx::Option{<:VecStr} = nothing,
+                  X::Option{<:MatNum} = nothing,
+                  nf::Option{<:VecStr} = nothing,
+                  F::Option{<:MatNum} = nothing,
+                  ts::Option{<:VecDate} = nothing,
+                  iv::Option{<:MatNum} = nothing,
+                  ivpa::Option{<:NumUVecNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -119,9 +119,9 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
-    function ReturnsResult(nx::Option{<:StrVec}, X::Option{<:NumMat}, nf::Option{<:StrVec},
-                           F::Option{<:NumMat}, ts::Option{<:DateVec}, iv::Option{<:NumMat},
-                           ivpa::Option{<:NumUNumVec})
+    function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
+                           F::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
+                           ivpa::Option{<:NumUVecNum})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
@@ -142,7 +142,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_geq0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
-            if isa(ivpa, NumVec)
+            if isa(ivpa, VecNum)
                 @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
             end
         end
@@ -150,10 +150,10 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
-function ReturnsResult(; nx::Option{<:StrVec} = nothing, X::Option{<:NumMat} = nothing,
-                       nf::Option{<:StrVec} = nothing, F::Option{<:NumMat} = nothing,
-                       ts::Option{<:DateVec} = nothing, iv::Option{<:NumMat} = nothing,
-                       ivpa::Option{<:NumUNumVec} = nothing)
+function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
+                       nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
+                       ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
+                       ivpa::Option{<:NumUVecNum} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i)
@@ -167,7 +167,7 @@ end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
                       iv::Option{<:TimeArray} = nothing,
-                      ivpa::Option{<:NumUNumVec} = nothing,
+                      ivpa::Option{<:NumUVecNum} = nothing,
                       ret_method::Symbol = :simple, padding::Bool = false,
                       missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0,
@@ -231,7 +231,7 @@ ReturnsResult
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            iv::Option{<:TimeArray} = nothing,
-                           ivpa::Option{<:NumUNumVec} = nothing,
+                           ivpa::Option{<:NumUVecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Number = 1.0,
                            missing_row_percent::Option{<:Number} = 1.0,

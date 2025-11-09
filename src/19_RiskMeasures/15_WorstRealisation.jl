@@ -7,7 +7,7 @@ end
 function WorstRealisation(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return WorstRealisation(settings)
 end
-function (::WorstRealisation)(x::NumVec)
+function (::WorstRealisation)(x::VecNum)
     return -minimum(x)
 end
 

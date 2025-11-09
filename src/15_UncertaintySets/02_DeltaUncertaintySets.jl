@@ -73,8 +73,8 @@ function DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
 """
-    ucs(ue::DeltaUncertaintySet, X::NumMat,
-        F::Option{<:NumMat} = nothing; dims::Int = 1, kwargs...)
+    ucs(ue::DeltaUncertaintySet, X::MatNum,
+        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs box uncertainty sets for mean and covariance statistics using delta bounds from a prior estimator.
 
@@ -104,7 +104,7 @@ Constructs box uncertainty sets for mean and covariance statistics using delta b
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function ucs(ue::DeltaUncertaintySet, X::NumMat, F::Option{<:NumMat} = nothing;
+function ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     d_sigma = ue.dsigma * abs.(pr.sigma)
@@ -115,8 +115,8 @@ function ucs(ue::DeltaUncertaintySet, X::NumMat, F::Option{<:NumMat} = nothing;
            BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
 end
 """
-    mu_ucs(ue::DeltaUncertaintySet, X::NumMat,
-           F::Option{<:NumMat} = nothing; dims::Int = 1, kwargs...)
+    mu_ucs(ue::DeltaUncertaintySet, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for expected returns (mean) using delta bounds from a prior estimator.
 
@@ -145,7 +145,7 @@ Constructs a box uncertainty set for expected returns (mean) using delta bounds 
   - [`ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function mu_ucs(ue::DeltaUncertaintySet, X::NumMat, F::Option{<:NumMat} = nothing;
+function mu_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     return BoxUncertaintySet(;
@@ -154,8 +154,8 @@ function mu_ucs(ue::DeltaUncertaintySet, X::NumMat, F::Option{<:NumMat} = nothin
                              ub = ue.dmu * abs.(pr.mu) * 2)
 end
 """
-    sigma_ucs(ue::DeltaUncertaintySet, X::NumMat,
-              F::Option{<:NumMat} = nothing; dims::Int = 1, kwargs...)
+    sigma_ucs(ue::DeltaUncertaintySet, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using delta bounds from a prior estimator.
 
@@ -184,7 +184,7 @@ Constructs a box uncertainty set for covariance using delta bounds from a prior 
   - [`ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
-function sigma_ucs(ue::DeltaUncertaintySet, X::NumMat, F::Option{<:NumMat} = nothing;
+function sigma_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     d_sigma = ue.dsigma * abs.(pr.sigma)

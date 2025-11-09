@@ -1,13 +1,13 @@
 function w_neg_flag(wb::Number)
     return wb < zero(wb)
 end
-function w_neg_flag(wb::NumVec)
+function w_neg_flag(wb::VecNum)
     return any(x -> x < zero(x), wb)
 end
 function w_finite_flag(wb::Number)
     return isfinite(wb)
 end
-function w_finite_flag(wb::NumVec)
+function w_finite_flag(wb::VecNum)
     return any(isfinite, wb)
 end
 function set_weight_constraints!(args...)
@@ -52,7 +52,7 @@ end
 function non_zero_real_or_vec(x::Number)
     return !iszero(x)
 end
-function non_zero_real_or_vec(x::NumVec)
+function non_zero_real_or_vec(x::VecNum)
     return any(!iszero, x)
 end
 function set_linear_weight_constraints!(args...)

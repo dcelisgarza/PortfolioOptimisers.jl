@@ -104,7 +104,7 @@ end
 function variance_risk_bounds_val(flag::Bool, ub::Frontier)
     return _Frontier(; N = ub.N, factor = 1, flag = flag)
 end
-function variance_risk_bounds_val(flag::Bool, ub::NumVec)
+function variance_risk_bounds_val(flag::Bool, ub::VecNum)
     return flag ? ub : sqrt.(ub)
 end
 function variance_risk_bounds_val(flag::Bool, ub::Number)
@@ -164,7 +164,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RkJu
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
-                               ::Any, b1::NumMat, args...; kwargs...)
+                               ::Any, b1::MatNum, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -204,7 +204,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     return ucs_variance_risk, key
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
-                                sigma::NumMat)
+                                sigma::MatNum)
     sc = model[:sc]
     if !haskey(model, :E)
         W = model[:W]

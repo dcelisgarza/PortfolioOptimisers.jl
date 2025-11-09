@@ -77,7 +77,7 @@ function factory(ce::Coskewness, w::Option{<:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """
-    __coskewness(cskew::NumMat, X::NumMat,
+    __coskewness(cskew::MatNum, X::MatNum,
                  mp::AbstractMatrixProcessingEstimator)
 
 Internal helper for coskewness matrix processing.
@@ -101,7 +101,7 @@ Internal helper for coskewness matrix processing.
   - [`matrix_processing!`](@ref)
   - [`coskewness`](@ref)
 """
-function __coskewness(cskew::NumMat, X::NumMat, mp::AbstractMatrixProcessingEstimator)
+function __coskewness(cskew::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
     N = size(cskew, 1)
     V = zeros(eltype(cskew), N, N)
     for i in 1:N
@@ -122,7 +122,7 @@ function __coskewness(cskew::NumMat, X::NumMat, mp::AbstractMatrixProcessingEsti
     return V
 end
 """
-    _coskewness(Y::NumMat, X::NumMat, mp::AbstractMatrixProcessingEstimator)
+    _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
 
 Internal helper for coskewness computation.
 
@@ -145,7 +145,7 @@ Internal helper for coskewness computation.
   - [`__coskewness`](@ref)
   - [`coskewness`](@ref)
 """
-function _coskewness(Y::NumMat, X::NumMat, mp::AbstractMatrixProcessingEstimator)
+function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
     o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
     z = kron(o, Y) ⊙ kron(Y, o)
     cskew = transpose(Y) * z / size(Y, 1)
@@ -153,7 +153,7 @@ function _coskewness(Y::NumMat, X::NumMat, mp::AbstractMatrixProcessingEstimator
     return cskew, V
 end
 """
-    coskewness(ske::Option{<:Coskewness}, X::NumMat; dims::Int = 1,
+    coskewness(ske::Option{<:Coskewness}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
 Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
@@ -210,7 +210,7 @@ julia> V
   - [`_coskewness`](@ref)
   - [`__coskewness`](@ref)
 """
-function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::NumMat; dims::Int = 1,
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -220,7 +220,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::NumMat; dims::Int 
     Y = X .- mu
     return _coskewness(Y, X, ske.mp)
 end
-function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::NumMat; dims::Int = 1,
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

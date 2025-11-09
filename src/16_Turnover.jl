@@ -17,7 +17,7 @@ Estimator for turnover portfolio constraints.
 
 # Constructor
 
-    TurnoverEstimator(; w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
+    TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing)
 
 ## Validation
 
@@ -44,7 +44,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     w::T1
     val::T2
     dval::T3
-    function TurnoverEstimator(w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
+    function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number} = nothing)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)
@@ -53,7 +53,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
         return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
     end
 end
-function TurnoverEstimator(; w::NumVec, val::EstValType, dval::Option{<:Number} = nothing)
+function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing)
     return TurnoverEstimator(w, val, dval)
 end
 """
@@ -122,7 +122,7 @@ Container for turnover portfolio constraints.
 
 # Constructor
 
-    Turnover(; w::NumVec, val::NumUNumVec = 0.0)
+    Turnover(; w::VecNum, val::NumUVecNum = 0.0)
 
 ## Validation
 
@@ -156,22 +156,22 @@ Turnover
 struct Turnover{T1, T2} <: AbstractResult
     w::T1
     val::T2
-    function Turnover(w::NumVec, val::NumUNumVec)
+    function Turnover(w::VecNum, val::NumUVecNum)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
-        if isa(val, NumVec)
+        if isa(val, VecNum)
             @argcheck(length(val) == length(w), DimensionMismatch)
         end
         return new{typeof(w), typeof(val)}(w, val)
     end
 end
-function Turnover(; w::NumVec, val::NumUNumVec = 0.0)
+function Turnover(; w::VecNum, val::NumUVecNum = 0.0)
     return Turnover(w, val)
 end
 const TnUTnE = Union{<:Turnover, <:TurnoverEstimator}
 const VecTnUTnE = AbstractVector{<:TnUTnE}
 const VecTn = AbstractVector{<:Turnover}
-const TnVecTn = Union{<:Turnover, <:VecTn}
+const TnUVecTn = Union{<:Turnover, <:VecTn}
 const TnUTnEUVecTnUTnE = Union{<:TnUTnE, <:VecTnUTnE}
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
@@ -239,7 +239,7 @@ end
 function turnover_view(tn::VecTn, i)
     return [turnover_view(tni, i) for tni in tn]
 end
-function factory(tn::Turnover, w::NumVec)
+function factory(tn::Turnover, w::VecNum)
     return Turnover(; w = w, val = tn.val)
 end
 

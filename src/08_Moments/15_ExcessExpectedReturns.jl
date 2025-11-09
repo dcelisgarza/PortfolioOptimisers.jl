@@ -51,7 +51,7 @@ function factory(me::ExcessExpectedReturns, w::Option{<:AbstractWeights} = nothi
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """
-    mean(me::ExcessExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
+    mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute excess expected returns by subtracting the risk-free rate.
 
@@ -66,13 +66,13 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
 # Returns
 
-  - `mu::NumArr`: Excess expected returns vector.
+  - `mu::ArrNum`: Excess expected returns vector.
 
 # Related
 
   - [`ExcessExpectedReturns`](@ref)
 """
-function Statistics.mean(me::ExcessExpectedReturns, X::NumMat; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     return mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end
 

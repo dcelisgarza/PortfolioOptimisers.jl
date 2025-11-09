@@ -292,7 +292,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
     LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                    w::Option{<:AbstractWeights} = nothing,
-                   mu::Option{<:NumUNumVecUVecScalar} = nothing,
+                   mu::Option{<:NumUVecNumUVecScalar} = nothing,
                    alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -581,7 +581,7 @@ Where:
 
 # Functor
 
-    (r::LowOrderMoment)(w::NumVec, X::NumMat;
+    (r::LowOrderMoment)(w::VecNum, X::MatNum;
                         fees::Option{<:Fees} = nothing)
 
 Computes the the low order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
@@ -623,9 +623,9 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     mu::T3
     alg::T4
     function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                            mu::Option{<:NumUNumVecUVecScalar},
+                            mu::Option{<:NumUVecNumUVecScalar},
                             alg::LowOrderMomentMeasureAlgorithm)
-        if isa(mu, NumVec)
+        if isa(mu, VecNum)
             @argcheck(!isempty(mu))
             @argcheck(all(isfinite, mu))
         elseif isa(mu, Number)
@@ -640,7 +640,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Option{<:AbstractWeights} = nothing,
-                        mu::Option{<:NumUNumVecUVecScalar} = nothing,
+                        mu::Option{<:NumUVecNumUVecScalar} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -667,7 +667,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
     HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                     w::Option{<:AbstractWeights} = nothing,
-                    mu::Option{<:NumUNumVecUVecScalar} = nothing,
+                    mu::Option{<:NumUVecNumUVecScalar} = nothing,
                     alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -738,7 +738,7 @@ Where:
 
 # Functor
 
-    (r::HighOrderMoment)(w::NumVec, X::NumMat;
+    (r::HighOrderMoment)(w::VecNum, X::MatNum;
                         fees::Option{<:Fees} = nothing)
 
 Computes the the high order moment risk measure as defined in `r` using portfolio weights `w`, return matrix `X`, and optional fees `fees`.
@@ -776,9 +776,9 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     mu::T3
     alg::T4
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                             mu::Option{<:NumUNumVecUVecScalar},
+                             mu::Option{<:NumUVecNumUVecScalar},
                              alg::HighOrderMomentMeasureAlgorithm)
-        if isa(mu, NumVec)
+        if isa(mu, VecNum)
             @argcheck(!isempty(mu))
             @argcheck(all(isfinite, mu))
         elseif isa(mu, Number)
@@ -793,14 +793,14 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Option{<:AbstractWeights} = nothing,
-                         mu::Option{<:NumUNumVecUVecScalar} = nothing,
+                         mu::Option{<:NumUVecNumUVecScalar} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
 """
     calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
                                <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
-                       ::Any, x::NumVec)
+                       ::Any, x::VecNum)
 
 Compute the target value for moment calculations when neither a target value (`mu`) nor observation weights are provided in the risk measure.
 
@@ -822,13 +822,13 @@ Compute the target value for moment calculations when neither a target value (`m
 """
 function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
                                     <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
-                            ::Any, x::NumVec)
+                            ::Any, x::VecNum)
     return mean(x)
 end
 """
     calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
                                 <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any}},
-                       ::Any, x::NumVec)
+                       ::Any, x::VecNum)
 
 Compute the target value for moment calculations when the risk measure provides an observation weights vector but no explicit target value (`mu`).
 
@@ -851,13 +851,13 @@ Compute the target value for moment calculations when the risk measure provides 
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing,
                                                       <:Any},
                                      <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing,
-                                                       <:Any}}, ::Any, x::NumVec)
+                                                       <:Any}}, ::Any, x::VecNum)
     return mean(x, r.w)
 end
 """
-    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:NumVec, <:Any},
-                                <:HighOrderMoment{<:Any, <:Any, <:NumVec, <:Any}},
-                       w::NumVec, ::Any)
+    calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
+                                <:HighOrderMoment{<:Any, <:Any, <:VecNum, <:Any}},
+                       w::VecNum, ::Any)
 
 Compute the target value for moment calculations when the risk measure provides an explicit expected returns vector (`mu`).
 
@@ -877,15 +877,15 @@ Compute the target value for moment calculations when the risk measure provides 
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:NumVec, <:Any},
-                                     <:HighOrderMoment{<:Any, <:Any, <:NumVec, <:Any}},
-                            w::NumVec, ::Any)
+function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
+                                     <:HighOrderMoment{<:Any, <:Any, <:VecNum, <:Any}},
+                            w::VecNum, ::Any)
     return dot(w, r.mu)
 end
 """
     calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                 <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
-                       w::NumVec, ::Any)
+                       w::VecNum, ::Any)
 
 Compute the target value for moment calculations when the risk measure provides a `VecScalar` as the expected returns (`mu`).
 
@@ -908,7 +908,7 @@ Compute the target value for moment calculations when the risk measure provides 
 """
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      <:HighOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}},
-                            w::NumVec, ::Any)
+                            w::VecNum, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
 """
@@ -939,8 +939,8 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Number, <:
     return r.mu
 end
 """
-    calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                    X::NumMat; fees::Option{<:Fees} = nothing)
+    calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::VecNum,
+                    X::MatNum; fees::Option{<:Fees} = nothing)
 
 Compute the vector of deviations from the target value for moment-based risk measures.
 
@@ -968,32 +968,32 @@ Compute the vector of deviations from the target value for moment-based risk mea
   - [`calc_moment_target`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::NumVec,
-                             X::NumMat, fees::Option{<:Fees} = nothing)
+function calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::VecNum,
+                             X::MatNum, fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::NumVec, X::NumMat,
+function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::VecNum, X::MatNum,
                                                                       fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::NumVec,
-                                                                           X::NumMat,
+function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::VecNum,
+                                                                           X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = abs.(calc_deviations_vec(r, w, X, fees))
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::NumVec, X::NumMat,
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::VecNum, X::MatNum,
                                                                        fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 3
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:ThirdLowerMoment}})(w::NumVec,
-                                                                                        X::NumMat,
+                             <:StandardisedHighOrderMoment{<:Any, <:ThirdLowerMoment}})(w::VecNum,
+                                                                                        X::MatNum,
                                                                                         fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
@@ -1002,50 +1002,50 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     return res / (sigma * sqrt(sigma))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}})(w::NumVec,
-                                                                           X::NumMat,
+                            <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}})(w::VecNum,
+                                                                           X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Semi, <:QuadSecondMomentFormulations}})(w::NumVec,
-                                                                                            X::NumMat,
+                            <:SecondMoment{<:Any, <:Semi, <:QuadSecondMomentFormulations}})(w::VecNum,
+                                                                                            X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}})(w::NumVec,
-                                                                           X::NumMat,
+                            <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}})(w::VecNum,
+                                                                           X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Full, <:QuadSecondMomentFormulations}})(w::NumVec,
-                                                                                            X::NumMat,
+                            <:SecondMoment{<:Any, <:Full, <:QuadSecondMomentFormulations}})(w::VecNum,
+                                                                                            X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(w::NumVec,
-                                                                           X::NumMat,
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(w::VecNum,
+                                                                           X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Full}})(w::NumVec,
-                                                                           X::NumMat,
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Full}})(w::VecNum,
+                                                                           X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Semi}}})(w::NumVec,
-                                                                                            X::NumMat,
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Semi}}})(w::VecNum,
+                                                                                            X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
@@ -1054,8 +1054,8 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     return res / sigma^2
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Full}}})(w::NumVec,
-                                                                                            X::NumMat,
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Full}}})(w::VecNum,
+                                                                                            X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))

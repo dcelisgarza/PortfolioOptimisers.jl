@@ -24,7 +24,7 @@ struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
     mu::T1
     sigma::T2
     dist::T3
-    function DistributionValueatRisk(mu::Option{<:NumVec}, sigma::Option{<:NumMat},
+    function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
                                      dist::Distribution)
         if !isnothing(mu)
             @argcheck(!isempty(mu))
@@ -35,8 +35,8 @@ struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
         return new{typeof(mu), typeof(sigma), typeof(dist)}(mu, sigma, dist)
     end
 end
-function DistributionValueatRisk(; mu::Option{<:NumVec} = nothing,
-                                 sigma::Option{<:NumMat} = nothing,
+function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
+                                 sigma::Option{<:MatNum} = nothing,
                                  dist::Distribution = Normal())
     return DistributionValueatRisk(mu, sigma, dist)
 end
@@ -64,10 +64,10 @@ function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
 end
-function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::NumVec)
+function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort!(x, ceil(Int, r.alpha * length(x)))
 end
-function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::NumVec)
+function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     w = r.w
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -108,12 +108,12 @@ function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwarg
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
                             alg = r.alg)
 end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::NumVec)
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
     gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
     return loss - gain
 end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::NumVec)
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum)
     w = r.w
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -144,7 +144,7 @@ function DrawdownatRisk(;
                         alpha::Number = 0.05)
     return DrawdownatRisk(settings, alpha)
 end
-function (r::DrawdownatRisk)(x::NumVec)
+function (r::DrawdownatRisk)(x::VecNum)
     pushfirst!(x, 1)
     cs = cumsum(x)
     peak = typemin(eltype(x))
@@ -173,7 +173,7 @@ function RelativeDrawdownatRisk(;
                                 alpha::Number = 0.05)
     return RelativeDrawdownatRisk(settings, alpha)
 end
-function (r::RelativeDrawdownatRisk)(x::NumVec)
+function (r::RelativeDrawdownatRisk)(x::VecNum)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     peak = typemin(eltype(x))

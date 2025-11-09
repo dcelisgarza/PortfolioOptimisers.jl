@@ -82,7 +82,7 @@ function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
     return DistanceDistance(dist, args, kwargs, power, alg)
 end
 """
-    distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::NumMat;
+    distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
              dims::Int = 1, kwargs...)
 
 Compute the distance-of-distances matrix from a covariance estimator and data matrix.
@@ -107,14 +107,14 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
   - [`Distance`](@ref)
   - [`distance`](@ref)
 """
-function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::NumMat;
+function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                   dims::Int = 1, kwargs...)
     dist = distance(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    distance(de::DistanceDistance, rho::NumMat, args...; kwargs...)
+    distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
 
 Compute the distance-of-distances matrix from a correlation or covariance matrix.
 
@@ -140,12 +140,12 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 ```
 ```
 """
-function distance(de::DistanceDistance, rho::NumMat, args...; kwargs...)
+function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
     dist = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::NumMat;
+    cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                  dims::Int = 1, kwargs...)
 
 Compute both the correlation matrix and the distance-of-distances matrix from a covariance estimator and data matrix.
@@ -170,7 +170,7 @@ This method first computes the correlation and base distance matrices using [`Di
   - [`Distance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::NumMat;
+function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                       dims::Int = 1, kwargs...)
     rho, dist = cor_and_dist(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
                              kwargs...)

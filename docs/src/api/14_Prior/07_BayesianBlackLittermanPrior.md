@@ -2,6 +2,6 @@
 
 ```@docs
 BayesianBlackLittermanPrior
-prior(pe::BayesianBlackLittermanPrior, X::NumMat, F::NumMat;
+prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum;
                dims::Int = 1, strict::Bool = false, kwargs...)
 ```

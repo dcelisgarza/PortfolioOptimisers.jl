@@ -179,7 +179,7 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     alg::T5
     function OWAJuMP(slv::SlvUVecSlv, max_phi::Number, sc::Number, so::Number,
                      alg::AbstractOrderedWeightsArrayAlgorithm)
-        if isa(slv, SlvVec)
+        if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError)
         end
         @argcheck(zero(max_phi) < max_phi < one(max_phi),
@@ -199,7 +199,7 @@ function OWAJuMP(; slv::SlvUVecSlv = Solver(), max_phi::Number = 0.5, sc::Number
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 """
-    ncrra_weights(weights::NumMat; g::Number = 0.5)
+    ncrra_weights(weights::MatNum; g::Number = 0.5)
 
 Compute normalised constant relative risk aversion (CRRA) Ordered Weights Array (OWA) weights.
 
@@ -249,7 +249,7 @@ julia> PortfolioOptimisers.ncrra_weights(w, 0.5)
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
   - [`owa_l_moment_crm`](@ref)
 """
-function ncrra_weights(weights::NumMat, g::Number = 0.5)
+function ncrra_weights(weights::MatNum, g::Number = 0.5)
     N = size(weights, 2)
     phis = Vector{eltype(weights)}(undef, N)
     e = 1
@@ -268,7 +268,7 @@ function ncrra_weights(weights::NumMat, g::Number = 0.5)
     return w
 end
 """
-    owa_model_setup(method::OWAJuMP, weights::NumMat)
+    owa_model_setup(method::OWAJuMP, weights::MatNum)
 
 Construct a JuMP model for Ordered Weights Array (OWA) weight estimation.
 
@@ -295,7 +295,7 @@ This function sets up a JuMP optimization model for OWA weights, given an `OWAJu
   - [`OWAJuMP`](@ref)
   - [`owa_l_moment_crm`](@ref)
 """
-function owa_model_setup(method::OWAJuMP, weights::NumMat)
+function owa_model_setup(method::OWAJuMP, weights::MatNum)
     T, N = size(weights)
     model = JuMP.Model()
     max_phi = method.max_phi
@@ -315,7 +315,7 @@ function owa_model_setup(method::OWAJuMP, weights::NumMat)
     return model
 end
 """
-    owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::NumMat)
+    owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
 
 Solve a JuMP model for OWA weight estimation and extract the resulting OWA weights.
 
@@ -342,7 +342,7 @@ This function solves the provided JuMP model using the solver(s) specified in th
   - [`OWAJuMP`](@ref)
   - [`ncrra_weights`](@ref)
 """
-function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::NumMat)
+function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     slv = method.slv
     return if optimise_JuMP_model!(model, slv).success
         phi = model[:phi]
@@ -356,7 +356,7 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::NumMat)
 end
 """
     owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator,
-                     weights::NumMat)
+                     weights::MatNum)
 
 Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
 
@@ -383,11 +383,11 @@ This function dispatches on the estimator `method` to compute OWA weights from a
   - [`MinimumSumSquares`](@ref)
   - [`ncrra_weights`](@ref)
 """
-function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::NumMat)
+function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
     return ncrra_weights(weights, method.g)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
-                          weights::NumMat)
+                          weights::MatNum)
     T = size(weights, 1)
     sc = method.sc
     so = method.so
@@ -407,7 +407,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumE
     return owa_model_solve(model, method, weights)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
-                                          <:MinimumSquaredDistance}, weights::NumMat)
+                                          <:MinimumSquaredDistance}, weights::MatNum)
     sc = method.sc
     so = method.so
     model = owa_model_setup(method, weights)
@@ -419,7 +419,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     return owa_model_solve(model, method, weights)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares},
-                          weights::NumMat)
+                          weights::MatNum)
     sc = method.sc
     so = method.so
     model = owa_model_setup(method, weights)
@@ -478,7 +478,7 @@ function owa_cvar(T::Integer, alpha::Number = 0.05)
     return w
 end
 """
-    owa_wcvar(T::Integer, alphas::NumVec, weights::NumVec)
+    owa_wcvar(T::Integer, alphas::VecNum, weights::VecNum)
 
 Compute the Ordered Weights Array (OWA) weights for a weighted combination of Conditional Value at Risk measures.
 
@@ -497,7 +497,7 @@ Compute the Ordered Weights Array (OWA) weights for a weighted combination of Co
   - [`owa_cvar`](@ref)
   - [`owa_tg`](@ref)
 """
-function owa_wcvar(T::Integer, alphas::NumVec, weights::NumVec)
+function owa_wcvar(T::Integer, alphas::VecNum, weights::VecNum)
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
     for (i, j) in zip(alphas, weights)
         w .+= owa_cvar(T, i) * j
@@ -622,9 +622,9 @@ function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
 """
-    owa_wcvarrg(T::Integer, alphas::NumVec, weights_a::NumVec;
-                betas::NumVec = alphas,
-                weights_b::NumVec = weights_a)
+    owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum;
+                betas::VecNum = alphas,
+                weights_b::VecNum = weights_a)
 
 Compute the Ordered Weights Array (OWA) weights for the weighted Conditional Value at Risk Range risk measure.
 
@@ -647,8 +647,8 @@ This function returns a vector of OWA weights corresponding to the difference be
   - [`owa_wcvar`](@ref)
   - [`owa_cvarrg`](@ref)
 """
-function owa_wcvarrg(T::Integer, alphas::NumVec, weights_a::NumVec, betas::NumVec = alphas,
-                     weights_b::NumVec = weights_a)
+function owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum, betas::VecNum = alphas,
+                     weights_b::VecNum = weights_a)
     w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
     return w
 end

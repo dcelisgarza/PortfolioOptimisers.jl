@@ -236,7 +236,7 @@ function to_tree(a::Hclust)
 end
 """
     clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-               X::NumMat; branchorder::Symbol = :optimal, dims::Int = 1,
+               X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                kwargs...)
 
 Run hierarchical clustering and return the result as a [`HierarchicalClustering`](@ref) object.
@@ -261,7 +261,7 @@ This function applies the specified clustering estimator to the input data matri
   - [`ClusteringEstimator`](@ref)
 """
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-                    X::NumMat; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+                    X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     clustering = hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
     k = optimal_number_clusters(cle.onc, clustering, D)
@@ -315,7 +315,7 @@ function validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNod
     return true
 end
 """
-    valid_k_clusters(clustering::Hclust, arr::NumVec)
+    valid_k_clusters(clustering::Hclust, arr::VecNum)
 
 Find a valid number of clusters for a hierarchical clustering tree given a scoring array.
 
@@ -335,7 +335,7 @@ This function iteratively searches for a valid `k` (number of clusters) by check
   - [`validate_k_value`](@ref)
   - [`optimal_number_clusters`](@ref)
 """
-function valid_k_clusters(clustering::Hclust, arr::NumVec)
+function valid_k_clusters(clustering::Hclust, arr::VecNum)
     nodes = to_tree(clustering)[2]
     heights = [i.height for i in nodes]
     nodes = nodes[sortperm(heights; rev = true)]
@@ -353,9 +353,9 @@ end
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer}, clustering::Hclust,
                             args...)
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                            clustering::Hclust, dist::NumMat)
+                            clustering::Hclust, dist::MatNum)
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore},
-                            clustering::Hclust, dist::NumMat)
+                            clustering::Hclust, dist::MatNum)
 
 Select the optimal number of clusters for a hierarchical clustering tree.
 
@@ -440,7 +440,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     return k
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                                 clustering::Hclust, dist::NumMat)
+                                 clustering::Hclust, dist::MatNum)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)
@@ -481,7 +481,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
                                                             <:StandardisedSilhouetteScore},
-                                 clustering::Hclust, dist::NumMat)
+                                 clustering::Hclust, dist::MatNum)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)

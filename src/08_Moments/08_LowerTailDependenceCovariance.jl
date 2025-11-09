@@ -68,7 +68,7 @@ function factory(ce::LowerTailDependenceCovariance, w::Option{<:AbstractWeights}
                                          threads = ce.threads)
 end
 """
-    lower_tail_dependence(X::NumMat; alpha::Number = 0.05,
+    lower_tail_dependence(X::MatNum; alpha::Number = 0.05,
                           threads::FLoops.Transducers.Executor = SequentialEx())
 
 Compute the lower tail dependence matrix for a set of asset returns.
@@ -96,7 +96,7 @@ The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
   - [`LowerTailDependenceCovariance`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-function lower_tail_dependence(X::NumMat, alpha::Number = 0.05,
+function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                                threads::FLoops.Transducers.Executor = SequentialEx())
     T, N = size(X)
     k = ceil(Int, T * alpha)
@@ -119,7 +119,7 @@ function lower_tail_dependence(X::NumMat, alpha::Number = 0.05,
     return rho
 end
 """
-    cor(ce::LowerTailDependenceCovariance, X::NumMat; dims::Int = 1, kwargs...)
+    cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -145,7 +145,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
   - [`LowerTailDependenceCovariance`](@ref)
   - [`lower_tail_dependence`](@ref)
 """
-function Statistics.cor(ce::LowerTailDependenceCovariance, X::NumMat; dims::Int = 1,
+function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -154,7 +154,7 @@ function Statistics.cor(ce::LowerTailDependenceCovariance, X::NumMat; dims::Int 
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
 """
-    cov(ce::LowerTailDependenceCovariance, X::NumMat; dims::Int = 1, kwargs...)
+    cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence covariance matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -180,7 +180,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
   - [`LowerTailDependenceCovariance`](@ref)
   - [`lower_tail_dependence`](@ref)
 """
-function Statistics.cov(ce::LowerTailDependenceCovariance, X::NumMat; dims::Int = 1,
+function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

@@ -12,12 +12,12 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegURegE, r::RMUVecRM,
                                     obj::ObjectiveFunction,
                                     plg::Option{<:PhCUPhCEUVecPhCUPhCE},
-                                    sets::Option{<:AssetSets}, wi::Option{<:NumVec},
+                                    sets::Option{<:AssetSets}, wi::Option{<:VecNum},
                                     flag::Bool, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
-        if isa(wi, NumVec)
+        if isa(wi, VecNum)
             @argcheck(!isempty(wi))
         end
         return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(plg),
@@ -31,11 +31,11 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 plg::Option{<:PhCUPhCEUVecPhCUPhCE} = nothing,
                                 sets::Option{<:AssetSets} = nothing,
-                                wi::Option{<:NumVec} = nothing, flag::Bool = true,
+                                wi::Option{<:VecNum} = nothing, flag::Bool = true,
                                 fb::Option{<:OptimisationEstimator} = nothing)
     return FactorRiskContribution(opt, re, r, obj, plg, sets, wi, flag, fb)
 end
-function opt_view(frc::FactorRiskContribution, i, X::NumMat)
+function opt_view(frc::FactorRiskContribution, i, X::MatNum)
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
@@ -46,7 +46,7 @@ function opt_view(frc::FactorRiskContribution, i, X::NumMat)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegURegE,
                                                    rd::ReturnsResult, flag::Bool,
-                                                   wi::Option{<:NumVec})
+                                                   wi::Option{<:VecNum})
     rr = regression(re, rd.X, rd.F)
     Bt = transpose(rr.L)
     b1 = pinv(Bt)

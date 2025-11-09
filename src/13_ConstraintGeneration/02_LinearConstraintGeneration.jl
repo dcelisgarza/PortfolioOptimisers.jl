@@ -15,7 +15,7 @@ Container for a set of linear constraints (either equality or inequality) in the
 
 # Constructor
 
-    PartialLinearConstraint(; A::NumMat, B::NumVec)
+    PartialLinearConstraint(; A::MatNum, B::VecNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -41,13 +41,13 @@ PartialLinearConstraint
 struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
-    function PartialLinearConstraint(A::NumMat, B::NumVec)
+    function PartialLinearConstraint(A::MatNum, B::VecNum)
         @argcheck(!isempty(A), IsEmptyError)
         @argcheck(!isempty(B), IsEmptyError)
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
-function PartialLinearConstraint(; A::NumMat, B::NumVec)
+function PartialLinearConstraint(; A::MatNum, B::VecNum)
     return PartialLinearConstraint(A, B)
 end
 """
@@ -173,7 +173,7 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     op::T3
     rhs::T4
     eqn::T5
-    function ParsingResult(vars::StrVec, coef::NumVec, op::AbstractString, rhs::Number,
+    function ParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                            eqn::AbstractString)
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
@@ -225,10 +225,10 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     rhs::T4
     eqn::T5
     ij::T6
-    function RhoParsingResult(vars::StrVec, coef::NumVec, op::AbstractString, rhs::Number,
+    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                               eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                                         <:Tuple{<:IntVec, <:IntVec}}})
+                                                         <:Tuple{<:VecInt, <:VecInt}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
@@ -325,8 +325,8 @@ function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """
-    group_to_val!(nx::StrVec, sdict::AbstractDict, key::Any, val::Number,
-                  dict::EstValType, arr::NumVec, strict::Bool)
+    group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
+                  dict::EstValType, arr::VecNum, strict::Bool)
 
 Set values in a vector for all assets belonging to a specified group.
 
@@ -356,8 +356,8 @@ Set values in a vector for all assets belonging to a specified group.
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
-function group_to_val!(nx::StrVec, sdict::AbstractDict, key::Any, val::Number,
-                       dict::EstValType, arr::NumVec, strict::Bool)
+function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
+                       dict::EstValType, arr::VecNum, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
         msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
@@ -471,7 +471,7 @@ function estimator_to_val(val::Option{<:Number}, args...; kwargs...)
     return val
 end
 """
-    estimator_to_val(val::NumVec, sets::AssetSets, args...; kwargs...)
+    estimator_to_val(val::VecNum, sets::AssetSets, args...; kwargs...)
 
 Return a numeric vector for asset/group estimators, validating length against asset universe.
 
@@ -486,7 +486,7 @@ This method checks that the input vector `val` matches the length of the asset u
 
 # Returns
 
-  - `val::NumVec`: The input vector, unchanged.
+  - `val::VecNum`: The input vector, unchanged.
 
 # Validation
 
@@ -498,7 +498,7 @@ This method checks that the input vector `val` matches the length of the asset u
   - [`AssetSets`](@ref)
   - [`group_to_val!`](@ref)
 """
-function estimator_to_val(val::NumVec, sets::AssetSets, args...; kwargs...)
+function estimator_to_val(val::VecNum, sets::AssetSets, args...; kwargs...)
     @argcheck(length(val) == length(sets.dict[sets.key]), DimensionMismatch)
     return val
 end
@@ -1378,11 +1378,11 @@ Container for the result of a risk budget constraint.
 
 # Fields
 
-  - `val`: Vector of risk budget allocations (typically `NumVec`).
+  - `val`: Vector of risk budget allocations (typically `VecNum`).
 
 # Constructor
 
-    RiskBudgetResult(; val::NumVec)
+    RiskBudgetResult(; val::VecNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -1407,13 +1407,13 @@ RiskBudgetResult
 """
 struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
-    function RiskBudgetResult(val::NumVec)
+    function RiskBudgetResult(val::VecNum)
         @argcheck(!isempty(val))
         @argcheck(all(x -> zero(x) <= x, val))
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetResult(; val::NumVec)
+function RiskBudgetResult(; val::VecNum)
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)
@@ -1678,7 +1678,7 @@ end
 function AssetSetsMatrixEstimator(; val::AbstractString)
     return AssetSetsMatrixEstimator(val)
 end
-const MatUASMatE = Union{<:AssetSetsMatrixEstimator, <:NumMat}
+const MatUASMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
 const VecMatUASMatE = AbstractVector{<:MatUASMatE}
 const MatUASMatEUVecMatUASMatE = Union{<:MatUASMatE, <:VecMatUASMatE}
 """
@@ -1740,15 +1740,15 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     return transpose(A)
 end
 """
-    asset_sets_matrix(smtx::Option{<:NumMat}, args...)
+    asset_sets_matrix(smtx::Option{<:MatNum}, args...)
 
 No-op fallback for asset set membership matrix construction.
 
-This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `NumMat` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
+This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `MatNum` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
 
 # Arguments
 
-  - `smtx`: An existing asset set membership matrix (`NumMat`) or `nothing`.
+  - `smtx`: An existing asset set membership matrix (`MatNum`) or `nothing`.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns
@@ -1761,7 +1761,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Option{<:NumMat}, args...)
+function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
 end
 """
@@ -1781,7 +1781,7 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
-    asset_sets_matrix(smtx::AbstractVector{<:Union{<:NumMat,
+    asset_sets_matrix(smtx::AbstractVector{<:Union{<:MatNum,
                                                    <:AssetSetsMatrixEstimator}},
                       sets::AssetSets)
 
@@ -1789,20 +1789,20 @@ Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::AbstractVector{<:Union{<:NumMat,
+function asset_sets_matrix(smtx::AbstractVector{<:Union{<:MatNum,
                                                         <:AssetSetsMatrixEstimator}},
                            sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
 """
-function asset_sets_matrix_view(smtx::NumMat, i; kwargs...)
+function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
     return view(smtx, :, i)
 end
 function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
     return smtx
 end
-function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:NumMat,
+function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:MatNum,
                                                              <:AssetSetsMatrixEstimator}},
                                 i; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]

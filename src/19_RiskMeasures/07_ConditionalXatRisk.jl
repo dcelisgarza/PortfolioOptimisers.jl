@@ -56,7 +56,7 @@ function factory(r::DistributionallyRobustConditionalValueatRisk,
 end
 function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
                    <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                  <:Any, Nothing}})(x::NumVec)
+                                                                  <:Any, Nothing}})(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
@@ -68,7 +68,7 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
 end
 function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
                    <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                  <:Any, <:AbstractWeights}})(x::NumVec)
+                                                                  <:Any, <:AbstractWeights}})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -161,7 +161,7 @@ end
 function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing},
                    <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any, <:Any,
                                                                        <:Any, <:Any, <:Any,
-                                                                       <:Any, Nothing}})(x::NumVec)
+                                                                       <:Any, Nothing}})(x::VecNum)
     alpha = r.alpha
     aT = alpha * length(x)
     idx1 = ceil(Int, aT)
@@ -187,7 +187,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
                    <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any, <:Any,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any,
-                                                                       <:AbstractWeights}})(x::NumVec)
+                                                                       <:AbstractWeights}})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -229,7 +229,7 @@ function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasure
                                    alpha::Number = 0.05)
     return ConditionalDrawdownatRisk(settings, alpha)
 end
-function (r::ConditionalDrawdownatRisk)(x::NumVec)
+function (r::ConditionalDrawdownatRisk)(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     pushfirst!(x, 1)
@@ -265,7 +265,7 @@ function RelativeConditionalDrawdownatRisk(;
                                            alpha::Number = 0.05)
     return RelativeConditionalDrawdownatRisk(settings, alpha)
 end
-function (r::RelativeConditionalDrawdownatRisk)(x::NumVec)
+function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     aT = r.alpha * length(x)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)

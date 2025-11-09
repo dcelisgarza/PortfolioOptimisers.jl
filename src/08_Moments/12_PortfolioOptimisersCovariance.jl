@@ -61,7 +61,7 @@ function factory(ce::PortfolioOptimisersCovariance, w::Option{<:AbstractWeights}
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
-    cov(ce::PortfolioOptimisersCovariance, X::NumMat; dims = 1, kwargs...)
+    cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -88,7 +88,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - [`matrix_processing!`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cov-Tuple%7BCovarianceEstimator,%20AbstractMatrix%7D)
 """
-function Statistics.cov(ce::PortfolioOptimisersCovariance, X::NumMat; dims = 1, kwargs...)
+function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -101,7 +101,7 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::NumMat; dims = 1, 
     return sigma
 end
 """
-    cor(ce::PortfolioOptimisersCovariance, X::NumMat; dims = 1, kwargs...)
+    cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -128,7 +128,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - [`matrix_processing!`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cor)
 """
-function Statistics.cor(ce::PortfolioOptimisersCovariance, X::NumMat; dims = 1, kwargs...)
+function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
