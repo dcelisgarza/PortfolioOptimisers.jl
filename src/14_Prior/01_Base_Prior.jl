@@ -70,8 +70,8 @@ Low order prior estimator using both asset and factor returns.
 """
 abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
 """
-    const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                      AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                      <:AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only and asset-and-factor low order prior estimators.
 
@@ -84,12 +84,11 @@ Union type for asset-only and asset-and-factor low order prior estimators.
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
   - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
 """
-const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                  AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                  <:AbstractLowOrderPriorEstimator_AF}
 """
-    const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
-
-                                                  AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_F_AF = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                      <:AbstractLowOrderPriorEstimator_AF}
 
 Union type for factor-only and asset-and-factor low order prior estimators.
 
@@ -102,12 +101,12 @@ Union type for factor-only and asset-and-factor low order prior estimators.
   - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
   - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
 """
-const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
-                                                  AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_F_AF = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                  <:AbstractLowOrderPriorEstimator_AF}
 """
-    const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                        AbstractLowOrderPriorEstimator_F,
-                                                        AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                        <:AbstractLowOrderPriorEstimator_F,
+                                                        <:AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only, factor-only, and asset-and-factor low order prior estimators.
 
@@ -121,9 +120,9 @@ Union type for asset-only, factor-only, and asset-and-factor low order prior est
   - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
 """
-const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                    AbstractLowOrderPriorEstimator_F,
-                                                    AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                    <:AbstractLowOrderPriorEstimator_F,
+                                                    <:AbstractLowOrderPriorEstimator_AF}
 """
     abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 

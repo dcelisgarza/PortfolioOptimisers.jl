@@ -1878,6 +1878,9 @@ function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDist
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
     return LoGo(dist, sim)
 end
+const DVarInfUDDVarInf = Union{<:Distance{<:Any, <:VariationInfoDistance},
+                               <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
+                                                  <:Any, <:Any}}
 """
     LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::MatNum, X::MatNum)
 
@@ -1898,10 +1901,7 @@ Validate compatibility of the distance estimator and covariance matrix for LoGo 
   - [`LoGo`](@ref)
   - [`logo!`](@ref)
 """
-function LoGo_dist_assert(::Union{<:Distance{<:Any, <:VariationInfoDistance},
-                                  <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
-                                                     <:Any, <:Any}}, sigma::MatNum,
-                          X::MatNum)
+function LoGo_dist_assert(::DVarInfUDDVarInf, sigma::MatNum, X::MatNum)
     @argcheck(size(sigma, 1) == size(X, 2), DimensionMismatch)
     return nothing
 end

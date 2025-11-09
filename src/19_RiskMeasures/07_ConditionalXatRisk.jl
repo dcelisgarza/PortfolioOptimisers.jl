@@ -54,9 +54,10 @@ function factory(r::DistributionallyRobustConditionalValueatRisk,
                                                         alpha = r.alpha, l = r.l, r = r.r,
                                                         w = w)
 end
-function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
-                   <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                  <:Any, Nothing}})(x::VecNum)
+const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
+                        <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
+                                                                       <:Any, T}}
+function (r::RMCVaR{Nothing})(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
@@ -66,9 +67,7 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
     end
     return var - sum_var / aT
 end
-function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
-                   <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
-                                                                  <:Any, <:AbstractWeights}})(x::VecNum)
+function (r::RMCVaR{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -158,10 +157,12 @@ function factory(r::DistributionallyRobustConditionalValueatRiskRange,
                                                              l_b = r.l_b, r_b = r.r_b,
                                                              w = w)
 end
-function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing},
-                   <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any, <:Any,
-                                                                       <:Any, <:Any, <:Any,
-                                                                       <:Any, Nothing}})(x::VecNum)
+const RMCVaRRG{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
+                          <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
+                                                                              <:Any, <:Any,
+                                                                              <:Any, <:Any,
+                                                                              <:Any, T}}
+function (r::RMCVaRRG{Nothing})(x::VecNum)
     alpha = r.alpha
     aT = alpha * length(x)
     idx1 = ceil(Int, aT)
@@ -183,11 +184,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing},
     gain = var2 - sum_var2 / bT
     return loss - gain
 end
-function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights},
-                   <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any, <:Any,
-                                                                       <:Any, <:Any, <:Any,
-                                                                       <:Any,
-                                                                       <:AbstractWeights}})(x::VecNum)
+function (r::RMCVaRRG{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -290,4 +287,4 @@ end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
        ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
-       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk
+       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk, RMCVaR, RMCVaRRG

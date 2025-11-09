@@ -930,7 +930,7 @@ function calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:Number, <:Any}, ::A
     return r.mu
 end
 """
-    calc_deviations_vec(r::Union{<:LowOrderMoment, <:HighOrderMoment}, w::VecNum,
+    calc_deviations_vec(r::LHOrderMoment, w::VecNum,
                     X::MatNum; fees::Option{<:Fees} = nothing)
 
 Compute the vector of deviations from the target value for moment-based risk measures.

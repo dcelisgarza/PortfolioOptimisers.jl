@@ -58,30 +58,24 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   mu::Option{<:NumUVecNumUVecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
-function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},
-                                    <:Skewness{<:Any, Nothing, Nothing}}, ::Any, x::VecNum)
+const TCMUSk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
+function calc_moment_target(::TCMUSk{Nothing, Nothing}, ::Any, x::VecNum)
     return mean(x)
 end
-function calc_moment_target(r::Union{<:ThirdCentralMoment{<:AbstractWeights, Nothing},
-                                     <:Skewness{<:Any, <:AbstractWeights, Nothing}}, ::Any,
-                            x::VecNum)
+function calc_moment_target(r::TCMUSk{<:AbstractWeights, Nothing}, ::Any, x::VecNum)
     return mean(x, r.w)
 end
-function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:VecNum},
-                                     <:Skewness{<:Any, <:Any, <:VecNum}}, w::VecNum, ::Any)
+function calc_moment_target(r::TCMUSk{<:Any, <:VecNum}, w::VecNum, ::Any)
     return dot(w, r.mu)
 end
-function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:VecScalar},
-                                     <:Skewness{<:Any, <:Any, <:VecScalar}}, w::VecNum,
-                            ::Any)
+function calc_moment_target(r::TCMUSk{<:Any, <:VecScalar}, w::VecNum, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
-function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Number},
-                                     <:Skewness{<:Any, <:Any, <:Number}}, ::Any, ::Any)
+function calc_moment_target(r::TCMUSk{<:Any, <:Number}, ::Any, ::Any)
     return r.mu
 end
-function calc_deviations_vec(r::Union{<:ThirdCentralMoment, <:Skewness}, w::VecNum,
-                             X::MatNum, fees::Option{<:Fees} = nothing)
+function calc_deviations_vec(r::TCMUSk, w::VecNum, X::MatNum,
+                             fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
     return x .- target
@@ -117,4 +111,4 @@ function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     return res / sigma^3
 end
 
-export MeanReturn, ThirdCentralMoment, Skewness
+export MeanReturn, ThirdCentralMoment, Skewness, TCMUSk

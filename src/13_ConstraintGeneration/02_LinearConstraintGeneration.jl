@@ -571,7 +571,7 @@ Expand and collect all terms from a Julia expression representing a linear const
 
 # Returns
 
-  - `terms::Vector{Tuple{Float64, Union{String, Nothing}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
+  - `terms::Vector{Tuple{Float64, Option{<:String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
 
 # Related
 
@@ -594,7 +594,7 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
   - `expr`: The Julia expression to traverse.
   - `coeff`: The current numeric coefficient to apply.
-  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(Float64, Union{String, Nothing})`, where `Nothing` indicates a constant term.
+  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(Float64, Option{<:String})`, where `Nothing` indicates a constant term.
 
 # Details
 
@@ -1248,6 +1248,7 @@ const LcULcE = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 const VecLcULcE = AbstractVector{<:LcULcE}
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
 const LcULcEUVecLcULcE = Union{<:LcULcE, <:VecLcULcE}
+const LcEUVecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
@@ -1339,8 +1340,7 @@ function linear_constraints(eqn::EqnType, sets::AssetSets; ops1::Tuple = ("==", 
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 """
-    linear_constraints(lcs::Union{<:LinearConstraintEstimator,
-                                  <:VecLcE},
+    linear_constraints(lcs::LcEUVecLcE,
                        sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false)
 

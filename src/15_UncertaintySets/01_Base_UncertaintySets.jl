@@ -54,6 +54,7 @@ Subtypes implement specific methods for generating the scaling parameter, which 
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
+const UcKUNum = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
@@ -479,7 +480,7 @@ Ellipse uncertainty sets model uncertainty by specifying an ellipsoidal region f
 # Constructor
 
     EllipseUncertaintySetAlgorithm(;
-                                   method::Union{<:AbstractUncertaintyKAlgorithm, <:Number} = ChiSqKUncertaintyAlgorithm(),
+                                   method::UcKUNum = ChiSqKUncertaintyAlgorithm(),
                                    diagonal::Bool = true)
 
   - `method`: Sets the scaling algorithm or value for the ellipse.
@@ -504,14 +505,11 @@ EllipseUncertaintySetAlgorithm
 struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
-    function EllipseUncertaintySetAlgorithm(method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                          <:Number}, diagonal::Bool)
+    function EllipseUncertaintySetAlgorithm(method::UcKUNum, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
     end
 end
-function EllipseUncertaintySetAlgorithm(;
-                                        method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                      <:Number} = ChiSqKUncertaintyAlgorithm(),
+function EllipseUncertaintySetAlgorithm(; method::UcKUNum = ChiSqKUncertaintyAlgorithm(),
                                         diagonal::Bool = true)
     return EllipseUncertaintySetAlgorithm(method, diagonal)
 end
@@ -631,4 +629,4 @@ end
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet,
-       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet, UcUUcE
+       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet, UcUUcE, UcKUNum
