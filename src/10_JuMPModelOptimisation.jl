@@ -10,9 +10,9 @@ All concrete types representing the result of a JuMP model optimisation should s
   - [`JuMPResult`](@ref)
 """
 abstract type AbstractJuMPResult <: AbstractResult end
-const SlvSettings = Union{<:AbstractDict{<:AbstractString, <:Any},
-                          <:Pair{<:AbstractString, <:Any},
-                          <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
+const DictStrAUVecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
+                                   <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
+const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrAUVecPairStrA}
 """
     struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
         name::T1
@@ -154,9 +154,7 @@ function set_solver_attributes(args...)
 end
 """
     set_solver_attributes(model::JuMP.Model,
-                          settings::Union{<:AbstractDict{<:AbstractString, <:Any},
-                                          <:AbstractVector{<:Pair{<:AbstractString,
-                                                                  <:Any}}})
+                          settings::DictStrAUVecPairStrA)
 
 Set multiple solver attributes on a JuMP model.
 
@@ -171,10 +169,7 @@ Iterates over the provided settings and applies each as a solver attribute.
 
   - `nothing`
 """
-function set_solver_attributes(model::JuMP.Model,
-                               settings::Union{<:AbstractDict{<:AbstractString, <:Any},
-                                               <:AbstractVector{<:Pair{<:AbstractString,
-                                                                       <:Any}}})
+function set_solver_attributes(model::JuMP.Model, settings::DictStrAUVecPairStrA)
     for (k, v) in settings
         set_attribute(model, k, v)
     end
@@ -249,4 +244,4 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::SlvUVecSlv)
     return JuMPResult(; trials = trials, success = success)
 end
 
-export Solver, JuMPResult, VecSlv, SlvUVecSlv, SlvSettings
+export Solver, JuMPResult, VecSlv, SlvUVecSlv, SlvSettings, DictStrAUVecPairStrA

@@ -311,7 +311,8 @@ const NumUVecNum = Union{<:Number, <:VecNum}
 const EstValType = Union{<:NumUVecNum, <:Pair{<:AbstractString, <:Number},
                          <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
                          <:AbstractDict{<:AbstractString, <:Number}}
-const VecStrUExpr = AbstractVector{<:Union{<:AbstractString, Expr}}
+const StrUExpr = Union{<:AbstractString, Expr}
+const VecStrUExpr = AbstractVector{<:StrUExpr}
 const EqnType = Union{<:AbstractString, Expr, <:VecStrUExpr}
 const VecVecNum = AbstractVector{<:VecNum}
 const VecVecInt = AbstractVector{<:VecInt}
@@ -328,4 +329,4 @@ const VecDate = AbstractVector{<:Dates.AbstractTime}
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, VecNum, VecInt,
        MatNum, ArrNum, EstValType, VecStrUExpr, EqnType, VecVecNum, VecVecInt, VecMatNum,
        VecStr, VecPair, VecJuMPScalar, Option, NumUVecNum, MatNumUVecMatNum, IntUVecInt,
-       VecNumUVecVecNum, VecDate
+       VecNumUVecVecNum, VecDate, StrUExpr

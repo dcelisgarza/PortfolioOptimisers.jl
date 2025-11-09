@@ -858,7 +858,7 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
 
 # Returns
 
-  - If `eqn::Union{<:AbstractString, Expr}`:
+  - If `eqn::StrUExpr`:
 
       + `res::ParsingResult`: Structured parsing result.
 
@@ -930,8 +930,7 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
 end
-function parse_equation(eqn::AbstractVector{<:Union{<:AbstractString, Expr}};
-                        ops1::Tuple = ("==", "<=", ">="),
+function parse_equation(eqn::AbstractVector{<:StrUExpr}; ops1::Tuple = ("==", "<=", ">="),
                         ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64)
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
@@ -1781,17 +1780,14 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
-    asset_sets_matrix(smtx::AbstractVector{<:Union{<:MatNum,
-                                                   <:AssetSetsMatrixEstimator}},
+    asset_sets_matrix(smtx::AbstractVector{<:MatUASMatE},
                       sets::AssetSets)
 
 Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::AbstractVector{<:Union{<:MatNum,
-                                                        <:AssetSetsMatrixEstimator}},
-                           sets::AssetSets)
+function asset_sets_matrix(smtx::AbstractVector{<:MatUASMatE}, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
@@ -1802,9 +1798,7 @@ end
 function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
     return smtx
 end
-function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:MatNum,
-                                                             <:AssetSetsMatrixEstimator}},
-                                i; kwargs...)
+function asset_sets_matrix_view(smtx::AbstractVector{<:MatUASMatE}, i; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
 end
 
