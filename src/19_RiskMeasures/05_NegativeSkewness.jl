@@ -1,4 +1,4 @@
-const NSkAlg = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr, <:SOCRiskExpr}
+const NSkAlg = Union{<:NSkeQuadAlg, <:SOCRiskExpr}
 struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     mp::T2
@@ -33,8 +33,7 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::VecNum)
     return sqrt(dot(w, r.V, w))
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                              <:Union{<:SquaredSOCRiskExpr, <:QuadRiskExpr}})(w::VecNum)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadAlg})(w::VecNum)
     return dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, prior::HighOrderPrior, args...; kwargs...)

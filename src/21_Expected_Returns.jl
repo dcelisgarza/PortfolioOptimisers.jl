@@ -20,7 +20,7 @@ Compute the expected portfolio return using the specified return estimator.
 
 # Returns
 
-  - `rt::Union{<:Number, <:VecNum}`: Expected portfolio return(s), net of fees if provided.
+  - `rt::NumUVecNum`: Expected portfolio return(s), net of fees if provided.
 
 # Details
 

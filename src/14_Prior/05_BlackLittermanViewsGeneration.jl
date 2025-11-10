@@ -52,7 +52,7 @@ function BlackLittermanViews(; P::MatNum, Q::VecNum)
 end
 const LcUBlV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
-    get_black_litterman_views(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
+    get_black_litterman_views(lcs::PRUVecPR,
                               sets::AssetSets; datatype::DataType = Float64,
                               strict::Bool = false)
 
@@ -97,10 +97,8 @@ BlackLittermanViews
   - [`parse_equation`](@ref)
   - [`AssetSets`](@ref)
 """
-function get_black_litterman_views(lcs::Union{<:ParsingResult,
-                                              <:AbstractVector{<:ParsingResult}},
-                                   sets::AssetSets; datatype::DataType = Float64,
-                                   strict::Bool = false)
+function get_black_litterman_views(lcs::PRUVecPR, sets::AssetSets;
+                                   datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs))
     end

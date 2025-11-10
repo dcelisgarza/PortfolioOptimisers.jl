@@ -308,9 +308,11 @@ const VecInt = AbstractVector{<:Integer}
 const MatNum = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
 const ArrNum = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
 const NumUVecNum = Union{<:Number, <:VecNum}
-const EstValType = Union{<:NumUVecNum, <:Pair{<:AbstractString, <:Number},
-                         <:AbstractVector{<:Pair{<:AbstractString, <:Number}},
-                         <:AbstractDict{<:AbstractString, <:Number}}
+const NumUArrNum = Union{<:Number, <:ArrNum}
+const PairStrNum = Pair{<:AbstractString, <:Number}
+const DictStrNum = AbstractDict{<:AbstractString, <:Number}
+const DictPairStrNum = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+const EstValType = Union{<:NumUVecNum, <:PairStrNum, <:DictPairStrNum}
 const StrUExpr = Union{<:AbstractString, Expr}
 const VecStrUExpr = AbstractVector{<:StrUExpr}
 const EqnType = Union{<:AbstractString, Expr, <:VecStrUExpr}
@@ -325,8 +327,12 @@ const MatNumUVecMatNum = Union{<:MatNum, <:VecMatNum}
 const IntUVecInt = Union{<:Integer, <:VecInt}
 const VecNumUVecVecNum = Union{<:VecNum, <:VecVecNum}
 const VecDate = AbstractVector{<:Dates.AbstractTime}
+const DictVec = Union{<:AbstractDict, <:AbstractVector}
+const SymStr = Union{Symbol, <:AbstractString}
+const StrUVec = Union{<:AbstractString, <:AbstractVector}
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError, VecNum, VecInt,
        MatNum, ArrNum, EstValType, VecStrUExpr, EqnType, VecVecNum, VecVecInt, VecMatNum,
        VecStr, VecPair, VecJuMPScalar, Option, NumUVecNum, MatNumUVecMatNum, IntUVecInt,
-       VecNumUVecVecNum, VecDate, StrUExpr
+       VecNumUVecVecNum, VecDate, StrUExpr, DictVec, SymStr, PairStrNum, DictStrNum,
+       DictPairStrNum, StrUVec, NumUArrNum

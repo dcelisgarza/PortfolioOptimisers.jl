@@ -411,10 +411,10 @@ function LogSumExpScalariser(; gamma::Number = 1.0)
 end
 """
     nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_factory(risk_variable::Union{<:Number, <:ArrNum, <:VecScalar},
+    nothing_scalar_array_factory(risk_variable::NumUArrNumUVecScalar,
                                  ::Any)
     nothing_scalar_array_factory(risk_variable::Nothing,
-                                 prior_variable::Union{<:Number, <:ArrNum, <:VecScalar})
+                                 prior_variable::NumUArrNumUVecScalar)
 
 Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
@@ -432,20 +432,16 @@ Utility to select a non-nothing value when provided by a risk measure, or fall b
 function nothing_scalar_array_factory(::Nothing, ::Nothing)
     return nothing
 end
-function nothing_scalar_array_factory(risk_variable::Union{<:Number, <:ArrNum, <:VecScalar},
-                                      ::Any)
+function nothing_scalar_array_factory(risk_variable::NumUArrNumUVecScalar, ::Any)
     return risk_variable
 end
-function nothing_scalar_array_factory(::Nothing,
-                                      prior_variable::Union{<:Number, <:ArrNum,
-                                                            <:VecScalar})
+function nothing_scalar_array_factory(::Nothing, prior_variable::NumUArrNumUVecScalar)
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
-function risk_measure_nothing_scalar_array_view(risk_variable::Union{<:Number, <:ArrNum},
-                                                ::Any, i)
+function risk_measure_nothing_scalar_array_view(risk_variable::NumUArrNum, ::Any, i)
     return nothing_scalar_array_view(risk_variable, i)
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::ArrNum, i)

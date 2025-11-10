@@ -183,6 +183,7 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
                                                                                      eqn)
     end
 end
+const PRUVecPR = Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}}
 """
     struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
         vars::T1
@@ -414,10 +415,9 @@ The function creates the vector and sets the values for assets or groups as spec
   - [`AssetSets`](@ref)
   - [`estimator_to_val`](@ref)
 """
-function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number},
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Number}}},
-                          sets::AssetSets, val::Option{<:Number} = nothing;
-                          datatype::DataType = Float64, strict::Bool = false)
+function estimator_to_val(dict::DictPairStrNum, sets::AssetSets,
+                          val::Option{<:Number} = nothing; datatype::DataType = Float64,
+                          strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
@@ -430,7 +430,7 @@ function estimator_to_val(dict::Union{<:AbstractDict{<:AbstractString, <:Number}
     end
     return arr
 end
-function estimator_to_val(dict::Pair{<:AbstractString, <:Number}, sets::AssetSets,
+function estimator_to_val(dict::PairStrNum, sets::AssetSets,
                           val::Option{<:Number} = nothing; datatype::DataType = Float64,
                           strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
@@ -936,7 +936,7 @@ function parse_equation(eqn::AbstractVector{<:StrUExpr}; ops1::Tuple = ("==", "<
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
 """
-    replace_group_by_assets(res::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
+    replace_group_by_assets(res::PRUVecPR,
                             sets::AssetSets; bl_flag::Bool = false, ep_flag::Bool = false,
                             rho_flag::Bool = false)
 
@@ -1097,7 +1097,7 @@ function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::Ass
     return replace_group_by_assets.(res, sets, args...)
 end
 """
-    get_linear_constraints(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
+    get_linear_constraints(lcs::PRUVecPR,
                            sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
@@ -1130,10 +1130,8 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
 """
-function get_linear_constraints(lcs::Union{<:ParsingResult,
-                                           <:AbstractVector{<:ParsingResult}},
-                                sets::AssetSets; datatype::DataType = Float64,
-                                strict::Bool = false)
+function get_linear_constraints(lcs::PRUVecPR, sets::AssetSets;
+                                datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
     end
@@ -1234,7 +1232,7 @@ LinearConstraint
 struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
     val::T1
     function LinearConstraintEstimator(val::EqnType)
-        if isa(val, Union{<:AbstractString, <:AbstractVector})
+        if isa(val, StrUVec)
             @argcheck(!isempty(val))
         end
         return new{typeof(val)}(val)
@@ -1681,7 +1679,7 @@ const MatUASMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
 const VecMatUASMatE = AbstractVector{<:MatUASMatE}
 const MatUASMatEUVecMatUASMatE = Union{<:MatUASMatE, <:VecMatUASMatE}
 """
-    asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
+    asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
 
 Construct a binary asset-group membership matrix from asset set groupings.
 
@@ -1726,7 +1724,7 @@ julia> asset_sets_matrix("sector", sets)
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix_view`](@ref)
 """
-function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
+function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
     all_sets = sets.dict[smtx]
     @argcheck(length(sets.dict[sets.key]) == length(all_sets),
@@ -1806,4 +1804,4 @@ export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEst
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
        linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, VecLcULcE,
-       RkbURkbE, VecMatUASMatE, MatUASMatEUVecMatUASMatE, VecLc
+       RkbURkbE, VecMatUASMatE, MatUASMatEUVecMatUASMatE, VecLc, PRUVecPR

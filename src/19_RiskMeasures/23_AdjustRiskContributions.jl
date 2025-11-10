@@ -6,15 +6,13 @@ const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                   <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:SOCRiskExpr},
                                   <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                     <:Union{<:SquaredSOCRiskExpr,
-                                                             <:QuadRiskExpr}}}
+                                                     <:NSkeQuadAlg}}
 const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                          <:LowOrderMoment{<:Any, <:Any, <:Any,
                                                           <:SecondMoment{<:Any, <:Any,
                                                                          <:QuadSecondMomentFormulations}},
                                          <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                            <:Union{<:SquaredSOCRiskExpr,
-                                                                    <:QuadRiskExpr}},
+                                                            <:NSkeQuadAlg},
                                          <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:QuadSecondMomentFormulations}}
 const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,

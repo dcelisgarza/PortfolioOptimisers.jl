@@ -571,7 +571,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
 """
 struct MaxValue <: VectorToScalarMeasure end
 """
-    vec_to_real_measure(measure::Union{<:VectorToScalarMeasure, <:Number}, val::VecNum)
+    vec_to_real_measure(measure::NumUVecToScaM, val::VecNum)
 
 Reduce a vector of real values to a single real value using a specified measure.
 

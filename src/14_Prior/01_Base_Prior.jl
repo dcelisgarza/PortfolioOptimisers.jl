@@ -233,8 +233,7 @@ function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-    phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
-                                  <:AbstractClusteringResult}, pr::AbstractPriorResult;
+    phylogeny_matrix(necle::NwEUClRUClE, pr::AbstractPriorResult;
                      kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
@@ -258,10 +257,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator,
-                                       <:AbstractClusteringEstimator,
-                                       <:AbstractClusteringResult}, pr::AbstractPriorResult;
-                          kwargs...)
+function phylogeny_matrix(necle::NwEUClRUClE, pr::AbstractPriorResult; kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """

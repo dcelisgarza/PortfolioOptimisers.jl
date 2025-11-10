@@ -449,6 +449,7 @@ function VecScalar(; v::VecNum, s::Number)
     return VecScalar(v, s)
 end
 const NumUVecNumUVecScalar = Union{<:NumUVecNum, <:VecScalar}
+const NumUArrNumUVecScalar = Union{<:NumUArrNum, <:VecScalar}
 """
     nothing_scalar_array_view(x, i)
 

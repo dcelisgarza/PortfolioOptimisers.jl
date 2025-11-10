@@ -209,10 +209,10 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
                                    ub::Option{<:EstValTypeUCWbA},
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)
-        if isa(lb, Union{<:AbstractDict, <:AbstractVector})
+        if isa(lb, DictVec)
             @argcheck(!isempty(lb), IsEmptyError)
         end
-        if isa(ub, Union{<:AbstractDict, <:AbstractVector})
+        if isa(ub, DictVec)
             @argcheck(!isempty(ub), IsEmptyError)
         end
         if !isnothing(dlb) && !isnothing(dub)
@@ -342,7 +342,7 @@ Generate a vector of portfolio weight bounds from a scalar bound.
 
 # Returns
 
-  - `wb::Union{<:Vector{<:Number}, <:StepRangeLen}`: Vector of length `N` filled with `wb` or `val`.
+  - `wb::VecNum`: Vector of length `N` filled with `wb` or `val`.
 
 # Examples
 
