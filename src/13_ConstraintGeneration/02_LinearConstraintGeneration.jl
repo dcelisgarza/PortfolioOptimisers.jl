@@ -183,7 +183,8 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
                                                                                      eqn)
     end
 end
-const PRUVecPR = Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}}
+const VecPR = AbstractVector{<:ParsingResult}
+const PRUVecPR = Union{<:ParsingResult, <:VecPR}
 """
     struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
         vars::T1
@@ -930,7 +931,7 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
 end
-function parse_equation(eqn::AbstractVector{<:StrUExpr}; ops1::Tuple = ("==", "<=", ">="),
+function parse_equation(eqn::VecStrUExpr; ops1::Tuple = ("==", "<=", ">="),
                         ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64)
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
@@ -1092,8 +1093,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
 end
-function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
-                                 args...)
+function replace_group_by_assets(res::VecPR, sets::AssetSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
@@ -1471,6 +1471,7 @@ end
 function RiskBudgetEstimator(; val::EstValType)
     return RiskBudgetEstimator(val)
 end
+const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
 const RkbURkbE = Union{<:RiskBudgetEstimator, <:RiskBudgetResult}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
@@ -1596,7 +1597,7 @@ function risk_budget_constraints(rb::EstValType, sets::AssetSets;
 end
 """
     risk_budget_constraints(rb::Union{<:RiskBudgetEstimator,
-                                      <:AbstractVector{<:RiskBudgetEstimator}}, sets::AssetSets;
+                                      <:VecRkbE}, sets::AssetSets;
                             strict::Bool = false, kwargs...)
 
 If `rb` is a vector of [`RiskBudgetEstimator`](@ref) objects, this function is broadcast over the vector.
@@ -1615,8 +1616,8 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
     return risk_budget_constraints(rb.val, sets; strict = strict)
 end
-function risk_budget_constraints(rb::AbstractVector{<:RiskBudgetEstimator}, sets::AssetSets;
-                                 strict::Bool = false, kwargs...)
+function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
+                                 kwargs...)
     return [risk_budget_constraints(rbi, sets; strict = strict) for rbi in rb]
 end
 """
@@ -1778,14 +1779,14 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
-    asset_sets_matrix(smtx::AbstractVector{<:MatUASMatE},
+    asset_sets_matrix(smtx::VecMatUASMatE,
                       sets::AssetSets)
 
 Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::AbstractVector{<:MatUASMatE}, sets::AssetSets)
+function asset_sets_matrix(smtx::VecMatUASMatE, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
@@ -1796,7 +1797,7 @@ end
 function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
     return smtx
 end
-function asset_sets_matrix_view(smtx::AbstractVector{<:MatUASMatE}, i; kwargs...)
+function asset_sets_matrix_view(smtx::VecMatUASMatE, i; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
 end
 

@@ -224,7 +224,7 @@ Validate Black-Litterman view confidence specification.
   - `views`:
 
       + `::StrUExpr`, `length(views_conf) == 1`.
-      + `::AbstractVector{<:StrUExpr}`, `length(views_conf) == length(views)`.
+      + `::VecStrUExpr`, `length(views_conf) == length(views)`.
       + `::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
       + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
 

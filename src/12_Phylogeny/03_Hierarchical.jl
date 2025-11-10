@@ -61,6 +61,7 @@ struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
                                                                                            ilevel)
     end
 end
+const VecClN = AbstractVector{<:ClusterNode}
 """
     is_leaf(a::ClusterNode)
 
@@ -268,7 +269,7 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:
     return HierarchicalClustering(; clustering = clustering, S = S, D = D, k = k)
 end
 """
-    validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNode}, k::Integer)
+    validate_k_value(clustering::Hclust, nodes::VecClN, k::Integer)
 
 Validate whether a given number of clusters `k` is consistent with the hierarchical clustering tree.
 
@@ -289,8 +290,7 @@ This function checks if the clustering assignment for `k` clusters is compatible
   - [`optimal_number_clusters`](@ref)
   - [`ClusterNode`](@ref)
 """
-function validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNode},
-                          k::Integer)
+function validate_k_value(clustering::Hclust, nodes::VecClN, k::Integer)
     idx = cutree(clustering; k = k)
     clusters = Vector{Vector{Int}}(undef, length(minimum(idx):maximum(idx)))
     for i in eachindex(clusters)

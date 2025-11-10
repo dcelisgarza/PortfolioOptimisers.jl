@@ -15,6 +15,7 @@ All concrete risk measures can be used as functors (callable structs) to compute
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
+const VecABRM = AbstractVector{<:AbstractBaseRiskMeasure}
 """
     abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 
@@ -263,13 +264,13 @@ end
 function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
-function factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...; kwargs...)
+function factory(rs::VecABRM, args...; kwargs...)
     return [factory(r, args...; kwargs...) for r in rs]
 end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
-function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i, X::MatNum)
+function risk_measure_view(rs::VecABRM, i, X::MatNum)
     return [risk_measure_view(r, i, X) for r in rs]
 end
 """

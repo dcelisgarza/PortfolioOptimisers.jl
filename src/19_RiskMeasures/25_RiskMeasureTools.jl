@@ -51,7 +51,7 @@ for r in traverse_concrete_subtypes(HierarchicalRiskMeasure)
              end
          end)
 end
-function no_bounds_no_risk_expr_risk_measure(r::AbstractVector{<:AbstractBaseRiskMeasure})
+function no_bounds_no_risk_expr_risk_measure(r::VecABRM)
     return no_bounds_no_risk_expr_risk_measure.(r)
 end
 

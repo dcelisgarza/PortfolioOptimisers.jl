@@ -633,6 +633,7 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+const VecEP = AbstractVector{<:EntropyPoolingPrior}
 function factory(pe::EntropyPoolingPrior, w::Option{<:AbstractWeights} = nothing)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
@@ -751,7 +752,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     return ParsingResult(variables_new, coeffs_new, res.op, rhs, "$(eqn) $(res.op) $(rhs)")
 end
 """
-    replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
+    replace_prior_views(res::VecPR, args...; kwargs...)
 
 Broadcast prior reference replacement across multiple view constraints.
 
@@ -773,7 +774,7 @@ Broadcast prior reference replacement across multiple view constraints.
   - [`LowOrderPrior`](@ref)
   - [`AssetSets`](@ref)
 """
-function replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
+function replace_prior_views(res::VecPR, args...; kwargs...)
     return replace_prior_views.(res, args...; kwargs...)
 end
 """

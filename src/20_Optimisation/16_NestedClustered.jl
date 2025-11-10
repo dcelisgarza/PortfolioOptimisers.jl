@@ -50,7 +50,7 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.plg))
     return nothing
 end
-function assert_internal_optimiser(opt::AbstractVector{<:OptEUOptR})
+function assert_internal_optimiser(opt::VecOptEUOptR)
     assert_internal_optimiser.(opt)
     return nothing
 end
@@ -74,7 +74,7 @@ function assert_external_optimiser(opt::FactorRiskContribution)
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::AbstractVector{<:OptEUOptR})
+function assert_external_optimiser(opt::VecOptEUOptR)
     assert_external_optimiser.(opt)
     return nothing
 end
@@ -153,8 +153,7 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
                            threads = nco.threads, fb = nco.fb)
 end
 function nested_clustering_finaliser(wb::Option{<:WbUWbE}, sets::Option{<:AssetSets},
-                                     cwf::WeightFinaliser, strict::Bool,
-                                     resi::AbstractVector{<:OptimisationResult},
+                                     cwf::WeightFinaliser, strict::Bool, resi::VecOptR,
                                      res::OptimisationResult, w::VecNum;
                                      datatype::DataType = Float64)
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
