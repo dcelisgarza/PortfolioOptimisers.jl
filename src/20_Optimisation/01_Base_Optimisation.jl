@@ -4,11 +4,11 @@ abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
-const VecOptR = AbstractVector{<:OptimisationResult}
+const VecOpt = AbstractVector{<:OptimisationResult}
 abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
-const OptEUOptR = Union{<:OptimisationEstimator, <:OptimisationResult}
-const VecOptEUOptR = AbstractVector{<:OptEUOptR}
+const OptE_Opt = Union{<:OptimisationEstimator, <:OptimisationResult}
+const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
@@ -67,7 +67,7 @@ function assert_external_optimiser(::OptimisationResult)
     return nothing
 end
 function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
-                                         pr::AbstractPriorResult, wi::MatNum, resi::VecOptR;
+                                         pr::AbstractPriorResult, wi::MatNum, resi::VecOpt;
                                          kwargs...)
     iv = isnothing(rd.iv) ? nothing : rd.iv * wi
     ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
@@ -75,3 +75,5 @@ function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::Returns
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure
+
+export VecOptE, VecOpt, OptE_Opt, VecOptE_Opt

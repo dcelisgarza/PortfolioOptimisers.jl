@@ -157,12 +157,12 @@ function factory(r::DistributionallyRobustConditionalValueatRiskRange,
                                                              l_b = r.l_b, r_b = r.r_b,
                                                              w = w)
 end
-const RMCVaRRG{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
+const RMCVaRRg{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
                           <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
                                                                               <:Any, <:Any,
                                                                               <:Any, <:Any,
                                                                               <:Any, T}}
-function (r::RMCVaRRG{Nothing})(x::VecNum)
+function (r::RMCVaRRg{Nothing})(x::VecNum)
     alpha = r.alpha
     aT = alpha * length(x)
     idx1 = ceil(Int, aT)
@@ -184,7 +184,7 @@ function (r::RMCVaRRG{Nothing})(x::VecNum)
     gain = var2 - sum_var2 / bT
     return loss - gain
 end
-function (r::RMCVaRRG{<:AbstractWeights})(x::VecNum)
+function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = x[order]
@@ -287,4 +287,4 @@ end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
        ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
-       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk, RMCVaR, RMCVaRRG
+       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk, RMCVaR, RMCVaRRg

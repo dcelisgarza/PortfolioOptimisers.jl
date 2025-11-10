@@ -22,8 +22,8 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sets::T6
     cwf::T7
     strict::T8
-    function HierarchicalOptimiser(pe::PrEUPr, cle::ClRUClE, slv::Option{<:SlvUVecSlv},
-                                   fees::Option{<:FeesUFeesE}, wb::Option{<:WbUWbE},
+    function HierarchicalOptimiser(pe::PrE_Pr, cle::ClE_Cl, slv::Option{<:Slv_VecSlv},
+                                   fees::Option{<:FeesE_Fees}, wb::Option{<:WbE_Wb},
                                    sets::Option{<:AssetSets}, cwf::WeightFinaliser,
                                    strict::Bool)
         if isa(wb, WeightBoundsEstimator)
@@ -34,11 +34,11 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                                               cwf, strict)
     end
 end
-function HierarchicalOptimiser(; pe::PrEUPr = EmpiricalPrior(),
-                               cle::ClRUClE = ClusteringEstimator(),
-                               slv::Option{<:SlvUVecSlv} = nothing,
-                               fees::Option{<:FeesUFeesE} = nothing,
-                               wb::Option{<:WbUWbE} = WeightBounds(),
+function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
+                               cle::ClE_Cl = ClusteringEstimator(),
+                               slv::Option{<:Slv_VecSlv} = nothing,
+                               fees::Option{<:FeesE_Fees} = nothing,
+                               wb::Option{<:WbE_Wb} = WeightBounds(),
                                sets::Option{<:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)

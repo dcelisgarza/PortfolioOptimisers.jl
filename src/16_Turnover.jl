@@ -122,7 +122,7 @@ Container for turnover portfolio constraints.
 
 # Constructor
 
-    Turnover(; w::VecNum, val::NumUVecNum = 0.0)
+    Turnover(; w::VecNum, val::Num_VecNum = 0.0)
 
 ## Validation
 
@@ -156,7 +156,7 @@ Turnover
 struct Turnover{T1, T2} <: AbstractResult
     w::T1
     val::T2
-    function Turnover(w::VecNum, val::NumUVecNum)
+    function Turnover(w::VecNum, val::Num_VecNum)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if isa(val, VecNum)
@@ -165,14 +165,14 @@ struct Turnover{T1, T2} <: AbstractResult
         return new{typeof(w), typeof(val)}(w, val)
     end
 end
-function Turnover(; w::VecNum, val::NumUVecNum = 0.0)
+function Turnover(; w::VecNum, val::Num_VecNum = 0.0)
     return Turnover(w, val)
 end
-const TnUTnE = Union{<:Turnover, <:TurnoverEstimator}
-const VecTnUTnE = AbstractVector{<:TnUTnE}
+const TnE_Tn = Union{<:Turnover, <:TurnoverEstimator}
+const VecTnE_Tn = AbstractVector{<:TnE_Tn}
 const VecTn = AbstractVector{<:Turnover}
-const TnUVecTn = Union{<:Turnover, <:VecTn}
-const TnUTnEUVecTnUTnE = Union{<:TnUTnE, <:VecTnUTnE}
+const Tn_VecTn = Union{<:Turnover, <:VecTn}
+const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
 
@@ -211,14 +211,14 @@ function turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
     return tn
 end
 """
-    turnover_constraints(tn::VecTnUTnE,
+    turnover_constraints(tn::VecTnE_Tn,
                          sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
-function turnover_constraints(tn::VecTnUTnE, sets::AssetSets; datatype::DataType = Float64,
+function turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType = Float64,
                               strict::Bool = false)
     return [turnover_constraints(tni, sets; datatype = datatype, strict = strict)
             for tni in tn]
@@ -243,5 +243,6 @@ function factory(tn::Turnover, w::VecNum)
     return Turnover(; w = w, val = tn.val)
 end
 
-export TurnoverEstimator, Turnover, turnover_constraints, TnUTnE, VecTnUTnE,
-       TnUTnEUVecTnUTnE
+export TurnoverEstimator, Turnover, turnover_constraints
+
+export TnE_Tn, VecTnE_Tn, VecTn, Tn_VecTn, TnE_Tn_VecTnE_Tn

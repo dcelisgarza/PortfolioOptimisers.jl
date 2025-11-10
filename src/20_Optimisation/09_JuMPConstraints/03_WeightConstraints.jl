@@ -14,7 +14,7 @@ function set_weight_constraints!(args...)
     return nothing
 end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                 bgt::Option{<:NumUBgtRg}, sbgt::Option{<:NumUBgtRg},
+                                 bgt::Option{<:Num_BgtRg}, sbgt::Option{<:Num_BgtRg},
                                  long::Bool = false)
     lb = wb.lb
     ub = wb.ub
@@ -58,7 +58,7 @@ end
 function set_linear_weight_constraints!(args...)
     return nothing
 end
-function set_linear_weight_constraints!(model::JuMP.Model, lcms::VecLcULc, key_ineq::Symbol,
+function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc, key_ineq::Symbol,
                                         key_eq::Symbol)
     w = model[:w]
     k = model[:k]

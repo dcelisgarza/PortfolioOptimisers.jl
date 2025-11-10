@@ -1,11 +1,11 @@
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
     rkb::T1
-    function AssetRiskBudgeting(rkb::Option{<:RkbURkbE})
+    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb})
         return new{typeof(rkb)}(rkb)
     end
 end
-function AssetRiskBudgeting(; rkb::Option{<:RkbURkbE} = nothing)
+function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing)
     return AssetRiskBudgeting(rkb)
 end
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
@@ -15,12 +15,12 @@ struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
     flag::T3
-    function FactorRiskBudgeting(re::RegURegE, rkb::Option{<:RkbURkbE}, flag::Bool)
+    function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb}, flag::Bool)
         return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
     end
 end
-function FactorRiskBudgeting(; re::RegURegE = StepwiseRegression(),
-                             rkb::Option{<:RkbURkbE} = nothing, flag::Bool = true)
+function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
+                             rkb::Option{<:RkbE_Rkb} = nothing, flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, flag)
 end
 function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
@@ -33,7 +33,7 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     rba::T3
     wi::T4
     fb::T5
-    function RiskBudgeting(opt::JuMPOptimiser, r::RMUVecRM, rba::RiskBudgetingAlgorithm,
+    function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
@@ -48,7 +48,7 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
                                                                                 wi, fb)
     end
 end
-function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RMUVecRM = Variance(),
+function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:VecNum} = nothing,
                        fb::Option{<:OptimisationEstimator} = nothing)

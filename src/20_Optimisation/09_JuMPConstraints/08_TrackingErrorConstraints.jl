@@ -56,7 +56,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         plg::Option{<:PhCUVecPhC}, fees::Option{<:Fees},
+                                         plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees},
                                          args...; kwargs...)
     r = te.r
     wb = te.tracking.w
@@ -81,7 +81,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         plg::Option{<:PhCUVecPhC}, fees::Option{<:Fees},
+                                         plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees},
                                          args...; kwargs...)
     ri = te.r
     wb = te.tracking.w
@@ -107,7 +107,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                         tres::TrUVecTr, args...; kwargs...)
+                                         tres::Tr_VecTr, args...; kwargs...)
     for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...; kwargs...)
     end

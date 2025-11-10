@@ -113,7 +113,7 @@ function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
     return LinearConstraint(ineq, eq)
 end
 const VecLc = AbstractVector{<:LinearConstraint}
-const VecLcULc = Union{<:LinearConstraint, <:VecLc}
+const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
         isnothing(obj.ineq) ? nothing : obj.ineq.A
@@ -184,7 +184,7 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     end
 end
 const VecPR = AbstractVector{<:ParsingResult}
-const PRUVecPR = Union{<:ParsingResult, <:VecPR}
+const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
     struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
         vars::T1
@@ -416,7 +416,7 @@ The function creates the vector and sets the values for assets or groups as spec
   - [`AssetSets`](@ref)
   - [`estimator_to_val`](@ref)
 """
-function estimator_to_val(dict::DictPairStrNum, sets::AssetSets,
+function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
                           val::Option{<:Number} = nothing; datatype::DataType = Float64,
                           strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
@@ -859,7 +859,7 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
 
 # Returns
 
-  - If `eqn::StrUExpr`:
+  - If `eqn::Str_Expr`:
 
       + `res::ParsingResult`: Structured parsing result.
 
@@ -931,13 +931,13 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
 end
-function parse_equation(eqn::VecStrUExpr; ops1::Tuple = ("==", "<=", ">="),
+function parse_equation(eqn::VecStr_Expr; ops1::Tuple = ("==", "<=", ">="),
                         ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64)
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
 """
-    replace_group_by_assets(res::PRUVecPR,
+    replace_group_by_assets(res::PR_VecPR,
                             sets::AssetSets; bl_flag::Bool = false, ep_flag::Bool = false,
                             rho_flag::Bool = false)
 
@@ -1097,7 +1097,7 @@ function replace_group_by_assets(res::VecPR, sets::AssetSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
-    get_linear_constraints(lcs::PRUVecPR,
+    get_linear_constraints(lcs::PR_VecPR,
                            sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
@@ -1130,7 +1130,7 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
 """
-function get_linear_constraints(lcs::PRUVecPR, sets::AssetSets;
+function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets;
                                 datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
@@ -1232,7 +1232,7 @@ LinearConstraint
 struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
     val::T1
     function LinearConstraintEstimator(val::EqnType)
-        if isa(val, StrUVec)
+        if isa(val, Str_Vec)
             @argcheck(!isempty(val))
         end
         return new{typeof(val)}(val)
@@ -1241,11 +1241,11 @@ end
 function LinearConstraintEstimator(; val::EqnType)
     return LinearConstraintEstimator(val)
 end
-const LcULcE = Union{<:LinearConstraintEstimator, <:LinearConstraint}
-const VecLcULcE = AbstractVector{<:LcULcE}
+const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+const VecLcE_Lc = AbstractVector{<:LcE_Lc}
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
-const LcULcEUVecLcULcE = Union{<:LcULcE, <:VecLcULcE}
-const LcEUVecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
@@ -1337,7 +1337,7 @@ function linear_constraints(eqn::EqnType, sets::AssetSets; ops1::Tuple = ("==", 
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 """
-    linear_constraints(lcs::LcEUVecLcE,
+    linear_constraints(lcs::LcE_VecLcE,
                        sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false)
 
@@ -1472,7 +1472,7 @@ function RiskBudgetEstimator(; val::EstValType)
     return RiskBudgetEstimator(val)
 end
 const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
-const RkbURkbE = Union{<:RiskBudgetEstimator, <:RiskBudgetResult}
+const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudgetResult}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
 end
@@ -1676,9 +1676,9 @@ end
 function AssetSetsMatrixEstimator(; val::AbstractString)
     return AssetSetsMatrixEstimator(val)
 end
-const MatUASMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
-const VecMatUASMatE = AbstractVector{<:MatUASMatE}
-const MatUASMatEUVecMatUASMatE = Union{<:MatUASMatE, <:VecMatUASMatE}
+const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
+const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
+const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
 """
     asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
 
@@ -1779,14 +1779,14 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
-    asset_sets_matrix(smtx::VecMatUASMatE,
+    asset_sets_matrix(smtx::VecMatNum_ASetMatE,
                       sets::AssetSets)
 
 Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::VecMatUASMatE, sets::AssetSets)
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
@@ -1797,12 +1797,15 @@ end
 function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
     return smtx
 end
-function asset_sets_matrix_view(smtx::VecMatUASMatE, i; kwargs...)
+function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
 end
 
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
-       linear_constraints, risk_budget_constraints, asset_sets_matrix, LcULcE, VecLcULcE,
-       RkbURkbE, VecMatUASMatE, MatUASMatEUVecMatUASMatE, VecLc, PRUVecPR
+       linear_constraints, risk_budget_constraints, asset_sets_matrix
+
+export VecLc, Lc_VecLc, VecPR, PR_VecPR, LcE_Lc, VecLcE_Lc, VecLcE, LcE_Lc_VecLcE_Lc,
+       LcE_VecLcE, VecRkbE, RkbE_Rkb, MatNum_ASetMatE, VecMatNum_ASetMatE,
+       MatNum_ASetMatE_VecMatNum_ASetMatE

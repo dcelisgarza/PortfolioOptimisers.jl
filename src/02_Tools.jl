@@ -448,8 +448,8 @@ end
 function VecScalar(; v::VecNum, s::Number)
     return VecScalar(v, s)
 end
-const NumUVecNumUVecScalar = Union{<:NumUVecNum, <:VecScalar}
-const NumUArrNumUVecScalar = Union{<:NumUArrNum, <:VecScalar}
+const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 """
     nothing_scalar_array_view(x, i)
 
@@ -711,5 +711,6 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes,
-       NumUVecNumUVecScalar
+export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes
+
+export Num_VecNum_VecScalar, Num_ArrNum_VecScalar

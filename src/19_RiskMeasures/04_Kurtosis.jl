@@ -27,7 +27,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 
     Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                        w::Option{<:AbstractWeights} = nothing,
-                       mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                       mu::Option{<:Num_VecNum_VecScalar} = nothing,
                        kt::Option{<:MatNum} = nothing,
                        N::Option{<:Integer} = nothing,
                        alg1::AbstractMomentAlgorithm = Full(),
@@ -98,7 +98,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     alg1::T6
     alg2::T7
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                      mu::Option{<:NumUVecNumUVecScalar}, kt::Option{<:MatNum},
+                      mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
                       N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,
                       alg2::SecondMomentFormulation)
         mu_flag = isa(mu, VecNum)
@@ -130,7 +130,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   w::Option{<:AbstractWeights} = nothing,
-                  mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                  mu::Option{<:Num_VecNum_VecScalar} = nothing,
                   kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
                   alg2::SecondMomentFormulation = SOCRiskExpr())

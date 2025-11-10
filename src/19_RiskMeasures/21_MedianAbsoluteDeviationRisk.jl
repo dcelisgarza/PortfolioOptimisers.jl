@@ -1,14 +1,14 @@
 abstract type MedianCenteringFunction <: AbstractAlgorithm end
 struct MedianCentering <: MedianCenteringFunction end
 struct MeanCentering <: MedianCenteringFunction end
-const MedRMMu = Union{<:NumUVecNumUVecScalar, <:MedianCenteringFunction}
+const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
 struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
     mu::T3
     flag::T4
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
-                                     w::Option{<:AbstractWeights}, mu::MedRMMu,
+                                     w::Option{<:AbstractWeights}, mu::MedAbsDevMu,
                                      flag::Bool = true)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
@@ -26,7 +26,7 @@ end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                  w::Option{<:AbstractWeights} = nothing,
-                                 mu::MedRMMu = MedianCentering(), flag::Bool = true)
+                                 mu::MedAbsDevMu = MedianCentering(), flag::Bool = true)
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
 function factory(r::MedianAbsoluteDeviation, prior::AbstractPriorResult, args...; kwargs...)
@@ -81,4 +81,6 @@ function (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees::Option{<:Fees}
     return mad(val; center = zero(eltype(X)), normalize = r.flag)
 end
 
-export MedianAbsoluteDeviation, MedianCentering, MeanCentering, MedRMMu
+export MedianAbsoluteDeviation, MedianCentering, MeanCentering
+
+export MedAbsDevMu

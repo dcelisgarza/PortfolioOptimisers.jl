@@ -104,8 +104,8 @@ Second-order cone risk expression optimisation formulation for applicable risk m
   - [`RSOCRiskExpr`](@ref)
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
-const NSkeQuadAlg = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
-const QuadSecondMomentFormulations = Union{<:NSkeQuadAlg, <:RSOCRiskExpr}
+const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 """
     struct Variance{T1, T2, T3, T4} <: RiskMeasure
         settings::T1
@@ -127,7 +127,7 @@ Represents the portfolio variance using a covariance matrix.
 
     Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              sigma::Option{<:MatNum} = nothing,
-             rc::Option{<:LcULcE} = nothing,
+             rc::Option{<:LcE_Lc} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
 Keyword arguments correspond to the fields above.
@@ -233,7 +233,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     rc::T3
     alg::T4
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
-                      rc::Option{<:LcULcE}, alg::VarianceFormulation)
+                      rc::Option{<:LcE_Lc}, alg::VarianceFormulation)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -243,7 +243,7 @@ struct Variance{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:MatNum} = nothing, rc::Option{<:LcULcE} = nothing,
+                  sigma::Option{<:MatNum} = nothing, rc::Option{<:LcE_Lc} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
     return Variance(settings, sigma, rc, alg)
 end
@@ -439,7 +439,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 # Constructors
 
     UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           ucs::Option{<:UcUUcE} = NormalUncertaintySet(),
+                           ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
                            sigma::Option{<:MatNum} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -603,7 +603,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
-    function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcUUcE},
+    function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
@@ -612,7 +612,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     end
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                ucs::Option{<:UcUUcE} = NormalUncertaintySet(),
+                                ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
                                 sigma::Option{<:MatNum} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
@@ -634,7 +634,7 @@ function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
 end
 """
     factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-            ucs::Option{<:UcUUcE} = nothing, args...;
+            ucs::Option{<:UcSE_UcS} = nothing, args...;
             kwargs...)
 
 Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertainty set and covariance matrix from the risk-measure instance or falling back to the prior result.
@@ -667,7 +667,7 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
   - [`nothing_scalar_array_factory`](@ref)
 """
 function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-                 ucs::Option{<:UcUUcE} = nothing, args...; kwargs...)
+                 ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     ucs = ucs_factory(r.ucs, ucs)
     sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
@@ -679,4 +679,6 @@ function risk_measure_view(r::UncertaintySetVariance, i, args...)
 end
 
 export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, Variance,
-       StandardDeviation, UncertaintySetVariance, NSkeQuadAlg
+       StandardDeviation, UncertaintySetVariance
+
+export NSkeQuadFormulations, QuadSecondMomentFormulations

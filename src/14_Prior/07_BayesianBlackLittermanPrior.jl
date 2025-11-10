@@ -31,9 +31,9 @@ Bayesian Black-Litterman prior estimator for asset returns.
                                                                                       pe = EmpiricalPrior(;
                                                                                                           me = EquilibriumExpectedReturns())),
                                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                views::LcUBlV,
+                                views::Lc_BLV,
                                 sets::Option{<:AssetSets} = nothing,
-                                views_conf::Option{<:NumUVecNum} = nothing,
+                                views_conf::Option{<:Num_VecNum} = nothing,
                                 rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -142,8 +142,8 @@ struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
     tau::T7
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          mp::AbstractMatrixProcessingEstimator,
-                                         views::LcUBlV, sets::Option{<:AssetSets},
-                                         views_conf::Option{<:NumUVecNum}, rf::Number,
+                                         views::Lc_BLV, sets::Option{<:AssetSets},
+                                         views_conf::Option{<:Num_VecNum}, rf::Number,
                                          tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
@@ -161,8 +161,8 @@ function BayesianBlackLittermanPrior(;
                                                                                            pe = EmpiricalPrior(;
                                                                                                                me = EquilibriumExpectedReturns())),
                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                     views::LcUBlV, sets::Option{<:AssetSets} = nothing,
-                                     views_conf::Option{<:NumUVecNum} = nothing,
+                                     views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                                     views_conf::Option{<:Num_VecNum} = nothing,
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end

@@ -59,13 +59,14 @@ BuyInThresholdEstimator
 struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
     dval::T2
-    function BuyInThresholdEstimator(val::EstValTypeUCWbA, dval::Option{<:Number} = nothing)
+    function BuyInThresholdEstimator(val::EstValType_CustWb,
+                                     dval::Option{<:Number} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function BuyInThresholdEstimator(; val::EstValTypeUCWbA, dval::Option{<:Number} = nothing)
+function BuyInThresholdEstimator(; val::EstValType_CustWb, dval::Option{<:Number} = nothing)
     return BuyInThresholdEstimator(val, dval)
 end
 """
@@ -83,7 +84,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Constructor
 
-    BuyInThreshold(; val::NumUVecNum)
+    BuyInThreshold(; val::Num_VecNum)
 
 ## Validation
 
@@ -109,19 +110,19 @@ BuyInThreshold
 """
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
-    function BuyInThreshold(val::NumUVecNum)
+    function BuyInThreshold(val::Num_VecNum)
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function BuyInThreshold(; val::NumUVecNum)
+function BuyInThreshold(; val::Num_VecNum)
     return BuyInThreshold(val)
 end
-const BtUBtE = Union{<:BuyInThreshold, <:BuyInThresholdEstimator}
-const VecOBtUBtE = AbstractVector{<:Option{<:BtUBtE}}
-const BtUBtEUVecOBtUBtE = Union{<:BtUBtE, <:VecOBtUBtE}
-const VecOBt = AbstractVector{<:Option{<:BuyInThreshold}}
-const BtUVecOBt = Union{<:BuyInThreshold, <:VecOBt}
+const BtE_Bt = Union{<:BuyInThreshold, <:BuyInThresholdEstimator}
+const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
+const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+const VecOptBt = AbstractVector{<:Option{<:BuyInThreshold}}
+const Bt_VecOptBt = Union{<:BuyInThreshold, <:VecOptBt}
 function threshold_view(::Nothing, ::Any)
     return nothing
 end
@@ -132,7 +133,7 @@ end
 function threshold_view(t::BuyInThreshold, i)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
 end
-function threshold_view(t::VecOBtUBtE, i)
+function threshold_view(t::VecOptBtE_Bt, i)
     return [threshold_view(ti, i) for ti in t]
 end
 """
@@ -222,16 +223,17 @@ function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                                                  strict = strict))
 end
 """
-    threshold_constraints(t::VecOBtUBtE, sets::AssetSets;
+    threshold_constraints(t::VecOptBtE_Bt, sets::AssetSets;
                           kwargs...)
 
 Broadcasts [`threshold_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 """
-function threshold_constraints(t::VecOBtUBtE, sets::AssetSets; kwargs...)
+function threshold_constraints(t::VecOptBtE_Bt, sets::AssetSets; kwargs...)
     return [threshold_constraints(ti, sets; kwargs...) for ti in t]
 end
 
-export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints, BtUBtE, VecOBt,
-       BtUVecOBt, VecOBtUBtE, BtUBtEUVecOBtUBtE
+export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints
+
+export BtE_Bt, VecOptBtE_Bt, BtE_Bt_VecOptBtE_Bt, VecOptBt, Bt_VecOptBt

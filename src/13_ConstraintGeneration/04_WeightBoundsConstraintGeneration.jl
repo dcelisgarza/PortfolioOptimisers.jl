@@ -50,8 +50,8 @@ Container for lower and upper portfolio weight bounds.
 
 # Constructor
 
-    WeightBounds(lb::Option{<:NumUVecNum},
-                 ub::Option{<:NumUVecNum})
+    WeightBounds(lb::Option{<:Num_VecNum},
+                 ub::Option{<:Num_VecNum})
 
 ## Validation
 
@@ -84,12 +84,12 @@ WeightBounds
 struct WeightBounds{T1, T2} <: AbstractConstraintResult
     lb::T1
     ub::T2
-    function WeightBounds(lb::Option{<:NumUVecNum}, ub::Option{<:NumUVecNum})
+    function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function WeightBounds(; lb::Option{<:NumUVecNum} = 0.0, ub::Option{<:NumUVecNum} = 1.0)
+function WeightBounds(; lb::Option{<:Num_VecNum} = 0.0, ub::Option{<:Num_VecNum} = 1.0)
     return WeightBounds(lb, ub)
 end
 function weight_bounds_view(wb::WeightBounds, i)
@@ -111,7 +111,7 @@ Abstract supertype for custom portfolio weight bounds constraints.
   - [`UniformlyDistributedBounds`](@ref)
 """
 abstract type CustomWeightBoundsAlgorithm <: AbstractConstraintAlgorithm end
-const EstValTypeUCWbA = Union{<:EstValType, <:CustomWeightBoundsAlgorithm}
+const EstValType_CustWb = Union{<:EstValType, <:CustomWeightBoundsAlgorithm}
 function nothing_scalar_array_view(x::CustomWeightBoundsAlgorithm, ::Any)
     return x
 end
@@ -162,8 +162,8 @@ Estimator for portfolio weight bounds constraints.
 # Constructor
 
     WeightBoundsEstimator(;
-                          lb::Option{<:EstValTypeUCWbA} = nothing,
-                          ub::Option{<:EstValTypeUCWbA} = nothing)
+                          lb::Option{<:EstValType_CustWb} = nothing,
+                          ub::Option{<:EstValType_CustWb} = nothing)
 
 ## Validation
 
@@ -205,14 +205,14 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
     ub::T2
     dlb::T3
     dub::T4
-    function WeightBoundsEstimator(lb::Option{<:EstValTypeUCWbA},
-                                   ub::Option{<:EstValTypeUCWbA},
+    function WeightBoundsEstimator(lb::Option{<:EstValType_CustWb},
+                                   ub::Option{<:EstValType_CustWb},
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)
-        if isa(lb, DictVec)
+        if isa(lb, Dict_Vec)
             @argcheck(!isempty(lb), IsEmptyError)
         end
-        if isa(ub, DictVec)
+        if isa(ub, Dict_Vec)
             @argcheck(!isempty(ub), IsEmptyError)
         end
         if !isnothing(dlb) && !isnothing(dub)
@@ -221,8 +221,8 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end
 end
-function WeightBoundsEstimator(; lb::Option{<:EstValTypeUCWbA} = nothing,
-                               ub::Option{<:EstValTypeUCWbA} = nothing,
+function WeightBoundsEstimator(; lb::Option{<:EstValType_CustWb} = nothing,
+                               ub::Option{<:EstValType_CustWb} = nothing,
                                dlb::Option{<:Number} = nothing,
                                dub::Option{<:Number} = nothing)
     return WeightBoundsEstimator(lb, ub, dlb, dub)
@@ -232,7 +232,7 @@ function weight_bounds_view(wb::WeightBoundsEstimator, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)
 end
-const WbUWbE = Union{<:WeightBoundsEstimator, <:WeightBounds}
+const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets; strict::Bool = false,
                               datatype::DataType = Float64, kwargs...)
@@ -534,4 +534,6 @@ function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0, kwargs.
 end
 
 export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints,
-       UniformlyDistributedBounds, WbUWbE, EstValTypeUCWbA
+       UniformlyDistributedBounds
+
+export EstValType_CustWb, WbE_Wb

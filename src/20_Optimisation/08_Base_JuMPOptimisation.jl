@@ -57,7 +57,7 @@ function set_initial_w!(w::VecNum, wi::VecNum)
     set_start_value.(w, wi)
     return nothing
 end
-function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNumUVecVecNum})
+function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNum_VecVecNum})
     @variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing

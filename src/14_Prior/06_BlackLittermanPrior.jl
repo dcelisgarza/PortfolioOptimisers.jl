@@ -29,9 +29,9 @@ Black-Litterman prior estimator for asset returns.
                         pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
                                                                                    me = EquilibriumExpectedReturns()),
                         mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                        views::LcUBlV,
+                        views::Lc_BLV,
                         sets::Option{<:AssetSets} = nothing,
-                        views_conf::Option{<:NumUVecNum} = nothing,
+                        views_conf::Option{<:Num_VecNum} = nothing,
                         rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -116,9 +116,9 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
     rf::T6
     tau::T7
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
-                                 mp::AbstractMatrixProcessingEstimator, views::LcUBlV,
+                                 mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
                                  sets::Option{<:AssetSets},
-                                 views_conf::Option{<:NumUVecNum}, rf::Number,
+                                 views_conf::Option{<:Num_VecNum}, rf::Number,
                                  tau::Option{<:Number})
         if isa(views, LinearConstraintEstimator)
             @argcheck(!isnothing(sets))
@@ -135,8 +135,8 @@ function BlackLittermanPrior(;
                              pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
                                                                                         me = EquilibriumExpectedReturns()),
                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                             views::LcUBlV, sets::Option{<:AssetSets} = nothing,
-                             views_conf::Option{<:NumUVecNum} = nothing, rf::Number = 0.0,
+                             views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                             views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
                              tau::Option{<:Number} = nothing)
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
@@ -155,7 +155,7 @@ function factory(pe::BlackLittermanPrior, w::Option{<:AbstractWeights} = nothing
                                tau = pe.tau)
 end
 """
-    calc_omega(views_conf::Option{<:NumUVecNum}, P::MatNum,
+    calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,
                sigma::MatNum)
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.

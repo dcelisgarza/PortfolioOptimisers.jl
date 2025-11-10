@@ -39,7 +39,7 @@ Represents the interface for all result types that encode uncertainty sets for r
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
-const UcUUcE = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
+const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
 """
     abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 
@@ -54,7 +54,7 @@ Subtypes implement specific methods for generating the scaling parameter, which 
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
-const UcKUNum = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
+const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
@@ -135,8 +135,8 @@ function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs..
 end
 """
     ucs_factory(risk_ucs::Nothing, prior_ucs::Nothing)
-    ucs_factory(risk_ucs::UcUUcE, prior_ucs::Any)
-    ucs_factory(risk_ucs::Nothing, prior_ucs::UcUUcE)
+    ucs_factory(risk_ucs::UcSE_UcS, prior_ucs::Any)
+    ucs_factory(risk_ucs::Nothing, prior_ucs::UcSE_UcS)
 
 Factory function for selecting uncertainty sets from risk measure or prior result instances.
 
@@ -148,8 +148,8 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 # Returns
 
   - `nothing`: If both `risk_ucs` and `prior_ucs` are `nothing`.
-  - `risk_ucs::UcUUcE`: If `risk_ucs` is not `nothing`.
-  - `prior_ucs::UcUUcE`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
+  - `risk_ucs::UcSE_UcS`: If `risk_ucs` is not `nothing`.
+  - `prior_ucs::UcSE_UcS`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
 
 # Related
 
@@ -160,10 +160,10 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 function ucs_factory(::Nothing, ::Nothing)
     return nothing
 end
-function ucs_factory(risk_ucs::UcUUcE, ::Any)
+function ucs_factory(risk_ucs::UcSE_UcS, ::Any)
     return risk_ucs
 end
-function ucs_factory(::Nothing, prior_ucs::UcUUcE)
+function ucs_factory(::Nothing, prior_ucs::UcSE_UcS)
     return prior_ucs
 end
 function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
@@ -480,7 +480,7 @@ Ellipse uncertainty sets model uncertainty by specifying an ellipsoidal region f
 # Constructor
 
     EllipseUncertaintySetAlgorithm(;
-                                   method::UcKUNum = ChiSqKUncertaintyAlgorithm(),
+                                   method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                    diagonal::Bool = true)
 
   - `method`: Sets the scaling algorithm or value for the ellipse.
@@ -505,11 +505,11 @@ EllipseUncertaintySetAlgorithm
 struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
-    function EllipseUncertaintySetAlgorithm(method::UcKUNum, diagonal::Bool)
+    function EllipseUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
     end
 end
-function EllipseUncertaintySetAlgorithm(; method::UcKUNum = ChiSqKUncertaintyAlgorithm(),
+function EllipseUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                         diagonal::Bool = true)
     return EllipseUncertaintySetAlgorithm(method, diagonal)
 end
@@ -629,4 +629,6 @@ end
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet,
-       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet, UcUUcE, UcKUNum
+       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet
+
+export UcSE_UcS, Num_UcSK

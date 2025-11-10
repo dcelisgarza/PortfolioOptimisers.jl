@@ -151,7 +151,7 @@ Abstract supertype for all prior result types.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractPriorResult <: AbstractResult end
-const PrEUPr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 
@@ -233,7 +233,7 @@ function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-    phylogeny_matrix(necle::NwEUClRUClE, pr::AbstractPriorResult;
+    phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult;
                      kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
@@ -257,7 +257,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(necle::NwEUClRUClE, pr::AbstractPriorResult; kwargs...)
+function phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """
@@ -287,7 +287,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(ne::NwEUClRUClE, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -312,12 +312,12 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ne::NwEUClRUClE, cent::AbstractCentralityAlgorithm,
+function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
                            pr::AbstractPriorResult; kwargs...)
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end
 """
-    average_centrality(ne::PhEUPhR,
+    average_centrality(ne::PhE_Ph,
                        cent::AbstractCentralityAlgorithm, w::VecNum,
                        pr::AbstractPriorResult; kwargs...)
 
@@ -344,7 +344,7 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(ne::PhEUPhR, cent::AbstractCentralityAlgorithm, w::VecNum,
+function average_centrality(ne::PhE_Ph, cent::AbstractCentralityAlgorithm, w::VecNum,
                             pr::AbstractPriorResult; kwargs...)
     return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
@@ -378,7 +378,7 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPri
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
 end
 """
-    asset_phylogeny(cle::PhEUClR,
+    asset_phylogeny(cle::PhE_Cl,
                     w::VecNum, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
@@ -412,7 +412,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::PhEUClR, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
+function asset_phylogeny(cle::PhE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
                          kwargs...)
     return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
 end
@@ -458,7 +458,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
                   chol::Option{<:MatNum} = nothing,
                   w::Option{<:AbstractWeights} = nothing,
                   ens::Option{<:Number} = nothing,
-                  kld::Option{<:NumUVecNum} = nothing,
+                  kld::Option{<:Num_VecNum} = nothing,
                   ow::Option{<:VecNum} = nothing,
                   rr::Option{<:Regression} = nothing,
                   f_mu::Option{<:VecNum} = nothing,
@@ -522,7 +522,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_w::T12
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:AbstractWeights}, ens::Option{<:Number},
-                           kld::Option{<:NumUVecNum}, ow::Option{<:VecNum},
+                           kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
                            f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
         @argcheck(!isempty(X))
@@ -570,7 +570,7 @@ end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        chol::Option{<:MatNum} = nothing,
                        w::Option{<:AbstractWeights} = nothing,
-                       ens::Option{<:Number} = nothing, kld::Option{<:NumUVecNum} = nothing,
+                       ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,
                        f_sigma::Option{<:MatNum} = nothing, f_w::Option{<:VecNum} = nothing)
@@ -711,4 +711,4 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
 
-export prior, LowOrderPrior, HighOrderPrior, PrEUPr
+export prior, LowOrderPrior, HighOrderPrior, PrE_Pr

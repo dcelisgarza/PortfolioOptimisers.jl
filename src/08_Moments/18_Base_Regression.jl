@@ -26,7 +26,7 @@ All concrete types representing the output of regression-based moment estimation
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
-const RegURegE = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
     abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 
@@ -603,3 +603,5 @@ end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, AIC, AICC, BIC,
        RSquared, AdjustedRSquared
+
+export RegE_Reg

@@ -3,7 +3,7 @@
 struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     ucs::T1
     lb::T2
-    function ArithmeticReturn(ucs::Option{<:UcUUcE}, lb::Option{<:RkRtUBounds})
+    function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds})
         if isa(ucs, EllipseUncertaintySet)
             @argcheck(isa(ucs,
                           EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
@@ -17,8 +17,8 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
         return new{typeof(ucs), typeof(lb)}(ucs, lb)
     end
 end
-function ArithmeticReturn(; ucs::Option{<:UcUUcE} = nothing,
-                          lb::Option{<:RkRtUBounds} = nothing)
+function ArithmeticReturn(; ucs::Option{<:UcSE_UcS} = nothing,
+                          lb::Option{<:RkRtBounds} = nothing)
     return ArithmeticReturn(ucs, lb)
 end
 function jump_returns_view(r::ArithmeticReturn, i, args...)
@@ -33,7 +33,7 @@ end
 struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
-    function KellyReturn(w::Option{<:AbstractWeights}, lb::Option{<:RkRtUBounds})
+    function KellyReturn(w::Option{<:AbstractWeights}, lb::Option{<:RkRtBounds})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -47,7 +47,7 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     end
 end
 function KellyReturn(; w::Option{<:AbstractWeights} = nothing,
-                     lb::Option{<:RkRtUBounds} = nothing)
+                     lb::Option{<:RkRtBounds} = nothing)
     return KellyReturn(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
@@ -245,7 +245,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Number)
     @constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, lb::NumVecUFront)
+function set_return_bounds!(model::JuMP.Model, lb::Front_NumVec)
     @expression(model, ret_frontier, lb)
     return nothing
 end
@@ -321,7 +321,8 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
     add_market_impact_cost!(model, ret)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:UcUUcE, <:Any},
+function set_return_constraints!(model::JuMP.Model,
+                                 pret::ArithmeticReturn{<:UcSE_UcS, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult;
                                  rd::ReturnsResult, kwargs...)
     lb = pret.lb

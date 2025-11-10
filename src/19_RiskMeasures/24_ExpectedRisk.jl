@@ -1,4 +1,4 @@
-const MatNumUPrR = Union{<:MatNum, <:AbstractPriorResult}
+const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult}
 const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                         <:ConditionalValueatRisk,
                         <:DistributionallyRobustConditionalValueatRisk,
@@ -18,7 +18,7 @@ const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
 const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                         <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
                         <:Skewness, <:MedianAbsoluteDeviation}
-const Erkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
+const ERkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
                    <:Variance, <:UncertaintySetVariance, <:EqualRiskMeasure}
 """
 """
@@ -38,7 +38,7 @@ function expected_risk(r::ERkwXFees, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return r(w, pr.X, fees)
 end
-function expected_risk(r::Erkw, w::VecNum, args...; kwargs...)
+function expected_risk(r::ERkw, w::VecNum, args...; kwargs...)
     return r(w)
 end
 function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, X::MatNum,
@@ -57,7 +57,7 @@ end
 function number_effective_assets(w::VecNum)
     return inv(dot(w, w))
 end
-function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNumUPrR,
+function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
     N = length(w)
@@ -82,9 +82,9 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNumUPrR,
     end
     return rc
 end
-function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNumUPrR,
+function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;
-                                  re::RegURegE = StepwiseRegression(),
+                                  re::RegE_Reg = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
@@ -99,4 +99,6 @@ function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatN
 end
 
 export RiskRatioRiskMeasure, number_effective_assets, risk_contribution,
-       factor_risk_contribution, MatNumUPrR, ERkNetRet, ERkwXFees
+       factor_risk_contribution
+
+export MatNum_Pr, ERkNetRet, ERkwXFees, ERkw

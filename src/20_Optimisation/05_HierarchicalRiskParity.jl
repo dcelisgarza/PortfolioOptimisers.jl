@@ -3,7 +3,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     r::T2
     sce::T3
     fb::T4
-    function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRMUVecOptRM,
+    function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sce::Scalariser, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
@@ -12,7 +12,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                r::OptRMUVecOptRM = Variance(),
+                                r::OptRM_VecOptRM = Variance(),
                                 sce::Scalariser = SumScalariser(),
                                 fb::Option{<:OptimisationEstimator} = nothing)
     return HierarchicalRiskParity(opt, r, sce, fb)

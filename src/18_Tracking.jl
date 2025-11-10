@@ -14,7 +14,7 @@ All concrete types representing tracking error or tracking constraint results sh
 """
 abstract type AbstractTracking <: AbstractResult end
 const VecTr = AbstractVector{<:AbstractTracking}
-const TrUVecTr = Union{<:AbstractTracking, <:VecTr}
+const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
     abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 
@@ -484,4 +484,6 @@ function factory(tracking::TrackingError, w::VecNum)
                          alg = tracking.alg)
 end
 
-export WeightsTracking, ReturnsTracking, TrackingError, VecTr
+export WeightsTracking, ReturnsTracking, TrackingError
+
+export VecTr, Tr_VecTr

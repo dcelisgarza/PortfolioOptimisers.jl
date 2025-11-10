@@ -8,7 +8,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
     threads::T6
     fb::T7
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
-                                               ri::OptRMUVecOptRM, ro::OptRMUVecOptRM,
+                                               ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
                                                scei::Scalariser, sceo::Scalariser,
                                                threads::FLoops.Transducers.Executor,
                                                fb::Option{<:OptimisationEstimator})
@@ -24,8 +24,8 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                           ri::OptRMUVecOptRM = Variance(),
-                                           ro::OptRMUVecOptRM = ri,
+                                           ri::OptRM_VecOptRM = Variance(),
+                                           ro::OptRM_VecOptRM = ri,
                                            scei::Scalariser = SumScalariser(),
                                            sceo::Scalariser = scei,
                                            threads::FLoops.Transducers.Executor = ThreadedEx(),

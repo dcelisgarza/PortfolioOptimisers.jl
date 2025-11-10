@@ -22,7 +22,7 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
     sc::T2
     so::T3
     fb::T4
-    function DiscreteAllocation(slv::SlvUVecSlv, sc::Number, so::Number,
+    function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 fb::Option{<:FiniteAllocationOptimisationEstimator})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
@@ -32,7 +32,7 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimat
         return new{typeof(slv), typeof(sc), typeof(so), typeof(fb)}(slv, sc, so, fb)
     end
 end
-function DiscreteAllocation(; slv::SlvUVecSlv, sc::Number = 1, so::Number = 1,
+function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             fb::Option{<:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, fb)
 end

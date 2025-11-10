@@ -26,8 +26,8 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     strict::T8
     threads::T9
     fb::T10
-    function Stacking(pe::PrEUPr, wb::Option{<:WbUWbE}, sets::Option{<:AssetSets},
-                      opti::VecOptEUOptR, opto::OptimisationEstimator,
+    function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+                      opti::VecOptE_Opt, opto::OptimisationEstimator,
                       cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
                       strict::Bool, threads::FLoops.Transducers.Executor,
                       fb::Option{<:OptimisationEstimator})
@@ -48,8 +48,8 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                                                                                          fb)
     end
 end
-function Stacking(; pe::PrEUPr = EmpiricalPrior(), wb::Option{<:WbUWbE} = nothing,
-                  sets::Option{<:AssetSets} = nothing, opti::VecOptEUOptR,
+function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
+                  sets::Option{<:AssetSets} = nothing, opti::VecOptE_Opt,
                   opto::OptimisationEstimator,
                   cv::Option{<:CrossValidationEstimator} = nothing,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,

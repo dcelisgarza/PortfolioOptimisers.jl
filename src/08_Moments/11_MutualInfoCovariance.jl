@@ -18,7 +18,7 @@ Covariance estimator based on mutual information.
 # Constructor
 
     MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                         bins::BinUInt = HacineGharbiRavier(),
+                         bins::Int_Bin = HacineGharbiRavier(),
                          normalise::Bool = true)
 
 Keyword arguments correspond to the fields above.
@@ -50,7 +50,7 @@ struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
-    function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::BinUInt,
+    function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
                                   normalise::Bool)
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins)
@@ -59,7 +59,7 @@ struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     end
 end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                              bins::BinUInt = HacineGharbiRavier(), normalise::Bool = true)
+                              bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true)
     return MutualInfoCovariance(ve, bins, normalise)
 end
 function factory(ce::MutualInfoCovariance, w::Option{<:AbstractWeights} = nothing)

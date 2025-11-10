@@ -8,7 +8,7 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::AbstractJuMPScalar,
-                                                  ub::Option{<:RkRtUBounds}, key::Symbol,
+                                                  ub::Option{<:RkRtBounds}, key::Symbol,
                                                   r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
@@ -41,7 +41,7 @@ end
 function sdp_rc_variance_flag!(::JuMP.Model, ::RkJuMPOpt, ::LinearConstraint)
     return true
 end
-function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, plg::Option{<:PhCUVecPhC})
+function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, plg::Option{<:PhC_VecPhC})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
               isa(plg, SemiDefinitePhylogeny) ||
@@ -139,7 +139,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
     return nothing
 end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
-                   pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC}, args...; kwargs...)
+                   pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC}, args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
@@ -150,7 +150,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
     return variance_risk, sdp_flag
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
-                               pr::AbstractPriorResult, plg::Option{<:PhCUVecPhC}, args...;
+                               pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC}, args...;
                                kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)

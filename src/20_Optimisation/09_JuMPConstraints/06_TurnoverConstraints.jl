@@ -22,7 +22,7 @@ function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer 
                                                                         end)
     return nothing
 end
-function set_turnover_constraints!(model::JuMP.Model, tns::TnUVecTn)
+function set_turnover_constraints!(model::JuMP.Model, tns::Tn_VecTn)
     for (i, tn) in enumerate(tns)
         _set_turnover_constraints!(model, tn, i)
     end

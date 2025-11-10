@@ -50,9 +50,9 @@ end
 function BlackLittermanViews(; P::MatNum, Q::VecNum)
     return BlackLittermanViews(P, Q)
 end
-const LcUBlV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
-    get_black_litterman_views(lcs::PRUVecPR,
+    get_black_litterman_views(lcs::PR_VecPR,
                               sets::AssetSets; datatype::DataType = Float64,
                               strict::Bool = false)
 
@@ -97,7 +97,7 @@ BlackLittermanViews
   - [`parse_equation`](@ref)
   - [`AssetSets`](@ref)
 """
-function get_black_litterman_views(lcs::PRUVecPR, sets::AssetSets;
+function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
                                    datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs))
@@ -197,7 +197,7 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
 end
 """
     assert_bl_views_conf(::Nothing, args...)
-    assert_bl_views_conf(views_conf::Option{<:NumUVecNum},
+    assert_bl_views_conf(views_conf::Option{<:Num_VecNum},
                          views::Union{<:EqnType, <:LinearConstraintEstimator, <:BlackLittermanViews})
 
 Validate Black-Litterman view confidence specification.
@@ -223,8 +223,8 @@ Validate Black-Litterman view confidence specification.
 
   - `views`:
 
-      + `::StrUExpr`, `length(views_conf) == 1`.
-      + `::VecStrUExpr`, `length(views_conf) == length(views)`.
+      + `::Str_Expr`, `length(views_conf) == 1`.
+      + `::VecStr_Expr`, `length(views_conf) == length(views)`.
       + `::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
       + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
 
@@ -248,11 +248,13 @@ function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::NumUVecNum, views::LinearConstraintEstimator)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::NumUVecNum, views::BlackLittermanViews)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)
     return @argcheck(length(views_conf) == length(views.Q))
 end
 
 export black_litterman_views, BlackLittermanViews
+
+export Lc_BLV

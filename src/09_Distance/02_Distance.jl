@@ -154,12 +154,12 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
     return distance(Distance(; power = de.power, alg = SimpleDistance()), ce, X;
                     dims = dims, kwargs...)
 end
-const LTDCovUPLTDCov = Union{<:LowerTailDependenceCovariance,
+const LTDCov_PLTDCov = Union{<:LowerTailDependenceCovariance,
                              <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
                                                              <:Any}}
 """
     distance(de::Distance{<:Any, <:LogDistance},
-             ce::LTDCovUPLTDCov,
+             ce::LTDCov_PLTDCov,
              X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance estimator and data matrix.
@@ -182,12 +182,12 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
   - [`LogDistance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCovUPLTDCov, X::MatNum;
+function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
                   dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
-function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCovUPLTDCov, X::MatNum;
+function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
                   dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return -log.(rho)
@@ -443,12 +443,12 @@ function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
     rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return rho, -log.(rho)
 end
-function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::LTDCovUPLTDCov, X::MatNum;
+function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
                       dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(rho)
 end
-function cor_and_dist(de::Distance{<:Integer, <:LogDistance}, ce::LTDCovUPLTDCov, X::MatNum;
+function cor_and_dist(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
                       dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return rho, -log.(rho)
@@ -500,14 +500,14 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
                                                              normalise = ce.ce.normalise)),
                         ce, X; dims = dims, kwargs...)
 end
-function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCovUPLTDCov,
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCov_PLTDCov,
                       X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power, alg = LogDistance()), ce, X;
                         dims = dims, kwargs...)
 end
-const DistCovUPDistCov = Union{<:DistanceCovariance,
+const DistCov_PDistCov = Union{<:DistanceCovariance,
                                <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}}
-function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCovUPDistCov,
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_PDistCov,
                       X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
                         dims = dims, kwargs...)
@@ -564,15 +564,17 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
                                                          normalise = ce.ce.normalise)), ce,
                     X; dims = dims, kwargs...)
 end
-function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCovUPLTDCov, X::MatNum;
+function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCov_PLTDCov, X::MatNum;
                   dims::Int = 1, kwargs...)
     return distance(Distance(; power = de.power, alg = LogDistance()), ce, X; dims = dims,
                     kwargs...)
 end
-function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCovUPDistCov, X::MatNum;
+function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_PDistCov, X::MatNum;
                   dims::Int = 1, kwargs...)
     return distance(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
                     dims = dims, kwargs...)
 end
 
-export Distance, LTDCovUPLTDCov
+export Distance
+
+export LTDCov_PLTDCov, DistCov_PDistCov

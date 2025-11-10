@@ -48,7 +48,7 @@ All concrete types implementing specific algorithms for determining the optimal 
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
-const IntUONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
+const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
     abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
@@ -62,8 +62,8 @@ All concrete types representing the result of a clustering estimation should sub
   - [`AbstractClusteringAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
-const ClRUClE = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
-const PhEUClR = Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult}
+const ClE_Cl = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
+const PhE_Cl = Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult}
 """
     struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
         clustering::T1
@@ -217,7 +217,7 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 # Constructor
 
     OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                          alg::IntUONC = SecondOrderDifference())
+                          alg::Int_ONC = SecondOrderDifference())
 
 Keyword arguments correspond to the fields above.
 
@@ -243,7 +243,7 @@ OptimalNumberClusters
 struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     max_k::T1
     alg::T2
-    function OptimalNumberClusters(max_k::Option{<:Integer}, alg::IntUONC)
+    function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
             @argcheck(one(max_k) <= max_k, DomainError)
         end
@@ -254,7 +254,7 @@ struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     end
 end
 function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                               alg::IntUONC = SecondOrderDifference())
+                               alg::Int_ONC = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)
 end
 """
@@ -384,4 +384,6 @@ end
 
 export HierarchicalClustering, clusterise, SecondOrderDifference,
        StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
-       ClusteringEstimator, IntUONC, ClRUClE, PhEUClR
+       ClusteringEstimator
+
+export Int_ONC, ClE_Cl, PhE_Cl

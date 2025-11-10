@@ -314,7 +314,7 @@ end
 
 # Constructor
 
-    JuMPEntropyPooling(; slv::SlvUVecSlv, sc1::Number = 1,
+    JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1,
                        sc2::Number = 1e5, so::Number = 1,
                        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
@@ -360,7 +360,7 @@ struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     sc2::T3
     so::T4
     alg::T5
-    function JuMPEntropyPooling(slv::SlvUVecSlv, sc1::Number, sc2::Number, so::Number,
+    function JuMPEntropyPooling(slv::Slv_VecSlv, sc1::Number, sc2::Number, so::Number,
                                 alg::AbstractEntropyPoolingOptAlgorithm)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
@@ -373,7 +373,7 @@ struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
                                                                                    alg)
     end
 end
-function JuMPEntropyPooling(; slv::SlvUVecSlv, sc1::Number = 1, sc2::Number = 1e5,
+function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e5,
                             so::Number = 1,
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
@@ -2242,4 +2242,6 @@ end
 
 export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior, H0_EntropyPooling,
        H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling,
-       CVaREntropyPooling, StagedEP, NonCVaREP
+       CVaREntropyPooling
+
+export StagedEP, NonCVaREP, VecEP

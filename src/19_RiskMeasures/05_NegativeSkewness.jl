@@ -1,4 +1,4 @@
-const NSkAlg = Union{<:NSkeQuadAlg, <:SOCRiskExpr}
+const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
 struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     mp::T2
@@ -7,7 +7,7 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
     alg::T5
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator, sk::Option{<:MatNum},
-                              V::Option{<:MatNum}, alg::NSkAlg)
+                              V::Option{<:MatNum}, alg::NSkeFormulations)
         sk_flag = isnothing(sk)
         V_flag = isnothing(V)
         if sk_flag || V_flag
@@ -27,13 +27,13 @@ end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                           sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
-                          alg::NSkAlg = SOCRiskExpr())
+                          alg::NSkeFormulations = SOCRiskExpr())
     return NegativeSkewness(settings, mp, sk, V, alg)
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::VecNum)
     return sqrt(dot(w, r.V, w))
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadAlg})(w::VecNum)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
     return dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, prior::HighOrderPrior, args...; kwargs...)
@@ -57,4 +57,6 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum,
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 
-export NegativeSkewness, NSkAlg
+export NegativeSkewness
+
+export NSkeFormulations

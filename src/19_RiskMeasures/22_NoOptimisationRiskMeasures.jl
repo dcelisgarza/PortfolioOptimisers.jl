@@ -24,7 +24,7 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     w::T1
     mu::T2
     function ThirdCentralMoment(w::Option{<:AbstractWeights},
-                                mu::Option{<:NumUVecNumUVecScalar})
+                                mu::Option{<:Num_VecNum_VecScalar})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -35,7 +35,7 @@ struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
     end
 end
 function ThirdCentralMoment(; w::Option{<:AbstractWeights} = nothing,
-                            mu::Option{<:NumUVecNumUVecScalar} = nothing)
+                            mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
 struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
@@ -43,7 +43,7 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
     w::T2
     mu::T3
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:AbstractWeights},
-                      mu::Option{<:NumUVecNumUVecScalar})
+                      mu::Option{<:Num_VecNum_VecScalar})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -55,26 +55,26 @@ struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Option{<:AbstractWeights} = nothing,
-                  mu::Option{<:NumUVecNumUVecScalar} = nothing)
+                  mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
-const TCMUSk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
-function calc_moment_target(::TCMUSk{Nothing, Nothing}, ::Any, x::VecNum)
+const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
+function calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     return mean(x)
 end
-function calc_moment_target(r::TCMUSk{<:AbstractWeights, Nothing}, ::Any, x::VecNum)
+function calc_moment_target(r::TCM_Sk{<:AbstractWeights, Nothing}, ::Any, x::VecNum)
     return mean(x, r.w)
 end
-function calc_moment_target(r::TCMUSk{<:Any, <:VecNum}, w::VecNum, ::Any)
+function calc_moment_target(r::TCM_Sk{<:Any, <:VecNum}, w::VecNum, ::Any)
     return dot(w, r.mu)
 end
-function calc_moment_target(r::TCMUSk{<:Any, <:VecScalar}, w::VecNum, ::Any)
+function calc_moment_target(r::TCM_Sk{<:Any, <:VecScalar}, w::VecNum, ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
-function calc_moment_target(r::TCMUSk{<:Any, <:Number}, ::Any, ::Any)
+function calc_moment_target(r::TCM_Sk{<:Any, <:Number}, ::Any, ::Any)
     return r.mu
 end
-function calc_deviations_vec(r::TCMUSk, w::VecNum, X::MatNum,
+function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
@@ -111,4 +111,4 @@ function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     return res / sigma^3
 end
 
-export MeanReturn, ThirdCentralMoment, Skewness, TCMUSk
+export MeanReturn, ThirdCentralMoment, Skewness, TCM_Sk

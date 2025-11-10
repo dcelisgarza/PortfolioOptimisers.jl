@@ -28,12 +28,12 @@ All concrete types representing the results of phylogeny-based constraint genera
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
-const PhCUPhCE = Union{<:AbstractPhylogenyConstraintEstimator,
+const PhCE_PhC = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
-const VecPhCUPhCE = AbstractVector{<:PhCUPhCE}
-const PhCUPhCEUVecPhCUPhCE = Union{<:PhCUPhCE, <:VecPhCUPhCE}
+const VecPhCE_PhC = AbstractVector{<:PhCE_PhC}
+const PhCE_PhC_VecPhCE_PhC = Union{<:PhCE_PhC, <:VecPhCE_PhC}
 const VecPhC = AbstractVector{<:AbstractPhylogenyConstraintResult}
-const PhCUVecPhC = Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}
+const PhC_VecPhC = Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
         pe::T1
@@ -52,7 +52,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pe::PhEUClR = NetworkEstimator(),
+                                   pe::PhE_Cl = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -99,16 +99,15 @@ SemiDefinitePhylogenyEstimator
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pe::PhEUClR, p::Number)
+    function SemiDefinitePhylogenyEstimator(pe::PhE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pe), typeof(p)}(pe, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pe::PhEUClR = NetworkEstimator(),
-                                        p::Number = 0.05)
+function SemiDefinitePhylogenyEstimator(; pe::PhE_Cl = NetworkEstimator(), p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
-const PhRMatNumUMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
+const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
     struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
         A::T1
@@ -127,7 +126,7 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 # Constructor
 
     SemiDefinitePhylogeny(;
-                          A::PhRMatNumUMatNum, p::Number = 0.05)
+                          A::MatNum_PhRMatNum, p::Number = 0.05)
 
 ## Validation
 
@@ -162,7 +161,7 @@ end
 function SemiDefinitePhylogeny(A::PhylogenyResult{<:MatNum}, p::Number)
     return SemiDefinitePhylogeny(A.X, p)
 end
-function SemiDefinitePhylogeny(; A::PhRMatNumUMatNum, p::Number = 0.05)
+function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum, p::Number = 0.05)
     return SemiDefinitePhylogeny(A, p)
 end
 """
@@ -271,8 +270,8 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 # Constructor
 
     IntegerPhylogenyEstimator(;
-                              pe::PhEUClR = NetworkEstimator(),
-                              B::IntUVecInt = 1,
+                              pe::PhE_Cl = NetworkEstimator(),
+                              B::Int_VecInt = 1,
                               scale::Number = 100_000.0)
 
 ## Validation
@@ -323,7 +322,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
     pe::T1
     B::T2
     scale::T3
-    function IntegerPhylogenyEstimator(pe::PhEUClR, B::IntUVecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pe::PhE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pe, B)
@@ -331,7 +330,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pe::PhEUClR = NetworkEstimator(), B::IntUVecInt = 1,
+function IntegerPhylogenyEstimator(; pe::PhE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
                                    scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
@@ -355,8 +354,8 @@ Container for the result of integer phylogeny-based constraint generation.
 # Constructor
 
     IntegerPhylogeny(;
-                     A::PhRMatNumUMatNum,
-                     B::IntUVecInt = 1,
+                     A::MatNum_PhRMatNum,
+                     B::Int_VecInt = 1,
                      scale::Number = 100_000.0)
 
 ## Validation
@@ -387,7 +386,7 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     A::T1
     B::T2
     scale::T3
-    function IntegerPhylogeny(A::MatNum, B::IntUVecInt, scale::Number)
+    function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
         @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
@@ -398,15 +397,15 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::IntUVecInt, scale::Number)
+function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt, scale::Number)
     return IntegerPhylogeny(A.X, B, scale)
 end
-function IntegerPhylogeny(; A::PhRMatNumUMatNum, B::IntUVecInt = 1,
+function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
                           scale::Number = 100_000.0)
     return IntegerPhylogeny(A, B, scale)
 end
 """
-    phylogeny_constraints(est::Option{<:PhCUPhCE}, X::MatNum;
+    phylogeny_constraints(est::Option{<:PhCE_PhC}, X::MatNum;
                           dims::Int = 1, kwargs...)
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
@@ -457,7 +456,7 @@ function phylogeny_constraints(plc::Option{<:AbstractPhylogenyConstraintResult},
                                kwargs...)
     return plc
 end
-function phylogeny_constraints(plcs::VecPhCUPhCE, args...; kwargs...)
+function phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """
@@ -477,7 +476,7 @@ Abstract supertype for algorithms mapping a vector of real values to a single re
   - [`vec_to_real_measure`](@ref)
 """
 abstract type VectorToScalarMeasure <: AbstractAlgorithm end
-const NumUVecToScaM = Union{<:Number, <:VectorToScalarMeasure}
+const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
 """
     struct MinValue <: VectorToScalarMeasure end
 
@@ -571,7 +570,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
 """
 struct MaxValue <: VectorToScalarMeasure end
 """
-    vec_to_real_measure(measure::NumUVecToScaM, val::VecNum)
+    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
 
 Reduce a vector of real values to a single real value using a specified measure.
 
@@ -640,7 +639,7 @@ Estimator for generating centrality-based portfolio constraints.
 # Constructor
 
     CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                         B::NumUVecToScaM = MinValue(),
+                         B::Num_VecToScaM = MinValue(),
                          comp::ComparisonOperator = LEQ())
 
 # Examples
@@ -689,21 +688,21 @@ struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
     A::T1
     B::T2
     comp::T3
-    function CentralityConstraint(A::CentralityEstimator, B::NumUVecToScaM,
+    function CentralityConstraint(A::CentralityEstimator, B::Num_VecToScaM,
                                   comp::ComparisonOperator)
         return new{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
     end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                              B::NumUVecToScaM = MinValue(),
+                              B::Num_VecToScaM = MinValue(),
                               comp::ComparisonOperator = LEQ())
     return CentralityConstraint(A, B, comp)
 end
 const VecCC = AbstractVector{<:CentralityConstraint}
-const CCUVecCC = Union{<:CentralityConstraint, <:VecCC}
-const CCUVecCCULc = Union{<:CCUVecCC, <:LinearConstraint}
+const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 """
-    centrality_constraints(ccs::CCUVecCC,
+    centrality_constraints(ccs::CC_VecCC,
                            X::MatNum; dims::Int = 1, kwargs...)
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
@@ -735,7 +734,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
   - [`PartialLinearConstraint`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_constraints(ccs::CCUVecCC, X::MatNum; dims::Int = 1, kwargs...)
+function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs))
     end
@@ -811,5 +810,7 @@ end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
-       phylogeny_constraints, centrality_constraints, PhCUPhCE, VecPhCUPhCE, VecPhC, VecCC,
-       CCUVecCC, PhCUVecPhC, PhCUPhCEUVecPhCUPhCE, CCUVecCCULc, PhRMatNumUMatNum
+       phylogeny_constraints, centrality_constraints
+
+export PhCE_PhC, VecPhCE_PhC, PhCE_PhC_VecPhCE_PhC, VecPhC, PhC_VecPhC, MatNum_PhRMatNum,
+       Num_VecToScaM, VecCC, CC_VecCC, Lc_CC_VecCC

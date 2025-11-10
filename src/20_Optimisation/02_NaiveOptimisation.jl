@@ -18,11 +18,11 @@ end
 struct InverseVolatility{T1, T2} <: NaiveOptimisationEstimator
     pe::T1
     fb::T2
-    function InverseVolatility(pe::PrEUPr, fb::Option{<:OptimisationEstimator} = nothing)
+    function InverseVolatility(pe::PrE_Pr, fb::Option{<:OptimisationEstimator} = nothing)
         return new{typeof(pe), typeof(fb)}(pe, fb)
     end
 end
-function InverseVolatility(; pe::PrEUPr = EmpiricalPrior(),
+function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            fb::Option{<:OptimisationEstimator} = nothing)
     return InverseVolatility(pe, fb)
 end

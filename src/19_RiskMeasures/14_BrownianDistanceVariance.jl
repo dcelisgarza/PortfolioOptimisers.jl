@@ -1,18 +1,19 @@
 abstract type BrownianDistanceVarianceFormulation <: AbstractAlgorithm end
 struct NormOneConeBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
-const BDVar = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
+const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
 struct BrownianDistanceVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     alg::T2
     algc::T3
-    function BrownianDistanceVariance(settings::RiskMeasureSettings, alg::BDVar,
+    function BrownianDistanceVariance(settings::RiskMeasureSettings,
+                                      alg::BDVarRkFormulations,
                                       algc::BrownianDistanceVarianceFormulation)
         return new{typeof(settings), typeof(alg), typeof(algc)}(settings, alg, algc)
     end
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  alg::BDVar = QuadRiskExpr(),
+                                  alg::BDVarRkFormulations = QuadRiskExpr(),
                                   algc::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
     return BrownianDistanceVariance(settings, alg, algc)
 end
@@ -28,4 +29,6 @@ function (::BrownianDistanceVariance)(x::VecNum)
 end
 
 export NormOneConeBrownianDistanceVariance, IneqBrownianDistanceVariance,
-       BrownianDistanceVariance, BDVar
+       BrownianDistanceVariance
+
+export BDVarRkFormulations

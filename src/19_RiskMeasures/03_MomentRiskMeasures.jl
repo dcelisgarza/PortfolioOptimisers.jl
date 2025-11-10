@@ -292,7 +292,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
     LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                    w::Option{<:AbstractWeights} = nothing,
-                   mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
                    alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -623,7 +623,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     mu::T3
     alg::T4
     function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                            mu::Option{<:NumUVecNumUVecScalar},
+                            mu::Option{<:Num_VecNum_VecScalar},
                             alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
@@ -640,7 +640,7 @@ struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Option{<:AbstractWeights} = nothing,
-                        mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                        mu::Option{<:Num_VecNum_VecScalar} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -667,7 +667,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
     HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                     w::Option{<:AbstractWeights} = nothing,
-                    mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                    mu::Option{<:Num_VecNum_VecScalar} = nothing,
                     alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
 
 Keyword arguments correspond to the fields above.
@@ -776,7 +776,7 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     mu::T3
     alg::T4
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
-                             mu::Option{<:NumUVecNumUVecScalar},
+                             mu::Option{<:Num_VecNum_VecScalar},
                              alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
@@ -793,14 +793,14 @@ struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Option{<:AbstractWeights} = nothing,
-                         mu::Option{<:NumUVecNumUVecScalar} = nothing,
+                         mu::Option{<:Num_VecNum_VecScalar} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
-const LHOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
-                                            <:HighOrderMoment{T1, T2, T3, T4}}
+const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
+                                              <:HighOrderMoment{T1, T2, T3, T4}}
 """
-    calc_moment_target(::LHOrderMoment{<:Any, Nothing, Nothing, <:Any},
+    calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any},
                        ::Any, x::VecNum)
 
 Compute the target value for moment calculations when neither a target value (`mu`) nor observation weights are provided in the risk measure.
@@ -821,12 +821,12 @@ Compute the target value for moment calculations when neither a target value (`m
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_moment_target(::LHOrderMoment{<:Any, Nothing, Nothing, <:Any}, ::Any,
+function calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any}, ::Any,
                             x::VecNum)
     return mean(x)
 end
 """
-    calc_moment_target(r::LHOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
+    calc_moment_target(r::LoHiOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
                        ::Any, x::VecNum)
 
 Compute the target value for moment calculations when the risk measure provides an observation weights vector but no explicit target value (`mu`).
@@ -847,12 +847,12 @@ Compute the target value for moment calculations when the risk measure provides 
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_moment_target(r::LHOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
+function calc_moment_target(r::LoHiOrderMoment{<:Any, <:AbstractWeights, Nothing, <:Any},
                             ::Any, x::VecNum)
     return mean(x, r.w)
 end
 """
-    calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:VecNum, <:Any},                             
+    calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},                             
                        w::VecNum, ::Any)
 
 Compute the target value for moment calculations when the risk measure provides an explicit expected returns vector (`mu`).
@@ -873,12 +873,12 @@ Compute the target value for moment calculations when the risk measure provides 
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:VecNum, <:Any}, w::VecNum,
+function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any}, w::VecNum,
                             ::Any)
     return dot(w, r.mu)
 end
 """
-    calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+    calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                        w::VecNum, ::Any)
 
 Compute the target value for moment calculations when the risk measure provides a `VecScalar` as the expected returns (`mu`).
@@ -900,12 +900,12 @@ Compute the target value for moment calculations when the risk measure provides 
   - [`calc_moment_target`](@ref)
   - [`dot`](https://docs.julialang.org/en/v1/base/math/#Base.dot)
 """
-function calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}, w::VecNum,
+function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}, w::VecNum,
                             ::Any)
     return dot(w, r.mu.v) + r.mu.s
 end
 """
-    calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:Number, <:Any},
+    calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
                        ::Any, ::Any)
 
 Compute the target value for moment calculations when the risk measure provides a scalar value for the expected returns (`mu`).
@@ -926,11 +926,11 @@ Compute the target value for moment calculations when the risk measure provides 
   - [`HighOrderMoment`](@ref)
   - [`calc_moment_target`](@ref)
 """
-function calc_moment_target(r::LHOrderMoment{<:Any, <:Any, <:Number, <:Any}, ::Any, ::Any)
+function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any}, ::Any, ::Any)
     return r.mu
 end
 """
-    calc_deviations_vec(r::LHOrderMoment, w::VecNum,
+    calc_deviations_vec(r::LoHiOrderMoment, w::VecNum,
                     X::MatNum; fees::Option{<:Fees} = nothing)
 
 Compute the vector of deviations from the target value for moment-based risk measures.
@@ -959,7 +959,7 @@ Compute the vector of deviations from the target value for moment-based risk mea
   - [`calc_moment_target`](@ref)
   - [`calc_net_returns`](@ref)
 """
-function calc_deviations_vec(r::LHOrderMoment, w::VecNum, X::MatNum,
+function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
@@ -1071,4 +1071,4 @@ end
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
        FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment,
-       LHOrderMoment
+       LoHiOrderMoment

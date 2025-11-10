@@ -42,11 +42,11 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     ucs_flag::T11
     alg::T12
     fb::T13
-    function NearOptimalCentering(opt::JuMPOptimiser, r::RMUVecRM,
+    function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
                                   w_min::Option{<:VecNum}, w_min_ini::Option{<:VecNum},
-                                  w_opt::Option{<:VecNumUVecVecNum},
-                                  w_opt_ini::Option{<:VecNumUVecVecNum},
+                                  w_opt::Option{<:VecNum_VecVecNum},
+                                  w_opt_ini::Option{<:VecNum_VecVecNum},
                                   w_max::Option{<:VecNum}, w_max_ini::Option{<:VecNum},
                                   ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
                                   fb::Option{<:OptimisationEstimator})
@@ -96,13 +96,13 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     end
 end
 function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
-                              r::RMUVecRM = StandardDeviation(),
+                              r::RM_VecRM = StandardDeviation(),
                               obj::Option{<:ObjectiveFunction} = MinimumRisk(),
                               bins::Option{<:Number} = nothing,
                               w_min::Option{<:VecNum} = nothing,
                               w_min_ini::Option{<:VecNum} = nothing,
-                              w_opt::Option{<:VecNumUVecVecNum} = nothing,
-                              w_opt_ini::Option{<:VecNumUVecVecNum} = nothing,
+                              w_opt::Option{<:VecNum_VecVecNum} = nothing,
+                              w_opt_ini::Option{<:VecNum_VecVecNum} = nothing,
                               w_max::Option{<:VecNum} = nothing,
                               w_max_ini::Option{<:VecNum} = nothing, ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
@@ -126,8 +126,8 @@ function opt_view(noc::NearOptimalCentering, i, X::MatNum)
                                 w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::SlvUVecSlv, w_min::VecNum,
-                                      w_opt::VecNumUVecVecNum, w_max::VecNum)
+                                      fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
+                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     r = factory(r, pr, slv)
     scale = r.settings.scale
@@ -137,8 +137,8 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
     return risk_min, risk_opt, risk_max
 end
 function near_optimal_centering_risks(::SumScalariser, rs::VecRM, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::SlvUVecSlv, w_min::VecNum,
-                                      w_opt::VecNumUVecVecNum, w_max::VecNum)
+                                      fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
+                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -156,8 +156,8 @@ function near_optimal_centering_risks(::SumScalariser, rs::VecRM, pr::AbstractPr
 end
 function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::VecRM,
                                       pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::SlvUVecSlv, w_min::VecNum,
-                                      w_opt::VecNumUVecVecNum, w_max::VecNum)
+                                      slv::Slv_VecSlv, w_min::VecNum,
+                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -180,8 +180,8 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::Ve
     return risk_min, risk_opt, risk_max
 end
 function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::Option{<:SlvUVecSlv},
-                                      w_min::VecNum, w_opt::VecNumUVecVecNum, w_max::VecNum)
+                                      fees::Option{<:Fees}, slv::Option{<:Slv_VecSlv},
+                                      w_min::VecNum, w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)

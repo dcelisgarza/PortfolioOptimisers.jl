@@ -43,9 +43,9 @@ Factor Black-Litterman prior estimator for asset returns.
                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                               re::AbstractRegressionEstimator = StepwiseRegression(),
                               ve::AbstractVarianceEstimator = SimpleVariance(),
-                              views::LcUBlV,
+                              views::Lc_BLV,
                               sets::Option{<:AssetSets} = nothing,
-                              views_conf::Option{<:NumUVecNum} = nothing,
+                              views_conf::Option{<:Num_VecNum} = nothing,
                               w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
                               l::Option{<:Number} = nothing,
                               tau::Option{<:Number} = nothing, rsd::Bool = true)
@@ -151,9 +151,9 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractRegressionEstimator,
-                                       ve::AbstractVarianceEstimator, views::LcUBlV,
+                                       ve::AbstractVarianceEstimator, views::Lc_BLV,
                                        sets::Option{<:AssetSets},
-                                       views_conf::Option{<:NumUVecNum},
+                                       views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool)
         if isa(views, LinearConstraintEstimator)
@@ -175,8 +175,8 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::LcUBlV, sets::Option{<:AssetSets} = nothing,
-                                   views_conf::Option{<:NumUVecNum} = nothing,
+                                   views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
+                                   views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
                                    tau::Option{<:Number} = nothing, rsd::Bool = true)

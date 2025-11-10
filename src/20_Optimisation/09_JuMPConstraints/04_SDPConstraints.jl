@@ -24,7 +24,7 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     @constraint(model, frc_M_PSD, sc * frc_M in PSDCone())
     return frc_W
 end
-function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhCUVecPhC})
+function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhC_VecPhC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
@@ -48,7 +48,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhCUVe
     return nothing
 end
 function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
-                                            plgs::Option{<:PhCUPhCEUVecPhCUPhCE})
+                                            plgs::Option{<:PhCE_PhC_VecPhCE_PhC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing

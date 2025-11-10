@@ -184,24 +184,24 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l1::T33
     l2::T34
     strict::T35
-    function JuMPOptimiser(pe::PrEUPr, slv::SlvUVecSlv, wb::Option{<:WbUWbE},
-                           bgt::Option{<:NumBgCE}, sbgt::Option{<:NumUBgtRg},
-                           lt::Option{<:BtUBtE}, st::Option{<:BtUBtE},
-                           lcs::Option{<:LcULcEUVecLcULcE}, cent::Option{<:CCUVecCCULc},
-                           gcard::Option{<:LcULcE}, sgcard::Option{<:LcULcEUVecLcULcE},
-                           smtx::Option{<:MatUASMatEUVecMatUASMatE},
-                           sgmtx::Option{<:MatUASMatEUVecMatUASMatE},
-                           slt::Option{<:BtUBtEUVecOBtUBtE},
-                           sst::Option{<:BtUBtEUVecOBtUBtE},
-                           sglt::Option{<:BtUBtEUVecOBtUBtE},
-                           sgst::Option{<:BtUBtEUVecOBtUBtE}, sets::Option{<:AssetSets},
-                           plg::Option{<:PhCUPhCEUVecPhCUPhCE},
-                           tn::Option{<:TnUTnEUVecTnUTnE}, te::Option{<:TrUVecTr},
-                           fees::Option{<:FeesUFeesE}, ret::JuMPReturnsEstimator,
+    function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
+                           bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
+                           lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
+                           lcs::Option{<:LcE_Lc_VecLcE_Lc}, cent::Option{<:Lc_CC_VecCC},
+                           gcard::Option{<:LcE_Lc}, sgcard::Option{<:LcE_Lc_VecLcE_Lc},
+                           smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
+                           sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
+                           slt::Option{<:BtE_Bt_VecOptBtE_Bt},
+                           sst::Option{<:BtE_Bt_VecOptBtE_Bt},
+                           sglt::Option{<:BtE_Bt_VecOptBtE_Bt},
+                           sgst::Option{<:BtE_Bt_VecOptBtE_Bt}, sets::Option{<:AssetSets},
+                           plg::Option{<:PhCE_PhC_VecPhCE_PhC},
+                           tn::Option{<:TnE_Tn_VecTnE_Tn}, te::Option{<:Tr_VecTr},
+                           fees::Option{<:FeesE_Fees}, ret::JuMPReturnsEstimator,
                            sce::Scalariser, ccnt::Option{<:CustomJuMPConstraint},
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::Option{<:Number}, card::Option{<:Integer},
-                           scard::Option{<:IntUVecInt}, nea::Option{<:Number},
+                           scard::Option{<:Int_VecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number}, strict::Bool)
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
@@ -222,9 +222,9 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if isa(scard, Integer)
             @argcheck(isfinite(scard))
             @argcheck(scard > 0)
-            @argcheck(isa(smtx, MatUASMatE))
-            @argcheck(isa(slt, Option{<:BtUBtE}))
-            @argcheck(isa(sst, Option{<:BtUBtE}))
+            @argcheck(isa(smtx, MatNum_ASetMatE))
+            @argcheck(isa(slt, Option{<:BtE_Bt}))
+            @argcheck(isa(sst, Option{<:BtE_Bt}))
         elseif isa(scard, VecInt)
             @argcheck(!isempty(scard))
             @argcheck(all(isfinite, scard))
@@ -239,8 +239,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                 @argcheck(!isempty(sst))
                 @argcheck(length(scard) == length(sst))
             end
-        elseif isnothing(scard) && (isa(slt, BtUBtE) || isa(sst, BtUBtE))
-            @argcheck(isa(smtx, MatUASMatE))
+        elseif isnothing(scard) && (isa(slt, BtE_Bt) || isa(sst, BtE_Bt))
+            @argcheck(isa(smtx, MatNum_ASetMatE))
         elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
             @argcheck(isa(smtx, AbstractVector))
             @argcheck(!isempty(smtx))
@@ -253,10 +253,10 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                 @argcheck(length(sst) == length(smtx))
             end
         end
-        if isa(sgcard, LcULcE)
-            @argcheck(isa(sgmtx, MatUASMatE))
-            @argcheck(isa(sglt, Option{<:BtUBtE}))
-            @argcheck(isa(sgst, Option{<:BtUBtE}))
+        if isa(sgcard, LcE_Lc)
+            @argcheck(isa(sgmtx, MatNum_ASetMatE))
+            @argcheck(isa(sglt, Option{<:BtE_Bt}))
+            @argcheck(isa(sgst, Option{<:BtE_Bt}))
             if isa(sgcard, LinearConstraint) && isa(smtx, MatNum)
                 N = size(smtx, 1)
                 N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
@@ -283,8 +283,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                     @argcheck(N == N_ineq + N_eq)
                 end
             end
-        elseif isnothing(sgcard) && (isa(sglt, BtUBtE) || isa(sgst, BtUBtE))
-            @argcheck(isa(sgmtx, MatUASMatE))
+        elseif isnothing(sgcard) && (isa(sglt, BtE_Bt) || isa(sgst, BtE_Bt))
+            @argcheck(isa(sgmtx, MatNum_ASetMatE))
         elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
             @argcheck(isa(sgmtx, AbstractVector))
             @argcheck(!isempty(sgmtx))
@@ -303,7 +303,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
            isa(lcs, LinearConstraintEstimator) ||
            isa(cent, LinearConstraintEstimator) ||
            isa(gcard, LinearConstraintEstimator) ||
-           !isa(sgcard, Option{<:VecLcULc}) ||
+           !isa(sgcard, Option{<:Lc_VecLc}) ||
            !isnothing(scard) ||
            isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets))
@@ -363,32 +363,32 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                                                                        strict)
     end
 end
-function JuMPOptimiser(; pe::PrEUPr = EmpiricalPrior(), slv::SlvUVecSlv,
-                       wb::Option{<:WbUWbE} = WeightBounds(), bgt::Option{<:NumBgCE} = 1.0,
-                       sbgt::Option{<:NumUBgtRg} = nothing, lt::Option{<:BtUBtE} = nothing,
-                       st::Option{<:BtUBtE} = nothing,
-                       lcs::Option{<:LcULcEUVecLcULcE} = nothing,
-                       cent::Option{<:CCUVecCCULc} = nothing,
-                       gcard::Option{<:LcULcE} = nothing,
-                       sgcard::Option{<:LcULcEUVecLcULcE} = nothing,
-                       smtx::Option{<:MatUASMatEUVecMatUASMatE} = nothing,
-                       sgmtx::Option{<:MatUASMatEUVecMatUASMatE} = nothing,
-                       slt::Option{<:BtUBtEUVecOBtUBtE} = nothing,
-                       sst::Option{<:BtUBtEUVecOBtUBtE} = nothing,
-                       sglt::Option{<:BtUBtEUVecOBtUBtE} = nothing,
-                       sgst::Option{<:BtUBtEUVecOBtUBtE} = nothing,
+function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
+                       wb::Option{<:WbE_Wb} = WeightBounds(),
+                       bgt::Option{<:Num_BgtCE} = 1.0, sbgt::Option{<:Num_BgtRg} = nothing,
+                       lt::Option{<:BtE_Bt} = nothing, st::Option{<:BtE_Bt} = nothing,
+                       lcs::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                       cent::Option{<:Lc_CC_VecCC} = nothing,
+                       gcard::Option{<:LcE_Lc} = nothing,
+                       sgcard::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                       smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+                       sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+                       slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
                        sets::Option{<:AssetSets} = nothing,
-                       plg::Option{<:PhCUPhCEUVecPhCUPhCE} = nothing,
-                       tn::Option{<:TnUTnEUVecTnUTnE} = nothing,
-                       te::Option{<:TrUVecTr} = nothing,
-                       fees::Option{<:FeesUFeesE} = nothing,
+                       plg::Option{<:PhCE_PhC_VecPhCE_PhC} = nothing,
+                       tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+                       te::Option{<:Tr_VecTr} = nothing,
+                       fees::Option{<:FeesE_Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),
                        ccnt::Option{<:CustomJuMPConstraint} = nothing,
                        cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
                        so::Number = 1, ss::Option{<:Number} = nothing,
                        card::Option{<:Integer} = nothing,
-                       scard::Option{<:IntUVecInt} = nothing,
+                       scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,

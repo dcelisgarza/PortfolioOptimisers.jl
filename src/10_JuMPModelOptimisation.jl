@@ -10,9 +10,9 @@ All concrete types representing the result of a JuMP model optimisation should s
   - [`JuMPResult`](@ref)
 """
 abstract type AbstractJuMPResult <: AbstractResult end
-const DictStrAUVecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
+const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
                                    <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
-const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrAUVecPairStrA}
+const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
 """
     struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
         name::T1
@@ -36,7 +36,7 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 
 # Constructor
 
-    Solver(; name::SymStr = "", solver::Any = nothing,
+    Solver(; name::Sym_Str = "", solver::Any = nothing,
            settings::Option{<:SlvSettings} = nothing,
            check_sol::NamedTuple = (;), add_bridges::Bool = true)
 
@@ -46,7 +46,7 @@ Keyword arguments correspond to the fields above.
 
   - `settings`:
 
-      + `DictVec`: `!isempty(settings)`.
+      + `Dict_Vec`: `!isempty(settings)`.
 
 # Examples
 
@@ -70,22 +70,22 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     settings::T3
     check_sol::T4
     add_bridges::T5
-    function Solver(name::SymStr, solver::Any, settings::Option{<:SlvSettings},
+    function Solver(name::Sym_Str, solver::Any, settings::Option{<:SlvSettings},
                     check_sol::NamedTuple, add_bridges::Bool)
-        if isa(settings, DictVec)
+        if isa(settings, Dict_Vec)
             @argcheck(!isempty(settings), IsEmptyError)
         end
         return new{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                    typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
     end
 end
-function Solver(; name::SymStr = "", solver::Any = nothing,
+function Solver(; name::Sym_Str = "", solver::Any = nothing,
                 settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
                 add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
 const VecSlv = AbstractVector{<:Solver}
-const SlvUVecSlv = Union{<:Solver, <:VecSlv}
+const Slv_VecSlv = Union{<:Solver, <:VecSlv}
 """
     struct JuMPResult{T1, T2} <: AbstractJuMPResult
         trials::T1
@@ -153,7 +153,7 @@ function set_solver_attributes(args...)
 end
 """
     set_solver_attributes(model::JuMP.Model,
-                          settings::DictStrAUVecPairStrA)
+                          settings::DictStrA_VecPairStrA)
 
 Set multiple solver attributes on a JuMP model.
 
@@ -168,7 +168,7 @@ Iterates over the provided settings and applies each as a solver attribute.
 
   - `nothing`
 """
-function set_solver_attributes(model::JuMP.Model, settings::DictStrAUVecPairStrA)
+function set_solver_attributes(model::JuMP.Model, settings::DictStrA_VecPairStrA)
     for (k, v) in settings
         set_attribute(model, k, v)
     end
@@ -193,7 +193,7 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)
     return nothing
 end
 """
-    optimise_JuMP_model!(model::JuMP.Model, slv::SlvUVecSlv)
+    optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
 
 Attempt to optimise a JuMP model using one or more configured solvers.
 
@@ -214,7 +214,7 @@ Tries each solver in order, applying settings and checking for solution feasibil
   - If a solver fails, records the error and tries the next.
   - Stops at the first successful solution.
 """
-function optimise_JuMP_model!(model::JuMP.Model, slv::SlvUVecSlv)
+function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
     trials = Dict()
     success = false
     for solver in slv
@@ -243,4 +243,6 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::SlvUVecSlv)
     return JuMPResult(; trials = trials, success = success)
 end
 
-export Solver, JuMPResult, VecSlv, SlvUVecSlv, SlvSettings, DictStrAUVecPairStrA
+export Solver, JuMPResult
+
+export DictStrA_VecPairStrA, SlvSettings, VecSlv, Slv_VecSlv

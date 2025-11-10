@@ -9,9 +9,9 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     wi::T7
     flag::T8
     fb::T9
-    function FactorRiskContribution(opt::JuMPOptimiser, re::RegURegE, r::RMUVecRM,
+    function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,
-                                    plg::Option{<:PhCUPhCEUVecPhCUPhCE},
+                                    plg::Option{<:PhCE_PhC_VecPhCE_PhC},
                                     sets::Option{<:AssetSets}, wi::Option{<:VecNum},
                                     flag::Bool, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
@@ -26,10 +26,10 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
-                                re::RegURegE = StepwiseRegression(),
-                                r::RMUVecRM = Variance(),
+                                re::RegE_Reg = StepwiseRegression(),
+                                r::RM_VecRM = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
-                                plg::Option{<:PhCUPhCEUVecPhCUPhCE} = nothing,
+                                plg::Option{<:PhCE_PhC_VecPhCE_PhC} = nothing,
                                 sets::Option{<:AssetSets} = nothing,
                                 wi::Option{<:VecNum} = nothing, flag::Bool = true,
                                 fb::Option{<:OptimisationEstimator} = nothing)
@@ -44,7 +44,7 @@ function opt_view(frc::FactorRiskContribution, i, X::MatNum)
                                   sets = frc.sets, wi = frc.wi, flag = frc.flag,
                                   fb = frc.fb)
 end
-function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegURegE,
+function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Option{<:VecNum})
     rr = regression(re, rd.X, rd.F)
