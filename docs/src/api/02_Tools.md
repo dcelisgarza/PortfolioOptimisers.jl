@@ -6,6 +6,7 @@
 VecScalar
 brinson_attribution
 traverse_concrete_subtypes
+factory(::Nothing, args...; kwargs...)
 ```
 
 ## Private

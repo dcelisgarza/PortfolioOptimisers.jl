@@ -1,5 +1,7 @@
 # Denoise
 
+## Public
+
 ```@docs
 SpectralDenoise
 FixedDenoise
@@ -7,6 +9,11 @@ ShrunkDenoise
 Denoise
 denoise!
 denoise
+```
+
+## Private
+
+```@docs
 AbstractDenoiseEstimator
 AbstractDenoiseAlgorithm
 errPDF

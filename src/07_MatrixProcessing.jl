@@ -123,6 +123,11 @@ DefaultMatrixProcessing
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
+  - [`Denoise`](@ref)
+  - [`Detone`](@ref)
+  - [`AbstractMatrixProcessingAlgorithm`](@ref)
 """
 struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
     pdm::T1
@@ -143,8 +148,8 @@ function DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
-                       X::MatNum, args...; kwargs...)
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
+                       kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
 
 In-place processing of a covariance or correlation matrix.
@@ -226,6 +231,8 @@ julia> sigma
   - [`denoise!`](@ref)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatNum`](@ref)
 """
 function matrix_processing!(::Nothing, args...; kwargs...)
     return nothing
@@ -240,8 +247,8 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::MatNum, X::MatNu
     return nothing
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
-                      X::MatNum, args...; kwargs...)
+    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
+                      kwargs...)
     matrix_processing(::Nothing, args...; kwargs...)
 
 Out-of-place version of [`matrix_processing!`](@ref).
@@ -254,6 +261,8 @@ Out-of-place version of [`matrix_processing!`](@ref).
   - [`denoise!`](@ref)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatNum`](@ref)
 """
 function matrix_processing(::Nothing, args...; kwargs...)
     return nothing

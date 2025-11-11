@@ -566,7 +566,7 @@ const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
     nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
     nothing_scalar_array_view(x::AbstractMatrix, i)
 
-Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
+Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
 # Arguments
 
@@ -620,7 +620,7 @@ function nothing_scalar_array_view(x::AbstractMatrix, i)
     return view(x, i, i)
 end
 """
-    nothing_scalar_array_view_odd_order(x, i, j)
+    nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
 
@@ -649,69 +649,100 @@ julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_view_odd_order(x::ArrNum, i, j)
+function nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
     return view(x, i, j)
 end
 """
-    nothing_scalar_array_getindex(x, i)
-    nothing_scalar_array_getindex(x, i, j)
+    nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any)
+    nothing_scalar_array_getindex(x::AbstractVector, i)
+    nothing_scalar_array_getindex(x::VecScalar, i)
+    nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
+    nothing_scalar_array_getindex(x::AbstractMatrix, i)
 
-Utility for safely indexing into possibly `nothing`, scalar, vector, or array values.
-
-  - `x`: Input value.
-
-      + `nothing`: returns `nothing`.
-      + `Number`: returns `x`.
-      + `VecNum`: returns `x[i]`.
-      + `MatNum`: returns `x[i, i]` or `x[i, j]`.
+Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
 # Arguments
 
-  - `x`: Input value, which may be `nothing`, a scalar, vector, or matrix.
-  - `i`, `j`: Indices.
+  - `x`: Input value.
+  - `i`: Index or indices to view.
 
 # Returns
 
-  - The corresponding value or `nothing`.
+  - `x`: Input value.
+
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: returns `x` unchanged.
+      + `::AbstractVector`: returns `view(x, i)`.
+      + `::VecScalar`: returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: returns a vector of views for each element in `x`.
+      + `::AbstractMatrix`: returns `view(x, i, i)`.
 
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.nothing_scalar_array_getindex(nothing, 1)
+julia> PortfolioOptimisers.nothing_scalar_array_getindex(nothing, 1:2)
 
-julia> PortfolioOptimisers.nothing_scalar_array_getindex(3.0, 1)
+julia> PortfolioOptimisers.nothing_scalar_array_getindex(3.0, 1:2)
 3.0
 
-julia> PortfolioOptimisers.nothing_scalar_array_getindex([1.0, 2.0, 3.0], 2)
-2.0
+julia> PortfolioOptimisers.nothing_scalar_array_getindex([1.0, 2.0, 3.0], 2:3)
+2-element Vector{Float64}:
+ 2.0
+ 3.0
 
-julia> PortfolioOptimisers.nothing_scalar_array_getindex([1 2; 3 4], 2)
-4
+julia> PortfolioOptimisers.nothing_scalar_array_getindex([[1, 2], [3, 4]], 1)
+2-element Vector{Int64}:
+ 1
+ 3
+```
+"""
+function nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair,
+                                                <:Dict}, ::Any)
+    return x
+end
+function nothing_scalar_array_getindex(x::AbstractVector, i)
+    return x[i]
+end
+function nothing_scalar_array_getindex(x::VecScalar, i)
+    return VecScalar(; v = x.v[i], s = x.s)
+end
+function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector,
+                                                                 <:VecScalar}}, i)
+    return [xi[i] for xi in x]
+end
+function nothing_scalar_array_getindex(x::AbstractMatrix, i)
+    return x[i, i]
+end
+"""
+    nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j)
 
-julia> PortfolioOptimisers.nothing_scalar_array_getindex([1 2; 3 4], 1, 2)
+Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
+
+  - If `x` is `nothing`, returns `nothing`.
+  - Otherwise, returns `view(x, i, j)`.
+
+# Arguments
+
+  - `x`: Input value, which may be `nothing` or an array.
+  - `i`, `j`: Indices to view.
+
+# Returns
+
+  - The corresponding view or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.nothing_scalar_array_getindex_odd_order(nothing, 1, 2)
+
+julia> PortfolioOptimisers.nothing_scalar_array_getindex_odd_order([1 2; 3 4], 1, 2)
 2
 ```
 """
-function nothing_scalar_array_getindex(x::Number, ::Any)
-    return x
-end
-function nothing_scalar_array_getindex(::Nothing, ::Any)
+function nothing_scalar_array_getindex_odd_order(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_getindex(x::VecNum, i)
-    return x[i]
-end
-function nothing_scalar_array_getindex(x::MatNum, i)
-    return x[i, i]
-end
-function nothing_scalar_array_getindex(::Nothing, i, j)
-    return nothing
-end
-function nothing_scalar_array_getindex(x::MatNum, i, j)
+function nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j)
     return x[i, j]
-end
-function nothing_scalar_array_getindex(x::VecScalar, i)
-    return VecScalar(x.v[i], x.s)
 end
 """
     fourth_moment_index_factory(N::Integer, i)
@@ -818,6 +849,30 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
 function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
+"""
+    factory(::Nothing, args...; kwargs...)
+
+No-op factory function for constructing objects with a uniform interface.
+
+Defining methods which dispatch on the first argument allows for a consistent factory interface across different types.
+
+# Arguments
+
+  - `::Nothing`: Indicates no object should be constructed.
+  - `args...`: Arbitrary positional arguments (ignored).
+  - `kwargs...`: Arbitrary keyword arguments (ignored).
+
+# Returns
+
+  - `nothing`: Always returns `nothing`.
+
+# Related
+
+  - [`factory`](@ref)
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+  - [`AbstractResult`](@ref)
+"""
 function factory(::Nothing, args...; kwargs...)
     return nothing
 end

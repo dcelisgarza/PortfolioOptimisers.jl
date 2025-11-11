@@ -140,5 +140,29 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
+"""
+"""
+function drop_correlated(X::MatNum;
+                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                         threshold::Number = 0.95, absolute::Bool = false)
+    N = size(X, 2)
+    rho = !absolute ? cor(ce, X) : abs.(cor(ce, X))
+    mean_rho = mean(rho; dims = 1)
+    tril_idx = findall(tril!(trues(size(rho)), -1))
+    candidate_idx = findall(rho[tril_idx] .>= threshold)
+    candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
+    to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
+    for idx in candidate_idx
+        i, j = tril_idx[idx][1], tril_idx[idx][2]
+        if i ∉ to_remove && j ∉ to_remove
+            if mean_rho[i] > mean_rho[j]
+                push!(to_remove, i)
+            else
+                push!(to_remove, j)
+            end
+        end
+    end
+    return setdiff(1:N, to_remove)
+end
 
 export PortfolioOptimisersCovariance

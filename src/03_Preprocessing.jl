@@ -1,40 +1,84 @@
-function drop_correlated(X::MatNum; threshold::Number = 0.95, absolute::Bool = false)
+"""
+    drop_incomplete(X::AbstractMatrix)
+
+Return the indices of columns in matrix `X` that do not contain missing or NaN values, optionally filtering based on whether any missing value is present in a column.
+
+# Arguments
+
+  - `X`: Input matrix of numeric values (observations × assets).
+  - `any_missing`: Boolean flag for dropping columns with missing or NaN values.
+
+# Returns
+
+  - `res::Vector{Int}`: Indices of columns in `X` that are complete according to the specified rule.
+
+# Examples
+
+```jldoctest
+julia> X = [1.0 2.0 NaN; 4.0 missing 6.0];
+
+julia> drop_incomplete(X)
+2-element Vector{Int64}:
+ 1
+ 2
+```
+
+# Related
+
+  - [`drop_correlated`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
+function drop_incomplete(X::AbstractMatrix)
     N = size(X, 2)
-    rho = !absolute ? cor(X) : abs.(cor(X))
-    mean_rho = mean(rho; dims = 1)
-    tril_idx = findall(tril!(trues(size(rho)), -1))
-    candidate_idx = findall(rho[tril_idx] .>= threshold)
-    candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
-    to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
-    for idx in candidate_idx
-        i, j = tril_idx[idx][1], tril_idx[idx][2]
-        if i ∉ to_remove && j ∉ to_remove
-            if mean_rho[i] > mean_rho[j]
-                push!(to_remove, i)
-            else
-                push!(to_remove, j)
-            end
+    to_remove = Vector{Int}(undef, 0)
+    for i in axes(X, 2)
+        if any(map(ismissing, X[:, i])) || any(map(isnan, X[:, i]))
+            push!(to_remove, i)
         end
     end
     return setdiff(1:N, to_remove)
 end
-function drop_incomplete(X::MatNum, any_missing::Bool = true)
-    N = size(X, 2)
-    return if any_missing
-        to_remove = Vector{Int}(undef, 0)
-        for i in axes(X, 2)
-            if any(isnan, view(X, :, i)) || any(ismissing, view(X, :, i))
-                push!(to_remove, i)
-            end
-        end
-        setdiff(1:N, to_remove)
-    else
-        (1:N)[(.!isnan.(X[1, :]) .|| ismissing.(X[1, :])) .& (.!isnan.(X[end, :]) .|| ismissing.(X[end,
-                                                                                                   :]))]
-    end
-end
-function select_kextremes(X::MatNum) end
-function _check_names_and_returns_matrix(names, mat, names_sym, mat_sym)
+"""
+!!! note
+
+    Not implemented yet, still unexported.
+"""
+function select_k_extremes(X::MatNum) end
+"""
+    _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
+                                    names_sym::Symbol, mat_sym::Symbol)
+
+Validate that asset or factor names and their corresponding returns matrix are provided and consistent.
+
+# Arguments
+
+  - `names`: Asset or factor names.
+  - `mat`: Returns matrix.
+  - `names_sym`: Symbolic name for the names argument displayed in error messages.
+  - `mat_sym`: Symbolic name for the matrix argument displayed in error messages.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Details
+
+  - If either `names` or `mat` is not `nothing`:
+
+      + `!isnothing(names)` and `!isnothing(mat)`.
+      + `!isempty(names)` and `!isempty(mat)`.
+      + `length(names) == size(mat, 2)`.
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+"""
+function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
+                                         names_sym::Symbol, mat_sym::Symbol)
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
                   IsNothingError("$names_sym cannot be nothing if $mat_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
@@ -74,12 +118,9 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Option{<:VecStr} = nothing,
-                  X::Option{<:MatNum} = nothing,
-                  nf::Option{<:VecStr} = nothing,
-                  F::Option{<:MatNum} = nothing,
-                  ts::Option{<:VecDate} = nothing,
-                  iv::Option{<:MatNum} = nothing,
+    ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
+                  nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
+                  ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                   ivpa::Option{<:Num_VecNum} = nothing)
 
 Keyword arguments correspond to the fields above.
@@ -110,6 +151,11 @@ ReturnsResult
 
   - [`AbstractReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecDate`](@ref)
+  - [`Num_VecNum`](@ref)
 """
 struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     nx::T1
@@ -166,13 +212,11 @@ function returns_result_view(rd::ReturnsResult, i)
 end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
-                      iv::Option{<:TimeArray} = nothing,
-                      ivpa::Option{<:Num_VecNum} = nothing,
+                      iv::Option{<:TimeArray} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
                       ret_method::Symbol = :simple, padding::Bool = false,
                       missing_col_percent::Number = 1.0,
-                      missing_row_percent::Option{<:Number} = 1.0,
-                      collapse_args::Tuple = (), map_func::Option{<:Function} = nothing,
-                      join_method::Symbol = :outer,
+                      missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
+                      map_func::Option{<:Function} = nothing, join_method::Symbol = :outer,
                       impute_method::Option{<:Impute.Imputor} = nothing)
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
@@ -228,6 +272,13 @@ ReturnsResult
 # Related
 
   - [`ReturnsResult`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecDate`](@ref)
+  - [`Num_VecNum`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+  - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            iv::Option{<:TimeArray} = nothing,
@@ -308,4 +359,4 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                          ivpa = ivpa)
 end
 
-export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns
+export drop_incomplete, ReturnsResult, prices_to_returns

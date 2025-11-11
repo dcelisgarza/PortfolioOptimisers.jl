@@ -174,6 +174,7 @@ Denoise
   - [`ShrunkDenoise`](@ref)
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
+  - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
 """
 struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     alg::T1
@@ -197,8 +198,8 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise(alg, args, kwargs, kernel, m, n)
 end
 """
-    _denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum,
-              vecs::MatNum, num_factors::Integer)
+    _denoise!(de::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
+              num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
 
@@ -228,6 +229,8 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - [`SpectralDenoise`](@ref)
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecNum`](@ref)
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -283,6 +286,8 @@ This function is used internally to fit the MP distribution to the observed spec
 
   - [`find_max_eval`](@ref)
   - [`Denoise`](@ref)
+  - [`VecNum`](@ref)
+  - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
 """
 function errPDF(x::Number, vals::VecNum, q::Number;
                 kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
@@ -325,6 +330,8 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
   - [`errPDF`](@ref)
   - [`Denoise`](@ref)
+  - [`VecNum`](@ref)
+  - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
 """
 function find_max_eval(vals::VecNum, q::Number;
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
@@ -395,6 +402,9 @@ julia> X
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
   - [`posdef!`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function denoise!(::Nothing, args...)
     return nothing
@@ -432,6 +442,9 @@ Out-of-place version of [`denoise!`](@ref).
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
   - [`posdef`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function denoise(::Nothing, args...)
     return nothing

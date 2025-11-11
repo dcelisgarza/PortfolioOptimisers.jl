@@ -105,6 +105,7 @@ true
 
   - [`posdef`](@ref)
   - [`Posdef`](@ref)
+  - [`MatNum`](@ref)
 """
 function posdef!(::Nothing, args...)
     return nothing
@@ -139,6 +140,7 @@ Out-of-place version of [`posdef!`](@ref).
 
   - [`posdef!`](@ref)
   - [`Posdef`](@ref)
+  - [`MatNum`](@ref)
 """
 function posdef(::Nothing, args...)
     return nothing

@@ -114,6 +114,9 @@ julia> X
 
   - [`detone`](@ref)
   - [`Detone`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function detone!(::Nothing, args...)
     return nothing
@@ -150,6 +153,9 @@ Out-of-place version of [`detone!`](@ref).
 
   - [`detone!`](@ref)
   - [`Detone`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function detone(::Nothing, args...)
     return nothing
