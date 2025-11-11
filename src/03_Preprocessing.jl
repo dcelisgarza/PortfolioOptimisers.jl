@@ -18,9 +18,8 @@ Return the indices of columns in matrix `X` that do not contain missing or NaN v
 julia> X = [1.0 2.0 NaN; 4.0 missing 6.0];
 
 julia> drop_incomplete(X)
-2-element Vector{Int64}:
+1-element Vector{Int64}:
  1
- 2
 ```
 
 # Related
