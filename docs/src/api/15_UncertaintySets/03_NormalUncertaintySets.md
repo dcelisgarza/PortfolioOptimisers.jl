@@ -52,5 +52,5 @@ sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
                                             <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-PortfolioOptimisers.commutation_matrix
+commutation_matrix
 ```

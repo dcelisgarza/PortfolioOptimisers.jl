@@ -3,7 +3,7 @@
 ```@docs
 Solver
 JuMPResult
-PortfolioOptimisers.AbstractJuMPResult
-PortfolioOptimisers.set_solver_attributes
-PortfolioOptimisers.optimise_JuMP_model!
+AbstractJuMPResult
+set_solver_attributes
+optimise_JuMP_model!
 ```

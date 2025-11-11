@@ -466,5 +466,3 @@ function mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
 end
 
 export Knuth, FreedmanDiaconis, Scott, HacineGharbiRavier
-
-export Int_Bin

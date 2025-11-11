@@ -6,13 +6,13 @@ Forward
 Backward
 StepwiseRegression
 regression(re::StepwiseRegression, X::MatNum, F::MatNum)
-PortfolioOptimisers._regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)
-PortfolioOptimisers._regression(re::StepwiseRegression{PortfolioOptimisers.AbstractMinMaxValStepwiseRegressionCriterion, <:Forward}, x::VecNum, F::MatNum)
-PortfolioOptimisers._regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F::MatNum)
-PortfolioOptimisers._regression(re::StepwiseRegression{<:PortfolioOptimisers.AbstractMinMaxValStepwiseRegressionCriterion, <:Backward}, x::VecNum, F::MatNum)
-PortfolioOptimisers.add_best_feature_after_pval_failure!
-PortfolioOptimisers.get_forward_reg_incl_excl!(::PortfolioOptimisers.AbstractMinValStepwiseRegressionCriterion, value::VecNum, excluded::VecInt, included::VecInt, threshold::Number)
-PortfolioOptimisers.get_forward_reg_incl_excl!(::PortfolioOptimisers.AbstractMaxValStepwiseRegressionCriteria, value::VecNum, excluded::VecInt, included::VecInt, threshold::Number)
-PortfolioOptimisers.get_backward_reg_incl!(::PortfolioOptimisers.AbstractMinValStepwiseRegressionCriterion, value::VecNum, included::VecInt, threshold::Number)
-PortfolioOptimisers.get_backward_reg_incl!(::PortfolioOptimisers.AbstractMaxValStepwiseRegressionCriteria, value::VecNum, included::VecInt, threshold::Number)
+_regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)
+_regression(re::StepwiseRegression{AbstractMinMaxValStepwiseRegressionCriterion, <:Forward}, x::VecNum, F::MatNum)
+_regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F::MatNum)
+_regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion, <:Backward}, x::VecNum, F::MatNum)
+add_best_feature_after_pval_failure!
+get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum, excluded::VecInt, included::VecInt, threshold::Number)
+get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum, excluded::VecInt, included::VecInt, threshold::Number)
+get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum, included::VecInt, threshold::Number)
+get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum, included::VecInt, threshold::Number)
 ```

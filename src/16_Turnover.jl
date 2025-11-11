@@ -244,5 +244,3 @@ function factory(tn::Turnover, w::VecNum)
 end
 
 export TurnoverEstimator, Turnover, turnover_constraints
-
-export TnE_Tn, VecTnE_Tn, VecTn, Tn_VecTn, TnE_Tn_VecTnE_Tn

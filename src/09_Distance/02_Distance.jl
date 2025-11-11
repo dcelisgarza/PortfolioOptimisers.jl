@@ -576,5 +576,3 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_PDistCov
 end
 
 export Distance
-
-export LTDCov_PLTDCov, DistCov_PDistCov

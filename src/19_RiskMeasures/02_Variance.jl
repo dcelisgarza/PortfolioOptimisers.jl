@@ -680,5 +680,3 @@ end
 
 export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, Variance,
        StandardDeviation, UncertaintySetVariance
-
-export NSkeQuadFormulations, QuadSecondMomentFormulations

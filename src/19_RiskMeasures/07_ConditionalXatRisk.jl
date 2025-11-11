@@ -287,4 +287,4 @@ end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
        ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
-       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk, RMCVaR, RMCVaRRg
+       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk

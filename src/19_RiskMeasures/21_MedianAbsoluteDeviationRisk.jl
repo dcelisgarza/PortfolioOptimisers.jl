@@ -82,5 +82,3 @@ function (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees::Option{<:Fees}
 end
 
 export MedianAbsoluteDeviation, MedianCentering, MeanCentering
-
-export MedAbsDevMu

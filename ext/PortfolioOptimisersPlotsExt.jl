@@ -3,6 +3,9 @@ module PortfolioOptimisersPlotsExt
 using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
       Clustering, Distributions
 
+import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
+                            MatNum_Pr, PrE_Pr, ClE_Cl, VecVecNum
+
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                                          fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
@@ -31,8 +34,10 @@ function compute_relevant_assets(w::VecNum, M::Number, N::Number)
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Option{<:Number} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -122,7 +127,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
                       kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",

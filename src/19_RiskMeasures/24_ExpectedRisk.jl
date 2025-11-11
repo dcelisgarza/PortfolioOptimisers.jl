@@ -100,5 +100,3 @@ end
 
 export RiskRatioRiskMeasure, number_effective_assets, risk_contribution,
        factor_risk_contribution
-
-export MatNum_Pr, ERkNetRet, ERkwXFees, ERkw

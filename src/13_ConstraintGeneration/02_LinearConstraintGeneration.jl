@@ -1805,7 +1805,3 @@ export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEst
        AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
        RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
        linear_constraints, risk_budget_constraints, asset_sets_matrix
-
-export VecLc, Lc_VecLc, VecPR, PR_VecPR, LcE_Lc, VecLcE_Lc, VecLcE, LcE_Lc_VecLcE_Lc,
-       LcE_VecLcE, VecRkbE, RkbE_Rkb, MatNum_ASetMatE, VecMatNum_ASetMatE,
-       MatNum_ASetMatE_VecMatNum_ASetMatE

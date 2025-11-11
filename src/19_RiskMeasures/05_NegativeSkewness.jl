@@ -58,5 +58,3 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum,
 end
 
 export NegativeSkewness
-
-export NSkeFormulations

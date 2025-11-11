@@ -535,5 +535,3 @@ end
 
 export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints,
        UniformlyDistributedBounds
-
-export EstValType_CustWb, WbE_Wb

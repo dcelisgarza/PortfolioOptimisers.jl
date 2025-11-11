@@ -630,5 +630,3 @@ export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet,
        SigmaEllipseUncertaintySet, MuEllipseUncertaintySet
-
-export UcSE_UcS, Num_UcSK

@@ -30,5 +30,3 @@ end
 
 export NormOneConeBrownianDistanceVariance, IneqBrownianDistanceVariance,
        BrownianDistanceVariance
-
-export BDVarRkFormulations

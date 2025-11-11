@@ -75,5 +75,3 @@ function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::Returns
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure
-
-export VecOptE, VecOpt, OptE_Opt, VecOptE_Opt

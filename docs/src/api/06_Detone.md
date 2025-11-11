@@ -4,5 +4,5 @@
 Detone
 detone!
 detone
-PortfolioOptimisers.AbstractDetoneEstimator
+AbstractDetoneEstimator
 ```

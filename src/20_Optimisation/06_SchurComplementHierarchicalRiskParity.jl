@@ -293,5 +293,3 @@ end
 export SchurComplementHierarchicalRiskParityOptimisation, SchurComplementParams,
        SchurComplementHierarchicalRiskParity, NonMonotonicSchurComplement,
        MonotonicSchurComplement
-
-export Sd_Var, VecScP, ScP_VecScP

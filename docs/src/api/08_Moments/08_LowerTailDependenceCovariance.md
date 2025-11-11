@@ -4,5 +4,5 @@
 LowerTailDependenceCovariance
 cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-PortfolioOptimisers.lower_tail_dependence
+lower_tail_dependence
 ```

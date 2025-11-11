@@ -7,5 +7,5 @@ cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
 SpearmanCovariance
 cov(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
-PortfolioOptimisers.RankCovarianceEstimator
+RankCovarianceEstimator
 ```

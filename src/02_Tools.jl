@@ -14,32 +14,40 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    assert_nonempty_nonneg_finite_val(val::Union{<:Number, <:Pair, <:AbstractDict,
-                                        <:VecNum, <:VecPair};
-                             val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Symbol = :val)
+    assert_nonempty_nonneg_finite_val(val::Number, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(args...)
 
-Validate that the input value is non-negative and finite.
-
-Checks that the provided value (scalar, vector, dictionary, or pair) contains only finite and non-negative entries. Used for defensive programming and input validation throughout PortfolioOptimisers.jl.
+Validate that the input value is non-empty, non-negative and finite.
 
 # Arguments
 
   - `val`: Input value to validate.
-  - `val_sym`: Symbolic name for the value (used in error messages).
+  - `val_sym`: Symbolic name used in the error messages.
 
 # Returns
 
   - `nothing`: Returns nothing if validation passes.
 
-# Validation
+# Details
 
-  - `args...`: always passes.
-  - `Number`: `isfinite(val)` and `val >= 0`.
-  - `Pair`: `isfinite(val[2])` and `val[2] >= 0`.
-  - `AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
-  - `VecNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-  - `VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+  - `val`: input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+      + `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
+      + `::Number`: `isfinite(val)` and `val >= 0`.
+      + `args...`: always passes.
+
+# Related
+
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_nonempty_geq0_finite_val`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
 """
 function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -84,6 +92,42 @@ end
 function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
+"""
+    assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(val::VecPair, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(val::ArrNum, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(val::Pair, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(val::Number, val_sym::Symbol = :val)
+    assert_nonempty_finite_val(args...)
+
+Validate that the input value is non-empty and finite.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Details
+
+  - `val`: input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
+      + `::Pair`: `isfinite(val[2])`.
+      + `::Number`: `isfinite(val).
+      + `args...`: always passes.
+
+# Related
+
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_geq0_finite_val`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+"""
 function assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
@@ -118,6 +162,42 @@ end
 function assert_nonempty_finite_val(args...)
     return nothing
 end
+"""
+    assert_nonempty_geq0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(val::VecPair, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(val::ArrNum, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(val::Pair, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(val::Number, val_sym::Symbol = :val)
+    assert_nonempty_geq0_finite_val(args...)
+
+Validate that the input value is non-empty, greater than zero, and finite.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Details
+
+  - `val`: input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
+      + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
+      + `::Number`: `isfinite(val)` and `val > 0`.
+      + `args...`: always passes.
+
+# Related
+
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+"""
 function assert_nonempty_geq0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
@@ -235,6 +315,11 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
  3  4
  6  8
 ```
+
+# Related
+
+  - [`ArrNum`](@ref)
+  - [`kron`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#Base.kron)
 """
 ⊗(A::ArrNum, B::ArrNum) = reshape(kron(B, A), (length(A), length(B)))
 """
@@ -362,13 +447,13 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Number, b::VecNum)
-    dot_scalar(a::VecNum, b::Number)
+    dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::VecNum)
+    dot_scalar(a::VecNum, b::Union{<:Number, <:AbstractJuMPScalar})
     dot_scalar(a::VecNum, b::VecNum)
 
 Efficient scalar and vector dot product utility.
 
-  - If one argument is a `Number` and the other an `VecNum`, returns the scalar times the sum of the vector.
+  - If one argument is a `Union{<:Number, <:AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
 
 # Returns
@@ -387,6 +472,11 @@ julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], 2.0)
 julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
 32.0
 ```
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
 """
 function dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::VecNum)
     return a * sum(b)
@@ -416,7 +506,7 @@ Encapsulates a vector and a scalar value, commonly used for storing results that
 
     VecScalar(; v::VecNum, s::Number)
 
-Arguments correspond to the fields above.
+Keyword arguments correspond to the fields above.
 
 ## Validation
 
@@ -435,6 +525,7 @@ VecScalar
 # Related
 
   - [`AbstractResult`](@ref)
+  - [`VecNum`](@ref)
 """
 struct VecScalar{T1, T2} <: AbstractResult
     v::T1
@@ -448,7 +539,27 @@ end
 function VecScalar(; v::VecNum, s::Number)
     return VecScalar(v, s)
 end
+"""
+    const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+
+Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar` result.
+
+# Related Types
+
+  - [`Num_VecNum`](@ref)
+  - [`VecScalar`](@ref)
+"""
 const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+"""
+    const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+
+Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
+
+# Related Types
+
+  - [`Num_ArrNum`](@ref)
+  - [`VecScalar`](@ref)
+"""
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 """
     nothing_scalar_array_view(x, i)
@@ -712,5 +823,3 @@ function factory(::Nothing, args...; kwargs...)
 end
 
 export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes
-
-export Num_VecNum_VecScalar, Num_ArrNum_VecScalar

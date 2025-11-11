@@ -603,5 +603,3 @@ end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, AIC, AICC, BIC,
        RSquared, AdjustedRSquared
-
-export RegE_Reg

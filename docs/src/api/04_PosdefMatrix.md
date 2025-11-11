@@ -4,5 +4,5 @@
 Posdef
 posdef!
 posdef
-PortfolioOptimisers.AbstractPosdefEstimator
+AbstractPosdefEstimator
 ```

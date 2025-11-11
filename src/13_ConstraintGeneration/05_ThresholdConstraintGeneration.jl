@@ -235,5 +235,3 @@ function threshold_constraints(t::VecOptBtE_Bt, sets::AssetSets; kwargs...)
 end
 
 export BuyInThreshold, BuyInThresholdEstimator, threshold_constraints
-
-export BtE_Bt, VecOptBtE_Bt, BtE_Bt_VecOptBtE_Bt, VecOptBt, Bt_VecOptBt

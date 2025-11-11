@@ -256,5 +256,3 @@ function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews
 end
 
 export black_litterman_views, BlackLittermanViews
-
-export Lc_BLV

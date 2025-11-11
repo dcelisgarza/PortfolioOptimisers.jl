@@ -111,4 +111,4 @@ function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     return res / sigma^3
 end
 
-export MeanReturn, ThirdCentralMoment, Skewness, TCM_Sk
+export MeanReturn, ThirdCentralMoment, Skewness

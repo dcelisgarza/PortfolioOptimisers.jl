@@ -244,5 +244,3 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
 end
 
 export Solver, JuMPResult
-
-export DictStrA_VecPairStrA, SlvSettings, VecSlv, Slv_VecSlv

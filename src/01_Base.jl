@@ -246,16 +246,125 @@ function mul_cond_msg(conds::AbstractString...)
     end
     return msg
 end
+"""
+    abstract type PortfolioOptimisersError <: Exception end
+
+Abstract supertype for all custom exception types in PortfolioOptimisers.jl.
+
+All error types specific to PortfolioOptimisers.jl should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
+
+# Related Types
+
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
 abstract type PortfolioOptimisersError <: Exception end
+"""
+    struct IsNothingError{T1} <: PortfolioOptimisersError
+        msg::T1
+    end
+
+Exception type thrown when an argument or value is unexpectedly `nothing`.
+
+# Fields
+
+  - `msg`: Error message describing the condition that triggered the exception.
+
+# Constructors
+
+    IsNothingError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(IsNothingError("Input data must not be nothing"))
+ERROR: IsNothingError: Input data must not be nothing
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
 struct IsNothingError{T1} <: PortfolioOptimisersError
     msg::T1
 end
+"""
+    struct IsEmptyError{T1} <: PortfolioOptimisersError
+        msg::T1
+    end
+
+Exception type thrown when an argument or value is unexpectedly empty.
+
+# Fields
+
+  - `msg`: Error message describing the condition that triggered the exception.
+
+# Constructors
+
+    IsEmptyError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(IsEmptyError("Input array must not be empty"))
+ERROR: IsEmptyError: Input array must not be empty
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
 struct IsEmptyError{T1} <: PortfolioOptimisersError
     msg::T1
 end
-struct IsNothingEmptyError{T1} <: PortfolioOptimisersError
-    msg::T1
-end
+"""
+    struct IsNonFiniteError{T1} <: PortfolioOptimisersError
+        msg::T1
+    end
+
+Exception type thrown when an argument or value is unexpectedly non-finite (e.g., contains `NaN` or `Inf`).
+
+# Fields
+
+  - `msg`: Error message describing the condition that triggered the exception.
+
+# Constructors
+
+    IsNonFiniteError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(IsNonFiniteError("Input array contains non-finite values"))
+ERROR: IsNonFiniteError: Input array contains non-finite values
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+"""
 struct IsNonFiniteError{T1} <: PortfolioOptimisersError
     msg::T1
 end
@@ -263,36 +372,6 @@ function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
     name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
-end
-function non_finite_msg(a)
-    return "$a must finite"
-end
-function non_zero_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-zero"
-end
-function non_neg_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-negative"
-end
-function non_pos_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-positive"
-end
-function some_msg(a, va = nothing)
-    return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`"
-end
-function non_empty_msg(a, va = nothing)
-    return "$a$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "") must be non-empty"
-end
-function nothing_non_empty_msg(a, va = nothing)
-    return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`, and non-empty$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "")"
-end
-function range_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c$(ci ? ']' : ')')"
-end
-function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
-    msg = (; :eq => "must be equal to", :gt => "must be greater than",
-           :lt => "must be smaller than", :geq => "must be greater than or equal to",
-           :leq => "must be smaller than or equal to")
-    return "$a$(!isnothing(va) ? " ($va)" : "") $(msg[c]) $b$(!isnothing(vb) ? " ($vb)" : "")"
 end
 function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                  <:AbstractResult}, state = 1)
@@ -303,38 +382,301 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError())
 end
+"""
+    const VecNum = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
 
-export IsEmptyError, IsNothingError, IsNothingEmptyError, IsNonFiniteError
+Alias for an abstract vector of numeric types or JuMP scalar types.
 
+# Related Types
+
+  - [`VecInt`](@ref)
+  - [`MatNum`](@ref)
+  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
+"""
 const VecNum = AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}
+"""
+    const VecInt = AbstractVector{<:Integer}
+
+Alias for an abstract vector of integer types.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
+  - [`ArrNum`](@ref)
+"""
 const VecInt = AbstractVector{<:Integer}
+"""
+    const MatNum = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
+
+Alias for an abstract matrix of numeric types or JuMP scalar types.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`ArrNum`](@ref)
+  - [`VecMatNum`](@ref)
+"""
 const MatNum = AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}
+"""
+    const ArrNum = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
+
+Alias for an abstract array of numeric types or JuMP scalar types.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
+"""
 const ArrNum = AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}
+"""
+    const Num_VecNum = Union{<:Number, <:VecNum}
+
+Alias for a union of a numeric type or an abstract vector of numeric types.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`ArrNum`](@ref)
+"""
 const Num_VecNum = Union{<:Number, <:VecNum}
+"""
+    const Num_ArrNum = Union{<:Number, <:ArrNum}
+
+Alias for a union of a numeric type or an abstract array of numeric types.
+
+# Related Types
+
+  - [`ArrNum`](@ref)
+  - [`VecNum`](@ref)
+"""
 const Num_ArrNum = Union{<:Number, <:ArrNum}
+"""
+    const PairStrNum = Pair{<:AbstractString, <:Number}
+
+Alias for a pair consisting of an abstract string and a numeric type.
+
+# Related Types
+
+  - [`DictStrNum`](@ref)
+  - [`MultiEstValType`](@ref)
+"""
 const PairStrNum = Pair{<:AbstractString, <:Number}
+"""
+    const DictStrNum = AbstractDict{<:AbstractString, <:Number}
+
+Alias for an abstract dictionary with string keys and numeric values.
+
+# Related Types
+
+  - [`PairStrNum`](@ref)
+  - [`MultiEstValType`](@ref)
+"""
 const DictStrNum = AbstractDict{<:AbstractString, <:Number}
+"""
+    const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+
+Alias for a union of a dictionary with string keys and numeric values, or a vector of string-number pairs.
+
+# Related Types
+
+  - [`DictStrNum`](@ref)
+  - [`PairStrNum`](@ref)
+  - [`EstValType`](@ref)
+"""
 const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+"""
+    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType}
+
+Alias for a union of numeric, vector of numeric, string-number pair, or multi-estimator value types.
+
+# Related Types
+
+  - [`Num_VecNum`](@ref)
+  - [`PairStrNum`](@ref)
+  - [`MultiEstValType`](@ref)
+"""
 const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType}
+"""
+    const Str_Expr = Union{<:AbstractString, Expr}
+
+Alias for a union of abstract string or Julia expression.
+
+# Related Types
+
+  - [`VecStr_Expr`](@ref)
+  - [`EqnType`](@ref)
+"""
 const Str_Expr = Union{<:AbstractString, Expr}
+"""
+    const VecStr_Expr = AbstractVector{<:Str_Expr}
+
+Alias for an abstract vector of strings or Julia expressions.
+
+# Related Types
+
+  - [`Str_Expr`](@ref)
+  - [`EqnType`](@ref)
+"""
 const VecStr_Expr = AbstractVector{<:Str_Expr}
+"""
+    const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
+
+Alias for a union of string, Julia expression, or vector of strings/expressions.
+
+# Related Types
+
+  - [`Str_Expr`](@ref)
+  - [`VecStr_Expr`](@ref)
+"""
 const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
+"""
+    const VecVecNum = AbstractVector{<:VecNum}
+
+Alias for an abstract vector of numeric vectors.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`VecMatNum`](@ref)
+"""
 const VecVecNum = AbstractVector{<:VecNum}
+"""
+    const VecVecInt = AbstractVector{<:VecInt}
+
+Alias for an abstract vector of integer vectors.
+
+# Related Types
+
+  - [`VecInt`](@ref)
+"""
 const VecVecInt = AbstractVector{<:VecInt}
+"""
+    const VecMatNum = AbstractVector{<:MatNum}
+
+Alias for an abstract vector of numeric matrices.
+
+# Related Types
+
+  - [`MatNum`](@ref)
+  - [`VecNum`](@ref)
+"""
 const VecMatNum = AbstractVector{<:MatNum}
+"""
+    const VecStr = AbstractVector{<:AbstractString}
+
+Alias for an abstract vector of strings.
+
+# Related Types
+
+  - [`Str_Expr`](@ref)
+  - [`VecStr_Expr`](@ref)
+"""
 const VecStr = AbstractVector{<:AbstractString}
+"""
+    const VecPair = AbstractVector{<:Pair}
+
+Alias for an abstract vector of pairs.
+
+# Related Types
+
+  - [`PairStrNum`](@ref)
+"""
 const VecPair = AbstractVector{<:Pair}
+"""
+    const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
+
+Alias for an abstract vector of JuMP scalar types.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+"""
 const VecJuMPScalar = AbstractVector{<:AbstractJuMPScalar}
+"""
+    const Option{T} = Union{Nothing, T}
+
+Alias for an optional value of type `T`, which may be `nothing`.
+
+# Related Types
+
+  - [`EstValType`](@ref)
+"""
 const Option{T} = Union{Nothing, T}
+"""
+    const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
+
+Alias for a union of a numeric matrix or a vector of numeric matrices.
+
+# Related Types
+
+  - [`MatNum`](@ref)
+  - [`VecMatNum`](@ref)
+"""
 const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
+"""
+    const Int_VecInt = Union{<:Integer, <:VecInt}
+
+Alias for a union of an integer or a vector of integers.
+
+# Related Types
+
+  - [`VecInt`](@ref)
+"""
 const Int_VecInt = Union{<:Integer, <:VecInt}
+"""
+    const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
+
+Alias for a union of a numeric vector or a vector of numeric vectors.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`VecVecNum`](@ref)
+"""
 const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
+"""
+    const VecDate = AbstractVector{<:Dates.AbstractTime}
+
+Alias for an abstract vector of date or time types.
+
+# Related Types
+
+  - [`VecNum`](@ref)
+  - [`VecStr`](@ref)
+"""
 const VecDate = AbstractVector{<:Dates.AbstractTime}
+"""
+    const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
+
+Alias for a union of an abstract dictionary or an abstract vector.
+
+# Related Types
+
+  - [`DictStrNum`](@ref)
+  - [`VecNum`](@ref)
+"""
 const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
+"""
+    const Sym_Str = Union{Symbol, <:AbstractString}
+
+Alias for a union of a symbol or an abstract string.
+
+# Related Types
+
+  - [`VecStr`](@ref)
+"""
 const Sym_Str = Union{Symbol, <:AbstractString}
+"""
+    const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+
+Alias for a union of an abstract string or an abstract vector.
+
+# Related Types
+
+  - [`VecStr`](@ref)
+  - [`Str_Expr`](@ref)
+"""
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
 
-export VecNum, VecInt, MatNum, ArrNum, Num_VecNum, Num_ArrNum, PairStrNum, DictStrNum,
-       MultiEstValType, EstValType, Str_Expr, VecStr_Expr, EqnType, VecVecNum, VecVecInt,
-       VecMatNum, VecStr, VecPair, VecJuMPScalar, Option, MatNum_VecMatNum, Int_VecInt,
-       VecNum_VecVecNum, VecDate, Dict_Vec, Sym_Str, Str_Vec
+export IsEmptyError, IsNothingError, IsNonFiniteError

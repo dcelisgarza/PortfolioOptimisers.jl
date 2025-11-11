@@ -811,6 +811,3 @@ end
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
        IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
        phylogeny_constraints, centrality_constraints
-
-export PhCE_PhC, VecPhCE_PhC, PhCE_PhC_VecPhCE_PhC, VecPhC, PhC_VecPhC, MatNum_PhRMatNum,
-       Num_VecToScaM, VecCC, CC_VecCC, Lc_CC_VecCC

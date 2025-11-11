@@ -1206,5 +1206,3 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
        CentralityEstimator, centrality_vector
-
-export Tree_SimMat, NwE_ClE_Cl

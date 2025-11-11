@@ -385,5 +385,3 @@ end
 export HierarchicalClustering, clusterise, SecondOrderDifference,
        StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
        ClusteringEstimator
-
-export Int_ONC, ClE_Cl, PhE_Cl

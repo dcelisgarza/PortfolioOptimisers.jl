@@ -23,10 +23,10 @@ sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:A
 sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
                                           <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-PortfolioOptimisers.BootstrapUncertaintySetEstimator
-PortfolioOptimisers.ARCHBootstrapSet
-PortfolioOptimisers.bootstrap_func
-PortfolioOptimisers.bootstrap_generator
-PortfolioOptimisers.mu_bootstrap_generator
-PortfolioOptimisers.sigma_bootstrap_generator
+BootstrapUncertaintySetEstimator
+ARCHBootstrapSet
+bootstrap_func
+bootstrap_generator
+mu_bootstrap_generator
+sigma_bootstrap_generator
 ```

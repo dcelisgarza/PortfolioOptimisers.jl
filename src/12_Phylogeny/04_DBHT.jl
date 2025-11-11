@@ -2021,5 +2021,3 @@ end
 
 export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
        UniqueRoot, EqualRoot, DBHT, LoGo, DBHTClustering
-
-export DVarInfo_DDVarInfo

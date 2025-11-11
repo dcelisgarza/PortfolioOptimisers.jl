@@ -2,6 +2,18 @@ using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
       Handcalcs, StatsBase, DocumenterVitepress
 
+exported = names(PortfolioOptimisers)
+all_symbols = names(PortfolioOptimisers; all = true)
+filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
+for sym in setdiff!(all_symbols, exported)
+    # if sym in (:eval, :include)
+    #     continue
+    # end
+    eval(quote
+             import PortfolioOptimisers: $(sym)
+         end)
+end
+
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
                     recursive = true)
 

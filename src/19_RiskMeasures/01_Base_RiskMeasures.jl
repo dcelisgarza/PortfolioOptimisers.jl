@@ -464,5 +464,3 @@ function no_bounds_no_risk_expr_risk_measure end
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
        HierarchicalRiskMeasure
-
-export VecBaseRM, VecOptRM, OptRM_VecOptRM, VecRM, RM_VecRM, RkRtBounds, Front_NumVec

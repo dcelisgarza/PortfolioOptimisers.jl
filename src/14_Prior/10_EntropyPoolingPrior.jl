@@ -2243,5 +2243,3 @@ end
 export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior, H0_EntropyPooling,
        H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling,
        CVaREntropyPooling
-
-export StagedEP, NonCVaREP, VecEP

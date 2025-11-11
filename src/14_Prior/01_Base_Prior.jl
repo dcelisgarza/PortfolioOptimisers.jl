@@ -711,4 +711,4 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
 
-export prior, LowOrderPrior, HighOrderPrior, PrE_Pr
+export prior, LowOrderPrior, HighOrderPrior

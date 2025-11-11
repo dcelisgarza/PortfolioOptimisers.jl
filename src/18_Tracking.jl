@@ -485,5 +485,3 @@ function factory(tracking::TrackingError, w::VecNum)
 end
 
 export WeightsTracking, ReturnsTracking, TrackingError
-
-export VecTr, Tr_VecTr
