@@ -3,9 +3,7 @@
 
 Abstract supertype for all returns result types in PortfolioOptimisers.jl.
 
-All concrete types representing the result of returns calculations (e.g., asset returns, factor returns)
-should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis
-and optimization routines.
+All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
 
 # Related
 
@@ -562,26 +560,28 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 """
-    nothing_scalar_array_view(x, i)
+    nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any)
+    nothing_scalar_array_view(x::AbstractVector, i)
+    nothing_scalar_array_view(x::VecScalar, i)
+    nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
+    nothing_scalar_array_view(x::AbstractMatrix, i)
 
 Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
 
-  - `x`: Input value.
-
-      + `nothing`: returns `nothing`.
-      + `Number`: returns `x`.
-      + `VecNum`: returns `view(x, i)`.
-      + `VecVecNum`: returns `[view(xi, i) for xi in x]`.
-      + `ArrNum`: returns `view(x, i, i)`.
-
 # Arguments
 
-  - `x`: Input value, which may be `nothing`, a scalar, vector, or array.
+  - `x`: Input value.
   - `i`: Index or indices to view.
 
 # Returns
 
-  - The corresponding view or value, or `nothing` if `x` is `nothing`.
+  - `x`: Input value.
+
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: returns `x` unchanged.
+      + `::AbstractVector`: returns `view(x, i)`.
+      + `::VecScalar`: returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: returns a vector of views for each element in `x`.
+      + `::AbstractMatrix`: returns `view(x, i, i)`.
 
 # Examples
 
@@ -616,7 +616,7 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <
                                    i)
     return [view(xi, i) for xi in x]
 end
-function nothing_scalar_array_view(x::ArrNum, i)
+function nothing_scalar_array_view(x::AbstractMatrix, i)
     return view(x, i, i)
 end
 """

@@ -1,9 +1,16 @@
 # Base
 
+## Public
+
 ```@docs
 IsNothingError
 IsEmptyError
 IsNonFiniteError
+```
+
+## Private
+
+```@docs
 AbstractEstimator
 AbstractAlgorithm
 AbstractResult
