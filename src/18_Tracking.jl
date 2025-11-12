@@ -290,7 +290,7 @@ Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
 # Returns
 
-  - `Vector{<:Number}`: Net benchmark portfolio returns.
+  - `VecNum`: Net benchmark portfolio returns.
 
 # Details
 
@@ -382,7 +382,7 @@ Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 # Returns
 
-  - `Vector{<:Number}`: Benchmark portfolio returns.
+  - `VecNum`: Benchmark portfolio returns.
 
 # Examples
 

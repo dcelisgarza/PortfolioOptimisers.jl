@@ -92,7 +92,7 @@ This method computes the standard deviation of the input array `X` using the con
 
 # Returns
 
-  - `sd::Vector{<:Number}`: Standard deviation vector of `X`.
+  - `sd::VecNum`: Standard deviation vector of `X`.
 
 # Examples
 
@@ -208,7 +208,7 @@ This method computes the variance of the input array `X` using the configuration
 
 # Returns
 
-  - `v::Vector{<:Number}`: Variance vector of `X`.
+  - `v::VecNum`: Variance vector of `X`.
 
 # Examples
 

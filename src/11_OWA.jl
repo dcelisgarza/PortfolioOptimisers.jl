@@ -134,9 +134,8 @@ Estimator type for OWA weights using JuMP-based optimization.
 
 # Constructor
 
-    OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5,
-            sc::Number = 1.0, so::Number = 1.0,
-            alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+    OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
+            so::Number = 1.0, alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
 
 Keyword arguments correspond to the fields above.
 
@@ -170,6 +169,7 @@ OWAJuMP
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`owa_l_moment_crm`](@ref)
   - [`Solver`](@ref)
+  - [`Slv_VecSlv`](@ref)
 """
 struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     slv::T1
@@ -248,6 +248,7 @@ julia> PortfolioOptimisers.ncrra_weights(w, 0.5)
 
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
   - [`owa_l_moment_crm`](@ref)
+  - [`MatNum`](@ref)
 """
 function ncrra_weights(weights::MatNum, g::Number = 0.5)
     N = size(weights, 2)
@@ -293,6 +294,7 @@ This function sets up a JuMP optimization model for OWA weights, given an `OWAJu
 # Related
 
   - [`OWAJuMP`](@ref)
+  - [`MatNum`](@ref)
   - [`owa_l_moment_crm`](@ref)
 """
 function owa_model_setup(method::OWAJuMP, weights::MatNum)
@@ -338,8 +340,9 @@ This function solves the provided JuMP model using the solver(s) specified in th
 
 # Related
 
-  - [`owa_model_setup`](@ref)
   - [`OWAJuMP`](@ref)
+  - [`MatNum`](@ref)
+  - [`owa_model_setup`](@ref)
   - [`ncrra_weights`](@ref)
 """
 function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
@@ -355,8 +358,7 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     end
 end
 """
-    owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator,
-                     weights::MatNum)
+    owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator, weights::MatNum)
 
 Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
 
@@ -381,6 +383,7 @@ This function dispatches on the estimator `method` to compute OWA weights from a
   - [`MaximumEntropy`](@ref)
   - [`MinimumSquaredDistance`](@ref)
   - [`MinimumSumSquares`](@ref)
+  - [`MatNum`](@ref)
   - [`ncrra_weights`](@ref)
 """
 function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
@@ -461,12 +464,13 @@ Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Ris
 
 # Returns
 
-  - `w::Vector{<:Number}`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_wcvar`](@ref)
   - [`owa_tg`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_cvar(T::Integer, alpha::Number = 0.05)
     @argcheck(zero(alpha) < alpha < one(alpha),
@@ -490,12 +494,13 @@ Compute the Ordered Weights Array (OWA) weights for a weighted combination of Co
 
 # Returns
 
-  - `w::Vector{<:Number}`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_cvar`](@ref)
   - [`owa_tg`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_wcvar(T::Integer, alphas::VecNum, weights::VecNum)
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
@@ -525,12 +530,13 @@ This function approximates the tail Gini risk measure by integrating over a rang
 
 # Returns
 
-  - `w::Vector{<:Number}`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_cvar`](@ref)
   - [`owa_wcvar`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_tg(T::Integer; alpha_i::Number = 1e-4, alpha::Number = 0.05,
                 a_sim::Integer = 100)
@@ -560,11 +566,12 @@ This function returns a vector of OWA weights that select the minimum (worst) va
 
 # Returns
 
-  - `w::Vector{<:Number}`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_rg`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_wr(T::Integer)
     w = zeros(typeof(inv(T)), T)
@@ -584,11 +591,12 @@ This function returns a vector of OWA weights corresponding to the range (differ
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_wr`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_rg(T::Integer)
     w = zeros(typeof(inv(T)), T)
@@ -611,12 +619,13 @@ This function returns a vector of OWA weights corresponding to the difference be
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_cvar`](@ref)
   - [`owa_rg`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
@@ -640,12 +649,13 @@ This function returns a vector of OWA weights corresponding to the difference be
 
 # Returns
 
-  - `w::Vector{<:Number}`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_wcvar`](@ref)
   - [`owa_cvarrg`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum, betas::VecNum = alphas,
                      weights_b::VecNum = weights_a)
@@ -672,12 +682,13 @@ This function returns a vector of OWA weights corresponding to the difference be
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_tg`](@ref)
   - [`owa_rg`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05,
                   a_sim::Integer = 100, beta_i::Number = alpha_i, beta::Number = alpha,
@@ -701,11 +712,12 @@ This function returns the vector of weights for the OWA linear moment of order `
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights of length `T`.
+  - `w::VecNum`: Vector of OWA weights of length `T`.
 
 # Related
 
   - [`owa_l_moment_crm`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_l_moment(T::Integer, k::Integer = 2)
     T, k = promote(T, k)
@@ -743,7 +755,7 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights of length `T`, normalised to sum to one.
+  - `w::VecNum`: Vector of OWA weights of length `T`, normalised to sum to one.
 
 # Details
 
@@ -755,6 +767,7 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
   - [`owa_l_moment`](@ref)
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
   - [`OWAJuMP`](@ref)
+  - [`VecNum`](@ref)
 """
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())

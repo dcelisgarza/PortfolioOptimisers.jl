@@ -31,16 +31,11 @@ Estimator for portfolio transaction fees constraints.
 
 # Constructor
 
-    FeesEstimator(; tn::Option{<:TnE_Tn} = nothing,
-                    l::Option{<:EstValType} = nothing,
-                    s::Option{<:EstValType} = nothing,
-                    fl::Option{<:EstValType} = nothing,
-                    fs::Option{<:EstValType} = nothing,
-                    dl::Option{<:Number} = nothing,
-                    ds::Option{<:Number} = nothing,
-                    dfl::Option{<:Number} = nothing,
-                    dfs::Option{<:Number} = nothing,
-                    kwargs::NamedTuple = (; atol = 1e-8))
+    FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType} = nothing,
+                  s::Option{<:EstValType} = nothing, fl::Option{<:EstValType} = nothing,
+                  fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
+                  ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
+                  dfs::Option{<:Number} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
 
 Keyword arguments correspond to the fields above.
 
@@ -73,10 +68,13 @@ FeesEstimator
 # Related
 
   - [`Fees`](@ref)
-  - [`fees_constraints`](@ref)
   - [`TurnoverEstimator`](@ref)
   - [`Turnover`](@ref)
   - [`AbstractEstimator`](@ref)
+  - [`Option`](@ref)
+  - [`TnE_Tn`](@ref)
+  - [`EstValType`](@ref)
+  - [`fees_constraints`](@ref)
 """
 struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimator
     tn::T1
@@ -735,7 +733,7 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Actual per asset turnover fee.
+  - `val::VecNum`: Actual per asset turnover fee.
 
 # Examples
 
@@ -778,7 +776,7 @@ Sums actual proportional, fixed, and turnover fees for all assets.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Total actual per asset fees.
+  - `val::VecNum`: Total actual per asset fees.
 
 # Examples
 
@@ -826,7 +824,7 @@ Compute the proportional per asset fees for portfolio weights and prices.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Total proportional per asset fee.
+  - `val::VecNum`: Total proportional per asset fee.
 
 # Examples
 
@@ -878,7 +876,7 @@ Compute the per asset turnover fees for portfolio weights and prices.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Per asset turnover fee.
+  - `val::VecNum`: Per asset turnover fee.
 
 # Examples
 
@@ -927,7 +925,7 @@ Compute the per asset fixed portfolio fees for assets that have been allocated.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Total per asset fixed fee.
+  - `val::VecNum`: Total per asset fixed fee.
 
 # Examples
 
@@ -978,7 +976,7 @@ Sums proportional, fixed, and turnover fees for all assets.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Total per asset fees.
+  - `val::VecNum`: Total per asset fees.
 
 # Examples
 
@@ -1023,7 +1021,7 @@ Returns the portfolio returns as the product of the asset return matrix `X` and 
 
 # Returns
 
-  - `Vector{<:Number}`: Portfolio net returns.
+  - `VecNum`: Portfolio net returns.
 
 # Examples
 

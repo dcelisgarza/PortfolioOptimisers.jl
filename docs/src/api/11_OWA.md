@@ -1,5 +1,7 @@
 # Ordered Weights Array
 
+## Public
+
 ```@docs
 MaximumEntropy
 MinimumSquaredDistance
@@ -17,6 +19,11 @@ owa_rg
 owa_cvarrg
 owa_wcvarrg
 owa_tgrg
+```
+
+## Private
+
+```@docs
 AbstractOrderedWeightsArrayEstimator
 AbstractOrderedWeightsArrayAlgorithm
 ncrra_weights

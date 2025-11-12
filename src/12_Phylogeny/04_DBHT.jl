@@ -549,7 +549,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 # Returns
 
-  - `distance::Vector{<:Number}`: Vector of shortest path distances from the source to each vertex (`0` for the source itself, `Inf` for unreachable nodes).
+  - `distance::VecNum`: Vector of shortest path distances from the source to each vertex (`0` for the source itself, `Inf` for unreachable nodes).
   - `branch::Vector{Int}`: Vector of predecessor indices for each vertex in the BFS tree (`-1` for the source).
 
 # Details

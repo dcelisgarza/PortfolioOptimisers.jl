@@ -53,7 +53,7 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Returns
 
-  - `mu::Vector{<:Number}`: The expected returns vector.
+  - `mu::VecNum`: The expected returns vector.
 
 # Examples
 

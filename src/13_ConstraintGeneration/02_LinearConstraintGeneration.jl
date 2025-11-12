@@ -408,7 +408,7 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Returns
 
-  - `arr::Vector{<:Number}`: Value array.
+  - `arr::VecNum`: Value array.
 
 # Related
 

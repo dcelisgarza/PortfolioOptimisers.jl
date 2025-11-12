@@ -214,7 +214,7 @@ Compute the Black-Litterman posterior mean and covariance for asset returns.
 
 # Returns
 
-  - `posterior_mu::Vector{<:Number}`: Posterior mean vector of asset returns.
+  - `posterior_mu::VecNum`: Posterior mean vector of asset returns.
   - `posterior_sigma::Matrix{<:Number}`: Posterior covariance matrix of asset returns.
 
 # Related

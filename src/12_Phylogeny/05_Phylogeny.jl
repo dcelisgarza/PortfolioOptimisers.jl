@@ -488,7 +488,7 @@ This function dispatches to the appropriate centrality computation from [`Graphs
 
 # Returns
 
-  - `Vector{<:Number}`: Centrality scores for each node in the graph.
+  - `VecNum`: Centrality scores for each node in the graph.
 
 # Related
 
@@ -1018,7 +1018,7 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 
 # Returns
 
-  - `cv::Vector{<:Number}`: Centrality scores for each asset.
+  - `cv::VecNum`: Centrality scores for each asset.
 
 # Related
 
@@ -1047,7 +1047,7 @@ This function applies the centrality algorithm in the estimator to the network c
 
 # Returns
 
-  - `cv::Vector{<:Number}`: Centrality scores for each asset.
+  - `cv::VecNum`: Centrality scores for each asset.
 
 # Related
 

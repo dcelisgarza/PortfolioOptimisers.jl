@@ -290,7 +290,7 @@ This function fits a regression model (as specified by `retgt`) to the response 
 
 # Returns
 
-  - `beta::Vector{<:Number}`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
+  - `beta::VecNum`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
 
 # Details
 

@@ -877,4 +877,5 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes
+export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes,
+       concrete_typed_array

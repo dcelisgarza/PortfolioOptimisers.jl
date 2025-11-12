@@ -307,7 +307,7 @@ Generate a vector of portfolio weight bounds when no constraint is specified.
 
 # Returns
 
-  - `wb::Vector{<:Number}`: Vector of length `N` filled with `val`.
+  - `wb::VecNum`: Vector of length `N` filled with `val`.
 
 # Examples
 

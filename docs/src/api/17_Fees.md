@@ -1,5 +1,7 @@
 # Fees
 
+## Public
+
 ```@docs
 FeesEstimator
 Fees
@@ -10,4 +12,6 @@ calc_asset_fees
 calc_asset_fixed_fees
 calc_net_returns
 calc_net_asset_returns
+cumulative_returns
+drawdowns
 ```

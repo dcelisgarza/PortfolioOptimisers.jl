@@ -10,8 +10,35 @@ All concrete types representing the result of a JuMP model optimisation should s
   - [`JuMPResult`](@ref)
 """
 abstract type AbstractJuMPResult <: AbstractResult end
+"""
+    const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
+                                   <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
+
+Alias for a dictionary or vector of pairs with string keys.
+
+Represents solver settings as either a dictionary mapping strings to values, or a vector of pairs where the first element is a string and the second is any value. Used for passing attribute settings to JuMP solvers.
+
+# Related
+
+  - [`SlvSettings`](@ref)
+  - [`Solver`](@ref)
+  - [`set_solver_attributes`](@ref)
+"""
 const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
                                    <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
+"""
+    const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
+
+Alias for solver settings used in JuMP-based optimisation.
+
+Represents solver settings as either a single pair of string key and value, or as a dictionary/vector of pairs with string keys. Used for passing attribute settings to JuMP solvers.
+
+# Related
+
+  - [`DictStrA_VecPairStrA`](@ref)
+  - [`Solver`](@ref)
+  - [`set_solver_attributes`](@ref)
+"""
 const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
 """
     struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
@@ -37,8 +64,8 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 # Constructor
 
     Solver(; name::Sym_Str = "", solver::Any = nothing,
-           settings::Option{<:SlvSettings} = nothing,
-           check_sol::NamedTuple = (;), add_bridges::Bool = true)
+           settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
+           add_bridges::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -63,6 +90,11 @@ Solver
 # Related
 
   - [`optimise_JuMP_model!`](@ref)
+  - [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer)
+  - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
+  - [`Sym_Str`](@ref)
+  - [`Option`](@ref)
+  - [`SlvSettings`](@ref)
 """
 struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     name::T1
@@ -84,7 +116,30 @@ function Solver(; name::Sym_Str = "", solver::Any = nothing,
                 add_bridges::Bool = true)
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
+"""
+    const VecSlv = AbstractVector{<:Solver}
+
+Alias for a vector of `Solver` objects.
+
+Represents a collection of solver configurations to be used in JuMP-based optimisation routines. Enables sequential or fallback solver strategies by passing multiple solver setups.
+
+# Related Types
+
+  - [`Solver`](@ref)
+"""
 const VecSlv = AbstractVector{<:Solver}
+"""
+    const Slv_VecSlv = Union{<:Solver, <:VecSlv}
+
+Alias for a single `Solver` or a vector of `Solver` objects.
+
+Represents either a single solver configuration or a collection of solver configurations for JuMP-based optimisation routines. Enables flexible dispatch for optimisation functions that accept one or multiple solvers.
+
+# Related Types
+
+  - [`Solver`](@ref)
+  - [`VecSlv`](@ref)
+"""
 const Slv_VecSlv = Union{<:Solver, <:VecSlv}
 """
     struct JuMPResult{T1, T2} <: AbstractJuMPResult
@@ -152,8 +207,7 @@ function set_solver_attributes(args...)
     return nothing
 end
 """
-    set_solver_attributes(model::JuMP.Model,
-                          settings::DictStrA_VecPairStrA)
+    set_solver_attributes(model::JuMP.Model, settings::DictStrA_VecPairStrA)
 
 Set multiple solver attributes on a JuMP model.
 
@@ -167,6 +221,12 @@ Iterates over the provided settings and applies each as a solver attribute.
 # Returns
 
   - `nothing`
+
+# Related
+
+  - [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
+  - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
+  - [`DictStrA_VecPairStrA`](@ref)
 """
 function set_solver_attributes(model::JuMP.Model, settings::DictStrA_VecPairStrA)
     for (k, v) in settings
@@ -187,6 +247,11 @@ Set a single solver attribute on a JuMP model.
 # Returns
 
   - `nothing`
+
+# Related
+
+  - [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
+  - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
 """
 function set_solver_attributes(model::JuMP.Model, settings::Pair)
     set_attribute(model, settings...)
@@ -213,6 +278,15 @@ Tries each solver in order, applying settings and checking for solution feasibil
   - For each solver, sets the optimizer and attributes, runs `JuMP.optimize!`, and checks solution feasibility.
   - If a solver fails, records the error and tries the next.
   - Stops at the first successful solution.
+
+# Related
+
+  - [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
+  - [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer)
+  - [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible)
+  - [`set_solver_attributes`](@ref)
+  - [`JuMPResult`](@ref)
+  - [`Slv_VecSlv`](@ref)
 """
 function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
     trials = Dict()
