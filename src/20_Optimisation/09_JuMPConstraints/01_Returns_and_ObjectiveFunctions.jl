@@ -263,7 +263,7 @@ function set_max_ratio_return_constraints!(args...)
     return nothing
 end
 function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
-                                           mu::Vec_VecNum)
+                                           mu::Num_VecNum)
     sc = model[:sc]
     k = model[:k]
     ohf = model[:ohf]
