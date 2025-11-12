@@ -271,7 +271,6 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     rf = obj.rf
     if haskey(model, :bucs_w) || haskey(model, :t_eucs_gw) || all(x -> x <= rf, mu)
         risk = model[:risk]
-        add_to_expression!(ret, -rf, k)
         @constraint(model, sr_risk, sc * (risk - ohf) <= 0)
     else
         @constraint(model, sr_ret, sc * (ret - rf * k - ohf) == 0)
@@ -349,12 +348,10 @@ end
 function set_max_ratio_kelly_return_constraints!(args...)
     return nothing
 end
-function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, obj::MaximumRatio, k,
-                                                 sc, ret)
+function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, ::MaximumRatio)
+    sc = model[:sc]
     ohf = model[:ohf]
     risk = model[:risk]
-    rf = obj.rf
-    add_to_expression!(ret, -rf, k)
     @constraint(model, sr_ekelly_risk, sc * (risk - ohf) <= 0)
 end
 function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
@@ -374,7 +371,7 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     end
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
-    set_max_ratio_kelly_return_constraints!(model, obj, k, sc, ret)
+    set_max_ratio_kelly_return_constraints!(model, obj)
     @expression(model, kret, k .+ X)
     @constraint(model, ekelly_ret[i = 1:T],
                 [sc * t_ekelly[i], sc * k, sc * kret[i]] in MOI.ExponentialCone())
@@ -433,7 +430,9 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pr::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
-    @expression(model, obj_expr, ret)
+    k = model[:k]
+    rf = obj.rf
+    @expression(model, obj_expr, ret - rf * k)
     add_penalty_to_objective!(model, -1, obj_expr)
     add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     @objective(model, Max, so * obj_expr)
@@ -447,7 +446,9 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
     so = model[:so]
     if haskey(model, :sr_risk)
         ret = model[:ret]
-        @expression(model, obj_expr, ret)
+        k = model[:k]
+        rf = obj.rf
+        @expression(model, obj_expr, ret - rf * k)
         add_penalty_to_objective!(model, -1, obj_expr)
         add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
         @objective(model, Max, so * obj_expr)
