@@ -1,4 +1,4 @@
-# Fees
+# Portfolio Returns
 
 ## Public
 
@@ -14,4 +14,11 @@ calc_net_returns
 calc_net_asset_returns
 cumulative_returns
 drawdowns
+```
+
+## Private
+
+```@docs
+FeesE_Fees
+fees_view
 ```

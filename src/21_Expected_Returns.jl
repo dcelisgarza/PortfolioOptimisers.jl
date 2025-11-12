@@ -226,7 +226,8 @@ julia> ReturnRiskMeasure()
 ReturnRiskMeasure
   rt ┼ ArithmeticReturn
      │   ucs ┼ nothing
-     │    lb ┴ nothing
+     │    lb ┼ nothing
+     │    mu ┴ nothing
 ```
 
 # Related
@@ -311,7 +312,8 @@ julia> RatioRiskMeasure()
 RatioRiskMeasure
   rt ┼ ArithmeticReturn
      │   ucs ┼ nothing
-     │    lb ┴ nothing
+     │    lb ┼ nothing
+     │    mu ┴ nothing
   rk ┼ Variance
      │   settings ┼ RiskMeasureSettings
      │            │   scale ┼ Float64: 1.0

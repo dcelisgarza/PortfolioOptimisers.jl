@@ -116,6 +116,61 @@ function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType}
                        kwargs::NamedTuple = (; atol = 1e-8))
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end
+"""
+    fees_view(fees::FeesEstimator, i)
+
+Create a view of a `FeesEstimator` for a subset of assets.
+
+Returns a new `FeesEstimator` with all fee fields restricted to the indices or assets specified by `i`. The default fee values and keyword arguments are propagated unchanged.
+
+# Arguments
+
+  - `fees`: instance of `FeesEstimator`.
+  - `i`: Index or indices specifying the subset of assets.
+
+# Returns
+
+  - `fe::FeesEstimator`: New estimator with fields restricted to the specified subset.
+
+# Details
+
+  - Uses `turnover_view` to subset the turnover estimator/result.
+  - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
+  - Propagates default fee values and keyword arguments unchanged.
+  - Enables composable processing of asset subsets for fee constraints.
+
+# Examples
+
+```jldoctest
+julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1)),
+                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
+                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+
+julia> PortfolioOptimisers.fees_view(fees, 1:2)
+FeesEstimator
+      tn ┼ TurnoverEstimator
+         │      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+         │    val ┼ Dict{String, Float64}: Dict("A" => 0.1)
+         │   dval ┴ nothing
+       l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
+       s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
+      fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
+      fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
+      dl ┼ nothing
+      ds ┼ nothing
+     dfl ┼ nothing
+     dfs ┼ nothing
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+```
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Fees`](@ref)
+  - [`fees_constraints`](@ref)
+  - [`turnover_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
 function fees_view(fees::FeesEstimator, i)
     tn = turnover_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
@@ -150,12 +205,9 @@ Container for portfolio transaction fee constraints.
 
 # Constructor
 
-    Fees(; tn::Option{<:Turnover} = nothing,
-         l::Option{<:Num_VecNum} = nothing,
-         s::Option{<:Num_VecNum} = nothing,
-         fl::Option{<:Num_VecNum} = nothing,
-         fs::Option{<:Num_VecNum} = nothing,
-         kwargs::NamedTuple = (; atol = 1e-8))
+    Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
+         s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
+         fs::Option{<:Num_VecNum} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
 
 ## Validation
 
@@ -180,8 +232,11 @@ Fees
 # Related
 
   - [`FeesEstimator`](@ref)
+  - [`Option`](@ref)
   - [`Turnover`](@ref)
+  - [`Num_VecNum`](@ref)
   - [`AbstractResult`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`fees_constraints`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
@@ -210,6 +265,16 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = noth
               fs::Option{<:Num_VecNum} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
     return Fees(tn, l, s, fl, fs, kwargs)
 end
+"""
+    const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
+
+Union type for fee constraint objects and estimators.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`FeesEstimator`](@ref)
+"""
 const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
 """
     fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
@@ -232,9 +297,9 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 
 # Details
 
-  - Fee values are extracted and mapped to assets using `estimator_to_val`.
+  - Fee values are extracted and mapped to assets using [`estimator_to_val`](@ref).
   - If a fee value is missing for an asset, assigns zero unless `strict` is `true`.
-  - Turnover constraints are generated using `turnover_constraints`.
+  - Turnover constraints are generated using [`turnover_constraints`](@ref).
 
 # Examples
 
@@ -262,6 +327,7 @@ Fees
   - [`FeesEstimator`](@ref)
   - [`Fees`](@ref)
   - [`turnover_constraints`](@ref)
+  - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
 function fees_constraints(fees::FeesEstimator, sets::AssetSets;
@@ -293,7 +359,7 @@ Propagate or pass through portfolio transaction fee constraints.
 
 # Returns
 
-  - `Fees` or `nothing`: The input constraint object, unchanged.
+  - `fe::Option{<:Fees}`: The input constraint object, unchanged.
 
 # Examples
 
@@ -323,9 +389,80 @@ julia> fees_constraints(nothing)
 function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
     return fees
 end
+"""
+    fees_view(::Nothing, ::Any)
+
+Return `nothing` when no fee estimator or constraint is provided.
+
+This method is used as a fallback for missing fee estimators or constraints, ensuring composability and uniform interface handling in fee constraint processing workflows.
+
+# Arguments
+
+  - `::Nothing`: Indicates absence of a fee estimator or constraint.
+  - `::Any`: Index or argument (ignored).
+
+# Returns
+
+  - `nothing`: Always returns `nothing`.
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Fees`](@ref)
+  - [`fees_view`](@ref)
+"""
 function fees_view(::Nothing, ::Any)
     return nothing
 end
+"""
+    fees_view(fees::Fees, i)
+
+Create a view of a `Fees` constraint for a subset of assets.
+
+Returns a new `Fees` object with all fee fields restricted to the indices or assets specified by `i`. The keyword arguments are propagated unchanged.
+
+# Arguments
+
+  - `fees`: A `Fees` constraint object containing turnover, proportional, and fixed fee values.
+  - `i`: Index or indices specifying the subset of assets.
+
+# Returns
+
+  - `Fees`: New constraint object with fields restricted to the specified subset.
+
+# Details
+
+  - Uses `turnover_view` to subset the turnover constraint.
+  - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
+  - Propagates keyword arguments unchanged.
+  - Enables composable processing of asset subsets for fee constraints.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
+                   s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0]);
+
+julia> PortfolioOptimisers.fees_view(fees, 1:2)
+Fees
+      tn ┼ Turnover
+         │     w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+         │   val ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
+       l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
+       s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
+      fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
+      fs ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.0, 10.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`FeesEstimator`](@ref)
+  - [`fees_constraints`](@ref)
+  - [`turnover_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
 function fees_view(fees::Fees, i)
     tn = turnover_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
@@ -334,6 +471,58 @@ function fees_view(fees::Fees, i)
     fs = nothing_scalar_array_view(fees.fs, i)
     return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
 end
+"""
+    factory(fees::Fees, w::VecNum)
+
+Create a new `Fees` constraint with updated portfolio weights.
+
+`factory` constructs a new [`Fees`](@ref) object using the provided portfolio weights `w` and the fee values from an existing `Fees` constraint `fees`. The turnover constraint is updated using `factory(fees.tn, w)`, while all other fee fields and keyword arguments are preserved.
+
+# Arguments
+
+  - `fees`: Existing `Fees` constraint object.
+
+      + Contains turnover, proportional, and fixed fee values.
+
+  - `w`: Portfolio weights vector.
+
+      + New weights to assign to the constraint.
+
+# Returns
+
+  - `fe::Fees`: New constraint object with updated weights in the turnover field and original fee values.
+
+# Details
+
+  - Updates only the weights field in the turnover constraint via `factory(fees.tn, w)`.
+  - Propagates all other fields unchanged
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
+                   s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0]);
+
+julia> factory(fees, [0.4, 0.4, 0.2])
+Fees
+      tn ┼ Turnover
+         │     w ┼ Vector{Float64}: [0.4, 0.4, 0.2]
+         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
+      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`Turnover`](@ref)
+  - [`VecNum`](@ref)
+  - [`factory(tn::Turnover, w::VecNum)`](@ref)
+  - [`fees_constraints`](@ref)
+"""
 function factory(fees::Fees, w::VecNum)
     return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
                 fs = fees.fs, kwargs = fees.kwargs)
@@ -371,6 +560,7 @@ julia> calc_fees([0.1, 0.2], [100, 200], 0.01, .>=)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -418,6 +608,8 @@ julia> calc_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`Turnover`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -461,6 +653,7 @@ julia> calc_fees([0.1, -0.2], [100, 200], fees)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
@@ -507,6 +700,7 @@ julia> calc_fees([0.1, 0.2], 0.01, .>=)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -553,6 +747,8 @@ julia> calc_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
+  - [`Turnover`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -600,6 +796,7 @@ julia> calc_fixed_fees([0.1, 0.2], 0.01, (; atol = 1e-6), .>=)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -647,6 +844,7 @@ julia> calc_fees([0.1, -0.2], fees)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
@@ -694,6 +892,7 @@ julia> calc_asset_fees([0.1, 0.2], [100, 200], 0.01, .>=)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -747,6 +946,7 @@ julia> calc_asset_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -792,6 +992,7 @@ julia> calc_asset_fees([0.1, -0.2], [100, 200], fees)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
@@ -838,6 +1039,7 @@ julia> calc_asset_fees([0.1, 0.2], 0.01, .>=)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -890,6 +1092,7 @@ julia> calc_asset_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
@@ -939,6 +1142,7 @@ julia> calc_asset_fixed_fees([0.1, 0.2], 0.01, (; atol = 1e-6), .>=)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_fixed_fees`](@ref)
@@ -992,6 +1196,7 @@ julia> calc_asset_fees([0.1, -0.2], fees)
 # Related
 
   - [`Fees`](@ref)
+  - [`VecNum`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fixed_fees`](@ref)
   - [`calc_net_returns`](@ref)
@@ -1034,6 +1239,8 @@ julia> calc_net_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
 
 # Related
 
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
   - [`calc_net_asset_returns`](@ref)
   - [`calc_fees`](@ref)
 """
@@ -1073,6 +1280,8 @@ julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
 
 # Related
 
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
   - [`calc_net_returns`](@ref)
   - [`calc_fees`](@ref)
 """
@@ -1117,6 +1326,7 @@ julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
 
 # Related
 
+  - [`ArrNum`](@ref)
   - [`drawdowns`](@ref)
 """
 function cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
@@ -1162,6 +1372,7 @@ julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
 
 # Related
 
+  - [`ArrNum`](@ref)
   - [`cumulative_returns`](@ref)
 """
 function drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)

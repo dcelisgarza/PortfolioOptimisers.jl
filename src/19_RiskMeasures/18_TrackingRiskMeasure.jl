@@ -1,3 +1,4 @@
+# https://portfoliooptimizationbook.com/slides/slides-index-tracking.pdf
 struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     tracking::T1
     r::T2
