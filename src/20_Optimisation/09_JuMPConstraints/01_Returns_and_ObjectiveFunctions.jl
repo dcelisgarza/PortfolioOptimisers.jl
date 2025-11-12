@@ -1,9 +1,11 @@
 """
 """
-struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
+struct ArithmeticReturn{T1, T2, T3} <: JuMPReturnsEstimator
     ucs::T1
     lb::T2
-    function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds})
+    mu::T3
+    function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
+                              mu::Option{<:Num_VecNum})
         if isa(ucs, EllipseUncertaintySet)
             @argcheck(isa(ucs,
                           EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
@@ -14,19 +16,27 @@ struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
             @argcheck(!isempty(lb))
             @argcheck(all(isfinite, lb))
         end
-        return new{typeof(ucs), typeof(lb)}(ucs, lb)
+        if isa(mu, VecNum)
+            @argcheck(!isempty(mu))
+            @argcheck(all(isfinite, mu))
+        elseif isa(mu, Number)
+            @argcheck(isfinite(mu))
+        end
+        return new{typeof(ucs), typeof(lb), typeof(mu)}(ucs, lb, mu)
     end
 end
 function ArithmeticReturn(; ucs::Option{<:UcSE_UcS} = nothing,
-                          lb::Option{<:RkRtBounds} = nothing)
-    return ArithmeticReturn(ucs, lb)
+                          lb::Option{<:RkRtBounds} = nothing,
+                          mu::Option{<:Num_VecNum} = nothing)
+    return ArithmeticReturn(ucs, lb, mu)
 end
 function jump_returns_view(r::ArithmeticReturn, i, args...)
     uset = ucs_view(r.ucs, i)
-    return ArithmeticReturn(; ucs = uset, lb = r.lb)
+    mu = nothing_scalar_array_view(r.mu, i)
+    return ArithmeticReturn(; ucs = uset, lb = r.lb, mu = mu)
 end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
-    return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
+    return flag ? ArithmeticReturn(; ucs = r.ucs, mu = r.mu) : ArithmeticReturn()
 end
 """
 """
@@ -219,7 +229,7 @@ function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
     return MaximumRatio(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end
-function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::VecNum,
+function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
                                              obj::MaximumRatio)
     ohf = if isnothing(obj.ohf)
         min(1e3, max(1e-3, mean(abs.(mu))))
@@ -252,7 +262,8 @@ end
 function set_max_ratio_return_constraints!(args...)
     return nothing
 end
-function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, mu::VecNum)
+function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
+                                           mu::Vec_VecNum)
     sc = model[:sc]
     k = model[:k]
     ohf = model[:ohf]
@@ -283,32 +294,34 @@ function add_market_impact_cost!(model::JuMP.Model, ret)
     add_to_expression!(ret, -cost_bgt_expr)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothing, <:Any},
+function set_return_constraints!(model::JuMP.Model,
+                                 pret::ArithmeticReturn{Nothing, <:Any, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
     w = model[:w]
     lb = pret.lb
-    mu = pr.mu
-    @expression(model, ret, dot(mu, w))
+    mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
+    @expression(model, ret, dot_scalar(mu, w))
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing
 end
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet, mu::VecNum)
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
+                                     mu::Num_VecNum)
     sc = model[:sc]
     w = model[:w]
     N = length(w)
     d_mu = (ucs.ub - ucs.lb) * 0.5
     @variable(model, bucs_w[1:N])
     @constraint(model, bucs_ret[i = 1:N], [sc * bucs_w[i]; sc * w[i]] in MOI.NormOneCone(2))
-    @expression(model, ret, dot(mu, w) - dot(d_mu, bucs_w))
+    @expression(model, ret, dot_scalar(mu, w) - dot(d_mu, bucs_w))
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
     return nothing
 end
 function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
-                                     mu::VecNum)
+                                     mu::Num_VecNum)
     sc = model[:sc]
     w = model[:w]
     G = cholesky(ucs.sigma).U
@@ -316,18 +329,18 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
     @expression(model, x_eucs_w, G * w)
     @variable(model, t_eucs_gw)
     @constraint(model, eucs_ret, [sc * t_eucs_gw; sc * x_eucs_w] in SecondOrderCone())
-    @expression(model, ret, dot(mu, w) - k * t_eucs_gw)
+    @expression(model, ret, dot_scalar(mu, w) - k * t_eucs_gw)
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model,
-                                 pret::ArithmeticReturn{<:UcSE_UcS, <:Any},
+                                 pret::ArithmeticReturn{<:UcSE_UcS, <:Any, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult;
                                  rd::ReturnsResult, kwargs...)
     lb = pret.lb
     ucs = pret.ucs
-    mu = pr.mu
+    mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
     set_ucs_return_constraints!(model, mu_ucs(ucs, rd; kwargs...), mu)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
