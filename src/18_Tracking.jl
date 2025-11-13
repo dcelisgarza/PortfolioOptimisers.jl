@@ -13,7 +13,32 @@ All concrete types representing tracking error or tracking constraint results sh
   - [`ReturnsTracking`](@ref)
 """
 abstract type AbstractTracking <: AbstractResult end
+"""
+    const VecTr = AbstractVector{<:AbstractTracking}
+
+Alias for a vector of tracking result types.
+
+# Related Types
+
+  - [`AbstractTracking`](@ref)
+  - [`TrackingError`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`ReturnsTracking`](@ref)
+"""
 const VecTr = AbstractVector{<:AbstractTracking}
+"""
+    const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
+
+Union type for a single tracking result or a vector of tracking results.
+
+# Related Types
+
+  - [`AbstractTracking`](@ref)
+  - [`VecTr`](@ref)
+  - [`TrackingError`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`ReturnsTracking`](@ref)
+"""
 const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
     abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
@@ -85,7 +110,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 # Fields
 
-  - `ddof`: Degrees of freedom adjustment (integer, must be > 0).
+  - `ddof`: Degrees of freedom adjustment.
 
 # Constructor
 
@@ -179,13 +204,14 @@ julia> PortfolioOptimisers.norm_tracking(NOCTracking(), [0.5, 0.5], [0.6, 0.4], 
   - [`SOCTracking`](@ref)
   - [`NOCTracking`](@ref)
   - [`NormTracking`](@ref)
+  - [`Option`](@ref)
 """
 function norm_tracking(f::SOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
     return norm(a - b, 2) / factor
 end
 function norm_tracking(::NOCTracking, a, b, N::Option{<:Number} = nothing)
-    factor = isnothing(N) ? 1 : N
+    factor = ifelse(isnothing(N), 1, N)
     return norm(a - b, 1) / factor
 end
 """
@@ -214,6 +240,34 @@ Dependent variable-based tracking formulation.
   - [`IndependentVariableTracking`](@ref)
 """
 struct DependentVariableTracking <: VariableTracking end
+"""
+    tracking_view(::Nothing, ::Any)
+
+Return a `nothing` value for tracking view when the input tracking object is `nothing`.
+
+Used as a fallback method for missing tracking constraints or estimators, ensuring composability and uniform interface handling in constraint processing workflows.
+
+# Arguments
+
+  - `::Nothing`: Indicates absence of a tracking object.
+  - `::Any`: Index or argument (ignored).
+
+# Returns
+
+  - `nothing`: Returns `nothing`.
+
+# Details
+
+  - Used to propagate `nothing` in tracking view operations.
+  - Ensures interface consistency for missing tracking objects.
+
+# Related
+
+  - [`tracking_view`](@ref)
+  - [`AbstractTracking`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`ReturnsTracking`](@ref)
+"""
 function tracking_view(::Nothing, ::Any)
     return nothing
 end
@@ -255,6 +309,7 @@ WeightsTracking
   - [`TrackingError`](@ref)
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`Fees`](@ref)
+  - [`Option`](@ref)
   - [`tracking_benchmark`](@ref)
 """
 struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
@@ -268,6 +323,59 @@ end
 function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum)
     return WeightsTracking(fees, w)
 end
+"""
+    factory(tracking::WeightsTracking, w::VecNum)
+
+Construct a new `WeightsTracking` object with updated portfolio weights.
+
+This function creates a new [`WeightsTracking`](@ref) instance by copying the fees from the input `tracking` object and replacing the portfolio weights with `w`. The fees field is updated using the `factory` function on the existing fees and weights.
+
+# Arguments
+
+  - `tracking`: A [`WeightsTracking`](@ref) object to copy fees from.
+  - `w`: Portfolio weights (vector of real numbers).
+
+# Returns
+
+  - `WeightsTracking`: New tracking algorithm object with updated weights.
+
+# Details
+
+  - Copies and updates the `fees` field using `factory(tracking.fees, tracking.w)`.
+  - Replaces the `w` field with the provided weights.
+
+# Examples
+
+```jldoctest
+julia> tracking = WeightsTracking(; fees = Fees(; l = 0.002), w = [0.5, 0.5])
+WeightsTracking
+  fees ┼ Fees
+       │       tn ┼ nothing
+       │        l ┼ Float64: 0.002
+       │        s ┼ nothing
+       │       fl ┼ nothing
+       │       fs ┼ nothing
+       │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+     w ┴ Vector{Float64}: [0.5, 0.5]
+
+julia> PortfolioOptimisers.factory(tracking, [0.6, 0.4])
+WeightsTracking
+  fees ┼ Fees
+       │       tn ┼ nothing
+       │        l ┼ Float64: 0.002
+       │        s ┼ nothing
+       │       fl ┼ nothing
+       │       fs ┼ nothing
+       │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+     w ┴ Vector{Float64}: [0.6, 0.4]
+```
+
+# Related
+
+  - [`WeightsTracking`](@ref)
+  - [`VecNum`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(tracking::WeightsTracking, w::VecNum)
     return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
 end
@@ -484,4 +592,5 @@ function factory(tracking::TrackingError, w::VecNum)
                          alg = tracking.alg)
 end
 
-export WeightsTracking, ReturnsTracking, TrackingError
+export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
+       WeightsTracking, ReturnsTracking, TrackingError

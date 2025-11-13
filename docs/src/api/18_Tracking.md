@@ -1,5 +1,7 @@
 # Tracking
 
+## Public
+
 ```@docs
 SOCTracking
 NOCTracking
@@ -8,11 +10,19 @@ DependentVariableTracking
 WeightsTracking
 ReturnsTracking
 TrackingError
+TrackingFormulation
+```
+
+## Private
+
+```@docs
 AbstractTracking
 AbstractTrackingAlgorithm
-TrackingFormulation
+VecTr
+Tr_VecTr
 NormTracking
 VariableTracking
 norm_tracking
 tracking_benchmark
+tracking_view
 ```

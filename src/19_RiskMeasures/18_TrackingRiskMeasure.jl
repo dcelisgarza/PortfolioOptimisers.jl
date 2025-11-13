@@ -118,5 +118,4 @@ function factory(r::RiskTrackingRiskMeasure, w::VecNum)
                                    tracking = factory(r.tracking, w), r = r.r, alg = r.alg)
 end
 
-export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
-       TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError
+export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError
