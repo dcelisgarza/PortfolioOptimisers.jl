@@ -25,4 +25,6 @@ VariableTracking
 norm_tracking
 tracking_benchmark
 tracking_view
+factory(tr::WeightsTracking, w::VecNum)
+factory(tr::ReturnsTracking, ::Any)
 ```

@@ -9,8 +9,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = @variable(model)
     tracking_risk = model[key] = @expression(model, t_tracking_risk / T)
-    tracking = r.tracking
-    benchmark = tracking_benchmark(tracking, pr.X)
+    tr = r.tr
+    benchmark = tracking_benchmark(tr, pr.X)
     tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
     model[Symbol(:ctracking_r_noc_, i)] = @constraint(model,
                                                       [sc * t_tracking_risk;
@@ -30,8 +30,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = @variable(model)
     tracking_risk = model[key] = @expression(model, t_tracking_risk / sqrt(T - r.alg.ddof))
-    tracking = r.tracking
-    benchmark = tracking_benchmark(tracking, pr.X)
+    tr = r.tr
+    benchmark = tracking_benchmark(tr, pr.X)
     tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
     model[Symbol(:ctracking_r_soc_, i)] = @constraint(model,
                                                       [sc * t_tracking_risk;
@@ -394,7 +394,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
-    wb = r.tracking.w
+    wb = r.tr.w
     w = model[:w]
     k = model[:k]
     model[:oldw] = model[:w]
@@ -532,7 +532,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
-    wb = r.tracking.w
+    wb = r.tr.w
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
