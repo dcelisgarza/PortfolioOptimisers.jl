@@ -1,4 +1,4 @@
-# Regression
+# [Regression](@id api-regression)
 
 ```@docs
 LinearModel

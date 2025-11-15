@@ -261,7 +261,7 @@ Many of these can be used in conjunction. For example, some covariance estimator
           * Semi.
       + Implied volatility.
 
-### Regression
+### Regression Models
 
 Factor models and implied volatility use regression in their estimation.
 
@@ -296,7 +296,7 @@ Factor models and implied volatility use regression in their estimation.
       + Minimum Squared Distance.
       + Minimum Sum Squares.
 
-### Distance
+### Distance Matrices
 
 Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
 

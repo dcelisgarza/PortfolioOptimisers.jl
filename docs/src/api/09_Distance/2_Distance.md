@@ -1,4 +1,4 @@
-# Distance
+# [Distance](@id api-distance)
 
 ```@docs
 Distance
