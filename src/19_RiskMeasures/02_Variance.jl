@@ -619,25 +619,31 @@ end
 function (r::UncertaintySetVariance)(w::VecNum)
     return dot(w, r.sigma, w)
 end
-function no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
+function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Union{Val{false}, Val{true}, Nothing} = nothing)
+    return _no_bounds_risk_measure(r, flag)
+end
+function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                                  scale = r.settings.scale),
                                   r.ucs, sigma = r.sigma)
 end
-function no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
+function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                    scale = r.settings.scale), rc = nothing,
                     sigma = r.sigma)
 end
-function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{true})
+function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, flag::Union{Val{false}, Val{true}, Nothing} = nothing)
+    return _no_bounds_no_risk_expr_risk_measure(r, flag)
+end
+function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = false,
                                                                  scale = r.settings.scale),
                                   r.ucs, sigma = r.sigma)
 end
-function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
+function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = false, scale = r.settings.scale),
                     rc = nothing, sigma = r.sigma)
