@@ -14,9 +14,9 @@ for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVarianc
              end
          end)
 end
-for r in traverse_concrete_subtypes(RiskMeasure)
+for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
-             function no_bounds_no_risk_expr_risk_measure(r::$(r))
+             function no_bounds_no_risk_expr_risk_measure(r::$(r), ::Any = nothing)
                  pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = false, scale = 1)
@@ -58,7 +58,7 @@ for r in traverse_concrete_subtypes(HierarchicalRiskMeasure)
              function no_bounds_risk_measure(r::$(r), ::Any = nothing)
                  return r
              end
-             function no_bounds_no_risk_expr_risk_measure(r::$(r))
+             function no_bounds_no_risk_expr_risk_measure(r::$(r), ::Any = nothing)
                  return r
              end
              function no_risk_expr_risk_measure(r::$(r))
@@ -72,11 +72,11 @@ end
 function no_bounds_risk_measure(rs::VecBaseRM, flag::Any = true)
     return no_bounds_risk_measure.(rs, flag)
 end
-function no_bounds_no_risk_expr_risk_measure(r::VecBaseRM)
-    return no_bounds_no_risk_expr_risk_measure.(r)
+function no_bounds_no_risk_expr_risk_measure(r::VecBaseRM, flag::Any = nothing)
+    return no_bounds_no_risk_expr_risk_measure.(r, flag)
 end
 function no_risk_expr_risk_measure(r::VecBaseRM)
-    return r
+    return no_risk_expr_risk_measure.(r)
 end
 function bounds_risk_measure(r::VecBaseRM, ubs::VecNum)
     return bounds_risk_measure.(r, ubs)

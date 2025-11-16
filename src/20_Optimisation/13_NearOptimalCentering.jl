@@ -240,7 +240,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     r = noc.r
     opt = processed_jump_optimiser(noc.opt, rd; dims = dims)
     if w_min_flag || w_max_flag || unconstrained
-        nb_r = no_bounds_risk_measure(r, noc.ucs_flag)
+        nb_r = no_bounds_risk_measure(r, Val(noc.ucs_flag))
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
     if w_min_flag
