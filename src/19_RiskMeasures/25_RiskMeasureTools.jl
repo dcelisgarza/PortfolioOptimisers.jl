@@ -73,7 +73,7 @@ for r in traverse_concrete_subtypes(HierarchicalRiskMeasure)
              end
          end)
 end
-function no_bounds_risk_measure(rs::VecBaseRM, flag::Any = true)
+function no_bounds_risk_measure(rs::VecBaseRM, flag::Any = nothing)
     return no_bounds_risk_measure.(rs, flag)
 end
 function no_bounds_no_risk_expr_risk_measure(r::VecBaseRM, flag::Any = nothing)
