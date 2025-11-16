@@ -39,6 +39,10 @@ for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVarianc
                           NamedTuple{pnames}(getproperty.(r, pnames))...)
                  end
              end
+         end)
+end
+for r in traverse_concrete_subtypes(RiskMeasure)
+    eval(quote
              function bounds_risk_measure(r::$(r), ub::Number)
                  pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
