@@ -619,7 +619,7 @@ end
 function (r::UncertaintySetVariance)(w::VecNum)
     return dot(w, r.sigma, w)
 end
-function no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{true})
+function no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                                  scale = r.settings.scale),
