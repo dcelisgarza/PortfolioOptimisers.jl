@@ -628,7 +628,7 @@ function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
     else
         Variance(;
                  settings = RiskMeasureSettings(; rke = r.settings.rke,
-                                                scale = r.settings.scale), nothing,
+                                                scale = r.settings.scale), rc = nothing,
                  sigma = r.sigma)
     end
 end
