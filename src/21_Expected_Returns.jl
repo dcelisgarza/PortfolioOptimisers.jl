@@ -3,8 +3,8 @@
                     fees::Option{<:Fees} = nothing, kwargs...)
     expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
-    expected_return(ret::JuMPReturnsEstimator, w::VecVecNum,
-                    pr::AbstractPriorResult; fees::Option{<:Fees} = nothing, kwargs...)
+    expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult;
+                    fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected portfolio return using the specified return estimator.
 
@@ -32,6 +32,10 @@ Compute the expected portfolio return using the specified return estimator.
   - [`KellyReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
+  - [`VecNum`](@ref)
+  - [`VecVecNum`](@ref)
+  - [`Num_VecNum`](@ref)
+  - [`Option`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_sric`](@ref)
@@ -79,7 +83,12 @@ Compute the expected risk-adjusted return ratio for a portfolio.
 
 # Related
 
+  - [`AbstractBaseRiskMeasure`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
+  - [`VecNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`Option`](@ref)
+  - [`Fees`](@ref)
   - [`expected_return`](@ref)
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_sric`](@ref)
@@ -92,9 +101,9 @@ function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w
     return (rt - rf) / rk
 end
 """
-    expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                            w::VecNum, pr::AbstractPriorResult;
-                            fees::Option{<:Fees} = nothing, rf::Number = 0, kwargs...)
+    expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::VecNum,
+                            pr::AbstractPriorResult; fees::Option{<:Fees} = nothing,
+                            rf::Number = 0, kwargs...)
 
 Compute expected risk, expected return, and risk-adjusted return ratio for a portfolio.
 
@@ -116,7 +125,12 @@ Compute expected risk, expected return, and risk-adjusted return ratio for a por
 
 # Related
 
+  - [`AbstractBaseRiskMeasure`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
+  - [`VecNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`Option`](@ref)
+  - [`Fees`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_return`](@ref)
   - [`expected_sric`](@ref)
@@ -153,7 +167,12 @@ Compute the risk-adjusted ratio information criterion (SRIC) for a portfolio.
 
 # Related
 
+  - [`AbstractBaseRiskMeasure`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
+  - [`VecNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`Option`](@ref)
+  - [`Fees`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_risk_ret_ratio`](@ref)
   - [`expected_risk_ret_sric`](@ref)
@@ -166,9 +185,9 @@ function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w:
     return sr - N / (T * sr)
 end
 """
-    expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                           w::VecNum, pr::AbstractPriorResult;
-                           fees::Option{<:Fees} = nothing, rf::Number = 0, kwargs...)
+    expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator, w::VecNum,
+                           pr::AbstractPriorResult; fees::Option{<:Fees} = nothing,
+                           rf::Number = 0, kwargs...)
 
 Compute expected risk, expected return, and SRIC for a portfolio.
 
@@ -176,8 +195,8 @@ Compute expected risk, expected return, and SRIC for a portfolio.
 
 # Arguments
 
-  - `r`: Risk measure (`AbstractBaseRiskMeasure`).
-  - `ret`: Return estimator (`JuMPReturnsEstimator`).
+  - `r`: Risk measure.
+  - `ret`: Return estimator.
   - `w`: Portfolio weights.
   - `pr`: Prior result (must contain asset return matrix `X`).
   - `fees`: Optional transaction fees.
@@ -190,7 +209,12 @@ Compute expected risk, expected return, and SRIC for a portfolio.
 
 # Related
 
+  - [`AbstractBaseRiskMeasure`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
+  - [`VecNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`Option`](@ref)
+  - [`Fees`](@ref)
   - [`expected_sric`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_risk_ret_ratio`](@ref)
@@ -246,10 +270,67 @@ end
 function ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
     return ReturnRiskMeasure(rt)
 end
+"""
+    factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+
+Construct a new `ReturnRiskMeasure` object with an updated return estimator based on the provided prior result.
+
+This function creates a new [`ReturnRiskMeasure`](@ref) instance by updating the internal return estimator using the prior result and any additional arguments or keyword arguments. This enables composable updates to risk measures that use expected return as their metric.
+
+# Arguments
+
+  - `r`: A [`ReturnRiskMeasure`](@ref) object containing a return estimator.
+  - `prior`: Prior result used to update the return estimator.
+  - `args...`: Additional positional arguments for updating the return estimator.
+  - `kwargs...`: Additional keyword arguments for updating the return estimator.
+
+# Returns
+
+  - `r::ReturnRiskMeasure`: New risk measure object with updated return estimator.
+
+# Details
+
+  - Calls [`jump_returns_factory`](@ref) to update the return estimator using the prior result and arguments.
+  - Returns a new `ReturnRiskMeasure` object with the updated estimator.
+
+# Related
+
+  - [`ReturnRiskMeasure`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`jump_returns_factory`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
     rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
     return ReturnRiskMeasure(; rt = rt)
 end
+"""
+    factory(r::ReturnRiskMeasure, args...; kwargs...)
+
+Return the input `ReturnRiskMeasure` object unchanged.
+
+This function provides a consistent interface for updating or copying return-based risk measures. It is used for composability in portfolio analytics workflows where the risk measure does not require modification.
+
+# Arguments
+
+  - `r`: Return-based risk measure object.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `ReturnRiskMeasure`: The input risk measure object.
+
+# Details
+
+  - Returns the input object unchanged.
+  - Ensures interface consistency for factory operations.
+
+# Related
+
+  - [`ReturnRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::ReturnRiskMeasure, args...; kwargs...)
     return r
 end
@@ -328,7 +409,7 @@ RatioRiskMeasure
 # Related
 
   - [`JuMPReturnsEstimator`](@ref)
-  - [`ReturnRiskMeasure`](@ref)
+  - [`AbstractBaseRiskMeasure`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_risk`](@ref)
 """
@@ -345,11 +426,70 @@ function RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
                           rk::AbstractBaseRiskMeasure = Variance(), rf::Number = 0.0)
     return RatioRiskMeasure(rt, rk, rf)
 end
+"""
+    factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+
+Construct a new `RatioRiskMeasure` object with updated return and risk estimators based on the provided prior result.
+
+This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal return estimator and risk measure using the prior result and any additional arguments or keyword arguments. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+
+# Arguments
+
+  - `r`: Ratio-based risk measure object.
+  - `prior`: Prior result used to update the return estimator and risk measure.
+  - `args...`: Additional positional arguments for updating the estimators.
+  - `kwargs...`: Additional keyword arguments for updating the estimators.
+
+# Returns
+
+  - `RatioRiskMeasure`: New risk measure object with updated return estimator and risk measure.
+
+# Details
+
+  - Calls [`jump_returns_factory`](@ref) to update the return estimator using the prior result and arguments.
+  - Calls [`factory`](@ref) to update the risk measure using the prior result and arguments.
+  - Returns a new `RatioRiskMeasure` object with the updated fields and original risk-free rate.
+
+# Related
+
+  - [`RatioRiskMeasure`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`jump_returns_factory`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
     rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
     rk = factory(r.rk, prior, args...; kwargs...)
     return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
 end
+"""
+    factory(r::RatioRiskMeasure, w::VecNum)
+
+Construct a new `RatioRiskMeasure` object with updated risk measure weights.
+
+This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided portfolio weights `w`. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+
+# Arguments
+
+  - `r`: Ratio-based risk measure object.
+  - `w`: Portfolio weights to update the internal risk measure.
+
+# Returns
+
+  - `r::RatioRiskMeasure`: New risk measure object with updated risk measure.
+
+# Details
+
+  - Calls `factory(r.rk, w)` to update the risk measure.
+  - Preserves the return estimator and risk-free rate.
+  - Returns a new `RatioRiskMeasure` object with the updated risk measure.
+
+# Related
+
+  - [`RatioRiskMeasure`](@ref)
+  - [`VecNum`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::RatioRiskMeasure, w::VecNum)
     return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
@@ -376,6 +516,10 @@ Compute the expected risk for a portfolio using a ratio-based risk measure.
 # Related
 
   - [`RatioRiskMeasure`](@ref)
+  - [`VecNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`Option`](@ref)
+  - [`Fees`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_return`](@ref)
 """

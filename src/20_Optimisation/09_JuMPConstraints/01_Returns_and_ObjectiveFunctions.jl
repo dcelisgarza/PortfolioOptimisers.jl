@@ -201,6 +201,8 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
              end
          end)
 end
+"""
+"""
 function jump_returns_factory(r::KellyReturn, pr::AbstractPriorResult, args...; kwargs...)
     return KellyReturn(; w = nothing_scalar_array_factory(r.w, pr.w), lb = r.lb)
 end
