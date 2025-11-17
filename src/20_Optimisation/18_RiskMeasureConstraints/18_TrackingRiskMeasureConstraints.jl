@@ -40,21 +40,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
-#=
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                   plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees}, args...;
                                   kwargs...)
-    return set_risk_constraints!(model, Symbol(key,:_, 1), r, opt, pr, plg, fees, args...;
+    return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, plg, fees, args...;
                                  kwargs...)
 end
-=#
-function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::RM_VecRM,
+function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::VecRM,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                   plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees}, args...;
                                   kwargs...)
     for (i, r) in enumerate(rs)
-        set_risk_constraints!(model, Symbol(key, :_, i), r, opt, pr, plg, fees, args...;
+        set_risk_constraints!(model, Symbol(key, i), r, opt, pr, plg, fees, args...;
                               kwargs...)
     end
     return nothing
