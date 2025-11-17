@@ -263,8 +263,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         i = 1
         for r in rs
-            r1 = RiskTrackingRiskMeasure(; tr = tr,
-                                         r = no_bounds_no_risk_expr_risk_measure(r),
+            r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
                                          alg = DependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise(mr, rd)
@@ -306,8 +305,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         i = 1
         for r in rs
-            r1 = RiskTrackingRiskMeasure(; tr = tr,
-                                         r = no_bounds_no_risk_expr_risk_measure(r),
+            r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
                                          alg = IndependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise(mr, rd)
