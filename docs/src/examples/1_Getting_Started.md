@@ -50,7 +50,7 @@ Import the S&P500 data from a compressed `.csv` file. We will only use the last 
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
-pretty_table(X[(end - 5):end]; formatters = tsfmt)
+pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 ````
 
 First we must compute the returns from the prices. The `ReturnsResult` struct stores the asset names in `nx`, asset returns in `X`, and timestamps in `ts`. The other fields are used in other applications which we will not be showcasing here.
@@ -104,7 +104,7 @@ res = optimise(mr, rd)
 Let's view the solution results as a pretty table. For convenience, we have ensured all `AbstractResult` have a property called `w`, which directly accesses `sol.w`. The optimisations don't shuffle the asset order, so we can simply view the asset names and weights side by side.
 
 ````@example 1_Getting_Started
-pretty_table(DataFrame(:assets => rd.nx, :weights => res.w); formatters = resfmt)
+pretty_table(DataFrame(:assets => rd.nx, :weights => res.w); formatters = [resfmt])
 ````
 
 ## 3. Finite allocation
@@ -137,7 +137,7 @@ Let's see the results in another pretty table.
 ````@example 1_Getting_Started
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                        :opt_weights => res.w, :mip_weights => mip_res.w);
-             formatters = mipresfmt)
+             formatters = [mipresfmt])
 ````
 
 We can see that the mip weights do not exactly match the optimal ones, but that is because we only have finite resources. Note that the sum of the costs minus the initial cash is equal to the `cash` property of the result. This changes when we introduce fees, which will be shown in a future example.
