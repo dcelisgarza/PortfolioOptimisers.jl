@@ -692,12 +692,12 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
-                 ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
+                 ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function factory(r::UncertaintySetVariance, ucs::UcSE_UcS, args...; kwargs...)
+function factory(r::UncertaintySetVariance, ucs::UcSE_UcS; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = r.sigma)
 end

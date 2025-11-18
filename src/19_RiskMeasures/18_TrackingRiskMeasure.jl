@@ -109,5 +109,6 @@ function factory(r::RiskTrackingRiskMeasure, w::VecNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), r = r.r,
                                    alg = r.alg)
 end
+const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

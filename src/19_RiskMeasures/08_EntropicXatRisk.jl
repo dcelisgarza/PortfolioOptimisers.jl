@@ -177,7 +177,7 @@ for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
              end
-             function factory(r::$(r), slv::Option{<:Slv_VecSlv}; kwargs...)
+             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)

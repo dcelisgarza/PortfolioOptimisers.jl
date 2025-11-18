@@ -462,7 +462,15 @@ function factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs..
     rk = factory(r.rk, pr, args...; kwargs...)
     return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
 end
-#! Make factories for Solver risk measure, and uncertainty set variance
+function factory(r::RatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
+                 kwargs...)
+    rk = factory(r.rk, ucs; kwargs...)
+    return RatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
+end
+function factory(r::RatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
+    rk = factory(r.rk, slv; kwargs...)
+    return RatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
+end
 """
     factory(r::RatioRiskMeasure{<:Any,
                                 <:Union{<:RiskTrackingRiskMeasure, <:TrackingRiskMeasure}},
@@ -493,9 +501,7 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
   - [`VecNum`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::RatioRiskMeasure{<:Any,
-                                     <:Union{<:RiskTrackingRiskMeasure,
-                                             <:TrackingRiskMeasure}}, w::VecNum)
+function factory(r::RatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
     return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 """

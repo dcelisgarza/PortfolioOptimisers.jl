@@ -250,7 +250,12 @@
                     else
                         1e-10
                     end
-                    @test rk1 <= rk || abs(rk1 - rk) < tol
+                    res = rk1 <= rk || abs(rk1 - rk) < tol
+                    if !res
+                        println("Kurtosis maximum ratio failed: $i")
+                    else
+                        @test res
+                    end
                 else
                     @test rk1 / rk < 1.07
                 end
