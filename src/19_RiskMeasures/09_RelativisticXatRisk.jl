@@ -244,7 +244,7 @@ for r in (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
              end
-             function factory(r::$(r), slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+             function factory(r::$(r), slv::Option{<:Slv_VecSlv}; kwargs...)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
