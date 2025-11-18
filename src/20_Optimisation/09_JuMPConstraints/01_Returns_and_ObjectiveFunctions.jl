@@ -203,8 +203,11 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
 end
 """
 """
-function jump_returns_factory(r::KellyReturn, pr::AbstractPriorResult, args...; kwargs...)
-    return KellyReturn(; w = nothing_scalar_array_factory(r.w, pr.w), lb = r.lb)
+function factory(r::KellyReturn, pr::AbstractPriorResult, args...; kwargs...)
+    return KellyReturn(; w = nothing_scalar_array_selector(r.w, pr.w), lb = r.lb)
+end
+function factory(r::KellyReturn, w::AbstractWeights, args...; kwargs...)
+    return KellyReturn(; w = nothing_scalar_array_selector(r.w, w), lb = r.lb)
 end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1} <: ObjectiveFunction
@@ -365,7 +368,7 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     X = set_portfolio_returns!(model, X)
     T = length(X)
     @variable(model, t_ekelly[1:T])
-    wi = nothing_scalar_array_factory(pret.w, pr.w)
+    wi = nothing_scalar_array_selector(pret.w, pr.w)
     if isnothing(wi)
         @expression(model, ret, mean(t_ekelly))
     else

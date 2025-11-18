@@ -8,7 +8,7 @@ struct HierarchicalOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationR
     w::T7
     fb::T8
 end
-function opt_attempt_factory(res::HierarchicalOptimisation, fb)
+function factory(res::HierarchicalOptimisation, fb)
     return HierarchicalOptimisation(res.oe, res.pr, res.fees, res.wb, res.clr, res.retcode,
                                     res.w, fb)
 end

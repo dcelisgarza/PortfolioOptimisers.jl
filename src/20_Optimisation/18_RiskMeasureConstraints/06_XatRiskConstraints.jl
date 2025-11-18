@@ -16,7 +16,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                              (binary = true)
                                                                          end)
     alpha = r.alpha
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     if isnothing(wi)
         model[Symbol(:csvar_, i)] = @constraint(model,
                                                 sc * (sum(z_var) - alpha * T + s * T) <= 0)
@@ -54,7 +54,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                      end)
     alpha = r.alpha
     beta = r.beta
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     if isnothing(wi)
         model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = @constraints(model,
                                                                                 begin
@@ -130,7 +130,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    mu = nothing_scalar_array_factory(alg.mu, pr.mu)
+    mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
@@ -150,7 +150,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    mu = nothing_scalar_array_factory(alg.mu, pr.mu)
+    mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]

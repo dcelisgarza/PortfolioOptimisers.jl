@@ -134,11 +134,11 @@ function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs..
     return uc
 end
 """
-    ucs_factory(risk_ucs::Nothing, prior_ucs::Nothing)
-    ucs_factory(risk_ucs::UcSE_UcS, prior_ucs::Any)
-    ucs_factory(risk_ucs::Nothing, prior_ucs::UcSE_UcS)
+    ucs_selector(risk_ucs::Nothing, prior_ucs::Nothing)
+    ucs_selector(risk_ucs::UcSE_UcS, prior_ucs::Any)
+    ucs_selector(risk_ucs::Nothing, prior_ucs::UcSE_UcS)
 
-Factory function for selecting uncertainty sets from risk measure or prior result instances.
+Function for selecting uncertainty sets from risk measure or prior result instances.
 
 # Arguments
 
@@ -157,13 +157,13 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`factory`](@ref)
 """
-function ucs_factory(::Nothing, ::Nothing)
+function ucs_selector(::Nothing, ::Nothing)
     return nothing
 end
-function ucs_factory(risk_ucs::UcSE_UcS, ::Any)
+function ucs_selector(risk_ucs::UcSE_UcS, ::Any)
     return risk_ucs
 end
-function ucs_factory(::Nothing, prior_ucs::UcSE_UcS)
+function ucs_selector(::Nothing, prior_ucs::UcSE_UcS)
     return prior_ucs
 end
 function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
@@ -616,7 +616,7 @@ function EllipseUncertaintySet(; sigma::MatNum, k::Number,
 end
 function ucs_view(risk_ucs::EllipseUncertaintySet{<:MatNum, <:Any,
                                                   <:SigmaEllipseUncertaintySet}, i)
-    i = fourth_moment_index_factory(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
+    i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
     return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                  class = risk_ucs.class)
 end

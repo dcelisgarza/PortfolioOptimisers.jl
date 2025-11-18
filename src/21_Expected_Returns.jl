@@ -290,18 +290,18 @@ This function creates a new [`ReturnRiskMeasure`](@ref) instance by updating the
 
 # Details
 
-  - Calls [`jump_returns_factory`](@ref) to update the return estimator using the prior result and arguments.
+  - Calls [`factory`](@ref) to update the return estimator using the prior result and arguments.
   - Returns a new `ReturnRiskMeasure` object with the updated estimator.
 
 # Related
 
   - [`ReturnRiskMeasure`](@ref)
   - [`AbstractPriorResult`](@ref)
-  - [`jump_returns_factory`](@ref)
+  - [`factory`](@ref)
   - [`factory`](@ref)
 """
 function factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
+    rt = factory(r.rt, prior, args...; kwargs...)
     return ReturnRiskMeasure(; rt = rt)
 end
 """
@@ -446,7 +446,7 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Details
 
-  - Calls [`jump_returns_factory`](@ref) to update the return estimator using the prior result and arguments.
+  - Calls [`factory`](@ref) to update the return estimator using the prior result and arguments.
   - Calls [`factory`](@ref) to update the risk measure using the prior result and arguments.
   - Returns a new `RatioRiskMeasure` object with the updated fields and original risk-free rate.
 
@@ -454,13 +454,17 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
   - [`RatioRiskMeasure`](@ref)
   - [`AbstractPriorResult`](@ref)
-  - [`jump_returns_factory`](@ref)
+  - [`factory`](@ref)
   - [`factory`](@ref)
 """
 function factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
+    rt = factory(r.rt, prior, args...; kwargs...)
     rk = factory(r.rk, prior, args...; kwargs...)
     return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
+end
+function factory(r::RatioRiskMeasure, slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+    return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, slv, args...; kwargs...),
+                            rf = r.rf)
 end
 """
     factory(r::RatioRiskMeasure, w::VecNum)

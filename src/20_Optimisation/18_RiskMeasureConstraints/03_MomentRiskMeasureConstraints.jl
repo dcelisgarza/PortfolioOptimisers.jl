@@ -26,7 +26,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     flm_risk = model[key] = if isnothing(wi)
         @expression(model, mean(flm))
     else
@@ -49,7 +49,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
         @expression(model, 2 * mean(mad))
     else
@@ -124,7 +124,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                    ((net_X + second_moment) .-
                                                                     target) >= 0)
     end
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     second_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment, key,

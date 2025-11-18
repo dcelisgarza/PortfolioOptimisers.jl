@@ -191,16 +191,16 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, pr.w)
-    mu = nothing_scalar_array_factory(r.mu, pr.mu)
-    kt = nothing_scalar_array_factory(r.kt, pr.kt)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
+    kt = nothing_scalar_array_selector(r.kt, pr.kt)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
 function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, pr.w)
-    mu = nothing_scalar_array_factory(r.mu, pr.mu)
-    kt = nothing_scalar_array_factory(r.kt, nothing)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
+    kt = nothing_scalar_array_selector(r.kt, nothing)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
@@ -215,7 +215,7 @@ function risk_measure_view(r::Kurtosis, i, args...)
         nothing
     end
     if !isnothing(j) && !isnothing(kt)
-        idx = fourth_moment_index_factory(j, i)
+        idx = fourth_moment_index_generator(j, i)
         kt = nothing_scalar_array_view(kt, idx)
     end
     mu = nothing_scalar_array_view(mu, i)

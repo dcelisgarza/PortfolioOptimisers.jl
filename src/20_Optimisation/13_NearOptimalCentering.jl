@@ -14,7 +14,7 @@ struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10}
     model::T9
     fb::T10
 end
-function opt_attempt_factory(res::NearOptimalCenteringOptimisation, fb)
+function factory(res::NearOptimalCenteringOptimisation, fb)
     return NearOptimalCenteringOptimisation(res.oe, res.pa, res.w_min_retcode,
                                             res.w_opt_retcode, res.w_max_retcode,
                                             res.noc_retcode, res.retcode, res.sol,

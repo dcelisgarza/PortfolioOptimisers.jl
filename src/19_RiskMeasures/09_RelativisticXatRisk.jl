@@ -107,8 +107,8 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
 end
 function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
-    slv = solver_factory(r.slv, slv)
+    w = nothing_scalar_array_selector(r.w, prior.w)
+    slv = solver_selector(r.slv, slv)
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
                                    kappa = r.kappa, slv = slv, w = w)
 end
@@ -155,7 +155,7 @@ function (r::RelativisticValueatRiskRange)(x::VecNum)
 end
 function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    slv = solver_factory(r.slv, slv)
+    slv = solver_selector(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
@@ -240,7 +240,12 @@ for r in (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
     eval(quote
              function factory(r::$(r), ::Any, slv::Option{<:Slv_VecSlv}, args...;
                               kwargs...)
-                 slv = solver_factory(r.slv, slv)
+                 slv = solver_selector(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
+                             slv = slv)
+             end
+             function factory(r::$(r), slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
              end

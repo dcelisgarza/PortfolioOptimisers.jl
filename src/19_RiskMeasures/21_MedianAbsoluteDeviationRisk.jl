@@ -30,7 +30,7 @@ function MedianAbsoluteDeviation(;
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
 function factory(r::MedianAbsoluteDeviation, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, prior.w)
     return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)

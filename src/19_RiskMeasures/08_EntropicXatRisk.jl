@@ -60,8 +60,8 @@ function (r::EntropicValueatRisk)(x::VecNum)
 end
 function factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
-    slv = solver_factory(r.slv, slv)
+    w = nothing_scalar_array_selector(r.w, prior.w)
+    slv = solver_selector(r.slv, slv)
     return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
 end
 struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
@@ -99,8 +99,8 @@ function (r::EntropicValueatRiskRange)(x::VecNum)
 end
 function factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
-    slv = solver_factory(r.slv, slv)
+    w = nothing_scalar_array_selector(r.w, prior.w)
+    slv = solver_selector(r.slv, slv)
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                     beta = r.beta, w = w)
 end
@@ -174,8 +174,13 @@ for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
     eval(quote
              function factory(r::$(r), ::Any, slv::Option{<:Slv_VecSlv}, args...;
                               kwargs...)
-                 slv = solver_factory(r.slv, slv)
+                 slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
+             end
+             function factory(r::$(r), slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv = solver_selector(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
+                             slv = slv)
              end
          end)
 end

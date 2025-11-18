@@ -7,7 +7,7 @@ abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
 """
-function jump_returns_factory(r::JuMPReturnsEstimator, args...; kwargs...)
+function factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
 function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)

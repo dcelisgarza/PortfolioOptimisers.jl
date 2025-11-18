@@ -35,7 +35,7 @@ struct JuMPOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     model::T5
     fb::T6
 end
-function opt_attempt_factory(res::JuMPOptimisation, fb)
+function factory(res::JuMPOptimisation, fb)
     return JuMPOptimisation(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
 struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
@@ -49,7 +49,7 @@ struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
     model::T7
     fb::T8
 end
-function opt_attempt_factory(res::JuMPOptimisationFactorRiskContribution, fb)
+function factory(res::JuMPOptimisationFactorRiskContribution, fb)
     return JuMPOptimisationFactorRiskContribution(res.oe, res.pa, res.rr, res.frc_plg,
                                                   res.retcode, res.sol, res.model, fb)
 end
@@ -62,7 +62,7 @@ struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6, T7} <: Optimisation
     model::T6
     fb::T7
 end
-function opt_attempt_factory(res::JuMPOptimisationRiskBudgeting, fb)
+function factory(res::JuMPOptimisationRiskBudgeting, fb)
     return JuMPOptimisationRiskBudgeting(res.oe, res.pa, res.prb, res.retcode, res.sol,
                                          res.model, fb)
 end
@@ -475,7 +475,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     plg = phylogeny_constraints(opt.plg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
-    ret = jump_returns_factory(opt.ret, pr)
+    ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx,
                                             sgmtx, slt, sst, sglt, sgst, plg, tn, fees, ret)
 end

@@ -411,13 +411,13 @@ function LogSumExpScalariser(; gamma::Number = 1.0)
     return LogSumExpScalariser(gamma)
 end
 """
-    nothing_scalar_array_factory(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_factory(risk_variable::Num_ArrNum_VecScalar,
+    nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Nothing)
+    nothing_scalar_array_selector(risk_variable::Num_ArrNum_VecScalar,
                                  ::Any)
-    nothing_scalar_array_factory(risk_variable::Nothing,
+    nothing_scalar_array_selector(risk_variable::Nothing,
                                  prior_variable::Num_ArrNum_VecScalar)
 
-Utility to select a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
+Function for selecting a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
 # Arguments
 
@@ -430,13 +430,13 @@ Utility to select a non-nothing value when provided by a risk measure, or fall b
   - If `risk_variable` is not `nothing`, returns `risk_variable`.
   - If `risk_variable` is `nothing` and `prior_variable` is not `nothing`, returns `prior_variable`.
 """
-function nothing_scalar_array_factory(::Nothing, ::Nothing)
+function nothing_scalar_array_selector(::Nothing, ::Nothing)
     return nothing
 end
-function nothing_scalar_array_factory(risk_variable::Num_ArrNum_VecScalar, ::Any)
+function nothing_scalar_array_selector(risk_variable::Num_ArrNum_VecScalar, ::Any)
     return risk_variable
 end
-function nothing_scalar_array_factory(::Nothing, prior_variable::Num_ArrNum_VecScalar)
+function nothing_scalar_array_selector(::Nothing, prior_variable::Num_ArrNum_VecScalar)
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
@@ -448,13 +448,13 @@ end
 function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::ArrNum, i)
     return nothing_scalar_array_view(prior_variable, i)
 end
-function solver_factory(risk_solvers::Slv_VecSlv, ::Any)
+function solver_selector(risk_solvers::Slv_VecSlv, ::Any)
     return risk_solvers
 end
-function solver_factory(::Nothing, slv::Slv_VecSlv)
+function solver_selector(::Nothing, slv::Slv_VecSlv)
     return slv
 end
-function solver_factory(::Nothing, ::Nothing)
+function solver_selector(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
 function expected_risk end

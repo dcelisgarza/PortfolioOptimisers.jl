@@ -6,8 +6,4 @@
 JuMPReturnsEstimator
 ```
 
-## Private 
-
-```@docs
-jump_returns_factory
-```
+## Private

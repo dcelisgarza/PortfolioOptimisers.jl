@@ -10,7 +10,7 @@ struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: OptimisationR
     w::T8
     fb::T9
 end
-function opt_attempt_factory(res::StackingOptimisation, fb)
+function factory(res::StackingOptimisation, fb)
     return StackingOptimisation(res.oe, res.pr, res.wb, res.resi, res.reso, res.cv,
                                 res.retcode, res.w, fb)
 end

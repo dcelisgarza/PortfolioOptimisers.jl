@@ -11,7 +11,7 @@ struct NestedClusteredOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     w::T9
     fb::T10
 end
-function opt_attempt_factory(res::NestedClusteredOptimisation, fb)
+function factory(res::NestedClusteredOptimisation, fb)
     return NestedClusteredOptimisation(res.oe, res.pr, res.wb, res.clr, res.resi, res.reso,
                                        res.cv, res.retcode, res.w, fb)
 end

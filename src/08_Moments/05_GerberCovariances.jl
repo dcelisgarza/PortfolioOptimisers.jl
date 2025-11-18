@@ -243,7 +243,7 @@ for alg in (Gerber0, Gerber1, Gerber2)
 end
 for alg in (StandardisedGerber0, StandardisedGerber1, StandardisedGerber2)
     eval(quote
-             function factory(alg::$(alg), w::Option{<:AbstractWeights})
+             function factory(alg::$(alg), w::Option{<:AbstractWeights} = nothing)
                  return $(alg)(; me = factory(alg.me, w))
              end
          end)

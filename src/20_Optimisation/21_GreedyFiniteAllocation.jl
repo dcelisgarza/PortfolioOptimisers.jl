@@ -7,7 +7,7 @@ struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationR
     cash::T6
     fb::T7
 end
-function opt_attempt_factory(res::GreedyAllocationOptimisation, fb)
+function factory(res::GreedyAllocationOptimisation, fb)
     return GreedyAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
                                         res.cash, fb)
 end

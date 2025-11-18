@@ -17,7 +17,7 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
     return ConditionalValueatRisk(settings, alpha, w)
 end
 function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, prior.w)
     return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
@@ -49,7 +49,7 @@ function DistributionallyRobustConditionalValueatRisk(;
 end
 function factory(r::DistributionallyRobustConditionalValueatRisk,
                  prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, prior.w)
     return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
                                                         alpha = r.alpha, l = r.l, r = r.r,
                                                         w = w)
@@ -107,7 +107,7 @@ function ConditionalValueatRiskRange(;
 end
 function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, args...;
                  kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, prior.w)
     return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                        beta = r.beta, w = w)
 end
@@ -150,7 +150,7 @@ function DistributionallyRobustConditionalValueatRiskRange(;
 end
 function factory(r::DistributionallyRobustConditionalValueatRiskRange,
                  prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, prior.w)
     return DistributionallyRobustConditionalValueatRiskRange(; settings = r.settings,
                                                              alpha = r.alpha, l_a = r.l_a,
                                                              r_a = r.r_a, beta = r.beta,

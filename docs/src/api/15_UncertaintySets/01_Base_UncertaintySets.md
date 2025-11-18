@@ -22,6 +22,6 @@ AbstractUncertaintySetAlgorithm
 AbstractUncertaintySetResult
 AbstractUncertaintyKAlgorithm
 AbstractEllipseUncertaintySetResultClass
-ucs_factory
+ucs_selector
 k_ucs
 ```

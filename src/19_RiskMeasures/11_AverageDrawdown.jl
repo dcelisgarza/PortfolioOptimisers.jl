@@ -103,7 +103,7 @@ end
 for r in (AverageDrawdown, RelativeAverageDrawdown)
     eval(quote
              function factory(r::$(r), prior::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_factory(r.w, prior.w)
+                 w = nothing_scalar_array_selector(r.w, prior.w)
                  return $(r)(; settings = r.settings, w = w)
              end
          end)

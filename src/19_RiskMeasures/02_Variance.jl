@@ -253,7 +253,7 @@ end
 """
     factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
 
-Create an instance of [`Variance`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_factory`](@ref)).
+Create an instance of [`Variance`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
 
 # Arguments
 
@@ -268,16 +268,16 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
 
 # Details
 
-  - Selects `sigma` using [`nothing_scalar_array_factory`](@ref).
+  - Selects `sigma` using [`nothing_scalar_array_selector`](@ref).
   - Other fields are taken from `r`.
 
 # Related
 
   - [`Variance`](@ref)
-  - [`nothing_scalar_array_factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
+    sigma = nothing_scalar_array_selector(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
 function risk_measure_view(r::Variance, i, args...)
@@ -394,7 +394,7 @@ end
 """
     factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwargs...)
 
-Create an instance of [`StandardDeviation`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_factory`](@ref)).
+Create an instance of [`StandardDeviation`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
 
 # Arguments
 
@@ -409,16 +409,16 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
 
 # Details
 
-  - Selects `sigma` using [`nothing_scalar_array_factory`](@ref).
+  - Selects `sigma` using [`nothing_scalar_array_selector`](@ref).
   - Other fields are taken from `r`.
 
 # Related
 
   - [`StandardDeviation`](@ref)
-  - [`nothing_scalar_array_factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
+    sigma = nothing_scalar_array_selector(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 function risk_measure_view(r::StandardDeviation, i, args...)
@@ -673,8 +673,8 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
 
 # Details
 
-  - Selects `ucs` using [`ucs_factory`](@ref).
-  - Selects `sigma` using [`nothing_scalar_array_factory`](@ref).
+  - Selects `ucs` using [`ucs_selector`](@ref).
+  - Selects `sigma` using [`nothing_scalar_array_selector`](@ref).
   - Other fields are taken from `r`.
 
 # Related
@@ -682,13 +682,13 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
   - [`UncertaintySetVariance`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
-  - [`ucs_factory`](@ref)
-  - [`nothing_scalar_array_factory`](@ref)
+  - [`ucs_selector`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
 """
 function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
-    ucs = ucs_factory(r.ucs, ucs)
-    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
+    ucs = ucs_selector(r.ucs, ucs)
+    sigma = nothing_scalar_array_selector(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 function risk_measure_view(r::UncertaintySetVariance, i, args...)

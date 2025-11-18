@@ -12,7 +12,7 @@ struct NaiveOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
     retcode::T4
     fb::T5
 end
-function opt_attempt_factory(res::NaiveOptimisation, fb)
+function factory(res::NaiveOptimisation, fb)
     return NaiveOptimisation(res.oe, res.pr, res.w, res.retcode, fb)
 end
 struct InverseVolatility{T1, T2} <: NaiveOptimisationEstimator

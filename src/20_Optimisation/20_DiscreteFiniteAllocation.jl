@@ -12,7 +12,7 @@ struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T
     cash::T10
     fb::T11
 end
-function opt_attempt_factory(res::DiscreteAllocationOptimisation, fb)
+function factory(res::DiscreteAllocationOptimisation, fb)
     return DiscreteAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
                                           res.s_retcode, res.l_retcode, res.s_model,
                                           res.l_model, res.cash, fb)

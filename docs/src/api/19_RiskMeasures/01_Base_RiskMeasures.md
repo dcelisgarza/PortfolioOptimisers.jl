@@ -14,5 +14,5 @@ NoOptimisationRiskMeasure
 OptimisationRiskMeasure
 AbstractRiskMeasureSettings
 Scalariser
-nothing_scalar_array_factory
+nothing_scalar_array_selector
 ```

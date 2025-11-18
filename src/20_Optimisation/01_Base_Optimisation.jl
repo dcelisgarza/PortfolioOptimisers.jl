@@ -43,7 +43,6 @@ function optimise end
 function optimise(or::OptimisationResult, args...)
     return or
 end
-function opt_attempt_factory end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = opt
@@ -58,7 +57,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
             @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         end
     end
-    return isempty(fb) ? res : opt_attempt_factory(res, fb)
+    return isempty(fb) ? res : factory(res, fb)
 end
 function assert_internal_optimiser(::OptimisationResult)
     return nothing

@@ -31,5 +31,5 @@ nothing_scalar_array_view_odd_order
 nothing_scalar_array_getindex
 nothing_scalar_array_getindex_odd_order
 nothing_asset_sets_view
-fourth_moment_index_factory
+fourth_moment_index_generator
 ```

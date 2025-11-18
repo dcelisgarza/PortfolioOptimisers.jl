@@ -745,7 +745,7 @@ function nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j)
     return x[i, j]
 end
 """
-    fourth_moment_index_factory(N::Integer, i)
+    fourth_moment_index_generator(N::Integer, i)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
@@ -761,7 +761,7 @@ Constructs an index vector for extracting the fourth moment submatrix correspond
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.fourth_moment_index_factory(3, [1, 2])
+julia> PortfolioOptimisers.fourth_moment_index_generator(3, [1, 2])
 4-element Vector{Int64}:
  1
  2
@@ -769,7 +769,7 @@ julia> PortfolioOptimisers.fourth_moment_index_factory(3, [1, 2])
  5
 ```
 """
-function fourth_moment_index_factory(N::Integer, i)
+function fourth_moment_index_generator(N::Integer, i)
     idx = sizehint!(Int[], length(i)^2)
     for c in i
         append!(idx, (((c - 1) * N + 1):(c * N))[i])

@@ -641,7 +641,7 @@ function factory(pe::EntropyPoolingPrior, w::Option{<:AbstractWeights} = nothing
                                kt_views = pe.kt_views, rho_views = pe.rho_views,
                                var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
-                               opt = pe.opt, w = nothing_scalar_array_factory(pe.w, w),
+                               opt = pe.opt, w = nothing_scalar_array_selector(pe.w, w),
                                alg = pe.alg)
 end
 """
