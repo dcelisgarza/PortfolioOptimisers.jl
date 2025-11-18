@@ -271,7 +271,7 @@ function ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
     return ReturnRiskMeasure(rt)
 end
 """
-    factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+    factory(r::ReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 
 Construct a new `ReturnRiskMeasure` object with an updated return estimator based on the provided prior result.
 
@@ -300,8 +300,8 @@ This function creates a new [`ReturnRiskMeasure`](@ref) instance by updating the
   - [`factory`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    rt = factory(r.rt, prior, args...; kwargs...)
+function factory(r::ReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+    rt = factory(r.rt, pr, args...; kwargs...)
     return ReturnRiskMeasure(; rt = rt)
 end
 """
@@ -427,7 +427,7 @@ function RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
     return RatioRiskMeasure(rt, rk, rf)
 end
 """
-    factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+    factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 
 Construct a new `RatioRiskMeasure` object with updated return and risk estimators based on the provided prior result.
 
@@ -457,17 +457,16 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
   - [`factory`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    rt = factory(r.rt, prior, args...; kwargs...)
-    rk = factory(r.rk, prior, args...; kwargs...)
+function factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+    rt = factory(r.rt, pr, args...; kwargs...)
+    rk = factory(r.rk, pr, args...; kwargs...)
     return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
 end
-function factory(r::RatioRiskMeasure, slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, slv, args...; kwargs...),
-                            rf = r.rf)
-end
+#! Make factories for Solver risk measure, and uncertainty set variance
 """
-    factory(r::RatioRiskMeasure, w::VecNum)
+    factory(r::RatioRiskMeasure{<:Any,
+                                <:Union{<:RiskTrackingRiskMeasure, <:TrackingRiskMeasure}},
+            w::VecNum)
 
 Construct a new `RatioRiskMeasure` object with updated risk measure weights.
 
@@ -494,7 +493,9 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
   - [`VecNum`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::RatioRiskMeasure, w::VecNum)
+function factory(r::RatioRiskMeasure{<:Any,
+                                     <:Union{<:RiskTrackingRiskMeasure,
+                                             <:TrackingRiskMeasure}}, w::VecNum)
     return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 """

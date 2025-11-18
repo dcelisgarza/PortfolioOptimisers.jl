@@ -13,8 +13,8 @@ end
 function (r::MeanReturn)(x::VecNum)
     return isnothing(r.w) ? mean(x) : mean(x, r.w)
 end
-function factory(r::MeanReturn, prior::AbstractPriorResult, args...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+function factory(r::MeanReturn, pr::AbstractPriorResult, args...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return MeanReturn(; w = w)
 end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
@@ -80,9 +80,9 @@ function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
     target = calc_moment_target(r, w, x)
     return x .- target
 end
-function factory(r::ThirdCentralMoment, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
-    mu = nothing_scalar_array_selector(r.mu, prior.mu)
+function factory(r::ThirdCentralMoment, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
 end
 function risk_measure_view(r::ThirdCentralMoment, i, args...)
@@ -94,9 +94,9 @@ function (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = no
     val .= val .^ 3
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function factory(r::Skewness, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
-    mu = nothing_scalar_array_selector(r.mu, prior.mu)
+function factory(r::Skewness, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
 end
 function risk_measure_view(r::Skewness, i, args...)

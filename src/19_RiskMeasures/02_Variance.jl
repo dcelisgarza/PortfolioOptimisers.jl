@@ -224,7 +224,7 @@ julia> r(w)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
-  - [`factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)`](@ref)
+  - [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
 struct Variance{T1, T2, T3, T4} <: RiskMeasure
@@ -251,14 +251,14 @@ function (r::Variance)(w::VecNum)
     return dot(w, r.sigma, w)
 end
 """
-    factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
+    factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
 
 Create an instance of [`Variance`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
 
 # Arguments
 
   - `r`: Prototype risk measure whose `settings`, `rc` and `alg` fields are reused for the new instance.
-  - `prior`: Prior result providing `prior.sigma` to use when `r.sigma === nothing`.
+  - `prior`: Prior result providing `pr.sigma` to use when `r.sigma === nothing`.
   - `args...`: Extra positional arguments are accepted for API compatibility but are ignored by this constructor.
   - `kwargs...` : Keyword arguments are accepted for API compatibility but are ignored by this constructor.
 
@@ -276,8 +276,8 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
   - [`Variance`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = nothing_scalar_array_selector(r.sigma, prior.sigma)
+function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
 function risk_measure_view(r::Variance, i, args...)
@@ -370,7 +370,7 @@ julia> r(w)
 # Related
 
   - [`RiskMeasureSettings`](@ref)
-  - [`factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwargs...)`](@ref)
+  - [`factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
 struct StandardDeviation{T1, T2} <: RiskMeasure
@@ -392,14 +392,14 @@ function (r::StandardDeviation)(w::VecNum)
     return sqrt(dot(w, r.sigma, w))
 end
 """
-    factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwargs...)
+    factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
 
 Create an instance of [`StandardDeviation`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
 
 # Arguments
 
   - `r`: Prototype risk measure whose `settings`, `rc` and `alg` fields are reused for the new instance.
-  - `prior`: Prior result providing `prior.sigma` to use when `r.sigma === nothing`.
+  - `prior`: Prior result providing `pr.sigma` to use when `r.sigma === nothing`.
   - `args...`: Extra positional arguments are accepted for API compatibility but are ignored by this constructor.
   - `kwargs...` : Keyword arguments are accepted for API compatibility but are ignored by this constructor.
 
@@ -417,8 +417,8 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
   - [`StandardDeviation`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = nothing_scalar_array_selector(r.sigma, prior.sigma)
+function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 function risk_measure_view(r::StandardDeviation, i, args...)
@@ -596,7 +596,7 @@ julia> r(w)
   - [`Variance`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
-  - [`factory(r::UncertaintySetVariance, prior::AbstractPriorResult, args...; kwargs...)`](@ref)
+  - [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
 struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
@@ -652,7 +652,7 @@ function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{f
                     rc = nothing, sigma = r.sigma)
 end
 """
-    factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
+    factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
             ucs::Option{<:UcSE_UcS} = nothing, args...;
             kwargs...)
 
@@ -661,7 +661,7 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
 # Arguments
 
   - `r`: Prototype risk measure whose `settings` and `sigma` fields are reused for the new instance.
-  - `prior`: Prior result providing `prior.sigma` to use when `r.sigma === nothing`.
+  - `prior`: Prior result providing `pr.sigma` to use when `r.sigma === nothing`.
   - `::Any`: Placeholder positional argument for API compatibility.
   - `ucs`: Optional uncertainty set estimator or result to override `r.ucs`.
   - `args...`: Extra positional arguments are accepted for API compatibility but are ignored by this constructor.
@@ -685,11 +685,21 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
   - [`ucs_selector`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
+function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
-    sigma = nothing_scalar_array_selector(r.sigma, prior.sigma)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+end
+function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
+                 ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
+    ucs = ucs_selector(r.ucs, ucs)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+end
+function factory(r::UncertaintySetVariance, ucs::UcSE_UcS, args...; kwargs...)
+    ucs = ucs_selector(r.ucs, ucs)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = r.sigma)
 end
 function risk_measure_view(r::UncertaintySetVariance, i, args...)
     ucs = ucs_view(r.ucs, i)

@@ -60,8 +60,8 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
-function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
@@ -103,8 +103,8 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
-function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
                             alg = r.alg)
 end

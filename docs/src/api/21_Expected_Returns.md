@@ -15,8 +15,8 @@ expected_ratio
 expected_risk_ret_ratio
 expected_sric
 expected_risk_ret_sric
-factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+factory(r::ReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::ReturnRiskMeasure, args...; kwargs...)
-factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::RatioRiskMeasure, w::VecNum)
 ```

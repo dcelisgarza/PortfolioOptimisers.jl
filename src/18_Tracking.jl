@@ -758,7 +758,7 @@ This function applies `tracking_view` to each element of the input vector of tra
   - [`ReturnsTracking`](@ref)
 """
 function tracking_view(tr::VecTr, args...)
-    return [tracking_view(t, args...) for t in tracking]
+    return [tracking_view(t, args...) for t in tr]
 end
 """
     factory(tr::TrackingError, w::VecNum)

@@ -105,9 +105,9 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
                                  w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
-function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
+function factory(r::RelativisticValueatRisk, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
                                    kappa = r.kappa, slv = slv, w = w)
@@ -153,7 +153,7 @@ end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
-function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
+function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)
     slv = solver_selector(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,

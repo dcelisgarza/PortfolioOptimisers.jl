@@ -36,9 +36,9 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
     return dot(w, r.V, w)
 end
-function factory(r::NegativeSkewness, prior::HighOrderPrior, args...; kwargs...)
-    sk = nothing_scalar_array_selector(r.sk, prior.sk)
-    V = nothing_scalar_array_selector(r.V, prior.V)
+function factory(r::NegativeSkewness, pr::HighOrderPrior, args...; kwargs...)
+    sk = nothing_scalar_array_selector(r.sk, pr.sk)
+    V = nothing_scalar_array_selector(r.V, pr.V)
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg)
 end
 function factory(r::NegativeSkewness, ::LowOrderPrior, args...; kwargs...)

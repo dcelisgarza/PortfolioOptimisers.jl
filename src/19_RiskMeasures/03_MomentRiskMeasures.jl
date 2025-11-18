@@ -1056,9 +1056,9 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
 end
 for rt in (LowOrderMoment, HighOrderMoment)
     eval(quote
-             function factory(r::$(rt), prior::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, prior.w)
-                 mu = nothing_scalar_array_selector(r.mu, prior.mu)
+             function factory(r::$(rt), pr::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
+                 mu = nothing_scalar_array_selector(r.mu, pr.mu)
                  alg = factory(r.alg, w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end

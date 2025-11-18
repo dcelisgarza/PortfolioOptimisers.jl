@@ -16,8 +16,8 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
-function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+function factory(r::ConditionalValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
@@ -47,9 +47,9 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
-function factory(r::DistributionallyRobustConditionalValueatRisk,
-                 prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+function factory(r::DistributionallyRobustConditionalValueatRisk, pr::AbstractPriorResult,
+                 args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
                                                         alpha = r.alpha, l = r.l, r = r.r,
                                                         w = w)
@@ -105,9 +105,9 @@ function ConditionalValueatRiskRange(;
                                      w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
-function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, args...;
+function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
                  kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                        beta = r.beta, w = w)
 end
@@ -149,8 +149,8 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                              beta, l_b, r_b, w)
 end
 function factory(r::DistributionallyRobustConditionalValueatRiskRange,
-                 prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, prior.w)
+                 pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
     return DistributionallyRobustConditionalValueatRiskRange(; settings = r.settings,
                                                              alpha = r.alpha, l_a = r.l_a,
                                                              r_a = r.r_a, beta = r.beta,

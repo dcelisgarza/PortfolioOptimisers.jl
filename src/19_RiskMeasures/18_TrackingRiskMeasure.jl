@@ -25,8 +25,8 @@ function tracking_view(tr::RiskTrackingError, i, X::MatNum)
     return RiskTrackingError(; tr = tracking_view(tr.tr, i),
                              r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
 end
-function factory(tr::RiskTrackingError, prior::AbstractPriorResult, args...; kwargs...)
-    return RiskTrackingError(; tr = tr.tr, r = factory(tr.r, prior, args...; kwargs...),
+function factory(tr::RiskTrackingError, pr::AbstractPriorResult, args...; kwargs...)
+    return RiskTrackingError(; tr = tr.tr, r = factory(tr.r, pr, args...; kwargs...),
                              err = tr.err, alg = tr.alg)
 end
 function factory(tr::RiskTrackingError, w::VecNum)
@@ -54,7 +54,7 @@ function risk_measure_view(r::TrackingRiskMeasure, i, args...)
     tr = tracking_view(r.tr, i)
     return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
 end
-function factory(r::TrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+function factory(r::TrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     return TrackingRiskMeasure(; settings = r.settings, tr = r.tr, alg = r.alg)
 end
 function factory(r::TrackingRiskMeasure, w::VecNum)
@@ -101,9 +101,9 @@ function risk_measure_view(r::RiskTrackingRiskMeasure, i, X::MatNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
                                    r = risk_measure_view(r.r, i, X), alg = r.alg)
 end
-function factory(r::RiskTrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+function factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = r.tr,
-                                   r = factory(r.r, prior, args...; kwargs...), alg = r.alg)
+                                   r = factory(r.r, pr, args...; kwargs...), alg = r.alg)
 end
 function factory(r::RiskTrackingRiskMeasure, w::VecNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), r = r.r,
