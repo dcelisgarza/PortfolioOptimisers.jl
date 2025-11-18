@@ -18,5 +18,5 @@ expected_risk_ret_sric
 factory(r::ReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::ReturnRiskMeasure, args...; kwargs...)
 factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-factory(r::RatioRiskMeasure, w::VecNum)
+factory(r::RatioRiskMeasure{<:Any, <:Union{<:RiskTrackingRiskMeasure, <:TrackingRiskMeasure}}, w::VecNum)
 ```
