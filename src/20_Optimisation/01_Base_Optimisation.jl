@@ -65,12 +65,17 @@ end
 function assert_external_optimiser(::OptimisationResult)
     return nothing
 end
+function generate_grouped_returns_result(rd::ReturnsResult, pr::AbstractPriorResult,
+                                         wi::MatNum)
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
+    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = pr.X * wi, nf = rd.nf,
+                         F = rd.F, ts = rd.ts, iv = iv, ivpa = ivpa)
+end
 function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
                                          pr::AbstractPriorResult, wi::MatNum, resi::VecOpt;
                                          kwargs...)
-    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
-    return pr.X * wi, rd.F, rd.ts, iv, ivpa
+    return generate_grouped_returns_result(rd, pr, wi)
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure

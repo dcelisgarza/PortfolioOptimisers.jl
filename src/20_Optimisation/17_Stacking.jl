@@ -99,9 +99,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         wi[:, i] = res.w
         resi[i] = res
     end
-    X, F, ts, iv, ivpa = predict_outer_estimator_returns(st, rd, pr, wi, resi)
-    rdo = ReturnsResult(; nx = ["_$i" for i in 1:Ni], X = X, nf = rd.nf, F = F, ts = ts,
-                        iv = iv, ivpa = ivpa)
+    rdo = predict_outer_estimator_returns(st, rd, pr, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,

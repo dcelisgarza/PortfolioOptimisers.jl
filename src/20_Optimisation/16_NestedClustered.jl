@@ -203,9 +203,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
             resi[i] = res
         end
     end
-    X, F, ts, iv, ivpa = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
-    rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = X, nf = rd.nf, F = F,
-                        ts = ts, iv = iv, ivpa = ivpa)
+    rdo = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
