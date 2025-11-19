@@ -42,6 +42,7 @@ end
 function optimise(or::OptimisationResult, args...; kwargs...)
     return or
 end
+function _optimise end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = opt
