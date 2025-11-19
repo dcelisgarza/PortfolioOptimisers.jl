@@ -39,8 +39,7 @@ end
 function opt_view(opt::VecOptE, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
-function optimise end
-function optimise(or::OptimisationResult, args...)
+function optimise(or::OptimisationResult, args...; kwargs...)
     return or
 end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
@@ -68,7 +67,7 @@ end
 function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
                                          pr::AbstractPriorResult, wi::MatNum, resi::VecOpt;
                                          kwargs...)
-    iv = isnothing(rd.iv) ? nothing : rd.iv * wi
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
     ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
     return pr.X * wi, rd.F, rd.ts, iv, ivpa
 end
