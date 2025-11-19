@@ -65,113 +65,37 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-#=
-function Base.show(io::IO,
-                   ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                              <:AbstractCovarianceEstimator})
-    fields = propertynames(ear)
-    if isempty(fields)
-        return print(io, string(typeof(ear), "()"),'\n')
-    end
-    name = Base.typename(typeof(ear)).wrapper
-    print(io, name,'\n')
-    padding = maximum(map(length, map(string, fields))) + 2
-    for field in fields
-        if hasproperty(ear, field)
-            val = getproperty(ear, field)
-        else
-            continue
-        end
-        print(io, lpad(string(field), padding), " ")
-        if isnothing(val)
-            print(io, "| nothing",'\n')
-        elseif isa(val, AbstractMatrix)
-            print(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))",'\n')
-        elseif isa(val, AbstractVector) && length(val) > 6
-            print(io, "| $(length(val))-element $(typeof(val))",'\n')
-        elseif isa(val,
-                   Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                         <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
-            ioalg = IOBuffer()
-            print(ioalg, val,'\n')
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            print(io, "| ", alglines[1],'\n')
-            for l in alglines[2:end]
-                if isempty(l) || l == '\n'
-                    continue
-                end
-                print(io, lpad("| ", padding + 3), l,'\n')
-            end
-        elseif isa(val, DataType)
-            tval = typeof(val)
-            val = Base.typename(tval).wrapper
-            print(io, "| $(tval): ", val,'\n')
-        else
-            print(io, "| $(typeof(val)): ", repr(val),'\n')
-        end
-    end
-    return nothing
-end
-=#
-#=
-function Base.show(io::IO,
-                   ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                              <:AbstractCovarianceEstimator})
-    fields = propertynames(ear)
-    if isempty(fields)
-        return print(io, string(typeof(ear), "()"), '\n')
-    end
-    if get(io, :compact, false)
-        return print(io, string(typeof(ear), "{...}(...)"), '\n')
-    end
-    custom_type = Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                        <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust}
-    name = Base.typename(typeof(ear)).wrapper
-    print(io, name, '\n')
-    padding = maximum(map(length, map(string, fields))) + 2
-    for (i, field) in enumerate(fields)
-        if hasproperty(ear, field)
-            val = getproperty(ear, field)
-        else
-            continue
-        end
-        flag = isa(val, custom_type)
-        sym1 = ifelse(i == length(fields) && (!flag || flag && isempty(propertynames(val))),
-                      '┴', '┼')#┴ ┼ └ ├
-        # sym1 = ifelse(i == length(fields), '┴', '┼')
-        print(io, lpad(string(field), padding), " ")
-        if isnothing(val)
-            print(io, "$(sym1) nothing", '\n')
-        elseif flag || isa(val, AbstractVector{<:custom_type}) && length(val) <= 6
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            print(io, "$(sym1) ", alglines[1], '\n')
-            for l in alglines[2:end]
-                if isempty(l) || l == '\n'
-                    continue
-                end
-                # sym2 = ifelse(i == length(fields), ' ', '│')
-                sym2 = '│'
-                print(io, lpad("$sym2 ", padding + 3), l, '\n')
-            end
-        elseif isa(val, AbstractMatrix)
-            print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
-        elseif isa(val, AbstractVector) && length(val) > 6
-            print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
-        elseif isa(val, DataType)
-            tval = typeof(val)
-            val = Base.typename(tval).wrapper
-            print(io, "$(sym1) $(tval): ", val, '\n')
-        else
-            print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
-        end
-    end
-    return nothing
-end
-=#
+"""
+    @define_pretty_show(T)
+
+Macro to define a custom pretty-printing `Base.show` method for types in PortfolioOptimisers.jl.
+
+This macro generates a `show` method that displays the type name and all fields in a readable, aligned format. For fields that are themselves custom types or collections, the macro recursively applies pretty-printing for nested structures. Handles compact and multiline IO contexts gracefully.
+
+# Arguments
+
+  - `T`: The type for which to define the pretty-printing method.
+
+# Returns
+
+  - Defines a `Base.show(io::IO, obj::T)` method for the given type.
+
+# Details
+
+  - Prints the type name and all fields with aligned labels.
+  - Recursively pretty-prints nested custom types and collections.
+  - Handles compact and multiline IO contexts.
+  - Displays matrix/vector fields with their size and type.
+  - Skips fields that are not present or are `nothing`.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+  - [`AbstractResult`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`Base.show`](https://docs.julialang.org/en/v1/base/io/#Base.show)
+"""
 macro define_pretty_show(T)
     quote
         function Base.show(io::IO, obj::$(esc(T)))
@@ -237,15 +161,6 @@ function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm
 end
 @define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                           <:AbstractCovarianceEstimator})
-function mul_cond_msg(conds::AbstractString...)
-    N = isa(conds, Tuple) ? length(conds) : 1
-    msg = "the following conditions must hold:\n"
-    for (i, val) in enumerate(conds)
-        mi = i == N ? "$val." : "$val.\n"
-        msg *= mi
-    end
-    return msg
-end
 """
     abstract type PortfolioOptimisersError <: Exception end
 

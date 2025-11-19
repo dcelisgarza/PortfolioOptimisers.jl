@@ -206,9 +206,6 @@ end
 function factory(r::KellyReturn, pr::AbstractPriorResult, args...; kwargs...)
     return KellyReturn(; w = nothing_scalar_array_selector(r.w, pr.w), lb = r.lb)
 end
-function factory(r::KellyReturn, w::AbstractWeights, args...; kwargs...)
-    return KellyReturn(; w = nothing_scalar_array_selector(r.w, w), lb = r.lb)
-end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1} <: ObjectiveFunction
     l::T1

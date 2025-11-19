@@ -242,11 +242,29 @@ end
 """
     assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
 
-Assert that `size(A, 1) == size(A, 2)`.
+Assert that the input matrix is square.
+
+# Arguments
+
+  - `A`: Input matrix to validate.
+  - `A_sym`: Symbolic name used in error messages.
+
+# Returns
+
+  - Returns `nothing` if validation passes.
+
+# Validation
+
+  - `size(A, 1) == size(A, 2)`.
+
+# Details
+
+  - Throws `DimensionMismatch` if the check fails.
 """
 function assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
     @argcheck(size(A, 1) == size(A, 2),
               DimensionMismatch("size($A_sym, 1) == size($A_sym, 2) must hold. Got\nsize($A_sym, 1) => $(size(A, 1))\nsize($A_sym, 2) => $(size(A, 2))."))
+    return nothing
 end
 """
     brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,

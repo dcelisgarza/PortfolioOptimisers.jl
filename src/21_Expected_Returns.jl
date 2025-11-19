@@ -446,35 +446,88 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Details
 
-  - Calls [`factory`](@ref) to update the return estimator using the prior result and arguments.
-  - Calls [`factory`](@ref) to update the risk measure using the prior result and arguments.
+  - Calls `factory(r.rt, pr, args...; kwargs...)` to update the return estimator using the prior result and arguments.
+  - Calls `factory(r.rk, pr, args...; kwargs...)` to update the risk measure using the prior result and arguments.
   - Returns a new `RatioRiskMeasure` object with the updated fields and original risk-free rate.
 
 # Related
 
   - [`RatioRiskMeasure`](@ref)
   - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`factory`](@ref)
 """
 function factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     rt = factory(r.rt, pr, args...; kwargs...)
     rk = factory(r.rk, pr, args...; kwargs...)
     return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
 end
+"""
+    factory(r::RatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS; kwargs...)
+
+Construct a new `RatioRiskMeasure` object with an updated uncertainty set risk measure.
+
+This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided uncertainty set and any additional keyword arguments. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+
+# Arguments
+
+  - `r`: Ratio-based risk measure object.
+  - `ucs`: Uncertainty set for updating the internal risk measure.
+  - `kwargs...`: Additional keyword arguments for updating the risk measure.
+
+# Returns
+
+  - `RatioRiskMeasure`: New risk measure object with updated uncertainty set risk measure.
+
+# Details
+
+  - Calls `factory(r.rk, ucs; kwargs...)` to update the risk measure.
+  - Preserves the return estimator and risk-free rate.
+  - Returns a new `RatioRiskMeasure` object with the updated risk measure.
+
+# Related
+
+  - [`RatioRiskMeasure`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+"""
 function factory(r::RatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
                  kwargs...)
     rk = factory(r.rk, ucs; kwargs...)
     return RatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
 end
+"""
+    factory(r::RatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
+
+Construct a new `RatioRiskMeasure` object with an updated solver-based risk measure.
+
+Creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided solver and any additional keyword arguments. The return estimator and risk-free rate are preserved. Enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+
+# Arguments
+
+  - `r`: Ratio-based risk measure object.
+  - `slv`: Solver or vector of solvers for updating the internal risk measure.
+  - `kwargs...`: Additional keyword arguments for updating the risk measure.
+
+# Returns
+
+  - `RatioRiskMeasure`: New risk measure object with updated solver-based risk measure.
+
+# Details
+
+  - Calls `factory(r.rk, slv; kwargs...)` to update the risk measure.
+  - Preserves the return estimator and risk-free rate.
+  - Returns a new `RatioRiskMeasure` object with the updated risk measure.
+
+# Related
+
+  - [`RatioRiskMeasure`](@ref)
+  - [`SlvRM`](@ref)
+  - [`Slv_VecSlv`](@ref)
+"""
 function factory(r::RatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
     rk = factory(r.rk, slv; kwargs...)
     return RatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
 end
 """
-    factory(r::RatioRiskMeasure{<:Any,
-                                <:Union{<:RiskTrackingRiskMeasure, <:TrackingRiskMeasure}},
-            w::VecNum)
+    factory(r::RatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
 
 Construct a new `RatioRiskMeasure` object with updated risk measure weights.
 
@@ -499,6 +552,7 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
   - [`RatioRiskMeasure`](@ref)
   - [`VecNum`](@ref)
+  - [`TnTrRM`](@ref)
   - [`factory`](@ref)
 """
 function factory(r::RatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)

@@ -42,4 +42,5 @@ VecDate
 Dict_Vec
 Sym_Str
 Str_Vec
+@define_pretty_show
 ```
