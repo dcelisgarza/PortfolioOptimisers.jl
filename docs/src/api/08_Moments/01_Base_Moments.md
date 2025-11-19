@@ -1,8 +1,15 @@
 # Base Moments
 
+## Public
+
 ```@docs
 Full
 Semi
+```
+
+## Private
+
+```@docs
 AbstractExpectedReturnsEstimator
 AbstractExpectedReturnsAlgorithm
 AbstractMomentAlgorithm

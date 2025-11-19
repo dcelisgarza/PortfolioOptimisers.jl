@@ -24,6 +24,7 @@ Keyword arguments correspond to the fields above.
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`Option`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
@@ -84,13 +85,43 @@ julia> mean(serw, X)
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecNum`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
+"""
+    factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+
+Create a new `SimpleExpectedReturns` estimator with updated observation weights.
+
+This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionally replacing the weights stored in the input estimator with the provided weights. If `w` is `nothing`, the weights from `me` are used.
+
+# Arguments
+
+  - `me`: Existing `SimpleExpectedReturns` estimator.
+  - `w`: Optional observation weights to use in the new estimator. If `nothing`, uses `me.w`.
+
+# Returns
+
+  - `SimpleExpectedReturns`: New estimator with updated weights.
+
+# Details
+
+  - Returns a new estimator, preserving the type and updating weights as specified.
+  - If `w` is not provided, the weights from `me` are used.
+  - Validates that weights are non-empty and finite.
+
+# Related
+
+  - [`SimpleExpectedReturns`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
 function factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
-    return SimpleExpectedReturns(; w = isnothing(w) ? me.w : w)
+    return SimpleExpectedReturns(; w = ifelse(isnothing(w), me.w, w))
 end
 
 export SimpleExpectedReturns

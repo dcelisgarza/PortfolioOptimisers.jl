@@ -47,6 +47,7 @@ GeneralCovariance
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`Option`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
@@ -87,6 +88,8 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
 
 # Related
 
+  - [`MatNum`](@ref)
+  - [`GeneralCovariance`](@ref)
   - [`robust_cov`](@ref)
   - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
@@ -119,6 +122,8 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
 
 # Related
 
+  - [`MatNum`](@ref)
+  - [`GeneralCovariance`](@ref)
   - [`robust_cor`](@ref)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """

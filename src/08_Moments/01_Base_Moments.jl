@@ -82,6 +82,7 @@ This function attempts to compute the weighted covariance matrix using the provi
 
 # Related
 
+  - [`MatNum`](@ref)
   - [`robust_cor`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
@@ -124,6 +125,7 @@ This function attempts to compute the weighted correlation matrix using the prov
 
 # Related
 
+  - [`MatNum`](@ref)
   - [`robust_cov`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """

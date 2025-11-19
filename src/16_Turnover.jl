@@ -157,6 +157,8 @@ Turnover
   - [`VecNum`](@ref)
   - [`Num_VecNum`](@ref)
   - [`turnover_constraints`](@ref)
+  - [`factory(tn::Turnover, w::VecNum)`](@ref)
+  - [`turnover_view`](@ref)
 """
 struct Turnover{T1, T2} <: AbstractResult
     w::T1
