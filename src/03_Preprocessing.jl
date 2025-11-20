@@ -201,6 +201,58 @@ function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = n
                        ivpa::Option{<:Num_VecNum} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
+"""
+    returns_result_view(rd::ReturnsResult, i)
+
+Return a view of the `ReturnsResult` object for the asset or factor at index `i`.
+
+# Arguments
+
+  - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
+  - `i`: Index of the asset or factor to view.
+
+# Returns
+
+  - `ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
+
+# Details
+
+  - Extracts the asset/factor name, returns, implied volatility, and risk premium adjustment for index `i`.
+  - Preserves factor, timestamp, and other fields from the original object.
+  - Returns `nothing` for fields that are not present.
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> PortfolioOptimisers.returns_result_view(rd, 2)
+ReturnsResult
+    nx ┼ SubArray{String, 0, Vector{String}, Tuple{Int64}, true}: fill("B")
+     X ┼ SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}: [0.2, 0.4]
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+```
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+"""
 function returns_result_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
