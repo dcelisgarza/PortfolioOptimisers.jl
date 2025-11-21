@@ -29,9 +29,11 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
+julia> using StatsBase
+
 julia> gwc = GeneralCovariance()
 GeneralCovariance
-  ce ┼ SimpleCovariance: SimpleCovariance(true)
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
    w ┴ nothing
 
 julia> w = Weights([0.1, 0.2, 0.7]);

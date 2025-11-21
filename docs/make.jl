@@ -11,8 +11,8 @@ for sym in setdiff!(all_symbols, exported)
          end)
 end
 
-DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
-                    :(using PortfolioOptimisers, StatsBase); recursive = true)
+DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
+                    recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)
@@ -76,9 +76,6 @@ contribute = [joinpath("contribute", file)
 idx1 = findfirst("api", api_pages[1][1])[1]
 
 makedocs(; #modules = [PortfolioOptimisers],
-         # Done via CI workflow.
-         #  doctest = false,
-         #
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
