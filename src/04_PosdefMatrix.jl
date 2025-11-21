@@ -33,11 +33,8 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> using LinearAlgebra
-
 julia> Posdef()
-Posdef
-  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+
 ```
 
 # Related
@@ -80,25 +77,22 @@ For covariance matrices, the function internally converts to a correlation matri
 # Examples
 
 ```jldoctest
-julia> using LinearAlgebra
-
 julia> est = Posdef()
-Posdef
-  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
 
 julia> X = [1.0 0.9; 0.9 1.0];
+Posdef
+  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
 
 julia> X[1, 2] = 2.0;  # Not PD
 
 julia> posdef!(est, X)
 
 julia> X
+
+julia> isposdef(X)
 2×2 Matrix{Float64}:
  1.0  1.0
  1.0  1.0
-
-julia> isposdef(X)
-true
 ```
 
 # Related

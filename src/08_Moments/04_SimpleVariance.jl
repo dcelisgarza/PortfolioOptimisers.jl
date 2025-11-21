@@ -30,23 +30,17 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> SimpleVariance()
+
+julia> w = Weights([0.2, 0.3, 0.5]);
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
-julia> w = Weights([0.2, 0.3, 0.5]);
-
 julia> SimpleVariance(; w = w, corrected = false)
-SimpleVariance
-         me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
-          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  corrected ┴ Bool: false
+
 ```
 
 # Related
@@ -149,31 +143,28 @@ This method computes the standard deviation of the input vector `X` using the co
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> sv = SimpleVariance()
+
+julia> X = [1.0, 2.0, 3.0];
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
-julia> X = [1.0, 2.0, 3.0];
-
 julia> std(sv, X)
-1.0
 
 julia> w = Weights([0.2, 0.3, 0.5]);
+1.0
 
 julia> svw = SimpleVariance(; w = w, corrected = false)
+
+julia> std(svw, X)
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: false
-
-julia> std(svw, X)
-0.7810249675906654
 ```
 
 # Related
@@ -264,31 +255,28 @@ This method computes the variance of the input vector `X` using the configuratio
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> sv = SimpleVariance()
+
+julia> X = [1.0, 2.0, 3.0];
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
-julia> X = [1.0, 2.0, 3.0];
-
 julia> var(sv, X)
-1.0
 
 julia> w = Weights([0.2, 0.3, 0.5]);
+1.0
 
 julia> svw = SimpleVariance(; w = w, corrected = false)
+
+julia> var(svw, X)
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: false
-
-julia> var(svw, X)
-0.61
 ```
 
 # Related

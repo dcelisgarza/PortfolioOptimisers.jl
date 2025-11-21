@@ -180,13 +180,13 @@ The processing pipeline consists of:
 # Examples
 
 ```jldoctest
-julia> using StableRNGs, Statistics
-
 julia> rng = StableRNG(123456789);
 
 julia> X = rand(rng, 10, 5);
 
 julia> sigma = cov(X)
+
+julia> matrix_processing!(DefaultMatrixProcessing(; denoise = Denoise()), sigma, X)
 5×5 Matrix{Float64}:
   0.132026     0.0022567   0.0198243    0.00359832  -0.00743829
   0.0022567    0.0514194  -0.0131242    0.004123     0.0312379
@@ -194,9 +194,9 @@ julia> sigma = cov(X)
   0.00359832   0.004123   -0.0325342    0.0424332    0.0152574
  -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
 
-julia> matrix_processing!(DefaultMatrixProcessing(; denoise = Denoise()), sigma, X)
-
 julia> sigma
+
+julia> sigma = cov(X)
 5×5 Matrix{Float64}:
  0.132026  0.0        0.0        0.0        0.0
  0.0       0.0514194  0.0        0.0        0.0
@@ -204,7 +204,7 @@ julia> sigma
  0.0       0.0        0.0        0.0424332  0.0
  0.0       0.0        0.0        0.0        0.0926441
 
-julia> sigma = cov(X)
+julia> matrix_processing!(DefaultMatrixProcessing(; detone = Detone()), sigma, X)
 5×5 Matrix{Float64}:
   0.132026     0.0022567   0.0198243    0.00359832  -0.00743829
   0.0022567    0.0514194  -0.0131242    0.004123     0.0312379
@@ -212,15 +212,8 @@ julia> sigma = cov(X)
   0.00359832   0.004123   -0.0325342    0.0424332    0.0152574
  -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
 
-julia> matrix_processing!(DefaultMatrixProcessing(; detone = Detone()), sigma, X)
-
 julia> sigma
-5×5 Matrix{Float64}:
- 0.132026    0.0124802   0.0117303    0.0176194    0.0042142
- 0.0124802   0.0514194   0.0273105   -0.0290864    0.0088165
- 0.0117303   0.0273105   0.0843837   -0.00279296   0.0619156
- 0.0176194  -0.0290864  -0.00279296   0.0424332   -0.0242252
- 0.0042142   0.0088165   0.0619156   -0.0242252    0.0926441
+
 ```
 
 # Related

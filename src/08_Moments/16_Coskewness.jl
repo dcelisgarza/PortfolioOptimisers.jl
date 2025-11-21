@@ -183,8 +183,6 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
 # Examples
 
 ```jldoctest
-julia> using StableRNGs
-
 julia> rng = StableRNG(123456789);
 
 julia> X = randn(rng, 10, 3);
@@ -192,16 +190,12 @@ julia> X = randn(rng, 10, 3);
 julia> cskew, V = coskewness(Coskewness(), X);
 
 julia> cskew
+
+julia> V
 3×9 Matrix{Float64}:
  -0.329646    0.0782455   0.325842  …   0.325842  -0.250881   0.16769
   0.0782455  -0.236104   -0.250881     -0.250881   0.266005   0.144546
   0.325842   -0.250881    0.16769       0.16769    0.144546  -0.605589
-
-julia> V
-3×3 Matrix{Float64}:
-  0.513743   -0.0452078  -0.290893
- -0.0452078   0.402765   -0.0372996
- -0.290893   -0.0372996   0.837701
 ```
 
 # Related

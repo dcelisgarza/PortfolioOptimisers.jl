@@ -369,8 +369,6 @@ For covariance matrices, the function internally converts to a correlation matri
 # Examples
 
 ```jldoctest
-julia> using StableRNGs
-
 julia> rng = StableRNG(123456789);
 
 julia> X = rand(rng, 10, 5);
