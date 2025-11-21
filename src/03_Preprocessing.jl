@@ -296,10 +296,10 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
 # Examples
 
 ```jldoctest
+julia> using TimeSeries
+
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103; 104 105],
                      ["A", "B"])
-
-julia> prices_to_returns(X)
 3×2 TimeSeries.TimeArray{Int64, 2, Dates.Date, Matrix{Int64}} 2020-01-01 to 2020-01-03
 ┌────────────┬─────┬─────┐
 │            │ A   │ B   │
@@ -308,6 +308,16 @@ julia> prices_to_returns(X)
 │ 2020-01-02 │ 102 │ 103 │
 │ 2020-01-03 │ 104 │ 105 │
 └────────────┴─────┴─────┘
+
+julia> prices_to_returns(X)
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
+    iv ┼ nothing
+  ivpa ┴ nothing
 ```
 
 # Related

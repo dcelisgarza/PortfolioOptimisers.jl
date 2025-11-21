@@ -12,8 +12,7 @@ for sym in setdiff!(all_symbols, exported)
 end
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
-                    :(using PortfolioOptimisers, StatsBase, Statistics, StableRNGs,
-                            TimeSeries, LinearAlgebra); recursive = true)
+                    :(using PortfolioOptimisers, StatsBase); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)
@@ -76,7 +75,10 @@ contribute = [joinpath("contribute", file)
               if splitext(file)[2] == ".md"]
 idx1 = findfirst("api", api_pages[1][1])[1]
 
-makedocs(; modules = [PortfolioOptimisers],
+makedocs(; #modules = [PortfolioOptimisers],
+         # Done via CI workflow.
+         #  doctest = false,
+         #
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
@@ -107,9 +109,7 @@ makedocs(; modules = [PortfolioOptimisers],
                   "Contribute" => contribute;
                   "References" => root_pages[2]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
-                                         style = :numeric)],
-         doctestfilters = [r"StatsBase\.", r"Statistics\.", r"StableRNGs\.",
-                           r"TimeSeries\.", r"LinearAlgebra\."])
+                                         style = :numeric)])
 
 DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
                                target = "build", devbranch = "main", branch = "gh-pages",

@@ -132,18 +132,25 @@ Select entropy pooling weights according to the specified algorithm.
 # Examples
 
 ```jldoctest
+julia> using StatsBase
+
 julia> w0 = pweights([0.25, 0.25, 0.25, 0.25]);
 
 julia> wi = pweights([0.1, 0.2, 0.3, 0.4]);
 
 julia> PortfolioOptimisers.get_epw(H1_EntropyPooling(), w0, wi)
-
-julia> PortfolioOptimisers.get_epw(H2_EntropyPooling(), w0, wi)
 4-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
  0.25
  0.25
  0.25
  0.25
+
+julia> PortfolioOptimisers.get_epw(H2_EntropyPooling(), w0, wi)
+4-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
+ 0.1
+ 0.2
+ 0.3
+ 0.4
 ```
 
 # Related

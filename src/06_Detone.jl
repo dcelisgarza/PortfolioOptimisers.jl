@@ -85,13 +85,13 @@ For covariance matrices, the function internally converts to a correlation matri
 # Examples
 
 ```jldoctest
+julia> using StableRNGs
+
 julia> rng = StableRNG(123456789);
 
 julia> X = rand(rng, 10, 5);
 
 julia> X = X' * X
-
-julia> detone!(Detone(), X)
 5×5 Matrix{Float64}:
  3.29494  2.0765   1.73334  2.01524  1.77493
  2.0765   2.46967  1.39953  1.97242  2.07886
@@ -99,8 +99,15 @@ julia> detone!(Detone(), X)
  2.01524  1.97242  1.17071  2.24818  1.87091
  1.77493  2.07886  1.30459  1.87091  2.44414
 
-julia> X
+julia> detone!(Detone(), X)
 
+julia> X
+5×5 Matrix{Float64}:
+  3.29494    -1.14673     0.0868439  -0.502106   -1.71581
+ -1.14673     2.46967    -0.876289   -0.0864304   0.274663
+  0.0868439  -0.876289    1.90712    -1.18851    -0.750345
+ -0.502106   -0.0864304  -1.18851     2.24818    -0.0774753
+ -1.71581     0.274663   -0.750345   -0.0774753   2.44414
 ```
 
 # Related

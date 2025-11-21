@@ -138,12 +138,18 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
 # Examples
 
 ```jldoctest
+julia> using StableRNGs
+
 julia> rng = StableRNG(123456789);
 
 julia> X = randn(rng, 10, 2);
 
 julia> cokurtosis(Cokurtosis(), X)
-
+4×4 Matrix{Float64}:
+  1.33947   -0.246726  -0.246726   0.493008
+ -0.246726   0.493008   0.493008  -0.201444
+ -0.246726   0.493008   0.493008  -0.201444
+  0.493008  -0.201444  -0.201444   0.300335
 ```
 
 # Related

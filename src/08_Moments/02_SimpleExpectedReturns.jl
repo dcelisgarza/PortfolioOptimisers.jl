@@ -59,23 +59,27 @@ This method computes the expected returns as the sample mean of the input data `
 # Examples
 
 ```jldoctest
+julia> using StatsBase
+
 julia> X = [0.01 0.02; 0.03 0.04];
 
 julia> ser = SimpleExpectedReturns()
-
-julia> mean(ser, X)
 SimpleExpectedReturns
   w ┴ nothing
 
-julia> w = Weights([0.2, 0.8]);
+julia> mean(ser, X)
 1×2 Matrix{Float64}:
  0.02  0.03
 
-julia> serw = SimpleExpectedReturns(; w = w)
+julia> w = Weights([0.2, 0.8]);
 
-julia> mean(serw, X)
+julia> serw = SimpleExpectedReturns(; w = w)
 SimpleExpectedReturns
   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
+
+julia> mean(serw, X)
+1×2 Matrix{Float64}:
+ 0.026  0.036
 ```
 
 # Related
