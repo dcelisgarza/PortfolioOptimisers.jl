@@ -335,8 +335,6 @@ const VecInt = Union{<:AbstractVector{<:Integer},
                      <:SubArray{<:Integer, 1, <:AbstractVector{<:Integer}}}
 """
     const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}},
-                         <:SubArray{<:Union{<:Number, <:AbstractJuMPScalar}, 1,
-                                    <:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}},
                          <:SubArray{<:Union{<:Number, <:AbstractJuMPScalar}, 2,
                                     <:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}}}
 
@@ -349,8 +347,6 @@ Alias for an abstract matrix of numeric types or JuMP scalar types.
   - [`VecMatNum`](@ref)
 """
 const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}},
-                     <:SubArray{<:Union{<:Number, <:AbstractJuMPScalar}, 1,
-                                <:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}},
                      <:SubArray{<:Union{<:Number, <:AbstractJuMPScalar}, 2,
                                 <:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}}}
 """
