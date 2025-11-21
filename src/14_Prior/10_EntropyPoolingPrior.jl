@@ -112,61 +112,6 @@ Exponential entropy pooling optimisation algorithm.
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
-    get_epw(alg::StagedEP, w0::AbstractWeights,
-            wi::AbstractWeights)
-
-Select entropy pooling weights according to the specified algorithm.
-
-`get_epw` returns the appropriate weights for entropy pooling based on the chosen algorithm. For `H1_EntropyPooling`, it returns the initial prior weights `w0`. For `H2_EntropyPooling`, it returns the updated weights `wi`. This function is used internally to manage the flow of weights in multi-stage entropy pooling routines.
-
-# Arguments
-
-  - `alg`: Entropy pooling algorithm .
-  - `w0`: Initial prior weights.
-  - `wi`: Updated weights from previous step.
-
-# Returns
-
-  - `w::AbstractWeights`: Selected weights for the current entropy pooling step.
-
-# Examples
-
-```jldoctest
-julia> using StatsBase
-
-julia> w0 = pweights([0.25, 0.25, 0.25, 0.25]);
-
-julia> wi = pweights([0.1, 0.2, 0.3, 0.4]);
-
-julia> PortfolioOptimisers.get_epw(H1_EntropyPooling(), w0, wi)
-4-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
- 0.25
- 0.25
- 0.25
- 0.25
-
-julia> PortfolioOptimisers.get_epw(H2_EntropyPooling(), w0, wi)
-4-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
- 0.1
- 0.2
- 0.3
- 0.4
-```
-
-# Related
-
-  - [`H0_EntropyPooling`](@ref)
-  - [`H1_EntropyPooling`](@ref)
-  - [`H2_EntropyPooling`](@ref)
-  - [`EntropyPoolingPrior`](@ref)
-"""
-function get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
-    return w0
-end
-function get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
-    return wi
-end
-"""
     struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
         args::T1
         kwargs::T2
@@ -2097,8 +2042,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
         fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
         w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
-                                  get_epw(pe.alg, w0, w1), pe.opt, pe.ds_opt, pe.dm_opt;
-                                  strict = strict)
+                                  ifelse(isa(pe.alg, H1_EntropyPooling), w0, w1), pe.opt,
+                                  pe.ds_opt, pe.dm_opt; strict = strict)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
@@ -2122,8 +2067,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
             fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
         end
         w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
-                                  get_epw(pe.alg, w0, w1), pe.opt, pe.ds_opt, pe.dm_opt;
-                                  strict = strict)
+                                  ifelse(isa(pe.alg, H1_EntropyPooling), w0, w1), pe.opt,
+                                  pe.ds_opt, pe.dm_opt; strict = strict)
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end

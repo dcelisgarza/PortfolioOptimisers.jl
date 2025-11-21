@@ -24,7 +24,6 @@ prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <
 AbstractEntropyPoolingOptimiser
 AbstractEntropyPoolingAlgorithm
 AbstractEntropyPoolingOptAlgorithm
-get_epw
 add_ep_constraint!
 replace_prior_views
 get_pr_value
