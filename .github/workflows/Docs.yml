@@ -63,7 +63,7 @@ jobs:
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
             using PortfolioOptimisers
-            DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers); recursive=true)
+            DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers, StatsBase); recursive=true)
             doctest(PortfolioOptimisers)'
         env:
           JULIA_PKG_SERVER: ""
