@@ -12,13 +12,7 @@ All concrete types representing the result of a JuMP model optimisation should s
 abstract type AbstractJuMPResult <: AbstractResult end
 """
     const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
-                                       <:AbstractVector{<:Pair{<:AbstractString, <:Any}},
-                                       <:SubArray{<:Pair{<:AbstractString, <:Any}, 0,
-                                                  <:AbstractVector{<:Pair{<:AbstractString,
-                                                                          <:Any}}},
-                                       <:SubArray{<:Pair{<:AbstractString, <:Any}, 1,
-                                                  <:AbstractVector{<:Pair{<:AbstractString,
-                                                                          <:Any}}}}
+                                       <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
 
 Alias for a dictionary or vector of pairs with string keys.
 
@@ -31,13 +25,7 @@ Represents solver settings as either a dictionary mapping strings to values, or 
   - [`set_solver_attributes`](@ref)
 """
 const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Any}},
-                                   <:SubArray{<:Pair{<:AbstractString, <:Any}, 0,
-                                              <:AbstractVector{<:Pair{<:AbstractString,
-                                                                      <:Any}}},
-                                   <:SubArray{<:Pair{<:AbstractString, <:Any}, 1,
-                                              <:AbstractVector{<:Pair{<:AbstractString,
-                                                                      <:Any}}}}
+                                   <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
 """
     const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
 

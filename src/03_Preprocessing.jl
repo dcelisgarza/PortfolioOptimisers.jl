@@ -234,10 +234,10 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┴ nothing
 
-julia> PortfolioOptimisers.returns_result_view(rd, 2)
+julia> PortfolioOptimisers.returns_result_view(rd, 2:2)
 ReturnsResult
-    nx ┼ SubArray{String, 0, Vector{String}, Tuple{Int64}, true}: fill("B")
-     X ┼ SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}: [0.2, 0.4]
+    nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
+     X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, UnitRange{Int64}}, true}
     nf ┼ nothing
      F ┼ nothing
     ts ┼ nothing
