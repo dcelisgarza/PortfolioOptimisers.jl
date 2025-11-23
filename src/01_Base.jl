@@ -4,7 +4,10 @@
 Abstract supertype for all estimator types in PortfolioOptimisers.jl.
 
 All custom estimators (e.g., for moments, risk, or priors) should subtype `AbstractEstimator`.
+
 This enables a consistent interface for estimation routines throughout the package.
+
+Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different characteristics, to entirely different methodologies or algorithms yielding different results. Results are often encapsulated in result types, this simplifies dispatch and usage.
 
 # Related
 
@@ -15,10 +18,13 @@ abstract type AbstractEstimator end
 """
     abstract type AbstractAlgorithm end
 
-Abstract supertype for all algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
 
 All algorithms (e.g., solvers, metaheuristics) should subtype `AbstractAlgorithm`.
+
 This allows for flexible extension and dispatch of routines.
+
+Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details or entirely different procedures.
 
 # Related
 
@@ -29,10 +35,13 @@ abstract type AbstractAlgorithm end
 """
     abstract type AbstractResult end
 
-Abstract supertype for all result types returned by optimizers in PortfolioOptimisers.jl.
+Abstract supertype for all result types returned by optimizers in `PortfolioOptimisers.jl`.
 
 All result objects (e.g., optimization outputs, solution summaries) should subtype `AbstractResult`.
+
 This ensures a unified interface for accessing results across different estimators and algorithms.
+
+Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a variety of information.
 
 # Related
 
@@ -41,34 +50,9 @@ This ensures a unified interface for accessing results across different estimato
 """
 abstract type AbstractResult end
 """
-    abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
-
-Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
-
-All concrete types that implement covariance estimation (e.g., sample covariance, shrinkage estimators) should subtype `AbstractCovarianceEstimator`. This enables a consistent interface for covariance estimation routines throughout the package.
-
-# Related
-
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
-  - [`AbstractMomentAlgorithm`](@ref)
-"""
-abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
-"""
-    abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-
-Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
-
-All concrete types that implement variance estimation (e.g., sample variance, robust variance estimators) should subtype `AbstractVarianceEstimator`. This enables a consistent interface for variance estimation routines and allows for flexible extension and dispatch within the package.
-
-# Related
-
-  - [`AbstractCovarianceEstimator`](@ref)
-"""
-abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-"""
     @define_pretty_show(T)
 
-Macro to define a custom pretty-printing `Base.show` method for types in PortfolioOptimisers.jl.
+Macro to define a custom pretty-printing `Base.show` method for types in `PortfolioOptimisers.jl`.
 
 This macro generates a `show` method that displays the type name and all fields in a readable, aligned format. For fields that are themselves custom types or collections, the macro recursively applies pretty-printing for nested structures. Handles compact and multiline IO contexts gracefully.
 
@@ -98,7 +82,7 @@ This macro generates a `show` method that displays the type name and all fields 
 """
 macro define_pretty_show(T)
     quote
-        function Base.show(io::IO, obj::$(esc(T)))
+        function Base.show(io::IO, obj::$T)
             fields = propertynames(obj)
             if isempty(fields)
                 return print(io, string(typeof(obj), "()"), '\n')
@@ -152,21 +136,37 @@ macro define_pretty_show(T)
         end
     end
 end
+"""
+    has_pretty_show_method(::Any)
+
+Default method indicating whether a type has a custom pretty-printing `show` method.
+
+# Arguments
+
+  - `::Any`: Any type.
+
+# Returns
+
+  - `flag::Bool`: `false` by default, indicating no custom pretty-printing method.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+"""
 has_pretty_show_method(::Any) = false
 has_pretty_show_method(::JuMP.Model) = true
 has_pretty_show_method(::Clustering.Hclust) = true
 function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                        <:AbstractResult, <:AbstractCovarianceEstimator})
+                                        <:AbstractResult})
     return true
 end
-@define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                          <:AbstractCovarianceEstimator})
+@define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
 """
     abstract type PortfolioOptimisersError <: Exception end
 
-Abstract supertype for all custom exception types in PortfolioOptimisers.jl.
+Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
 
-All error types specific to PortfolioOptimisers.jl should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
+All error types specific to `PortfolioOptimisers.jl` should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
 
 # Related Types
 
