@@ -1,4 +1,4 @@
-@safetestset begin
+@safetestset "Docs completeness" begin
     using PortfolioOptimisers, Test
 
     all_symbols = names(PortfolioOptimisers; all = true)
