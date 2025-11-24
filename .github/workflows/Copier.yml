@@ -9,7 +9,7 @@ jobs:
   Copier:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           token: ${{ secrets.COPIER_PAT }}
       - uses: julia-actions/setup-julia@v2
