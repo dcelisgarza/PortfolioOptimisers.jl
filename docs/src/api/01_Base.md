@@ -23,6 +23,10 @@ has_pretty_show_method
 
 ## Error types
 
+Many of the types defined in `PortfolioOptimisers.jl` make use of extensive data validatin to ensure values meet various criteria. This simplifies the implementation of methods, and improves performance and by delegating as many checks as possible to variable instantiation. In cases where validation cannot be performed at variable instantiation, they are performed as soon as possible within functions.
+
+`PortfolioOptimisers.jl` aims to catch potential data validation issues as soon as possible and in an informative manner, in order to do so it makes use of a few custom error types.
+
 ```@docs
 PortfolioOptimisersError
 IsNothingError
@@ -30,9 +34,12 @@ IsEmptyError
 IsNonFiniteError
 ```
 
-## Private
+## Base type aliases
+
+`PortfolioOptimisers.jl` heavily relies on `Julia`'s dispatch and type system to ensure data validity. Many custom types and functions/methods can accept different datatypes. These can be represented as type unions, many of which are used throughout the library. The following type aliases centralise these union definitions, improve correctness and maintainability.
 
 ```@docs
+Option{T}
 VecNum
 VecInt
 MatNum
@@ -52,7 +59,6 @@ VecMatNum
 VecStr
 VecPair
 VecJuMPScalar
-Option{T}
 MatNum_VecMatNum
 Int_VecInt
 VecNum_VecVecNum
