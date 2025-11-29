@@ -263,9 +263,9 @@ function returns_result_view(rd::ReturnsResult, i)
 end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
-                      iv::Option{<:TimeArray} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
-                      ret_method::Symbol = :simple, padding::Bool = false,
-                      missing_col_percent::Number = 1.0,
+                      Rb::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
+                      ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
+                      padding::Bool = false, missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
                       map_func::Option{<:Function} = nothing, join_method::Symbol = :outer,
                       impute_method::Option{<:Impute.Imputor} = nothing)
@@ -278,6 +278,7 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
 
   - `X`: Asset price data (timestamps × assets).
   - `F`: Optional Factor price data (timestamps × factors).
+  - `Rb`: Optional Benchmark price data (timestamps × assets) or (timestamps × 1).
   - `iv`: Optional Implied volatility data.
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
@@ -332,6 +333,7 @@ ReturnsResult
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
+                           Rb::Option{<:TimeArray} = nothing,
                            iv::Option{<:TimeArray} = nothing,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
@@ -384,8 +386,16 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     X = X[!, [true; keep_cols]]
     select!(X, Not(names(X, Missing)))
     dropmissing!(X)
-    X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
-                                padding = padding))
+    X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
+    println(timestamp(X))
+    if !isnothing(Rb)
+        @argcheck(timestamp(X) == timestamp(Rb))
+        Rb_v = values(Rb)
+        X_v = values(X)
+        X = TimeArray(isa(Rb_v, AbstractMatrix) ? X_v - Rb_v : X_v .- Rb_v;
+                      timestamp = :timestamp)
+    end
+    X = DataFrame(X)
     col_names = names(X)
     nx = intersect(col_names, asset_names)
     nf = intersect(col_names, factor_names)

@@ -29,7 +29,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         te::TrackingError{<:Any, <:Any, <:SOCTracking},
+                                         te::TrackingError{<:Any, <:Any,
+                                                           <:Union{<:SOCTracking,
+                                                                   <:SquaredSOCTracking}},
                                          args...; kwargs...)
     X = pr.X
     k = model[:k]

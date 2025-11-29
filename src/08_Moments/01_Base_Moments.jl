@@ -117,17 +117,31 @@ This function attempts to compute the weighted covariance matrix using the provi
 """
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
+    #=
     return try
         cov(ce, X; dims = dims, mean = mean, kwargs...)
     catch
         cov(ce, X; dims = dims, mean = mean)
     end
+    =#
+    return if hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
+        cov(ce, X; dims = dims, mean = mean, kwargs...)
+    elseif hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean))
+        cov(ce, X; dims = dims, mean = mean)
+    end
 end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWeights;
                     dims::Int = 1, mean = nothing, kwargs...)
+    #=
     return try
         cov(ce, X, w; dims = dims, mean = mean, kwargs...)
     catch
+        cov(ce, X, w; dims = dims, mean = mean)
+    end
+    =#
+    return if hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
+        cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+    elseif hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean))
         cov(ce, X, w; dims = dims, mean = mean)
     end
 end
@@ -160,6 +174,7 @@ This function attempts to compute the weighted correlation matrix using the prov
 """
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
+    #=
     return try
         try
             cor(ce, X; dims = dims, mean = mean, kwargs...)
@@ -175,9 +190,24 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
         end
         sigma
     end
+    =#
+    return if hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
+        cor(ce, X; dims = dims, mean = mean, kwargs...)
+    elseif hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean))
+        cor(ce, X; dims = dims, mean = mean)
+    else
+        sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
+        if ismutable(sigma)
+            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+        else
+            sigma = StatsBase.cov2cor(Matrix(sigma))
+        end
+        sigma
+    end
 end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWeights;
                     dims::Int = 1, mean = nothing, kwargs...)
+    #=
     return try
         try
             cor(ce, X, w; dims = dims, mean = mean, kwargs...)
@@ -185,6 +215,20 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWei
             cor(ce, X, w; dims = dims, mean = mean)
         end
     catch
+        sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        if ismutable(sigma)
+            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+        else
+            sigma = StatsBase.cov2cor(Matrix(sigma))
+        end
+        sigma
+    end
+    =#
+    return if hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
+        cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+    elseif hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean))
+        cor(ce, X, w; dims = dims, mean = mean)
+    else
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
             StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))

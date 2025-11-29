@@ -82,6 +82,7 @@ All concrete types representing norm-based tracking algorithms (such as second-o
 
   - [`TrackingFormulation`](@ref)
   - [`SOCTracking`](@ref)
+  - [`SquaredSOCTracking`](@ref)
   - [`NOCTracking`](@ref)
 """
 abstract type NormTracking <: TrackingFormulation end
@@ -131,6 +132,7 @@ SOCTracking
 # Related
 
   - [`NormTracking`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
   - [`NOCTracking`](@ref)
   - [`norm_tracking`](@ref)
 """
@@ -143,6 +145,56 @@ struct SOCTracking{T1} <: NormTracking
 end
 function SOCTracking(; ddof::Integer = 1)
     return SOCTracking(ddof)
+end
+"""
+    struct SquaredSOCTracking{T1} <: NormTracking
+        ddof::T1
+    end
+
+Second-order cone (SOC) squared norm-based tracking formulation.
+
+`SquaredSOCTracking` implements a norm-based tracking error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation where squared error is preferred.
+
+# Fields
+
+  - `ddof`: Degrees of freedom adjustment for scaling.
+
+# Constructors
+
+```julia
+SquaredSOCTracking(; ddof::Integer = 1)
+```
+
+  - `ddof`: Sets the degrees of freedom adjustment.
+
+## Validation
+
+  - `ddof > 0`.
+
+# Examples
+
+```jldoctest
+julia> SquaredSOCTracking()
+SquaredSOCTracking
+  ddof ┴ Int64: 1
+```
+
+# Related
+
+  - [`NormTracking`](@ref)
+  - [`SOCTracking`](@ref)
+  - [`NOCTracking`](@ref)
+  - [`norm_tracking`](@ref)
+"""
+struct SquaredSOCTracking{T1} <: NormTracking
+    ddof::T1
+    function SquaredSOCTracking(ddof::Integer)
+        @argcheck(zero(ddof) < ddof, DomainError)
+        return new{typeof(ddof)}(ddof)
+    end
+end
+function SquaredSOCTracking(; ddof::Integer = 1)
+    return SquaredSOCTracking(ddof)
 end
 """
     struct NOCTracking <: NormTracking end
@@ -162,11 +214,13 @@ NOCTracking()
 
   - [`NormTracking`](@ref)
   - [`SOCTracking`](@ref)
+  - [`SquaredSOCTracking`](@ref)
   - [`norm_tracking`](@ref)
 """
 struct NOCTracking <: NormTracking end
 """
     norm_tracking(f::SOCTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::SquaredSOCTracking, a, b; N::Option{<:Number} = nothing)
     norm_tracking(::NOCTracking, a, b; N::Option{<:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
@@ -209,6 +263,11 @@ julia> PortfolioOptimisers.norm_tracking(NOCTracking(), [0.5, 0.5], [0.6, 0.4], 
 function norm_tracking(f::SOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
     return norm(a - b, 2) / factor
+end
+function norm_tracking(f::SquaredSOCTracking, a, b, N::Option{<:Number} = nothing)
+    factor = isnothing(N) ? 1 : (N - f.ddof)
+    val = norm(a - b, 2)
+    return val^2 / factor
 end
 function norm_tracking(::NOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = ifelse(isnothing(N), 1, N)
@@ -817,5 +876,5 @@ function factory(tr::TrackingError, w::VecNum)
     return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
 end
 
-export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
-       WeightsTracking, ReturnsTracking, TrackingError
+export SOCTracking, SquaredSOCTracking, NOCTracking, IndependentVariableTracking,
+       DependentVariableTracking, WeightsTracking, ReturnsTracking, TrackingError

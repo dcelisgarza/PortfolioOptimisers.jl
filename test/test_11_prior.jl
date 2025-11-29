@@ -972,7 +972,7 @@
                                                                     kt_views = kt_views,
                                                                     sk_views = sk_views,
                                                                     opt = opt)), rd)
-        @test pr.mu[1] <= 0.75 * pr0.mu[1]
+        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1])
         @test pr.mu[end] >= 0.4 * pr0.mu[end]
         @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)

@@ -4,6 +4,7 @@
 
 ```@docs
 SOCTracking
+SquaredSOCTracking
 NOCTracking
 IndependentVariableTracking
 DependentVariableTracking

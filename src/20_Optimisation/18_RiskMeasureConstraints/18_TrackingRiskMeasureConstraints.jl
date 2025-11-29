@@ -19,8 +19,28 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+function set_tracking_skewness_risk!(model::JuMP.Model,
+                                     r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
+                                     opt::RiskJuMPOptimisationEstimator,
+                                     tracking_risk::AbstractJuMPScalar, key::Symbol)
+    set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
+    return tracking_risk
+end
+function set_tracking_skewness_risk!(model::JuMP.Model,
+                                     r::TrackingRiskMeasure{<:Any, <:Any,
+                                                            <:SquaredSOCTracking},
+                                     opt::RiskJuMPOptimisationEstimator,
+                                     tracking_risk::AbstractJuMPScalar, key::Symbol)
+    qtracking_risk = model[Symbol(:sq_, key)] = @expression(model, tracking_risk^2)
+    ub = variance_risk_bounds_val(false, r.settings.ub)
+    set_risk_upper_bound!(model, opt, tracking_risk, ub, key)
+    set_risk_expression!(model, qtracking_risk, r.settings.scale, r.settings.rke)
+    return qtracking_risk
+end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any,
+                                                      <:Union{<:SOCTracking,
+                                                              <:SquaredSOCTracking}},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -37,8 +57,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                       [sc * t_tracking_risk;
                                                        sc * tracking_r] in
                                                       SecondOrderCone())
-    set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
-    return tracking_risk
+    return set_tracking_skewness_risk!(model, r, opt, tracking_risk, key)
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
