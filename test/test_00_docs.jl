@@ -1,6 +1,5 @@
 @safetestset "Docs completeness" begin
     using PortfolioOptimisers, Test
-
     all_symbols = names(PortfolioOptimisers; all = true)
     filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
     no_docs = Symbol[]
@@ -11,5 +10,5 @@
             push!(no_docs, sym)
         end
     end
-    @test length(no_docs) == 346
+    @test length(no_docs) == 347
 end

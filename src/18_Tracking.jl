@@ -68,6 +68,7 @@ All concrete types representing tracking formulation algorithms (such as norm-ba
   - [`NormTracking`](@ref)
   - [`VariableTracking`](@ref)
   - [`SOCTracking`](@ref)
+  - [`SquaredSOCTracking`](@ref)
   - [`NOCTracking`](@ref)
 """
 abstract type TrackingFormulation <: AbstractAlgorithm end
@@ -119,7 +120,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 ## Validation
 
-  - `ddof > 0`.
+  - `0 <= ddof`.
 
 # Examples
 
@@ -139,7 +140,7 @@ SOCTracking
 struct SOCTracking{T1} <: NormTracking
     ddof::T1
     function SOCTracking(ddof::Integer)
-        @argcheck(zero(ddof) < ddof, DomainError)
+        @argcheck(zero(ddof) <= ddof, DomainError)
         return new{typeof(ddof)}(ddof)
     end
 end
@@ -169,7 +170,7 @@ SquaredSOCTracking(; ddof::Integer = 1)
 
 ## Validation
 
-  - `ddof > 0`.
+  - `0 <= ddof`.
 
 # Examples
 
@@ -189,7 +190,7 @@ SquaredSOCTracking
 struct SquaredSOCTracking{T1} <: NormTracking
     ddof::T1
     function SquaredSOCTracking(ddof::Integer)
-        @argcheck(zero(ddof) < ddof, DomainError)
+        @argcheck(zero(ddof) <= ddof, DomainError)
         return new{typeof(ddof)}(ddof)
     end
 end
@@ -225,7 +226,7 @@ struct NOCTracking <: NormTracking end
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
-`norm_tracking` calculates the tracking error using either the Euclidean (L2) norm for [`SOCTracking`](@ref) or the L1 (norm-one) distance for [`NOCTracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+`norm_tracking` calculates the tracking error using either the Euclidean (L2) norm for [`SOCTracking`](@ref), squared Euclidean (L2) norm for [`SquaredSOCTracking`](@ref), or the L1 (norm-one) distance for [`NOCTracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
 
 # Arguments
 
@@ -241,6 +242,7 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 # Details
 
   - For `SOCTracking`, computes `norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is provided, else unscaled.
+  - For `SquaredSOCTracking`, computes `norm(a - b, 2)^2 / (N - f.ddof)` if `N` is provided, else unscaled.
   - For `NOCTracking`, computes `norm(a - b, 1) / N` if `N` is provided, else unscaled.
 
 # Examples

@@ -387,7 +387,6 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     select!(X, Not(names(X, Missing)))
     dropmissing!(X)
     X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
-    println(timestamp(X))
     if !isnothing(Rb)
         @argcheck(timestamp(X) == timestamp(Rb))
         Rb_v = values(Rb)
