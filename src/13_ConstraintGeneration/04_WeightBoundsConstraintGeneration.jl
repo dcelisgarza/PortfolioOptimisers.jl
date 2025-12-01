@@ -136,9 +136,10 @@ julia> PortfolioOptimisers.estimator_to_val(UniformlyDistributedBounds(), sets)
   - [`WeightBounds`](@ref)
 """
 struct UniformlyDistributedBounds <: CustomWeightBoundsAlgorithm end
-function estimator_to_val(::UniformlyDistributedBounds, sets::AssetSets, args...;
+function estimator_to_val(::UniformlyDistributedBounds, sets::AssetSets, ::Any,
+                          key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, kwargs...)
-    return datatype(inv(length(sets.dict[sets.key])))
+    return datatype(inv(length(sets.dict[ifelse(isnothing(key), sets.key, key)])))
 end
 """
     struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator

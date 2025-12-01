@@ -379,7 +379,7 @@ function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
     return nothing
 end
 """
-    estimator_to_val(dict::EstValType, sets::AssetSets; val::Option{<:Number}=nothing, strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::AssetSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -391,6 +391,7 @@ The function creates the vector and sets the values for assets or groups as spec
   - `dict`: A dictionary, vector of pairs, or single pair mapping asset or group names to values.
   - `sets`: The [`AssetSets`](@ref) containing the asset universe and group definitions.
   - `val`: The default value to assign to assets not specified in `dict`.
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
   - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning.
 
 # Details
@@ -417,10 +418,11 @@ The function creates the vector and sets the values for assets or groups as spec
   - [`estimator_to_val`](@ref)
 """
 function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
-                          val::Option{<:Number} = nothing; datatype::DataType = Float64,
-                          strict::Bool = false)
+                          val::Option{<:Number} = nothing,
+                          key::Option{<:AbstractString} = nothing;
+                          datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nx = sets.dict[sets.key]
+    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
     arr = fill(val, length(nx))
     for (key, val) in dict
         if key in nx
@@ -432,10 +434,11 @@ function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
     return arr
 end
 function estimator_to_val(dict::PairStrNum, sets::AssetSets,
-                          val::Option{<:Number} = nothing; datatype::DataType = Float64,
-                          strict::Bool = false)
+                          val::Option{<:Number} = nothing,
+                          key::Option{<:AbstractString} = nothing;
+                          datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nx = sets.dict[sets.key]
+    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
     arr = fill(val, length(nx))
     key, val = dict
     if key in nx
@@ -499,8 +502,10 @@ This method checks that the input vector `val` matches the length of the asset u
   - [`AssetSets`](@ref)
   - [`group_to_val!`](@ref)
 """
-function estimator_to_val(val::VecNum, sets::AssetSets, args...; kwargs...)
-    @argcheck(length(val) == length(sets.dict[sets.key]), DimensionMismatch)
+function estimator_to_val(val::VecNum, sets::AssetSets, ::Any,
+                          key::Option{<:AbstractString} = nothing; kwargs...)
+    @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
+              DimensionMismatch)
     return val
 end
 """
@@ -1097,8 +1102,9 @@ function replace_group_by_assets(res::VecPR, sets::AssetSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
-    get_linear_constraints(lcs::PR_VecPR,
-                           sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
+    get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
+                           key::Option{<:AbstractString} = nothing;
+                           datatype::DataType = Float64, strict::Bool = false)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
 
@@ -1130,7 +1136,8 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
 """
-function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets;
+function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
+                                key::Option{<:AbstractString} = nothing;
                                 datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs), IsEmptyError)
@@ -1139,7 +1146,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets;
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    nx = sets.dict[sets.key]
+    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
     At = Vector{datatype}(undef, length(nx))
     for lc in lcs
         fill!(At, zero(eltype(At)))
@@ -1185,8 +1192,9 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets;
     end
 end
 """
-    struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
+    struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
         val::T1
+        key::T2
     end
 
 Container for one or more linear constraint equations to be parsed and converted into constraint matrices.
@@ -1194,10 +1202,11 @@ Container for one or more linear constraint equations to be parsed and converted
 # Fields
 
   - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
 
 # Constructor
 
-    LinearConstraintEstimator(; val::EqnType)
+    LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -1229,17 +1238,22 @@ LinearConstraint
   - [`parse_equation`](@ref)
   - [`linear_constraints`](@ref)
 """
-struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
+struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
-    function LinearConstraintEstimator(val::EqnType)
+    key::T2
+    function LinearConstraintEstimator(val::EqnType,
+                                       key::Option{<:AbstractString} = nothing)
         if isa(val, Str_Vec)
             @argcheck(!isempty(val))
         end
-        return new{typeof(val)}(val)
+        if !isnothing(key)
+            @argcheck(!isempty(key))
+        end
+        return new{typeof(val), typeof(key)}(val, key)
     end
 end
-function LinearConstraintEstimator(; val::EqnType)
-    return LinearConstraintEstimator(val)
+function LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
+    return LinearConstraintEstimator(val, key)
 end
 const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
 const VecLcE_Lc = AbstractVector{<:LcE_Lc}
@@ -1275,6 +1289,7 @@ end
 """
     linear_constraints(eqn::EqnType,
                        sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+                       key::Option{<:AbstractString} = nothing;
                        ops2::Tuple = (:call, :(==), :(<=), :(>=)), datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false)
 
@@ -1328,13 +1343,15 @@ LinearConstraint
   - [`AssetSets`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(eqn::EqnType, sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+function linear_constraints(eqn::EqnType, sets::AssetSets,
+                            key::Option{<:AbstractString} = nothing;
+                            ops1::Tuple = ("==", "<=", ">="),
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false)
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
-    return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
+    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
 end
 """
     linear_constraints(lcs::LcE_VecLcE,
@@ -1345,7 +1362,7 @@ If `lcs` is a vector of [`LinearConstraintEstimator`](@ref) objects, this functi
 
 This method is a wrapper calling:
 
-    linear_constraints(lcs.val, sets; datatype = datatype, strict = strict, bl_flag = bl_flag)
+    linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict, bl_flag = bl_flag)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
 
@@ -1356,7 +1373,7 @@ It is used for type stability and to provide a uniform interface for processing 
 function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false)
-    return linear_constraints(lcs.val, sets; datatype = datatype, strict = strict,
+    return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
 function linear_constraints(lcs::VecLcE, sets::AssetSets; datatype::DataType = Float64,

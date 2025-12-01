@@ -56,18 +56,21 @@ BuyInThresholdEstimator
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
-struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
+struct BuyInThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
     val::T1
     dval::T2
+    key::T3
     function BuyInThresholdEstimator(val::EstValType_CustWb,
-                                     dval::Option{<:Number} = nothing)
+                                     dval::Option{<:Number} = nothing,
+                                     key::Option{<:AbstractString} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
-        return new{typeof(val), typeof(dval)}(val, dval)
+        return new{typeof(val), typeof(dval), typeof(key)}(val, dval, key)
     end
 end
-function BuyInThresholdEstimator(; val::EstValType_CustWb, dval::Option{<:Number} = nothing)
-    return BuyInThresholdEstimator(val, dval)
+function BuyInThresholdEstimator(; val::EstValType_CustWb, dval::Option{<:Number} = nothing,
+                                 key::Option{<:AbstractString} = nothing)
+    return BuyInThresholdEstimator(val, dval, key)
 end
 """
     struct BuyInThreshold{T1} <: AbstractConstraintResult
@@ -128,7 +131,7 @@ function threshold_view(::Nothing, ::Any)
 end
 function threshold_view(t::BuyInThresholdEstimator, i)
     return BuyInThresholdEstimator(; val = nothing_scalar_array_view(t.val, i),
-                                   dval = t.dval)
+                                   dval = t.dval, key = t.key)
 end
 function threshold_view(t::BuyInThreshold, i)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
@@ -219,8 +222,8 @@ BuyInThreshold
 function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                                datatype::DataType = Float64, strict::Bool = false)
     return BuyInThreshold(;
-                          val = estimator_to_val(t.val, sets, t.dval; datatype = datatype,
-                                                 strict = strict))
+                          val = estimator_to_val(t.val, sets, t.dval, t.key;
+                                                 datatype = datatype, strict = strict))
 end
 """
     threshold_constraints(t::VecOptBtE_Bt, sets::AssetSets;
