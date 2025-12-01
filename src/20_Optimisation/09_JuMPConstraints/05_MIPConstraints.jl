@@ -370,17 +370,13 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
             A = gcard.ineq.A
             B = gcard.ineq.B
             model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
-                                                          sc *
-                                                          (A * transpose(smtx) * sib ⊖ B) <=
-                                                          0)
+                                                          sc * (A * sib ⊖ B) <= 0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
             model[Symbol(:sgcard_eq_, i)] = @constraint(model,
-                                                        sc *
-                                                        (A * transpose(smtx) * sib ⊖ B) ==
-                                                        0)
+                                                        sc * (A * sib ⊖ B) == 0)
         end
     end
     return nothing
@@ -450,15 +446,13 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
         A = gcard.ineq.A
         B = gcard.ineq.B
         model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
-                                                      sc *
-                                                      (A * transpose(smtx) * sib ⊖ B) <= 0)
+                                                      sc * (A * sib ⊖ B) <= 0)
     end
     if !isnothing(gcard.eq)
         A = gcard.eq.A
         B = gcard.eq.B
         model[Symbol(:sgcard_eq_, i)] = @constraint(model,
-                                                    sc * (A * transpose(smtx) * sib ⊖ B) ==
-                                                    0)
+                                                    sc * (A * sib ⊖ B) == 0)
     end
     return nothing
 end
