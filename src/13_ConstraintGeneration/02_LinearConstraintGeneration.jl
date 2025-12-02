@@ -237,9 +237,10 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     end
 end
 """
-    struct AssetSets{T1, T2} <: AbstractEstimator
+    struct AssetSets{T1, T2, T3} <: AbstractEstimator
         key::T1
-        dict::T2
+        ukey::T2
+        dict::T3
     end
 
 Container for asset set and group information used in constraint generation.
@@ -250,20 +251,26 @@ If a key in `dict` starts with the same value as `key`, it means that the corres
 
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets.
+  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` must have the same length as `dict[key]` as their lengths are preserved across views.
+  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalent group prefixed by `key` with the same length as `dict[key]` as that group will be used to find the unique entries for the view.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
 # Constructor
 
-    AssetSets(; key::AbstractString = "nx", dict::AbstractDict{<:AbstractString, <:Any})
+    AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
+              dict::AbstractDict{<:AbstractString, <:Any})
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`. This means their lengths will be congruent when used in the `opti` field of [`NestedClustered`](@ref).
   - `!isempty(dict)`.
   - `haskey(dict, key)`.
+  - `key !== ukey`.
+  - `!startswith(key, ukey)`.
+  - `!startswith(ukey, key)`.
+  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`.
+  - If a key in `dict` starts with the same value as `ukey`, there must be a corresponding key in `dict` where the `ukey` prefix is replaced by the `key` prefix, and `length(dict[replace(k, ukey => key)]) == length(dict[key])`.
 
 # Examples
 
@@ -271,6 +278,7 @@ Keyword arguments correspond to the fields above.
 julia> AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]))
 AssetSets
    key ┼ String: "nx"
+  ukey ┼ String: "ux"
   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
@@ -280,39 +288,47 @@ AssetSets
   - [`estimator_to_val`](@ref)
   - [`linear_constraints`](@ref)
 """
-struct AssetSets{T1, T2} <: AbstractEstimator
+struct AssetSets{T1, T2, T3} <: AbstractEstimator
     key::T1
-    dict::T2
-    function AssetSets(key::AbstractString, dict::AbstractDict{<:AbstractString, <:Any})
+    ukey::T2
+    dict::T3
+    function AssetSets(key::AbstractString, ukey::AbstractString,
+                       dict::AbstractDict{<:AbstractString, <:Any})
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, key), KeyError)
-        for k in keys(dict)
-            if k == key
-                continue
-            elseif startswith(k, key)
+        @argcheck(key !== ukey, ValueError)
+        @argcheck(!startswith(key, ukey))
+        @argcheck(!startswith(ukey, key))
+        for k in setdiff(keys(dict), (key,))
+            if startswith(k, key)
                 @argcheck(length(dict[k]) == length(dict[key]), DimensionMismatch)
+            elseif startswith(k, ukey)
+                tmp_key = replace(k, ukey => key)
+                @argcheck(haskey(dict, tmp_key), KeyError)
+                @argcheck(length(dict[tmp_key]) == length(dict[key]), DimensionMismatch)
             end
         end
-        return new{typeof(key), typeof(dict)}(key, dict)
+        return new{typeof(key), typeof(ukey), typeof(dict)}(key, ukey, dict)
     end
 end
-function AssetSets(; key::AbstractString = "nx",
+function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
                    dict::AbstractDict{<:AbstractString, <:Any})
-    return AssetSets(key, dict)
+    return AssetSets(key, ukey, dict)
 end
 function nothing_asset_sets_view(sets::AssetSets, i)
     key = sets.key
+    ukey = sets.ukey
     dict = typeof(sets.dict)()
-    dict[key] = view(sets.dict[key], i)
     for (k, v) in sets.dict
-        if k == key
-            continue
-        elseif startswith(k, key)
+        if startswith(k, key)
             v = view(v, i)
+        elseif startswith(k, ukey)
+            tmp_key = replace(k, ukey => key)
+            v = unique(view(sets.dict[tmp_key], i))
         end
         push!(dict, k => v)
     end
-    return AssetSets(; key = key, dict = dict)
+    return AssetSets(; key = key, ukey = ukey, dict = dict)
 end
 """
     nothing_asset_sets_view(::Nothing, ::Any)
@@ -1667,7 +1683,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> sets = AssetSets(; key = "nx",
                         dict = Dict("nx" => ["A", "B", "C"],
-                                    "sector" => ["Tech", "Tech", "Finance"]));
+                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
 
 julia> est = AssetSetsMatrixEstimator(; val = "sector")
 AssetSetsMatrixEstimator
@@ -1730,9 +1746,9 @@ Construct a binary asset-group membership matrix from asset set groupings.
 ```jldoctest
 julia> sets = AssetSets(; key = "nx",
                         dict = Dict("nx" => ["A", "B", "C"],
-                                    "sector" => ["Tech", "Tech", "Finance"]));
+                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
 
-julia> asset_sets_matrix("sector", sets)
+julia> asset_sets_matrix("nx_sector", sets)
 2×3 transpose(::BitMatrix) with eltype Bool:
  1  1  0
  0  0  1

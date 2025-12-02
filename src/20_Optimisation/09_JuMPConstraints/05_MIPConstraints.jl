@@ -465,10 +465,9 @@ end
 function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                card::Option{<:Int_VecInt}, gcard::Option{<:Lc_VecLc},
                                smtx::Option{<:MatNum_VecMatNum},
-                               sgmtx::Option{<:MatNum_VecMatNum},
-                               lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
-                               glt::Option{<:BuyInThreshold}, gst::Option{<:BuyInThreshold},
-                               ss::Option{<:Number})
+                               sgmtx::Option{<:MatNum_VecMatNum}, lt::Option{<:Bt_VecOptBt},
+                               st::Option{<:Bt_VecOptBt}, glt::Option{<:Bt_VecOptBt},
+                               gst::Option{<:Bt_VecOptBt}, ss::Option{<:Number})
     if smtx === sgmtx
         set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss)
     else

@@ -145,8 +145,10 @@ all_industries = ["Energy", "Financials", "Health_Care", "Health_Care",
                   "Utilities", "Industrials", "Financials", "Materials",
                   "Telecommunications_Services", "Consumer_Discretionary", "Health_Care",
                   "Industrials", "Telecommunications_Services", "Financials"]
-sets = AssetSets(; dict = Dict("nx" => rd.nx, "nx_industries" => all_industries))
 unique_industries = unique(all_industries)
+sets = AssetSets(;
+                 dict = Dict("nx" => rd.nx, "nx_industries" => all_industries,
+                             "ux_industries" => unique_industries))
 idx = [all_industries .== i for i in unique_industries]
 for (i, ui) in zip(idx, unique_industries)
     sets.dict[ui] = sets.dict["nx"][i]
@@ -154,12 +156,12 @@ end
 m_idx = hcat(idx...)
 
 res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
 
 res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = mip_slv, card = 8)), rd)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
 
 res = optimise(MeanRisk(;
                         opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
@@ -168,8 +170,8 @@ res = optimise(MeanRisk(;
                                                                               val = :(nx ==
                                                                                       8)))),
                rd)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
 
 res = optimise(MeanRisk(;
                         opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
@@ -178,8 +180,8 @@ res = optimise(MeanRisk(;
                                                                               val = :(nx >=
                                                                                       20)))),
                rd; str_names = true)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
 
 res = optimise(MeanRisk(;
                         opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
@@ -189,8 +191,8 @@ res = optimise(MeanRisk(;
                                                                                       MMC <=
                                                                                       1)))),
                rd; str_names = true)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
 
 res = optimise(MeanRisk(;
                         opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
@@ -199,8 +201,8 @@ res = optimise(MeanRisk(;
                                                                               val = :(PSA <=
                                                                                       MSFT)))),
                rd; str_names = true)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
 
 res = optimise(MeanRisk(;
                         opt = JuMPOptimiser(; slv = mip_slv, lt = BuyInThreshold(0.02),
@@ -208,17 +210,17 @@ res = optimise(MeanRisk(;
                                             smtx = AssetSetsMatrixEstimator(;
                                                                             val = "nx_industries"),
                                             sets = sets)), rd; str_names = true)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
-
-#! fix this, probably adding an gsets parameter to jumpoptimiser
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
+sv = PortfolioOptimisers.nothing_asset_sets_view(sets, [2, 5, 10])
 res = optimise(MeanRisk(;
-                        opt = JuMPOptimiser(; slv = mip_slv, lt = BuyInThreshold(0.02),
-                                            sgcard = LinearConstraintEstimator(;
-                                                                               val = :(nx_industries <=
-                                                                                       5)),
-                                            sgmtx = AssetSetsMatrixEstimator(;
-                                                                             val = "nx_industries"),
+                        opt = JuMPOptimiser(; slv = mip_slv, sglt = [BuyInThreshold(0.01)],
+                                            sgcard = [LinearConstraintEstimator(;
+                                                                                key = "ux_industries",
+                                                                                val = [:(ux_industries ==
+                                                                                         9)])],
+                                            sgmtx = [AssetSetsMatrixEstimator(;
+                                                                              val = "nx_industries")],
                                             sets = sets)), rd; str_names = true)
-n_assets = count(round.(res.w, digits = 4) .> 0.0)
-n_industries = count(round.(m_idx' * res.w, digits = 4) .> 0)
+n_assets = count(round.(res.w; digits = 4) .> 0.0)
+n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
