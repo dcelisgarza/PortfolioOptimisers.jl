@@ -224,3 +224,54 @@ res = optimise(MeanRisk(;
                                             sets = sets)), rd; str_names = true)
 n_assets = count(round.(res.w; digits = 4) .> 0.0)
 n_industries = count(round.(m_idx' * res.w; digits = 4) .> 0)
+
+res = optimise(MeanRisk(;
+                        opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                            lt = BuyInThreshold(0.02),
+                                            gcard = LinearConstraintEstimator(;
+                                                                              val = :(5 *
+                                                                                      CNP +
+                                                                                      Financials <=
+                                                                                      5)))),
+               rd; str_names = true)
+
+res = optimise(MeanRisk(;
+                        opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                            lt = BuyInThreshold(0.02),
+                                            gcard = LinearConstraintEstimator(;
+                                                                              val = [:(5 *
+                                                                                       CNP +
+                                                                                       Financials <=
+                                                                                       5),
+                                                                                     :(5 *
+                                                                                       NI +
+                                                                                       Financials <=
+                                                                                       5)]))),
+               rd; str_names = true)
+
+res = optimise(MeanRisk(;
+                        opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                            lt = BuyInThreshold(0.05),
+                                            gcard = LinearConstraintEstimator(;
+                                                                              val = :(MSFT +
+                                                                                      Financials >=
+                                                                                      6)))),
+               rd; str_names = true)
+
+res = optimise(MeanRisk(;
+                        opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                            lt = BuyInThreshold(0.05),
+                                            gcard = LinearConstraintEstimator(;
+                                                                              val = [:(HPQ +
+                                                                                       Financials >=
+                                                                                       6),
+                                                                                     :(MSFT +
+                                                                                       Financials >=
+                                                                                       6)]))),
+               rd; str_names = true)
+
+[rd.nx sets.dict["nx_industries"] res.w]
+es = Dict()
+for e in sets.dict["nx_industries"]
+    push!(es, e => count(sets.dict["nx_industries"] .== e))
+end

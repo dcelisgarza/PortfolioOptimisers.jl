@@ -115,6 +115,7 @@ FactorBlackLittermanPrior
              │   key ┴ nothing
         sets ┼ AssetSets
              │    key ┼ String: "nx"
+             │   ukey ┼ String: "ux"
              │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
            w ┼ nothing

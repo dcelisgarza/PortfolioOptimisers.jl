@@ -111,7 +111,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
           │            pe ┼ EmpiricalPrior
           │               │        ce ┼ PortfolioOptimisersCovariance
           │               │           │   ce ┼ Covariance
@@ -143,6 +143,7 @@ OpinionPoolingPrior
           │    cvar_alpha ┼ nothing
           │          sets ┼ AssetSets
           │               │    key ┼ String: "nx"
+          │               │   ukey ┼ String: "ux"
           │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
           │        ds_opt ┼ nothing
           │        dm_opt ┼ nothing
@@ -186,6 +187,7 @@ OpinionPoolingPrior
           │    cvar_alpha ┼ nothing
           │          sets ┼ AssetSets
           │               │    key ┼ String: "nx"
+          │               │   ukey ┼ String: "ux"
           │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
           │        ds_opt ┼ nothing
           │        dm_opt ┼ nothing

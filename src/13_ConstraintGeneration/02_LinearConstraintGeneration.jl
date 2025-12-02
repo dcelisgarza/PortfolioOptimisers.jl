@@ -1685,9 +1685,9 @@ julia> sets = AssetSets(; key = "nx",
                         dict = Dict("nx" => ["A", "B", "C"],
                                     "nx_sector" => ["Tech", "Tech", "Finance"]));
 
-julia> est = AssetSetsMatrixEstimator(; val = "sector")
+julia> est = AssetSetsMatrixEstimator(; val = "nx_sector")
 AssetSetsMatrixEstimator
-  val ┴ String: "sector"
+  val ┴ String: "nx_sector"
 
 julia> asset_sets_matrix(est, sets)
 2×3 transpose(::BitMatrix) with eltype Bool:

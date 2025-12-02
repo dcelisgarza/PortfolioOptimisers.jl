@@ -440,6 +440,7 @@ EntropyPoolingPrior
    cvar_alpha ┼ nothing
          sets ┼ AssetSets
               │    key ┼ String: "nx"
+              │   ukey ┼ String: "ux"
               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
        ds_opt ┼ nothing
        dm_opt ┼ nothing

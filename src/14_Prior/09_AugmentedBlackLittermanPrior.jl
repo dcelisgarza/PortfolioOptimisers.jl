@@ -144,9 +144,11 @@ AugmentedBlackLittermanPrior
                │   key ┴ nothing
         a_sets ┼ AssetSets
                │    key ┼ String: "nx"
+               │   ukey ┼ String: "ux"
                │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
         f_sets ┼ AssetSets
                │    key ┼ String: "nx"
+               │   ukey ┼ String: "ux"
                │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
