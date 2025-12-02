@@ -191,12 +191,12 @@ function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::MatNum,
     sc = model[:sc]
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
-        lb = [sum(lb[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        lb = smtx * lb
         model[Symbol(key, :lb_, i)] = @constraint(model, sc * (smtx_expr - lb ⊙ is) >= 0)
     end
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
-        ub = [sum(ub[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        ub = smtx * ub
         model[Symbol(key, :ub_, i)] = @constraint(model, sc * (smtx_expr - ub ⊙ il) <= 0)
     end
     return nothing
