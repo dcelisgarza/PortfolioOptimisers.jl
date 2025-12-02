@@ -369,14 +369,12 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
-                                                          sc * (A * sib ⊖ B) <= 0)
+            model[Symbol(:sgcard_ineq_, i)] = @constraint(model, sc * (A * sib ⊖ B) <= 0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            model[Symbol(:sgcard_eq_, i)] = @constraint(model,
-                                                        sc * (A * sib ⊖ B) == 0)
+            model[Symbol(:sgcard_eq_, i)] = @constraint(model, sc * (A * sib ⊖ B) == 0)
         end
     end
     return nothing
@@ -445,14 +443,12 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
         B = gcard.ineq.B
-        model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
-                                                      sc * (A * sib ⊖ B) <= 0)
+        model[Symbol(:sgcard_ineq_, i)] = @constraint(model, sc * (A * sib ⊖ B) <= 0)
     end
     if !isnothing(gcard.eq)
         A = gcard.eq.A
         B = gcard.eq.B
-        model[Symbol(:sgcard_eq_, i)] = @constraint(model,
-                                                    sc * (A * sib ⊖ B) == 0)
+        model[Symbol(:sgcard_eq_, i)] = @constraint(model, sc * (A * sib ⊖ B) == 0)
     end
     return nothing
 end

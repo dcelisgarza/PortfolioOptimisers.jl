@@ -111,6 +111,18 @@ Abstract supertype for custom portfolio weight bounds constraints.
   - [`UniformlyDistributedBounds`](@ref)
 """
 abstract type CustomWeightBoundsAlgorithm <: AbstractConstraintAlgorithm end
+"""
+    const EstValType_CustWb = Union{<:EstValType, <:CustomWeightBoundsAlgorithm}
+
+Union type for custom weight bounds estimator values.
+
+`EstValType_CustWb` is a union type that allows either standard estimator values (`EstValType`) or custom weight bounds algorithms (`CustomWeightBoundsAlgorithm`) to be used for specifying portfolio weight bounds. This enables flexible assignment of bounds, supporting both conventional numeric types and advanced, user-defined constraint algorithms in portfolio optimisation workflows.
+
+# Related Types
+
+  - [`EstValType`](@ref)
+  - [`CustomWeightBoundsAlgorithm`](@ref)
+"""
 const EstValType_CustWb = Union{<:EstValType, <:CustomWeightBoundsAlgorithm}
 function nothing_scalar_array_view(x::CustomWeightBoundsAlgorithm, ::Any)
     return x

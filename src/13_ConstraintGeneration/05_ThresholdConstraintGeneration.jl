@@ -32,32 +32,32 @@ Estimator for buy-in threshold portfolio constraints.
 julia> BuyInThresholdEstimator(; val = Dict("A" => 0.05, "B" => 0.1))
 BuyInThresholdEstimator
    val ┼ Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
-  dval ┼ nothing
-   key ┴ nothing
+   key ┼ nothing
+  dval ┴ nothing
 
 julia> BuyInThresholdEstimator(; val = "A" => 0.05)
 BuyInThresholdEstimator
    val ┼ Pair{String, Float64}: "A" => 0.05
-  dval ┼ nothing
-   key ┴ nothing
+   key ┼ nothing
+  dval ┴ nothing
 
 julia> BuyInThresholdEstimator(; val = 0.05)
 BuyInThresholdEstimator
    val ┼ Float64: 0.05
-  dval ┼ nothing
-   key ┴ nothing
+   key ┼ nothing
+  dval ┴ nothing
 
 julia> BuyInThresholdEstimator(; val = [0.05])
 BuyInThresholdEstimator
    val ┼ Vector{Float64}: [0.05]
-  dval ┼ nothing
-   key ┴ nothing
+   key ┼ nothing
+  dval ┴ nothing
 
 julia> BuyInThresholdEstimator(; val = UniformlyDistributedBounds())
 BuyInThresholdEstimator
    val ┼ UniformlyDistributedBounds()
-  dval ┼ nothing
-   key ┴ nothing
+   key ┼ nothing
+  dval ┴ nothing
 ```
 
 # Related
@@ -72,8 +72,8 @@ struct BuyInThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
     key::T2
     dval::T3
     function BuyInThresholdEstimator(val::EstValType_CustWb,
-                                     dval::Option{<:Number} = nothing,
-                                     key::Option{<:AbstractString} = nothing)
+                                     key::Option{<:AbstractString} = nothing,
+                                     dval::Option{<:Number} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         if !isnothing(key)
@@ -82,9 +82,10 @@ struct BuyInThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
         return new{typeof(val), typeof(key), typeof(dval)}(val, key, dval)
     end
 end
-function BuyInThresholdEstimator(; val::EstValType_CustWb, dval::Option{<:Number} = nothing,
-                                 key::Option{<:AbstractString} = nothing)
-    return BuyInThresholdEstimator(val, dval, key)
+function BuyInThresholdEstimator(; val::EstValType_CustWb,
+                                 key::Option{<:AbstractString} = nothing,
+                                 dval::Option{<:Number} = nothing)
+    return BuyInThresholdEstimator(val, key, dval)
 end
 """
     struct BuyInThreshold{T1} <: AbstractConstraintResult
