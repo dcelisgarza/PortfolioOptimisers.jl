@@ -74,8 +74,8 @@ Keyword arguments correspond to the fields above.
 julia> AugmentedBlackLittermanPrior(;
                                     a_sets = AssetSets(; key = "nx",
                                                        dict = Dict("nx" => ["A", "B", "C"])),
-                                    f_sets = AssetSets(; key = "fx",
-                                                       dict = Dict("fx" => ["F1", "F2"])),
+                                    f_sets = AssetSets(; key = "nx",
+                                                       dict = Dict("nx" => ["F1", "F2"])),
                                     a_views = LinearConstraintEstimator(;
                                                                         val = ["A == 0.03",
                                                                                "B + C == 0.04"]),
@@ -137,15 +137,17 @@ AugmentedBlackLittermanPrior
                │           w ┼ nothing
                │   corrected ┴ Bool: true
        a_views ┼ LinearConstraintEstimator
-               │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+               │   key ┴ nothing
        f_views ┼ LinearConstraintEstimator
-               │   val ┴ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
+               │   val ┼ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
+               │   key ┴ nothing
         a_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
         f_sets ┼ AssetSets
-               │    key ┼ String: "fx"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("fx" => ["F1", "F2"])
+               │    key ┼ String: "nx"
+               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing

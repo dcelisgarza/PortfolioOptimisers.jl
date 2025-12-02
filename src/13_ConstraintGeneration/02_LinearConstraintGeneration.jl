@@ -475,7 +475,8 @@ function estimator_to_val(val::Option{<:Number}, args...; kwargs...)
     return val
 end
 """
-    estimator_to_val(val::VecNum, sets::AssetSets, args...; kwargs...)
+    estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
+                     key::Option{<:AbstractString} = nothing; kwargs...)
 
 Return a numeric vector for asset/group estimators, validating length against asset universe.
 
@@ -485,7 +486,8 @@ This method checks that the input vector `val` matches the length of the asset u
 
   - `val`: Numeric vector to be mapped to assets/groups.
   - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
-  - `args...`: Additional positional arguments (ignored).
+  - `::Any`: Fill value for API consistency (ignored).
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
@@ -494,7 +496,7 @@ This method checks that the input vector `val` matches the length of the asset u
 
 # Validation
 
-  - `length(val) == length(sets.dict[sets.key])`.
+  - `length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]`.
 
 # Related
 
@@ -502,7 +504,7 @@ This method checks that the input vector `val` matches the length of the asset u
   - [`AssetSets`](@ref)
   - [`group_to_val!`](@ref)
 """
-function estimator_to_val(val::VecNum, sets::AssetSets, ::Any,
+function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing; kwargs...)
     @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
               DimensionMismatch)

@@ -113,7 +113,8 @@ BayesianBlackLittermanPrior
              │    detone ┼ nothing
              │       alg ┴ nothing
        views ┼ LinearConstraintEstimator
-             │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+             │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+             │   key ┴ nothing
         sets ┼ AssetSets
              │    key ┼ String: "nx"
              │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])

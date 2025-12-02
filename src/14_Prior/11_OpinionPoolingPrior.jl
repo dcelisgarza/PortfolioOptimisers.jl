@@ -111,7 +111,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
           │            pe ┼ EmpiricalPrior
           │               │        ce ┼ PortfolioOptimisersCovariance
           │               │           │   ce ┼ Covariance
@@ -131,7 +131,8 @@ OpinionPoolingPrior
           │               │           │   w ┴ nothing
           │               │   horizon ┴ nothing
           │      mu_views ┼ LinearConstraintEstimator
-          │               │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+          │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+          │               │   key ┴ nothing
           │     var_views ┼ nothing
           │    cvar_views ┼ nothing
           │   sigma_views ┼ nothing
@@ -173,7 +174,8 @@ OpinionPoolingPrior
           │               │           │   w ┴ nothing
           │               │   horizon ┴ nothing
           │      mu_views ┼ LinearConstraintEstimator
-          │               │   val ┴ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
+          │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
+          │               │   key ┴ nothing
           │     var_views ┼ nothing
           │    cvar_views ┼ nothing
           │   sigma_views ┼ nothing

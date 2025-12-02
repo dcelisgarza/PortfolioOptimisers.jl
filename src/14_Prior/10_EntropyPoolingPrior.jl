@@ -428,7 +428,8 @@ EntropyPoolingPrior
               │           │   w ┴ nothing
               │   horizon ┴ nothing
      mu_views ┼ LinearConstraintEstimator
-              │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+              │   key ┴ nothing
     var_views ┼ nothing
    cvar_views ┼ nothing
   sigma_views ┼ nothing

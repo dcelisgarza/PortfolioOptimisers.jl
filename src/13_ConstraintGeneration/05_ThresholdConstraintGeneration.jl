@@ -1,7 +1,8 @@
 """
-    struct BuyInThresholdEstimator{T1, T2} <: AbstractConstraintEstimator
+    struct BuyInThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
         val::T1
-        dval::T2
+        key::T2
+        dval::T3
     end
 
 Estimator for buy-in threshold portfolio constraints.
@@ -11,61 +12,74 @@ Estimator for buy-in threshold portfolio constraints.
 # Fields
 
   - `val`: Asset-specific threshold values, as a dictionary, pair, or vector of pairs.
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
   - `dval`: Default threshold value applied to assets not explicitly specified in `val`.
 
 # Constructor
 
-    BuyInThresholdEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
+    BuyInThresholdEstimator(; val::EstValType_CustWb, dval::Option{<:Number} = nothing,
+                             key::Option{<:AbstractString} = nothing)
 
 ## Validation
 
   - If `val` is a `AbstractDict` or `AbstractVector`, `!isempty(val)`.
+  - If `dval` is provided, it is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - If `key` is provided, it is a non-empty string.
 
 # Examples
 
 ```jldoctest
-julia> BuyInThresholdEstimator(Dict("A" => 0.05, "B" => 0.1))
+julia> BuyInThresholdEstimator(; val = Dict("A" => 0.05, "B" => 0.1))
 BuyInThresholdEstimator
    val ┼ Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
-  dval ┴ nothing
+  dval ┼ nothing
+   key ┴ nothing
 
-julia> BuyInThresholdEstimator(["A" => 0.05, "B" => 0.1])
-BuyInThresholdEstimator
-   val ┼ Vector{Pair{String, Float64}}: ["A" => 0.05, "B" => 0.1]
-  dval ┴ nothing
-
-julia> BuyInThresholdEstimator("A" => 0.05)
+julia> BuyInThresholdEstimator(; val = "A" => 0.05)
 BuyInThresholdEstimator
    val ┼ Pair{String, Float64}: "A" => 0.05
-  dval ┴ nothing
+  dval ┼ nothing
+   key ┴ nothing
 
-julia> BuyInThresholdEstimator(0.05)
+julia> BuyInThresholdEstimator(; val = 0.05)
 BuyInThresholdEstimator
    val ┼ Float64: 0.05
-  dval ┴ nothing
+  dval ┼ nothing
+   key ┴ nothing
 
-julia> BuyInThresholdEstimator(UniformlyDistributedBounds())
+julia> BuyInThresholdEstimator(; val = [0.05])
+BuyInThresholdEstimator
+   val ┼ Vector{Float64}: [0.05]
+  dval ┼ nothing
+   key ┴ nothing
+
+julia> BuyInThresholdEstimator(; val = UniformlyDistributedBounds())
 BuyInThresholdEstimator
    val ┼ UniformlyDistributedBounds()
-  dval ┴ nothing
+  dval ┼ nothing
+   key ┴ nothing
 ```
 
 # Related
 
   - [`BuyInThreshold`](@ref)
+  - [`EstValType_CustWb`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
 struct BuyInThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
     val::T1
-    dval::T2
-    key::T3
+    key::T2
+    dval::T3
     function BuyInThresholdEstimator(val::EstValType_CustWb,
                                      dval::Option{<:Number} = nothing,
                                      key::Option{<:AbstractString} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
-        return new{typeof(val), typeof(dval), typeof(key)}(val, dval, key)
+        if !isnothing(key)
+            @argcheck(!isempty(key))
+        end
+        return new{typeof(val), typeof(key), typeof(dval)}(val, key, dval)
     end
 end
 function BuyInThresholdEstimator(; val::EstValType_CustWb, dval::Option{<:Number} = nothing,
