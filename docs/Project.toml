@@ -21,8 +21,5 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 YFinance = "e4b3b0a2-f9a3-42f3-aabb-32142cceaf77"
 
-[sources]
-PortfolioOptimisers = {path = ".."}
-
 [compat]
 Documenter = "1"

@@ -1,3 +1,6 @@
+function w_neg_flag(::Nothing)
+    return false
+end
 function w_neg_flag(wb::Number)
     return wb < zero(wb)
 end
