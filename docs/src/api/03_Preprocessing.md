@@ -12,5 +12,6 @@ select_k_extremes
 ## Private
 
 ```@docs
+AbstractReturnsResult
 _check_names_and_returns_matrix
 ```

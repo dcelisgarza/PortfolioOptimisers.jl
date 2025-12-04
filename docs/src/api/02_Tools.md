@@ -1,5 +1,9 @@
 # Tools
 
+`PorfolioOptimisers.jl` is a complex codebase which uses a variety of general purpose functions, constants and types.
+
+## Assertions
+
 ## Public
 
 ```@docs
@@ -13,7 +17,6 @@ factory(::Nothing, args...; kwargs...)
 ## Private
 
 ```@docs
-AbstractReturnsResult
 Num_VecNum_VecScalar
 Num_ArrNum_VecScalar
 assert_nonempty_nonneg_finite_val

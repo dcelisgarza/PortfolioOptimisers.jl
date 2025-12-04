@@ -1,17 +1,4 @@
 """
-    abstract type AbstractReturnsResult <: AbstractResult end
-
-Abstract supertype for all returns result types in PortfolioOptimisers.jl.
-
-All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
-
-# Related
-
-  - [`AbstractResult`](@ref)
-  - [`ReturnsResult`](@ref)
-"""
-abstract type AbstractReturnsResult <: AbstractResult end
-"""
     assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Symbol = :val)

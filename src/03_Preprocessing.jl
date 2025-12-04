@@ -1,4 +1,17 @@
 """
+    abstract type AbstractReturnsResult <: AbstractResult end
+
+Abstract supertype for all returns result types in PortfolioOptimisers.jl.
+
+All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+abstract type AbstractReturnsResult <: AbstractResult end
+"""
     drop_incomplete(X::AbstractMatrix)
 
 Return the indices of columns in matrix `X` that do not contain missing or NaN values, optionally filtering based on whether any missing value is present in a column.

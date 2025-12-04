@@ -2,10 +2,11 @@ using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
       Handcalcs, StatsBase, DocumenterVitepress
 
-exported = names(PortfolioOptimisers)
+exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)
 filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
-for sym in setdiff!(all_symbols, exported)
+private_symbols = setdiff(all_symbols, exported_symbols)
+for sym in private_symbols
     eval(quote
              import PortfolioOptimisers: $(sym)
          end)
