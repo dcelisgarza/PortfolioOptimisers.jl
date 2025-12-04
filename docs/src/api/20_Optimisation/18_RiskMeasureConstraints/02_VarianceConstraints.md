@@ -1,5 +1,5 @@
 # Variance Constraints
 
 ```@docs
-PortfolioOptimisers.variance_risk_bounds_val
+variance_risk_bounds_val
 ```

@@ -69,12 +69,11 @@
           RelativisticValueatRiskRange(), RelativisticDrawdownatRisk(),
           RelativeRelativisticDrawdownatRisk(), AverageDrawdown(),
           RelativeAverageDrawdown(), TurnoverRiskMeasure(; w = w0),
-          TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0)),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
-                                  tracking = WeightsTracking(; w = w0)),
-          TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0), alg = NOCTracking()),
-          RiskTrackingRiskMeasure(; r = StandardDeviation(),
-                                  tracking = WeightsTracking(; w = w0),
+                                  tr = WeightsTracking(; w = w0)),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
+          RiskTrackingRiskMeasure(; r = StandardDeviation(), tr = WeightsTracking(; w = w0),
                                   alg = DependentVariableTracking()),
           RiskRatioRiskMeasure(), MedianAbsoluteDeviation()]
     @testset "HierarchicalRiskParity" begin

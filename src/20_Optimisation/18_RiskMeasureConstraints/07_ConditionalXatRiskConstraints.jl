@@ -11,7 +11,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                                                                        [1:T],
                                                                                        (lower_bound = 0)
                                                                                    end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     cvar_risk = model[key] = if isnothing(wi)
         iat = inv(r.alpha * T)
         @expression(model, var + sum(z_cvar) * iat)
@@ -39,7 +39,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                                                                                                                                                          [1:T],
                                                                                                                                                                          (upper_bound = 0)
                                                                                                                                                                      end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     cvar_risk_l, cvar_risk_h = if isnothing(wi)
         iat = inv(r.alpha * T)
         ibt = inv(r.beta * T)
@@ -170,7 +170,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                        lb) <=
                                                                                                                                                                                                                                       0
                                                                                                                                                                                                                                   end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     drcvar_risk = model[key] = if isnothing(wi)
         @expression(model, radius * lb + mean(s))
     else
@@ -333,7 +333,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                lb_h) >=
                                                                                                                                                                                                                                                                                                                                                                                                                                                                               0
                                                                                                                                                                                                                                                                                                                                                                                                                                                                           end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     drcvar_risk_l, drcvar_risk_h = model[Symbol(:drcvar_risk_l_, i)], model[Symbol(:drcvar_risk_h_, i)] = if isnothing(wi)
         @expressions(model, begin
                          radius_l * lb_l + mean(s_l)

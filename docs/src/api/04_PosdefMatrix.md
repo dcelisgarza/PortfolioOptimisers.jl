@@ -1,8 +1,15 @@
 # PosdefMatrix
 
+## Public
+
 ```@docs
 Posdef
 posdef!
 posdef
-PortfolioOptimisers.AbstractPosdefEstimator
+```
+
+## Private
+
+```@docs
+AbstractPosdefEstimator
 ```

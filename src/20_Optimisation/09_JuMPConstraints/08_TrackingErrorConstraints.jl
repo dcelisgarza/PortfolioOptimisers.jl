@@ -9,7 +9,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
-    wb = tracking_benchmark(te.tracking, X)
+    wb = tracking_benchmark(te.tr, X)
     err = te.err
     T = size(X, 1)
     f = err * T
@@ -29,13 +29,15 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         te::TrackingError{<:Any, <:Any, <:SOCTracking},
+                                         te::TrackingError{<:Any, <:Any,
+                                                           <:Union{<:SOCTracking,
+                                                                   <:SquaredSOCTracking}},
                                          args...; kwargs...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
-    wb = tracking_benchmark(te.tracking, X)
+    wb = tracking_benchmark(te.tr, X)
     err = te.err
     f = err * sqrt(size(X, 1) - te.alg.ddof)
     t_te = model[Symbol(:t_te_, i)] = @variable(model)
@@ -56,12 +58,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         plg::Union{Nothing,
-                                                    <:AbstractPhylogenyConstraintResult,
-                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                                         fees::Union{Nothing, <:Fees}, args...; kwargs...)
+                                         plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees},
+                                         args...; kwargs...)
     r = te.r
-    wb = te.tracking.w
+    wb = te.tr.w
     err = te.err
     w = model[:w]
     k = model[:k]
@@ -83,12 +83,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         plg::Union{Nothing,
-                                                    <:AbstractPhylogenyConstraintResult,
-                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
-                                         fees::Union{Nothing, <:Fees}, args...; kwargs...)
+                                         plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees},
+                                         args...; kwargs...)
     ri = te.r
-    wb = te.tracking.w
+    wb = te.tr.w
     err = te.err
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
@@ -111,9 +109,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                         tres::Union{<:AbstractTracking,
-                                                     <:AbstractVector{<:AbstractTracking}},
-                                         args...; kwargs...)
+                                         tres::Tr_VecTr, args...; kwargs...)
     for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...; kwargs...)
     end

@@ -108,7 +108,7 @@ prices = hcat(prices...)
 cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
 prices = prices[cidx]
 TimeSeries.rename!(prices, Symbol.(assets))
-pretty_table(prices[(end - 5):end]; formatters = fmt1)
+pretty_table(prices[(end - 5):end]; formatters = [fmt1])
 ````
 
 We now have all we need to perform a basic optimisation.
@@ -148,7 +148,7 @@ mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
 # View the results.
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                :opt_weights => res.w, :mip_weights => mip_res.w)
-pretty_table(df; formatters = fmt2)
+pretty_table(df; formatters = [fmt2])
 ````
 
 Finally, let's plot some results.
@@ -261,7 +261,7 @@ Many of these can be used in conjunction. For example, some covariance estimator
           * Semi.
       + Implied volatility.
 
-### Regression
+### Regression Models
 
 Factor models and implied volatility use regression in their estimation.
 
@@ -296,7 +296,7 @@ Factor models and implied volatility use regression in their estimation.
       + Minimum Squared Distance.
       + Minimum Sum Squares.
 
-### Distance
+### Distance Matrices
 
 Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
 

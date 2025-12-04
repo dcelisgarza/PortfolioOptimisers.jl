@@ -39,7 +39,7 @@ We will use the same data as the previous example.
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
-pretty_table(X[(end - 5):end]; formatters = tsfmt)
+pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
 rd = prices_to_returns(X)
@@ -113,7 +113,7 @@ da = DiscreteAllocation(; slv = mip_slv)
 mip_res1 = optimise(da, res1.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res1.shares, :cost => mip_res1.cost,
                        :opt_weights => res1.w, :mip_weights => mip_res1.w);
-             formatters = mipresfmt)
+             formatters = [mipresfmt])
 println("long cost + short cost = cost: $(sum(mip_res1.cost))")
 println("long cost: $(sum(mip_res1.cost[mip_res1.cost .>= zero(eltype(mip_res1.cost))]))")
 println("short cost: $(sum(mip_res1.cost[mip_res1.cost .< zero(eltype(mip_res1.cost))]))")
@@ -152,7 +152,7 @@ The discrete allocation procedure automatically adjusts the cash amount dependin
 mip_res2 = optimise(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
-             formatters = mipresfmt)
+             formatters = [mipresfmt])
 println("long cost + short cost = cost: $(sum(mip_res2.cost))")
 println("long cost: $(sum(mip_res2.cost[mip_res2.cost .>= zero(eltype(mip_res2.cost))]))")
 println("short cost: $(sum(mip_res2.cost[mip_res2.cost .< zero(eltype(mip_res2.cost))]))")
@@ -184,7 +184,7 @@ We can confirm that the finite allocation behaves as expected.
 mip_res3 = optimise(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
-             formatters = mipresfmt)
+             formatters = [mipresfmt])
 println("long cost + short cost = cost: $(sum(mip_res3.cost))")
 println("long cost: $(sum(mip_res3.cost[mip_res3.cost .>= zero(eltype(mip_res3.cost))]))")
 println("short cost: $(sum(mip_res3.cost[mip_res3.cost .< zero(eltype(mip_res3.cost))]))")
@@ -212,7 +212,7 @@ Again, the finite allocation respects the budget constraints.
 mip_res4 = optimise(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
-             formatters = mipresfmt)
+             formatters = [mipresfmt])
 println("long cost + short cost = cost: $(sum(mip_res4.cost))")
 println("long cost: $(sum(mip_res4.cost[mip_res4.cost .>= zero(eltype(mip_res4.cost))]))")
 println("short cost: $(sum(mip_res4.cost[mip_res4.cost .< zero(eltype(mip_res4.cost))]))")
@@ -246,7 +246,7 @@ For this portfolio, the sum of the long and short cost will be approximately equ
 mip_res5 = optimise(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
-             formatters = mipresfmt)
+             formatters = [mipresfmt])
 println("long cost + short cost = cost: $(sum(mip_res5.cost))")
 println("long cost: $(sum(mip_res5.cost[mip_res5.cost .>= zero(eltype(mip_res5.cost))]))")
 println("short cost: $(sum(mip_res5.cost[mip_res5.cost .< zero(eltype(mip_res5.cost))]))")

@@ -2,5 +2,5 @@
 
 ```@docs
 ExcessExpectedReturns
-mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 ```

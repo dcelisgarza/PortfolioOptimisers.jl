@@ -14,7 +14,7 @@ function factory(r::RiskRatioRiskMeasure, pr::AbstractPriorResult, args...; kwar
     r2 = factory(r.r2, pr, args...; kwargs...)
     return RiskRatioRiskMeasure(; r1 = r1, r2 = r2)
 end
-function factory(r::RiskRatioRiskMeasure, w::AbstractVector)
+function factory(r::RiskRatioRiskMeasure, w::VecNum)
     return RiskRatioRiskMeasure(; r1 = factory(r.r1, w), r2 = factory(r.r2, w))
 end
 

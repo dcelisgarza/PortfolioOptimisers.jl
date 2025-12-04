@@ -2,9 +2,9 @@
 
 ```@docs
 BlackLittermanPrior
-prior(pe::BlackLittermanPrior, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
+prior(pe::BlackLittermanPrior, X::MatNum,
+               F::Option{<:MatNum} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-PortfolioOptimisers.calc_omega
-PortfolioOptimisers.vanilla_posteriors
+calc_omega
+vanilla_posteriors
 ```

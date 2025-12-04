@@ -16,7 +16,7 @@ Container type for excess expected returns estimators.
 # Constructor
 
     ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          rf::Real = 0.0)
+                          rf::Number = 0.0)
 
 Keyword arguments correspond to the fields above.
 
@@ -38,20 +38,20 @@ ExcessExpectedReturns
 struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
     me::T1
     rf::T2
-    function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Real)
+    function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Number)
         return new{typeof(me), typeof(rf)}(me, rf)
     end
 end
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                               rf::Real = 0.0)
+                               rf::Number = 0.0)
     return ExcessExpectedReturns(me, rf)
 end
-function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(me::ExcessExpectedReturns, w::Option{<:AbstractWeights} = nothing)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """
-    mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute excess expected returns by subtracting the risk-free rate.
 
@@ -66,14 +66,13 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
 # Returns
 
-  - `mu::AbstractArray`: Excess expected returns vector.
+  - `mu::ArrNum`: Excess expected returns vector.
 
 # Related
 
   - [`ExcessExpectedReturns`](@ref)
 """
-function Statistics.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1,
-                         kwargs...)
+function Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     return mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end
 

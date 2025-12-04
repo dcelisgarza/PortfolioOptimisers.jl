@@ -1,5 +1,9 @@
 # Base JuMP Optimisation
 
+## Public
+
 ```@docs
-PortfolioOptimisers.JuMPReturnsEstimator
+JuMPReturnsEstimator
 ```
+
+## Private

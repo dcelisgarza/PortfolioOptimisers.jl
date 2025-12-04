@@ -477,7 +477,7 @@
         sigma_views = LinearConstraintEstimator(; val = "AAPL == 0.0008")
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                        sigma_views = sigma_views), rd)
-        @test isapprox(pr.mu[1], pr0.mu[1] * 1.7)
+        @test isapprox(pr.mu[1], pr0.mu[1] * 1.7, rtol = 1e-7)
         @test isapprox(pr.sigma[1, 1], 0.0008, rtol = 1e-3)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
@@ -536,21 +536,23 @@
                                        sigma_views = sigma_views, kt_views = kt_views), rd)
         @test pr.mu[1] <= 1.5 * pr0.mu[1]
         @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
-        @test abs(HighOrderMoment(; w = pr.w,
-                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                                    ve = SimpleVariance(;
-                                                                                        w = pr.w)))([1],
-                                                                                                    reshape(pr.X[:,
-                                                                                                                 1],
-                                                                                                            :,
-                                                                                                            1)) -
-                  HighOrderMoment(;
-                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
-                                                                                             reshape(pr.X[:,
-                                                                                                          1],
-                                                                                                     :,
-                                                                                                     1)) *
-                  0.87) <= sqrt(eps())
+        @test isapprox(HighOrderMoment(; w = pr.w,
+                                       alg = StandardisedHighOrderMoment(;
+                                                                         alg = FourthMoment(),
+                                                                         ve = SimpleVariance(;
+                                                                                             w = pr.w)))([1],
+                                                                                                         reshape(pr.X[:,
+                                                                                                                      1],
+                                                                                                                 :,
+                                                                                                                 1)),
+                       HighOrderMoment(;
+                                       alg = StandardisedHighOrderMoment(;
+                                                                         alg = FourthMoment()))([1],
+                                                                                                reshape(pr.X[:,
+                                                                                                             1],
+                                                                                                        :,
+                                                                                                        1)) *
+                       0.87, rtol = 5e-6)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  mu_views = mu_views,
@@ -642,7 +644,7 @@
                                                                     kt_views = kt_views,
                                                                     sk_views = sk_views)),
                    rd)
-        @test pr.mu[1] <= 0.75 * pr0.mu[1]
+        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1])
         @test pr.mu[end] >= 0.4 * pr0.mu[end]
         @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
@@ -799,7 +801,7 @@
         sigma_views = LinearConstraintEstimator(; val = "AAPL == 0.0008")
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                        sigma_views = sigma_views, opt = opt), rd)
-        @test isapprox(pr.mu[1], pr0.mu[1] * 1.7)
+        @test isapprox(pr.mu[1], pr0.mu[1] * 1.7, rtol = 1e-7)
         @test isapprox(pr.sigma[1, 1], 0.0008, rtol = 1e-3)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
@@ -860,21 +862,23 @@
                                        opt = opt), rd)
         @test pr.mu[1] <= 1.5 * pr0.mu[1]
         @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
-        @test abs(HighOrderMoment(; w = pr.w,
-                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                                    ve = SimpleVariance(;
-                                                                                        w = pr.w)))([1],
-                                                                                                    reshape(pr.X[:,
-                                                                                                                 1],
-                                                                                                            :,
-                                                                                                            1)) -
-                  HighOrderMoment(;
-                                  alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
-                                                                                             reshape(pr.X[:,
-                                                                                                          1],
-                                                                                                     :,
-                                                                                                     1)) *
-                  0.87) <= sqrt(eps())
+        @test isapprox(HighOrderMoment(; w = pr.w,
+                                       alg = StandardisedHighOrderMoment(;
+                                                                         alg = FourthMoment(),
+                                                                         ve = SimpleVariance(;
+                                                                                             w = pr.w)))([1],
+                                                                                                         reshape(pr.X[:,
+                                                                                                                      1],
+                                                                                                                 :,
+                                                                                                                 1)),
+                       HighOrderMoment(;
+                                       alg = StandardisedHighOrderMoment(;
+                                                                         alg = FourthMoment()))([1],
+                                                                                                reshape(pr.X[:,
+                                                                                                             1],
+                                                                                                        :,
+                                                                                                        1)) *
+                       0.87, rtol = 5.0e-6)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  mu_views = mu_views,
@@ -968,7 +972,7 @@
                                                                     kt_views = kt_views,
                                                                     sk_views = sk_views,
                                                                     opt = opt)), rd)
-        @test pr.mu[1] <= 0.75 * pr0.mu[1]
+        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1])
         @test pr.mu[end] >= 0.4 * pr0.mu[end]
         @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)

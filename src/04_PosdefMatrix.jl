@@ -53,7 +53,7 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
     return Posdef(alg)
 end
 """
-    posdef!(pdm::Posdef, X::AbstractMatrix)
+    posdef!(pdm::Posdef, X::MatNum)
     posdef!(::Nothing, args...)
 
 In-place projection of a matrix to the nearest positive definite (PD) matrix using the specified estimator.
@@ -105,15 +105,16 @@ true
 
   - [`posdef`](@ref)
   - [`Posdef`](@ref)
+  - [`MatNum`](@ref)
 """
 function posdef!(::Nothing, args...)
     return nothing
 end
-function posdef!(pdm::Posdef, X::AbstractMatrix)
+function posdef!(pdm::Posdef, X::MatNum)
     if isposdef(X)
         return nothing
     end
-    assert_matrix_issquare(X)
+    assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -130,7 +131,7 @@ function posdef!(pdm::Posdef, X::AbstractMatrix)
     return nothing
 end
 """
-    posdef(pdm::Posdef, X::AbstractMatrix)
+    posdef(pdm::Posdef, X::MatNum)
     posdef(::Nothing, args...)
 
 Out-of-place version of [`posdef!`](@ref).
@@ -139,11 +140,12 @@ Out-of-place version of [`posdef!`](@ref).
 
   - [`posdef!`](@ref)
   - [`Posdef`](@ref)
+  - [`MatNum`](@ref)
 """
 function posdef(::Nothing, args...)
     return nothing
 end
-function posdef(pdm::Posdef, X::AbstractMatrix)
+function posdef(pdm::Posdef, X::MatNum)
     X = copy(X)
     posdef!(pdm, X)
     return X

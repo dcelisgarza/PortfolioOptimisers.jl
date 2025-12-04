@@ -11,7 +11,7 @@ struct NestedClusteredOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     w::T9
     fb::T10
 end
-function opt_attempt_factory(res::NestedClusteredOptimisation, fb)
+function factory(res::NestedClusteredOptimisation, fb)
     return NestedClusteredOptimisation(res.oe, res.pr, res.wb, res.clr, res.resi, res.reso,
                                        res.cv, res.retcode, res.w, fb)
 end
@@ -50,8 +50,7 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.plg))
     return nothing
 end
-function assert_internal_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
-                                                               <:OptimisationResult}})
+function assert_internal_optimiser(opt::VecOptE_Opt)
     assert_internal_optimiser.(opt)
     return nothing
 end
@@ -75,8 +74,7 @@ function assert_external_optimiser(opt::FactorRiskContribution)
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
-                                                               <:OptimisationResult}})
+function assert_external_optimiser(opt::VecOptE_Opt)
     assert_external_optimiser.(opt)
     return nothing
 end
@@ -95,15 +93,12 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     strict::T9
     threads::T10
     fb::T11
-    function NestedClustered(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                             cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                             wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
-                             sets::Union{Nothing, <:AssetSets}, opti::OptimisationEstimator,
+    function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
+                             sets::Option{<:AssetSets}, opti::OptimisationEstimator,
                              opto::OptimisationEstimator,
-                             cv::Union{Nothing, <:CrossValidationEstimator},
-                             cwf::WeightFinaliser, strict::Bool,
-                             threads::FLoops.Transducers.Executor,
-                             fb::Union{Nothing, <:OptimisationEstimator})
+                             cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
+                             strict::Bool, threads::FLoops.Transducers.Executor,
+                             fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)
@@ -116,17 +111,16 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                    typeof(fb)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
     end
 end
-function NestedClustered(;
-                         pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                         cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
-                         wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                         sets::Union{Nothing, <:AssetSets} = nothing,
-                         opti::OptimisationEstimator, opto::OptimisationEstimator,
-                         cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
+function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(),
+                         cle::ClE_Cl = ClusteringEstimator(),
+                         wb::Option{<:WbE_Wb} = nothing,
+                         sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,
+                         opto::OptimisationEstimator,
+                         cv::Option{<:CrossValidationEstimator} = nothing,
                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
                          threads::FLoops.Transducers.Executor = ThreadedEx(),
-                         fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                         fb::Option{<:OptimisationEstimator} = nothing)
     return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)
@@ -147,7 +141,7 @@ function assert_external_optimiser(opt::NestedClustered)
     end
     return nothing
 end
-function opt_view(nco::NestedClustered, i::AbstractVector, X::AbstractMatrix)
+function opt_view(nco::NestedClustered, i, X::MatNum)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
@@ -158,12 +152,9 @@ function opt_view(nco::NestedClustered, i::AbstractVector, X::AbstractMatrix)
                            opto = opto, cv = nco.cv, cwf = nco.cwf, strict = nco.strict,
                            threads = nco.threads, fb = nco.fb)
 end
-function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
-                                               <:WeightBounds},
-                                     sets::Union{Nothing, <:AssetSets},
-                                     cwf::WeightFinaliser, strict::Bool,
-                                     resi::AbstractVector{<:OptimisationResult},
-                                     res::OptimisationResult, w::AbstractVector;
+function nested_clustering_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+                                     cwf::WeightFinaliser, strict::Bool, resi::VecOpt,
+                                     res::OptimisationResult, w::VecNum;
                                      datatype::DataType = Float64)
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
                                    datatype = datatype)
@@ -212,9 +203,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
             resi[i] = res
         end
     end
-    X, F, ts, iv, ivpa = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
-    rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = X, nf = rd.nf, F = F,
-                        ts = ts, iv = iv, ivpa = ivpa)
+    rdo = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,

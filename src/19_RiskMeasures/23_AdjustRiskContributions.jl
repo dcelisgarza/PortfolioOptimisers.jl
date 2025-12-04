@@ -6,17 +6,18 @@ const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                   <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:SOCRiskExpr},
                                   <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                     <:Union{<:SquaredSOCRiskExpr,
-                                                             <:QuadRiskExpr}}}
+                                                     <:NSkeQuadFormulations},
+                                  <:TrackingRiskMeasure{<:Any, <:Any, <:SquaredSOCTracking}}
 const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                          <:LowOrderMoment{<:Any, <:Any, <:Any,
                                                           <:SecondMoment{<:Any, <:Any,
                                                                          <:QuadSecondMomentFormulations}},
                                          <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                            <:Union{<:SquaredSOCRiskExpr,
-                                                                    <:QuadRiskExpr}},
+                                                            <:NSkeQuadFormulations},
                                          <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                    <:Any, <:QuadSecondMomentFormulations}}
+                                                    <:Any, <:QuadSecondMomentFormulations},
+                                         <:TrackingRiskMeasure{<:Any, <:Any,
+                                                               <:SquaredSOCTracking}}
 const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
                                 <:HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment},
                                 <:HighOrderMoment{<:Any, <:Any, <:Any,
@@ -36,18 +37,18 @@ const DrawdownRiskMeasures = Union{<:DrawdownatRisk, <:RelativeDrawdownatRisk,
                                    <:RelativeEntropicDrawdownatRisk,
                                    <:RelativisticDrawdownatRisk,
                                    <:RelativeRelativisticDrawdownatRisk}
-function adjust_risk_contribution(::Any, val::Real, args...)
+function adjust_risk_contribution(::Any, val::Number, args...)
     return val
 end
-function adjust_risk_contribution(::SquaredRiskMeasures, val::Real, args...)
+function adjust_risk_contribution(::SquaredRiskMeasures, val::Number, args...)
     return val * 0.5
 end
-function adjust_risk_contribution(::CubedRiskMeasures, val::Real, args...)
+function adjust_risk_contribution(::CubedRiskMeasures, val::Number, args...)
     return val / 3
 end
-function adjust_risk_contribution(::FourthPowerRiskMeasures, val::Real, args...)
+function adjust_risk_contribution(::FourthPowerRiskMeasures, val::Number, args...)
     return val * 0.25
 end
-function adjust_risk_contribution(::EqualRiskMeasure, val::Real, delta::Real = 0.0)
+function adjust_risk_contribution(::EqualRiskMeasure, val::Number, delta::Number = 0.0)
     return val + delta
 end

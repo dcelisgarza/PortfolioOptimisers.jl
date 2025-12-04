@@ -36,7 +36,7 @@ We will use the same data as the previous example.
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
-pretty_table(X[(end - 5):end]; formatters = tsfmt)
+pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 # Compute the returns
 rd = prices_to_returns(X)
@@ -100,7 +100,7 @@ Let's view the results as pretty tables.
 ````@example 2_Mean_Risk_Objectives
 pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk => res1.w,
                        :MaximumUtility => res2.w, :MaximumRatio => res3.w,
-                       :MaximumReturn => res4.w); formatters = resfmt)
+                       :MaximumReturn => res4.w); formatters = [resfmt])
 ````
 
 In order to confirm that the objective functions do what they say on the tin, we can compute the risk, return and risk return ration. There are individual functions for each `expected_risk`, `expected_return`, `expected_ratio`, but we also have `expected_risk_ret_ratio` that returns all three at once (`risk`, `return`, `risk-return ratio`) which is what we will use here.
@@ -123,7 +123,7 @@ pretty_table(DataFrame(;
                        :obj => [:MinimumRisk, :MaximumUtility, :MaximumRatio,
                                 :MaximumReturn, :Benchmark],
                        :rk => [rk1, rk2, rk3, rk4, rk0], :rt => [rt1, rt2, rt3, rt4, rt0],
-                       :rr => [rr1, rr2, rr3, rr4, rr0]); formatters = resfmt)
+                       :rr => [rr1, rr2, rr3, rr4, rr0]); formatters = [resfmt])
 ````
 
 We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.

@@ -1,10 +1,14 @@
 abstract type AbstractOptimisationEstimator <: AbstractEstimator end
+const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
+const VecOpt = AbstractVector{<:OptimisationResult}
 abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
+const OptE_Opt = Union{<:OptimisationEstimator, <:OptimisationResult}
+const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
@@ -32,14 +36,13 @@ end
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end
-function opt_view(opt::AbstractVector{<:AbstractOptimisationEstimator}, args...)
+function opt_view(opt::VecOptE, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
-function optimise end
-function optimise(or::OptimisationResult, args...)
+function optimise(or::OptimisationResult, args...; kwargs...)
     return or
 end
-function opt_attempt_factory end
+function _optimise end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = opt
@@ -54,7 +57,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
             @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         end
     end
-    return isempty(fb) ? res : opt_attempt_factory(res, fb)
+    return isempty(fb) ? res : factory(res, fb)
 end
 function assert_internal_optimiser(::OptimisationResult)
     return nothing
@@ -62,13 +65,17 @@ end
 function assert_external_optimiser(::OptimisationResult)
     return nothing
 end
+function generate_grouped_returns_result(rd::ReturnsResult, pr::AbstractPriorResult,
+                                         wi::MatNum)
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
+    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = pr.X * wi, nf = rd.nf,
+                         F = rd.F, ts = rd.ts, iv = iv, ivpa = ivpa)
+end
 function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
-                                         pr::AbstractPriorResult, wi::AbstractMatrix,
-                                         resi::AbstractVector{<:OptimisationResult};
+                                         pr::AbstractPriorResult, wi::MatNum, resi::VecOpt;
                                          kwargs...)
-    iv = isnothing(rd.iv) ? nothing : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Real)) ? rd.ivpa : transpose(wi) * rd.ivpa
-    return pr.X * wi, rd.F, rd.ts, iv, ivpa
+    return generate_grouped_returns_result(rd, pr, wi)
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure

@@ -6,27 +6,27 @@ CircularBootstrap
 MovingBootstrap
 ARCHUncertaintySet
 ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::AbstractMatrix,
-             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                    <:Any, <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::AbstractMatrix,
-             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                    <:Any, <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
-PortfolioOptimisers.BootstrapUncertaintySetEstimator
-PortfolioOptimisers.ARCHBootstrapSet
-PortfolioOptimisers.bootstrap_func
-PortfolioOptimisers.bootstrap_generator
-PortfolioOptimisers.mu_bootstrap_generator
-PortfolioOptimisers.sigma_bootstrap_generator
+                                          <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+BootstrapUncertaintySetEstimator
+ARCHBootstrapSet
+bootstrap_func
+bootstrap_generator
+mu_bootstrap_generator
+sigma_bootstrap_generator
 ```

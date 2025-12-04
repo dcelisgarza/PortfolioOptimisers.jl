@@ -3,9 +3,11 @@ module PortfolioOptimisersPlotsExt
 using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
       Clustering, Distributions
 
-function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray,
-                                                         X::AbstractMatrix,
-                                                         fees::Union{Nothing, <:Fees} = nothing;
+import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
+                            MatNum_Pr, PrE_Pr, ClE_Cl, VecVecNum
+
+function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
+                                                         fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
                                                          compound::Bool = false,
                                                          kwargs::NamedTuple = (;
@@ -17,7 +19,7 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray,
     ret = cumulative_returns(calc_net_returns(w, X, fees); compound = compound)
     return plot(ts, ret; kwargs..., ekwargs...)
 end
-function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
+function compute_relevant_assets(w::VecNum, M::Number, N::Number)
     abs_w = abs.(w)
     idx = sortperm(abs_w; rev = true)
     abs_w /= sum(abs_w)
@@ -30,12 +32,11 @@ function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
     end
     return N, idx
 end
-function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
-                                                           X::AbstractMatrix,
-                                                           fees::Union{Nothing, <:Fees} = nothing;
+function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
+                                                           fees::Option{<:Fees} = nothing;
                                                            ts::AbstractVector = 1:size(X, 1),
                                                            nx::AbstractVector = 1:size(X, 2),
-                                                           N::Union{Nothing, <:Real} = nothing,
+                                                           N::Option{<:Number} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
                                                                                    xlabel = "Date",
@@ -68,9 +69,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
     plot!(f; legend_kwargs..., ekwargs...)
     return f
 end
-function PortfolioOptimisers.plot_composition(w::AbstractVector{<:Real},
-                                              nx::AbstractVector = 1:length(w);
-                                              N::Union{Nothing, <:Real} = nothing,
+function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
+                                              N::Option{<:Number} = nothing,
                                               kwargs::NamedTuple = (title = "Portfolio Composition",
                                                                     xlabel = "Asset",
                                                                     ylabel = "Weight",
@@ -89,14 +89,12 @@ function PortfolioOptimisers.plot_composition(w::AbstractVector{<:Real},
     end
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                    w::AbstractVector,
-                                                    X::Union{<:AbstractMatrix,
-                                                             <:PortfolioOptimisers.AbstractPriorResult},
-                                                    fees::Union{Nothing, <:Fees} = nothing;
+                                                    w::VecNum, X::MatNum_Pr,
+                                                    fees::Option{<:Fees} = nothing;
                                                     nx::AbstractVector = 1:length(w),
-                                                    N::Union{Nothing, <:Real} = nothing,
+                                                    N::Option{<:Number} = nothing,
                                                     percentage::Bool = false,
-                                                    delta::Real = 1e-6,
+                                                    delta::Number = 1e-6,
                                                     marginal::Bool = false,
                                                     kwargs::NamedTuple = (title = "Risk Contribution",
                                                                           xlabel = "Asset",
@@ -110,8 +108,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     end
     return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
 end
-function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVector{<:Real},
-                                                                   <:AbstractVector{<:AbstractVector}},
+function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
                                                           nx::AbstractVector = 1:size(w, 1);
                                                           kwargs::NamedTuple = (;
                                                                                 xlabel = "Portfolios",
@@ -119,7 +116,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVec
                                                                                 title = "Portfolio Composition",
                                                                                 legend = :outerright),
                                                           ekwargs...)
-    if isa(w, AbstractVector{<:AbstractVector})
+    if isa(w, VecVecNum)
         w = hcat(w...)
     end
     M = size(w, 2)
@@ -127,8 +124,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVec
     return groupedbar(transpose(w); xticks = (1:M, 1:M), bar_position = :stack, group = ctg,
                       kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:AbstractVector{<:Real},
-                                                                    <:AbstractVector{<:AbstractVector}},
+function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
                                                            nx::AbstractVector = 1:size(w, 1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
@@ -136,7 +132,7 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:AbstractVe
                                                                                  title = "Portfolio Composition",
                                                                                  legend = :outerright),
                                                            ekwargs...)
-    if isa(w, AbstractVector{<:AbstractVector})
+    if isa(w, VecVecNum)
         w = hcat(w...)
     end
     M = size(w, 2)
@@ -173,10 +169,7 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
     end
     return plot(dend1; fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_clusters(pe::Union{<:PortfolioOptimisers.AbstractPriorEstimator,
-                                                     <:PortfolioOptimisers.AbstractPriorResult},
-                                           cle::Union{<:PortfolioOptimisers.AbstractClusteringEstimator,
-                                                      <:PortfolioOptimisers.AbstractClusteringResult},
+function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::ClE_Cl,
                                            rd::PortfolioOptimisers.ReturnsResult = ReturnsResult();
                                            dims::Integer = 1,
                                            color_func = x -> if any(x .< zero(eltype(x)))
@@ -245,14 +238,12 @@ function PortfolioOptimisers.plot_clusters(pe::Union{<:PortfolioOptimisers.Abstr
     return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
                 hmap, dend2; layout = l, fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractMatrix,
-                                            slv::Union{<:Solver,
-                                                       <:AbstractVector{<:Solver}},
-                                            fees::Union{Nothing, <:Fees} = nothing;
+function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum, slv::Slv_VecSlv,
+                                            fees::Option{<:Fees} = nothing;
                                             ts::AbstractVector = 1:size(X, 1),
-                                            compound::Bool = false, alpha::Real = 0.05,
-                                            kappa::Real = 0.3,
-                                            rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                            compound::Bool = false, alpha::Number = 0.05,
+                                            kappa::Number = 0.3,
+                                            rw::Option{<:AbstractWeights} = nothing,
                                             theme::Symbol = :Dark2_5,
                                             dd_kwargs = (;
                                                          label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
@@ -308,20 +299,17 @@ function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractMatrix,
     f_ret = plot(ts, cret; color = colours[1], ret_kwargs...)
     return plot(f_ret, f_dd; layout = (2, 1), f_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_measures(w::Union{<:AbstractVector{<:Real},
-                                                    <:AbstractVector{<:AbstractVector}},
+function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum,
                                            pr::PortfolioOptimisers.AbstractPriorResult,
-                                           fees::Union{Nothing, <:Fees} = nothing;
+                                           fees::Option{<:Fees} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
-                                           z::Union{Nothing,
-                                                    <:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
+                                           z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
                                            c::PortfolioOptimisers.AbstractBaseRiskMeasure = RatioRiskMeasure(;
                                                                                                              rk = x,
                                                                                                              rt = ArithmeticReturn(),
                                                                                                              rf = 0),
-                                           slv::Union{Nothing, <:Solver,
-                                                      <:AbstractVector{<:Solver}} = nothing,
+                                           slv::Option{<:Slv_VecSlv} = nothing,
                                            flag::Bool = true,
                                            kwargs::NamedTuple = (title = "Pareto Frontier",
                                                                  xlabel = "X", ylabel = "Y",
@@ -347,15 +335,12 @@ function PortfolioOptimisers.plot_measures(w::Union{<:AbstractVector{<:Real},
         scatter(xr, yr, zr; zcolor = cr, kwargs..., ekwargs...)
     end
 end
-function PortfolioOptimisers.plot_histogram(w::AbstractArray, X::AbstractMatrix,
-                                            slv::Union{<:Solver,
-                                                       <:AbstractVector{<:Solver}},
-                                            fees::Union{Nothing, <:Fees} = nothing;
-                                            flag = true, alpha::Real = 0.05,
-                                            kappa::Real = 0.3,
+function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSlv,
+                                            fees::Option{<:Fees} = nothing; flag = true,
+                                            alpha::Number = 0.05, kappa::Number = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
-                                            rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                            rw::Option{<:AbstractWeights} = nothing,
                                             theme::Symbol = :Paired_10,
                                             h_kwargs::NamedTuple = (;
                                                                     ylabel = "Probability Density",

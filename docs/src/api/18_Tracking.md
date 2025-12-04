@@ -1,18 +1,31 @@
 # Tracking
 
+## Public
+
 ```@docs
 SOCTracking
+SquaredSOCTracking
 NOCTracking
 IndependentVariableTracking
 DependentVariableTracking
 WeightsTracking
 ReturnsTracking
 TrackingError
-PortfolioOptimisers.AbstractTracking
-PortfolioOptimisers.AbstractTrackingAlgorithm
-PortfolioOptimisers.TrackingFormulation
-PortfolioOptimisers.NormTracking
-PortfolioOptimisers.VariableTracking
-PortfolioOptimisers.norm_tracking
-PortfolioOptimisers.tracking_benchmark
+TrackingFormulation
+```
+
+## Private
+
+```@docs
+AbstractTracking
+AbstractTrackingAlgorithm
+VecTr
+Tr_VecTr
+NormTracking
+VariableTracking
+norm_tracking
+tracking_benchmark
+tracking_view
+factory(tr::WeightsTracking, w::VecNum)
+factory(tr::ReturnsTracking, ::Any)
 ```

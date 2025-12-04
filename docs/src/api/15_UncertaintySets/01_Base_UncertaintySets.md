@@ -10,19 +10,18 @@ GeneralKUncertaintyAlgorithm
 ChiSqKUncertaintyAlgorithm
 EllipseUncertaintySet
 EllipseUncertaintySetAlgorithm
-ucs(uc::Union{Nothing,
-                       <:Tuple{<:Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult},
-                               <:Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult}}}, args...;
+ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
+                       <:Option{<:AbstractUncertaintySetResult}}}, args...;
              kwargs...)
-ucs(uc::PortfolioOptimisers.AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-mu_ucs(uc::Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult}, args...; kwargs...)
-mu_ucs(uc::PortfolioOptimisers.AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-sigma_ucs(uc::Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult}, args...; kwargs...)
-PortfolioOptimisers.AbstractUncertaintySetEstimator
-PortfolioOptimisers.AbstractUncertaintySetAlgorithm
-PortfolioOptimisers.AbstractUncertaintySetResult
-PortfolioOptimisers.AbstractUncertaintyKAlgorithm
-PortfolioOptimisers.AbstractEllipseUncertaintySetResultClass
-PortfolioOptimisers.ucs_factory
-PortfolioOptimisers.k_ucs
+ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
+mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
+sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+AbstractUncertaintySetEstimator
+AbstractUncertaintySetAlgorithm
+AbstractUncertaintySetResult
+AbstractUncertaintyKAlgorithm
+AbstractEllipseUncertaintySetResultClass
+ucs_selector
+k_ucs
 ```

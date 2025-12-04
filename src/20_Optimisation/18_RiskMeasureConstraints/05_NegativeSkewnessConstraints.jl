@@ -28,8 +28,7 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:QuadRiskExpr},
                                      opt::RiskJuMPOptimisationEstimator,
-                                     nskew_risk::AbstractJuMPScalar, key::Symbol,
-                                     V::AbstractMatrix)
+                                     nskew_risk::AbstractJuMPScalar, key::Symbol, V::MatNum)
     w = model[:w]
     qnskew_risk = model[Symbol(:qd_, key)] = @expression(model, dot(w, V, w))
     ub = variance_risk_bounds_val(false, r.settings.ub)
@@ -50,8 +49,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
                                                  SecondOrderCone())
     return set_negative_skewness_risk!(model, r, opt, nskew_risk, key, V)
 end
-function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
-                               ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
+function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness, ::RkJuMPOpt,
                                pr::LowOrderPrior, args...; kwargs...)
     throw(ArgumentError("NegativeSkewness requires a HighOrderPrior, not a $(typeof(pr))."))
 end

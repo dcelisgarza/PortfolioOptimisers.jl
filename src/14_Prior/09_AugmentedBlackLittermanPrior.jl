@@ -47,17 +47,15 @@ Augmented Black-Litterman prior estimator for asset returns.
                                  mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                  re::AbstractRegressionEstimator = StepwiseRegression(),
                                  ve::AbstractVarianceEstimator = SimpleVariance(),
-                                 a_views::Union{<:LinearConstraintEstimator,
-                                                <:BlackLittermanViews},
-                                 f_views::Union{<:LinearConstraintEstimator,
-                                                <:BlackLittermanViews},
-                                 a_sets::Union{Nothing, <:AssetSets} = nothing,
-                                 f_sets::Union{Nothing, <:AssetSets} = nothing,
-                                 a_views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                                 f_views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
-                                 w::Union{Nothing, <:AbstractVector} = nothing, rf::Real = 0.0,
-                                 l::Union{Nothing, <:Real} = nothing,
-                                 tau::Union{Nothing, <:Real} = nothing)
+                                 a_views::Lc_BLV,
+                                 f_views::Lc_BLV,
+                                 a_sets::Option{<:AssetSets} = nothing,
+                                 f_sets::Option{<:AssetSets} = nothing,
+                                 a_views_conf::Option{<:Num_VecNum} = nothing,
+                                 f_views_conf::Option{<:Num_VecNum} = nothing,
+                                 w::Option{<:VecNum} = nothing, rf::Number = 0.0,
+                                 l::Option{<:Number} = nothing,
+                                 tau::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -76,8 +74,8 @@ Keyword arguments correspond to the fields above.
 julia> AugmentedBlackLittermanPrior(;
                                     a_sets = AssetSets(; key = "nx",
                                                        dict = Dict("nx" => ["A", "B", "C"])),
-                                    f_sets = AssetSets(; key = "fx",
-                                                       dict = Dict("fx" => ["F1", "F2"])),
+                                    f_sets = AssetSets(; key = "nx",
+                                                       dict = Dict("nx" => ["F1", "F2"])),
                                     a_views = LinearConstraintEstimator(;
                                                                         val = ["A == 0.03",
                                                                                "B + C == 0.04"]),
@@ -139,15 +137,19 @@ AugmentedBlackLittermanPrior
                │           w ┼ nothing
                │   corrected ┴ Bool: true
        a_views ┼ LinearConstraintEstimator
-               │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+               │   key ┴ nothing
        f_views ┼ LinearConstraintEstimator
-               │   val ┴ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
+               │   val ┼ Vector{String}: ["F1 == 0.01", "F2 == 0.02"]
+               │   key ┴ nothing
         a_sets ┼ AssetSets
                │    key ┼ String: "nx"
+               │   ukey ┼ String: "ux"
                │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
         f_sets ┼ AssetSets
-               │    key ┼ String: "fx"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("fx" => ["F1", "F2"])
+               │    key ┼ String: "nx"
+               │   ukey ┼ String: "ux"
+               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["F1", "F2"])
   a_views_conf ┼ nothing
   f_views_conf ┼ nothing
              w ┼ nothing
@@ -186,21 +188,14 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
                                           re::AbstractRegressionEstimator,
-                                          ve::AbstractVarianceEstimator,
-                                          a_views::Union{<:LinearConstraintEstimator,
-                                                         <:BlackLittermanViews},
-                                          f_views::Union{<:LinearConstraintEstimator,
-                                                         <:BlackLittermanViews},
-                                          a_sets::Union{Nothing, <:AssetSets},
-                                          f_sets::Union{Nothing, <:AssetSets},
-                                          a_views_conf::Union{Nothing, <:Real,
-                                                              <:AbstractVector},
-                                          f_views_conf::Union{Nothing, <:Real,
-                                                              <:AbstractVector},
-                                          w::Union{Nothing, <:AbstractVector}, rf::Real,
-                                          l::Union{Nothing, <:Real},
-                                          tau::Union{Nothing, <:Real})
-        if isa(w, AbstractVector)
+                                          ve::AbstractVarianceEstimator, a_views::Lc_BLV,
+                                          f_views::Lc_BLV, a_sets::Option{<:AssetSets},
+                                          f_sets::Option{<:AssetSets},
+                                          a_views_conf::Option{<:Num_VecNum},
+                                          f_views_conf::Option{<:Num_VecNum},
+                                          w::Option{<:VecNum}, rf::Number,
+                                          l::Option{<:Number}, tau::Option{<:Number})
+        if !isnothing(w)
             @argcheck(!isempty(w))
         end
         if isa(a_views, LinearConstraintEstimator)
@@ -228,24 +223,18 @@ function AugmentedBlackLittermanPrior(;
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
-                                      a_views::Union{<:LinearConstraintEstimator,
-                                                     <:BlackLittermanViews},
-                                      f_views::Union{<:LinearConstraintEstimator,
-                                                     <:BlackLittermanViews},
-                                      a_sets::Union{Nothing, <:AssetSets} = nothing,
-                                      f_sets::Union{Nothing, <:AssetSets} = nothing,
-                                      a_views_conf::Union{Nothing, <:Real,
-                                                          <:AbstractVector} = nothing,
-                                      f_views_conf::Union{Nothing, <:Real,
-                                                          <:AbstractVector} = nothing,
-                                      w::Union{Nothing, <:AbstractVector} = nothing,
-                                      rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
-                                      tau::Union{Nothing, <:Real} = nothing)
+                                      a_views::Lc_BLV, f_views::Lc_BLV,
+                                      a_sets::Option{<:AssetSets} = nothing,
+                                      f_sets::Option{<:AssetSets} = nothing,
+                                      a_views_conf::Option{<:Num_VecNum} = nothing,
+                                      f_views_conf::Option{<:Num_VecNum} = nothing,
+                                      w::Option{<:VecNum} = nothing, rf::Number = 0.0,
+                                      l::Option{<:Number} = nothing,
+                                      tau::Option{<:Number} = nothing)
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior,
-                 w::Union{Nothing, <:AbstractVector} = nothing)
+function factory(pe::AugmentedBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), ve = factory(pe.ve, w),
@@ -269,7 +258,7 @@ function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+    prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
           strict::Bool = false, kwargs...)
 
 Compute augmented Black-Litterman prior moments for asset returns.
@@ -318,8 +307,8 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - [`calc_omega`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
-function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
+               strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

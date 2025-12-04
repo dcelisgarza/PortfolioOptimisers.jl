@@ -49,7 +49,7 @@ Detone
 struct Detone{T1} <: AbstractDetoneEstimator
     n::T1
     function Detone(n::Integer)
-        @argcheck(n > zero(n), DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
+        @argcheck(zero(n) < n, DomainError)
         return new{typeof(n)}(n)
     end
 end
@@ -57,7 +57,7 @@ function Detone(; n::Integer = 1)
     return Detone(n)
 end
 """
-    detone!(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
+    detone!(dt::Detone, X::MatNum; pdm::Option{<:Posdef} = Posdef())
     detone!(::Nothing, args...)
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
@@ -114,14 +114,17 @@ julia> X
 
   - [`detone`](@ref)
   - [`Detone`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function detone!(::Nothing, args...)
     return nothing
 end
-function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
+function detone!(ce::Detone, X::MatNum, pdm::Option{<:Posdef} = Posdef())
     n = ce.n
-    @argcheck(one(n) <= n <= size(X, 2),
-              DomainError(n, range_msg("`n`", one(n), size(X, 2), n, true, true) * "."))
+    @argcheck(zero(n) < n <= size(X, 2),
+              DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
     s = diag(X)
     iscov = any(!isone, s)
@@ -141,7 +144,7 @@ function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = 
     return nothing
 end
 """
-    detone(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
+    detone(dt::Detone, X::MatNum; pdm::Option{<:Posdef} = Posdef())
     detone(::Nothing, args...)
 
 Out-of-place version of [`detone!`](@ref).
@@ -150,11 +153,14 @@ Out-of-place version of [`detone!`](@ref).
 
   - [`detone!`](@ref)
   - [`Detone`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function detone(::Nothing, args...)
     return nothing
 end
-function detone(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
+function detone(ce::Detone, X::MatNum, pdm::Option{<:Posdef} = Posdef())
     X = copy(X)
     detone!(ce, X, pdm)
     return X

@@ -9,10 +9,10 @@ HierarchicalRiskMeasureSettings
 SumScalariser
 MaxScalariser
 LogSumExpScalariser
-PortfolioOptimisers.AbstractBaseRiskMeasure
-PortfolioOptimisers.NoOptimisationRiskMeasure
-PortfolioOptimisers.OptimisationRiskMeasure
-PortfolioOptimisers.AbstractRiskMeasureSettings
-PortfolioOptimisers.Scalariser
-PortfolioOptimisers.nothing_scalar_array_factory
+AbstractBaseRiskMeasure
+NoOptimisationRiskMeasure
+OptimisationRiskMeasure
+AbstractRiskMeasureSettings
+Scalariser
+nothing_scalar_array_selector
 ```

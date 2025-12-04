@@ -73,11 +73,11 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis(me, mp, alg)
 end
-function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::Cokurtosis, w::Option{<:AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """
-    _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+    _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)
 
 Internal helper for cokurtosis computation.
 
@@ -90,7 +90,7 @@ Internal helper for cokurtosis computation.
 
 # Returns
 
-  - `ckurt::Matrix{<:Real}`: Cokurtosis tensor after matrix processing.
+  - `ckurt::Matrix{<:Number}`: Cokurtosis tensor after matrix processing.
 
 # Related
 
@@ -98,7 +98,7 @@ Internal helper for cokurtosis computation.
   - [`matrix_processing!`](@ref)
   - [`cokurtosis`](@ref)
 """
-function _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)
     T, N = size(X)
     o = transpose(range(one(eltype(X)), one(eltype(X)); length = N))
     z = kron(o, X) ⊙ kron(X, o)
@@ -107,7 +107,7 @@ function _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
     return ckurt
 end
 """
-    cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1,
+    cokurtosis(ke::Option{<:Cokurtosis}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
 Compute the cokurtosis tensor for a dataset.
@@ -133,7 +133,7 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
 
 # Returns
 
-  - `ckurt::Matrix{<:Real}`: Cokurtosis tensor (assets^2 × assets^2).
+  - `ckurt::Matrix{<:Number}`: Cokurtosis tensor (assets^2 × assets^2).
 
 # Examples
 
@@ -157,7 +157,7 @@ julia> cokurtosis(Cokurtosis(), X)
   - [`Cokurtosis`](@ref)
   - [`_cokurtosis`](@ref)
 """
-function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
+function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -167,7 +167,7 @@ function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dim
     X = X .- mu
     return _cokurtosis(X, ke.mp)
 end
-function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
+function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

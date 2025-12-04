@@ -13,29 +13,28 @@ EntropyPoolingPrior
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any,
-                                       <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
-               X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
+                                       <:StagedEP},
+               X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:H0_EntropyPooling}, X::AbstractMatrix;
-      F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+                              <:H0_EntropyPooling}, X::MatNum;
+      F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
       kwargs...)
-PortfolioOptimisers.AbstractEntropyPoolingOptimiser
-PortfolioOptimisers.AbstractEntropyPoolingAlgorithm
-PortfolioOptimisers.AbstractEntropyPoolingOptAlgorithm
-PortfolioOptimisers.get_epw
-PortfolioOptimisers.add_ep_constraint!
-PortfolioOptimisers.replace_prior_views
-PortfolioOptimisers.get_pr_value
-PortfolioOptimisers.ep_mu_views!
-PortfolioOptimisers.fix_mu!
-PortfolioOptimisers.ep_var_views!
-PortfolioOptimisers.entropy_pooling
-PortfolioOptimisers.ep_cvar_views_solve!
-PortfolioOptimisers.ep_sigma_views!
-PortfolioOptimisers.fix_sigma!
-PortfolioOptimisers.ep_rho_views!
-PortfolioOptimisers.ep_sk_views!
-PortfolioOptimisers.ep_kt_views!
+AbstractEntropyPoolingOptimiser
+AbstractEntropyPoolingAlgorithm
+AbstractEntropyPoolingOptAlgorithm
+add_ep_constraint!
+replace_prior_views
+get_pr_value
+ep_mu_views!
+fix_mu!
+ep_var_views!
+entropy_pooling
+ep_cvar_views_solve!
+ep_sigma_views!
+fix_sigma!
+ep_rho_views!
+ep_sk_views!
+ep_kt_views!
 ```

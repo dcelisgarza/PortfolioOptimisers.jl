@@ -3,8 +3,8 @@
 ```@docs
 DistanceDistance
 distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+                  X::MatNum; dims::Int = 1, kwargs...)
+distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
 cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+                      X::MatNum; dims::Int = 1, kwargs...)
 ```

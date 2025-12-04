@@ -1,5 +1,7 @@
 # Ordered Weights Array
 
+## Public
+
 ```@docs
 MaximumEntropy
 MinimumSquaredDistance
@@ -17,9 +19,14 @@ owa_rg
 owa_cvarrg
 owa_wcvarrg
 owa_tgrg
-PortfolioOptimisers.AbstractOrderedWeightsArrayEstimator
-PortfolioOptimisers.AbstractOrderedWeightsArrayAlgorithm
-PortfolioOptimisers.ncrra_weights
-PortfolioOptimisers.owa_model_setup
-PortfolioOptimisers.owa_model_solve
+```
+
+## Private
+
+```@docs
+AbstractOrderedWeightsArrayEstimator
+AbstractOrderedWeightsArrayAlgorithm
+ncrra_weights
+owa_model_setup
+owa_model_solve
 ```

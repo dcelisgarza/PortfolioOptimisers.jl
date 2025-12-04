@@ -61,7 +61,7 @@ function PCA(; kwargs::NamedTuple = (;))
     return PCA(kwargs)
 end
 """
-    StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
+    StatsAPI.fit(drtgt::PCA, X::MatNum)
 
 Fit a Principal Component Analysis (PCA) model to the data matrix `X` using the configuration in `drtgt`.
 
@@ -82,7 +82,7 @@ This method applies PCA as a dimension reduction technique for regression-based 
   - [`DimensionReductionTarget`](@ref)
   - [`DimensionReductionRegression`](@ref)
 """
-function StatsAPI.fit(drtgt::PCA, X::AbstractMatrix)
+function StatsAPI.fit(drtgt::PCA, X::MatNum)
     return MultivariateStats.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
 """
@@ -128,7 +128,7 @@ function PPCA(; kwargs::NamedTuple = (;))
     return PPCA(kwargs)
 end
 """
-    StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
+    StatsAPI.fit(drtgt::PPCA, X::MatNum)
 
 Fit a Probabilistic Principal Component Analysis (PPCA) model to the data matrix `X` using the configuration in `drtgt`.
 
@@ -149,7 +149,7 @@ This method applies PPCA as a dimension reduction technique for regression-based
   - [`DimensionReductionTarget`](@ref)
   - [`DimensionReductionRegression`](@ref)
 """
-function StatsAPI.fit(drtgt::PPCA, X::AbstractMatrix)
+function StatsAPI.fit(drtgt::PPCA, X::MatNum)
     return MultivariateStats.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
 """
@@ -227,14 +227,13 @@ function DimensionReductionRegression(;
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(re::DimensionReductionRegression, w::Option{<:AbstractWeights} = nothing)
     return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
 """
-    prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
+    prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
 
 Prepare data for dimension reduction regression.
 
@@ -247,8 +246,8 @@ This helper function standardizes the feature matrix `X` (using Z-score normaliz
 
 # Returns
 
-  - `x1::AbstractMatrix{<:Real}`: Projected feature matrix with an intercept column prepended.
-  - `Vp::AbstractMatrix{<:Real}`: Projection matrix from the fitted dimension reduction model.
+  - `x1::MatNum`: Projected feature matrix with an intercept column prepended.
+  - `Vp::MatNum`: Projection matrix from the fitted dimension reduction model.
 
 # Details
 
@@ -263,7 +262,7 @@ This helper function standardizes the feature matrix `X` (using Z-score normaliz
   - [`PCA`](@ref)
   - [`PPCA`](@ref)
 """
-function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
+function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
     N = size(X, 1)
     X_std = StatsBase.standardize(StatsBase.ZScoreTransform, transpose(X); dims = 2)
     model = fit(drtgt, X_std)
@@ -273,8 +272,8 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     return x1, Vp
 end
 """
-    _regression(re::DimensionReductionRegression, y::AbstractVector, mu::AbstractVector,
-               sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
+    _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum,
+               sigma::VecNum, x1::MatNum, Vp::MatNum)
 
 Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
 
@@ -291,7 +290,7 @@ This function fits a regression model (as specified by `retgt`) to the response 
 
 # Returns
 
-  - `beta::Vector{<:Real}`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
+  - `beta::VecNum`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
 
 # Details
 
@@ -305,9 +304,8 @@ This function fits a regression model (as specified by `retgt`) to the response 
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
 """
-function _regression(re::DimensionReductionRegression, y::AbstractVector,
-                     mu::AbstractVector, sigma::AbstractVector, x1::AbstractMatrix,
-                     Vp::AbstractMatrix)
+function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
+                     x1::MatNum, Vp::MatNum)
     mean_y = !haskey(re.retgt.kwargs, :wts) ? mean(y) : mean(y, re.retgt.kwargs.wts)
     fit_result = fit(re.retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
@@ -317,7 +315,7 @@ function _regression(re::DimensionReductionRegression, y::AbstractVector,
     return beta
 end
 """
-    regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)
+    regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
 
 Apply dimension reduction regression to each column of a response matrix.
 
@@ -349,7 +347,7 @@ This method fits a regression model with dimension reduction (e.g., PCA or PPCA)
   - [`prep_dim_red_reg`](@ref)
   - [`Regression`](@ref)
 """
-function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)
+function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     cols = size(F, 2) + 1
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)

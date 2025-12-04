@@ -4,10 +4,10 @@
 EQ
 LEQ
 GEQ
-PortfolioOptimisers.AbstractConstraintResult
-PortfolioOptimisers.AbstractConstraintEstimator
-PortfolioOptimisers.ComparisonOperator
-PortfolioOptimisers.EqualityComparisonOperator
-PortfolioOptimisers.InequalityComparisonOperator
-PortfolioOptimisers.comparison_sign_ineq_flag
+AbstractConstraintResult
+AbstractConstraintEstimator
+ComparisonOperator
+EqualityComparisonOperator
+InequalityComparisonOperator
+comparison_sign_ineq_flag
 ```

@@ -14,6 +14,7 @@ Abstract supertype for all histogram binning algorithms.
   - [`HacineGharbiRavier`](@ref)
 """
 abstract type AbstractBins <: AbstractAlgorithm end
+const Int_Bin = Union{<:AbstractBins, <:Integer}
 """
     abstract type AstroPyBins <: AbstractBins end
 
@@ -95,7 +96,7 @@ Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
-    get_bin_width_func(bins::Union{<:AbstractBins, <:Integer})
+    get_bin_width_func(bins::Int_Bin)
 
 Return the bin width selection function associated with a histogram binning algorithm.
 
@@ -150,8 +151,8 @@ function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
 end
 """
-    calc_num_bins(bins::Union{<:AbstractBins, <:Integer}, xj::AbstractVector,
-                  xi::AbstractVector, j::Integer, i::Integer, bin_width_func, T::Integer)
+    calc_num_bins(bins::Int_Bin, xj::VecNum,
+                  xi::VecNum, j::Integer, i::Integer, bin_width_func, T::Integer)
 
 Compute the number of histogram bins for a pair of variables using a specified binning algorithm.
 
@@ -183,8 +184,8 @@ This function determines the number of bins to use for histogram-based calculati
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
 """
-function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
-                       i::Integer, bin_width_func, ::Any)
+function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
+                       bin_width_func, ::Any)
     xjl, xju = extrema(xj)
     k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))
     return round(Int,
@@ -197,8 +198,8 @@ function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j:
                      k1
                  end)
 end
-function calc_num_bins(::HacineGharbiRavier, xj::AbstractVector, xi::AbstractVector,
-                       j::Integer, i::Integer, ::Any, T::Integer)
+function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
+                       ::Any, T::Integer)
     corr = cor(xj, xi)
     return round(Int, if isone(corr)
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
@@ -211,7 +212,7 @@ function calc_num_bins(bins::Integer, args...)
     return bins
 end
 """
-    calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
+    calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
 
 Compute histogram-based marginal and joint distributions for two variables.
 
@@ -225,9 +226,9 @@ This function computes the normalised histograms (probability mass functions) fo
 
 # Returns
 
-  - `ex::Real`: Entropy of `xj`.
-  - `ey::Real`: Entropy of `xi`.
-  - `hxy::Matrix{<:Real}`: Joint histogram (counts, not normalised to probability).
+  - `ex::Number`: Entropy of `xj`.
+  - `ey::Number`: Entropy of `xi`.
+  - `hxy::Matrix{<:Number}`: Joint histogram (counts, not normalised to probability).
 
 # Details
 
@@ -240,7 +241,7 @@ This function computes the normalised histograms (probability mass functions) fo
   - [`variation_info`](@ref)
   - [`mutual_info`](@ref)
 """
-function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
+function calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
     bp1 = bins + one(bins)
 
     xjl = minimum(xj) - eps(eltype(xj))
@@ -264,7 +265,7 @@ function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     return ex, ey, hxy
 end
 """
-    intrinsic_mutual_info(X::AbstractMatrix)
+    intrinsic_mutual_info(X::MatNum)
 
 Compute the intrinsic mutual information from a joint histogram.
 
@@ -276,7 +277,7 @@ This function calculates the mutual information between two variables given thei
 
 # Returns
 
-  - `mi::Real`: The intrinsic mutual information between the two variables.
+  - `mi::Number`: The intrinsic mutual information between the two variables.
 
 # Details
 
@@ -290,7 +291,7 @@ This function calculates the mutual information between two variables given thei
   - [`variation_info`](@ref)
   - [`mutual_info`](@ref)
 """
-function intrinsic_mutual_info(X::AbstractMatrix)
+function intrinsic_mutual_info(X::MatNum)
     p_i = vec(sum(X; dims = 2))
     p_j = vec(sum(X; dims = 1))
 
@@ -314,8 +315,8 @@ function intrinsic_mutual_info(X::AbstractMatrix)
     return sum(mi)
 end
 """
-    variation_info(X::AbstractMatrix;
-                   bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+    variation_info(X::MatNum;
+                   bins::Int_Bin = HacineGharbiRavier(),
                    normalise::Bool = true)
 
 Compute the variation of information (VI) matrix for a set of variables.
@@ -330,7 +331,7 @@ This function calculates the pairwise variation of information between all colum
 
 # Returns
 
-  - `var_mtx::Matrix{<:Real}`: Symmetric matrix of pairwise variation of information values.
+  - `var_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise variation of information values.
 
 # Details
 
@@ -345,8 +346,7 @@ This function calculates the pairwise variation of information between all colum
   - [`calc_hist_data`](@ref)
   - [`intrinsic_mutual_info`](@ref)
 """
-function variation_info(X::AbstractMatrix,
-                        bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                         normalise::Bool = true)
     T, N = size(X)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
@@ -371,9 +371,7 @@ function variation_info(X::AbstractMatrix,
     return var_mtx
 end
 # COV_EXCL_START
-function mutual_variation_info(X::AbstractMatrix,
-                               bins::Union{<:AbstractBins, <:Integer} = Knuth(),
-                               normalise::Bool = true)
+function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
@@ -414,8 +412,8 @@ function mutual_variation_info(X::AbstractMatrix,
 end
 # COV_EXCL_STOP
 """
-    mutual_info(X::AbstractMatrix;
-                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+    mutual_info(X::MatNum;
+                bins::Int_Bin = HacineGharbiRavier(),
                 normalise::Bool = true)
 
 Compute the mutual information (MI) matrix for a set of variables.
@@ -430,7 +428,7 @@ This function calculates the pairwise mutual information between all columns of 
 
 # Returns
 
-  - `mut_mtx::Matrix{<:Real}`: Symmetric matrix of pairwise mutual information values.
+  - `mut_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise mutual information values.
 
 # Details
 
@@ -445,8 +443,7 @@ This function calculates the pairwise mutual information between all columns of 
   - [`calc_hist_data`](@ref)
   - [`intrinsic_mutual_info`](@ref)
 """
-function mutual_info(X::AbstractMatrix,
-                     bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+function mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                      normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)

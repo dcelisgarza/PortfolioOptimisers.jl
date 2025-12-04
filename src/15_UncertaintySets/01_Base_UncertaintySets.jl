@@ -39,6 +39,7 @@ Represents the interface for all result types that encode uncertainty sets for r
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
+const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
 """
     abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 
@@ -53,10 +54,10 @@ Subtypes implement specific methods for generating the scaling parameter, which 
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
+const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
-    ucs(uc::Union{Nothing,
-                  <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult},
-                          <:Union{Nothing, <:AbstractUncertaintySetResult}}}, args...; kwargs...)
+    ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
+                           <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
 Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is provided.
 
@@ -68,7 +69,7 @@ Returns the argument(s) unchanged. This is a no-op function used to handle cases
 
 # Returns
 
-  - `uc::Union{Nothing, <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult}, <:Union{Nothing, <:AbstractUncertaintySetResult}}}`: The input, unchanged.
+  - `uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}`: The input, unchanged.
 
 # Related
 
@@ -77,14 +78,13 @@ Returns the argument(s) unchanged. This is a no-op function used to handle cases
   - [`BoxUncertaintySet`](@ref)
   - [`EllipseUncertaintySet`](@ref)
 """
-function ucs(uc::Union{Nothing,
-                       <:Tuple{<:Union{Nothing, <:AbstractUncertaintySetResult},
-                               <:Union{Nothing, <:AbstractUncertaintySetResult}}}, args...;
+function ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
+                                <:Option{<:AbstractUncertaintySetResult}}}, args...;
              kwargs...)
     return uc
 end
 """
-    mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
+    mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
 Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is provided.
 
@@ -96,7 +96,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
 
 # Returns
 
-  - `uc::Union{Nothing, <:AbstractUncertaintySetResult}`: The input, unchanged.
+  - `uc::Option{<:AbstractUncertaintySetResult}`: The input, unchanged.
 
 # Related
 
@@ -105,11 +105,11 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`BoxUncertaintySet`](@ref)
   - [`EllipseUncertaintySet`](@ref)
 """
-function mu_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
+function mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
 end
 """
-    sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
+    sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
 Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is provided.
 
@@ -121,7 +121,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
 
 # Returns
 
-  - `uc::Union{Nothing, <:AbstractUncertaintySetResult}`: The input, unchanged.
+  - `uc::Option{<:AbstractUncertaintySetResult}`: The input, unchanged.
 
 # Related
 
@@ -130,15 +130,15 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`BoxUncertaintySet`](@ref)
   - [`EllipseUncertaintySet`](@ref)
 """
-function sigma_ucs(uc::Union{Nothing, <:AbstractUncertaintySetResult}, args...; kwargs...)
+function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
 end
 """
-    ucs_factory(risk_ucs::Nothing, prior_ucs::Nothing)
-    ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}, prior_ucs::Any)
-    ucs_factory(risk_ucs::Nothing, prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator})
+    ucs_selector(risk_ucs::Nothing, prior_ucs::Nothing)
+    ucs_selector(risk_ucs::UcSE_UcS, prior_ucs::Any)
+    ucs_selector(risk_ucs::Nothing, prior_ucs::UcSE_UcS)
 
-Factory function for selecting uncertainty sets from risk measure or prior result instances.
+Function for selecting uncertainty sets from risk measure or prior result instances.
 
 # Arguments
 
@@ -148,8 +148,8 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
 # Returns
 
   - `nothing`: If both `risk_ucs` and `prior_ucs` are `nothing`.
-  - `risk_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is not `nothing`.
-  - `prior_ucs::Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
+  - `risk_ucs::UcSE_UcS`: If `risk_ucs` is not `nothing`.
+  - `prior_ucs::UcSE_UcS`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.
 
 # Related
 
@@ -157,19 +157,16 @@ Factory function for selecting uncertainty sets from risk measure or prior resul
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`factory`](@ref)
 """
-function ucs_factory(::Nothing, ::Nothing)
+function ucs_selector(::Nothing, ::Nothing)
     return nothing
 end
-function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult,
-                                     <:AbstractUncertaintySetEstimator}, ::Any)
+function ucs_selector(risk_ucs::UcSE_UcS, ::Any)
     return risk_ucs
 end
-function ucs_factory(::Nothing,
-                     prior_ucs::Union{<:AbstractUncertaintySetResult,
-                                      <:AbstractUncertaintySetEstimator})
+function ucs_selector(::Nothing, prior_ucs::UcSE_UcS)
     return prior_ucs
 end
-function ucs_view(risk_ucs::Union{Nothing, <:AbstractUncertaintySetEstimator}, ::Any)
+function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
     return risk_ucs
 end
 """
@@ -297,7 +294,7 @@ Stores lower and upper bounds for the uncertain quantity, such as expected retur
 
 # Constructor
 
-    BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
+    BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -325,22 +322,20 @@ BoxUncertaintySet
 struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     lb::T1
     ub::T2
-    function BoxUncertaintySet(lb::AbstractArray, ub::AbstractArray)
+    function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
         @argcheck(!isempty(lb))
         @argcheck(!isempty(ub))
         @argcheck(size(lb) == size(ub))
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
+function BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)
     return BoxUncertaintySet(lb, ub)
 end
-function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractVector, <:AbstractVector},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i)
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
 end
-function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractMatrix, <:AbstractMatrix},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 """
@@ -415,11 +410,12 @@ Algorithm for computing the scaling parameter `k` for ellipse uncertainty sets u
 """
 struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
-    k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix, sigma_X::AbstractMatrix)
-    k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
-    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
-    k_ucs(type::Real, args...)
+    k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
+    k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
+    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
+    k_ucs(type::Number, args...)
 
+ArrNum
 Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio optimisation.
 
 # Arguments
@@ -429,11 +425,11 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
   - `X`: Data matrix (returns).
   - `sigma_X`: Covariance matrix.
   - `args...`: Additional arguments.
-  - `type`: Real value for direct scaling.
+  - `type`: Number value for direct scaling.
 
 # Returns
 
-  - `k::Real`: Scaling parameter.
+  - `k::Number`: Scaling parameter.
 
 # Details
 
@@ -442,7 +438,7 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
       + Normal: `1 - q`'th quantile of the Mahalanobis distances.
       + General: formula `sqrt((1 - q) / q)`.
       + Chi-squared: `1 - q`'th quantile of the chi-squared distribution.
-      + Real: returns the provided value directly.
+      + Number: returns the provided value directly.
 
   - Supports multiple dispatch for extensibility.
 
@@ -453,18 +449,17 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`EllipseUncertaintySetAlgorithm`](@ref)
 """
-function k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix,
-               sigma_X::AbstractMatrix)
+function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
     k_mus = diag(X * (sigma_X \ transpose(X)))
     return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
-function k_ucs(::GeneralKUncertaintyAlgorithm, q::Real, args...)
+function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Real, X::AbstractArray, args...)
+function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
-function k_ucs(type::Real, args...)
+function k_ucs(type::Number, args...)
     return type
 end
 """
@@ -484,7 +479,7 @@ Ellipse uncertainty sets model uncertainty by specifying an ellipsoidal region f
 # Constructor
 
     EllipseUncertaintySetAlgorithm(;
-                                   method::Union{<:AbstractUncertaintyKAlgorithm, <:Real} = ChiSqKUncertaintyAlgorithm(),
+                                   method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                    diagonal::Bool = true)
 
   - `method`: Sets the scaling algorithm or value for the ellipse.
@@ -509,14 +504,11 @@ EllipseUncertaintySetAlgorithm
 struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
-    function EllipseUncertaintySetAlgorithm(method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                          <:Real}, diagonal::Bool)
+    function EllipseUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
     end
 end
-function EllipseUncertaintySetAlgorithm(;
-                                        method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                      <:Real} = ChiSqKUncertaintyAlgorithm(),
+function EllipseUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                         diagonal::Bool = true)
     return EllipseUncertaintySetAlgorithm(method, diagonal)
 end
@@ -577,7 +569,7 @@ Stores a covariance matrix, a scaling parameter, and a class identifier for the 
 
 # Constructor
 
-    EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
+    EllipseUncertaintySet(; sigma::MatNum, k::Number,
                           class::AbstractEllipseUncertaintySetResultClass)
 
 Keyword arguments correspond to the fields above.
@@ -609,28 +601,26 @@ struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
-    function EllipseUncertaintySet(sigma::AbstractMatrix, k::Real,
+    function EllipseUncertaintySet(sigma::MatNum, k::Number,
                                    class::AbstractEllipseUncertaintySetResultClass)
         @argcheck(!isempty(sigma))
-        assert_matrix_issquare(sigma)
+        assert_matrix_issquare(sigma, :sigma)
         @argcheck(k > zero(k))
         return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
     end
 end
-function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
+function EllipseUncertaintySet(; sigma::MatNum, k::Number,
                                class::AbstractEllipseUncertaintySetResultClass)
     return EllipseUncertaintySet(sigma, k, class)
 end
-function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,
-                                                  <:SigmaEllipseUncertaintySet},
-                  i::AbstractVector)
-    i = fourth_moment_index_factory(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
+function ucs_view(risk_ucs::EllipseUncertaintySet{<:MatNum, <:Any,
+                                                  <:SigmaEllipseUncertaintySet}, i)
+    i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
     return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                  class = risk_ucs.class)
 end
-function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,
-                                                  <:MuEllipseUncertaintySet},
-                  i::AbstractVector)
+function ucs_view(risk_ucs::EllipseUncertaintySet{<:MatNum, <:Any,
+                                                  <:MuEllipseUncertaintySet}, i)
     return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                  class = risk_ucs.class)
 end

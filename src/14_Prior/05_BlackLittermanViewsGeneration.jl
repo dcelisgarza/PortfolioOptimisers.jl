@@ -15,7 +15,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Constructor
 
-    BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
+    BlackLittermanViews(; P::MatNum, Q::VecNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -40,18 +40,19 @@ BlackLittermanViews
 struct BlackLittermanViews{T1, T2} <: AbstractResult
     P::T1
     Q::T2
-    function BlackLittermanViews(P::AbstractMatrix, Q::AbstractVector)
+    function BlackLittermanViews(P::MatNum, Q::VecNum)
         @argcheck(!isempty(P))
         @argcheck(!isempty(Q))
         @argcheck(size(P, 1) == length(Q))
         return new{typeof(P), typeof(Q)}(P, Q)
     end
 end
-function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
+function BlackLittermanViews(; P::MatNum, Q::VecNum)
     return BlackLittermanViews(P, Q)
 end
+const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
-    get_black_litterman_views(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
+    get_black_litterman_views(lcs::PR_VecPR,
                               sets::AssetSets; datatype::DataType = Float64,
                               strict::Bool = false)
 
@@ -96,10 +97,8 @@ BlackLittermanViews
   - [`parse_equation`](@ref)
   - [`AssetSets`](@ref)
 """
-function get_black_litterman_views(lcs::Union{<:ParsingResult,
-                                              <:AbstractVector{<:ParsingResult}},
-                                   sets::AssetSets; datatype::DataType = Float64,
-                                   strict::Bool = false)
+function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
+                                   datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs))
     end
@@ -131,9 +130,8 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
     end
 end
 """
-    black_litterman_views(views::Union{Nothing, <:BlackLittermanViews}, args...; kwargs...)
-    black_litterman_views(views::Union{<:AbstractString, Expr,
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+    black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
+    black_litterman_views(views::EqnType,
                           sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
     black_litterman_views(views::LinearConstraintEstimator, sets::AssetSets;
                           datatype::DataType = Float64, strict::Bool = false)
@@ -147,7 +145,7 @@ Unified interface for constructing or passing through Black-Litterman investor v
   - `views`:
 
       + `nothing` or [`BlackLittermanViews`](@ref): it is returned unchanged.
-      + `Union{<:AbstractString, Expr, <:AbstractVector{<:Union{<:AbstractString, Expr}}}`: the view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
+      + `EqnType`: the view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
       + [`LinearConstraintEstimator`](@ref): calls the method described above using the `val` field of the estimator.
 
   - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
@@ -184,13 +182,10 @@ BlackLittermanViews
   - [`AssetSets`](@ref)
   - [`LinearConstraintEstimator`](@ref)
 """
-function black_litterman_views(views::Union{Nothing, <:BlackLittermanViews}, args...;
-                               kwargs...)
+function black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
     return views
 end
-function black_litterman_views(eqn::Union{<:AbstractString, Expr,
-                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                               sets::AssetSets; datatype::DataType = Float64,
+function black_litterman_views(eqn::EqnType, sets::AssetSets; datatype::DataType = Float64,
                                strict::Bool = false)
     lcs = parse_equation(eqn; ops1 = ("==",), ops2 = (:call, :(==)), datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, true)
@@ -202,10 +197,8 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
 end
 """
     assert_bl_views_conf(::Nothing, args...)
-    assert_bl_views_conf(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                         views::Union{<:AbstractString, Expr,
-                                      <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                      <:LinearConstraintEstimator, <:BlackLittermanViews})
+    assert_bl_views_conf(views_conf::Option{<:Num_VecNum},
+                         views::Union{<:EqnType, <:LinearConstraintEstimator, <:BlackLittermanViews})
 
 Validate Black-Litterman view confidence specification.
 
@@ -225,13 +218,13 @@ Validate Black-Litterman view confidence specification.
   - `views_conf`:
 
       + `::Nothing`, no-op.
-      + `::Real`, `0 < views_conf < 1`.
-      + `::AbstractVector{<:Real}`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
+      + `::Number`, `0 < views_conf < 1`.
+      + `::VecNum`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
 
   - `views`:
 
-      + `::Union{<:AbstractString, Expr}`, `length(views_conf) == 1`.
-      + `::AbstractVector{<:Union{<:AbstractString, Expr}}`, `length(views_conf) == length(views)`.
+      + `::Str_Expr`, `length(views_conf) == 1`.
+      + `::VecStr_Expr`, `length(views_conf) == length(views)`.
       + `::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
       + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
 
@@ -242,15 +235,11 @@ Validate Black-Litterman view confidence specification.
 function assert_bl_views_conf(::Nothing, args...)
     return nothing
 end
-function assert_bl_views_conf(views_conf::Real,
-                              ::Union{<:AbstractString, Expr,
-                                      <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+function assert_bl_views_conf(views_conf::Number, ::EqnType)
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
-                              val::Union{<:AbstractString, Expr,
-                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
     if isa(val, AbstractVector)
         @argcheck(length(val) == length(views_conf))
     else
@@ -259,12 +248,10 @@ function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
-                              views::LinearConstraintEstimator)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
-                              views::BlackLittermanViews)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)
     return @argcheck(length(views_conf) == length(views.Q))
 end
 

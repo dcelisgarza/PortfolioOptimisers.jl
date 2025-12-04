@@ -1,8 +1,15 @@
 # Detone
 
+## Public
+
 ```@docs
 Detone
 detone!
 detone
-PortfolioOptimisers.AbstractDetoneEstimator
+```
+
+## Private
+
+```@docs
+AbstractDetoneEstimator
 ```

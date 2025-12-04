@@ -1,6 +1,6 @@
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::NormOneConeBrownianDistanceVariance,
-                                                     Dt::AbstractMatrix, Dx::AbstractMatrix)
+                                                     Dt::MatNum, Dx::MatNum)
     T = size(Dt, 1)
     sc = model[:sc]
     @constraint(model, cbdvariance_noc[j = 1:T, i = j:T],
@@ -9,7 +9,7 @@ function set_brownian_distance_variance_constraints!(model::JuMP.Model,
 end
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::IneqBrownianDistanceVariance,
-                                                     Dt::AbstractMatrix, Dx::AbstractMatrix)
+                                                     Dt::MatNum, Dx::MatNum)
     sc = model[:sc]
     @constraints(model, begin
                      cp_bdvariance, sc * (Dt - Dx) in Nonnegatives()
@@ -18,12 +18,12 @@ function set_brownian_distance_variance_constraints!(model::JuMP.Model,
     return nothing
 end
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::QuadRiskExpr,
-                                                Dt::AbstractMatrix, iT2::Real)
+                                                Dt::MatNum, iT2::Number)
     @expression(model, bdvariance_risk, iT2 * (dot(Dt, Dt) + iT2 * sum(Dt)^2))
     return bdvariance_risk
 end
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExpr,
-                                                Dt::AbstractMatrix, iT2::Real)
+                                                Dt::MatNum, iT2::Number)
     sc = model[:sc]
     @variable(model, tDt)
     @constraint(model, rsoc_Dt, [sc * tDt;

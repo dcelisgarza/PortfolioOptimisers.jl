@@ -13,7 +13,7 @@ Stepwise regression criterion based on p-value thresholding.
 
 # Constructor
 
-    PValue(; threshold::Real = 0.05)
+    PValue(; threshold::Number = 0.05)
 
 Keyword arguments correspond to the fields above.
 
@@ -36,12 +36,13 @@ PValue
 """
 struct PValue{T1} <: AbstractStepwiseRegressionCriterion
     threshold::T1
-    function PValue(threshold::Real)
-        @argcheck(zero(threshold) < threshold < one(threshold))
+    function PValue(threshold::Number)
+        @argcheck(zero(threshold) < threshold < one(threshold),
+                  DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         return new{typeof(threshold)}(threshold)
     end
 end
-function PValue(; threshold::Real = 0.05)
+function PValue(; threshold::Number = 0.05)
     return PValue(threshold)
 end
 """
@@ -130,14 +131,14 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             target::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, target)
 end
-function factory(re::StepwiseRegression, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(re::StepwiseRegression, w::Option{<:AbstractWeights} = nothing)
     return StepwiseRegression(; crit = re.crit, alg = re.alg,
                               target = factory(re.target, w))
 end
 """
     add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
-                                         included::AbstractVector, F::AbstractMatrix,
-                                         x::AbstractVector)
+                                         included::VecInt, F::MatNum,
+                                         x::VecNum)
 
 Helper for stepwise regression: add the "best" asset by p-value if no variables are included.
 
@@ -164,8 +165,7 @@ If `included` is not empty, the function does nothing. Otherwise, it evaluates e
   - [`regression`](@ref)
 """
 function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
-                                              included::AbstractVector, F::AbstractMatrix,
-                                              x::AbstractVector)
+                                              included::VecInt, F::MatNum, x::VecNum)
     if !isempty(included)
         return nothing
     end
@@ -190,8 +190,8 @@ function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
     return nothing
 end
 """
-    _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
-               F::AbstractMatrix)
+    _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum,
+               F::MatNum)
 
 Perform forward stepwise regression using a p-value criterion.
 
@@ -221,8 +221,7 @@ This method implements forward selection for stepwise regression, where variable
   - [`Forward`](@ref)
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
-                     F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     indices = 1:size(F, 2)
     included = Vector{eltype(indices)}(undef, 0)
@@ -255,8 +254,8 @@ function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVec
 end
 """
     get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
-                               value::AbstractVector, excluded::AbstractVector,
-                               included::AbstractVector, threshold::Real)
+                               value::VecNum, excluded::VecInt,
+                               included::VecInt, threshold::Number)
 
 Helper for forward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
 
@@ -272,7 +271,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 
 # Returns
 
-  - `threshold::Real`: Updated threshold value after inclusion (if any).
+  - `threshold::Number`: Updated threshold value after inclusion (if any).
 
 # Details
 
@@ -287,8 +286,8 @@ This function updates the `included` and `excluded` variable sets in forward ste
   - [`regression`](@ref)
 """
 function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
-                                    value::AbstractVector, excluded::AbstractVector,
-                                    included::AbstractVector, threshold::Real)
+                                    value::VecNum, excluded::VecInt, included::VecInt,
+                                    threshold::Number)
     val, idx = findmin(value)
     if val < threshold
         i = searchsortedfirst(excluded, idx)
@@ -299,8 +298,8 @@ function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
 end
 """
     get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
-                               value::AbstractVector, excluded::AbstractVector,
-                               included::AbstractVector, threshold::Real)
+                               value::VecNum, excluded::VecInt,
+                               included::VecInt, threshold::Number)
 
 Helper for forward stepwise regression with maximum-value criteria (e.g., R²).
 
@@ -316,7 +315,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 
 # Returns
 
-  - `threshold::Real`: Updated threshold value after inclusion (if any).
+  - `threshold::Number`: Updated threshold value after inclusion (if any).
 
 # Details
 
@@ -331,8 +330,8 @@ This function updates the `included` and `excluded` variable sets in forward ste
   - [`regression`](@ref)
 """
 function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
-                                    value::AbstractVector, excluded::AbstractVector,
-                                    included::AbstractVector, threshold::Real)
+                                    value::VecNum, excluded::VecInt, included::VecInt,
+                                    threshold::Number)
     val, idx = findmax(value)
     if val > threshold
         i = searchsortedfirst(excluded, idx)
@@ -342,9 +341,8 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
     return threshold
 end
 """
-    _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                              <:AbstractMaxValStepwiseRegressionCriteria},
-                                      <:Forward}, x::AbstractVector, F::AbstractMatrix)
+    _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+                                      <:Forward}, x::VecNum, F::MatNum)
 
 Perform forward stepwise regression using a general criterion (minimization or maximization).
 
@@ -375,10 +373,8 @@ This method implements forward selection for stepwise regression, where variable
   - [`Forward`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                    <:AbstractMaxValStepwiseRegressionCriteria},
-                                            <:Forward}, x::AbstractVector,
-                     F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+                                            <:Forward}, x::VecNum, F::MatNum)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
@@ -407,8 +403,8 @@ function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegr
     return included
 end
 """
-    _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
-               F::AbstractMatrix)
+    _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum,
+               F::MatNum)
 
 Perform backward stepwise regression using a p-value criterion.
 
@@ -437,8 +433,7 @@ This method implements backward elimination for stepwise regression, where all v
   - [`Backward`](@ref)
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
-                     F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F::MatNum)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     fri = fit(re.target, [ovec F], x)
     included = 1:size(F, 2)
@@ -461,8 +456,8 @@ function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVe
     return included
 end
 """
-    get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::AbstractVector,
-                           included::AbstractVector, threshold::Real)
+    get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum,
+                           included::VecInt, threshold::Number)
 
 Helper for backward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
 
@@ -477,7 +472,7 @@ This function updates the `included` variable set in backward stepwise regressio
 
 # Returns
 
-  - `threshold::Real`: Updated threshold value after exclusion (if any).
+  - `threshold::Number`: Updated threshold value after exclusion (if any).
 
 # Details
 
@@ -490,9 +485,8 @@ This function updates the `included` variable set in backward stepwise regressio
   - [`StepwiseRegression`](@ref)
   - [`regression`](@ref)
 """
-function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion,
-                                value::AbstractVector, included::AbstractVector,
-                                threshold::Real)
+function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum,
+                                included::VecInt, threshold::Number)
     val, idx = findmin(value)
     if val < threshold
         i = searchsortedfirst(included, idx)
@@ -502,8 +496,8 @@ function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion,
     return threshold
 end
 """
-    get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::AbstractVector,
-                           included::AbstractVector, threshold::Real)
+    get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum,
+                           included::VecInt, threshold::Number)
 
 Helper for backward stepwise regression with maximum-value criteria (e.g., R²).
 
@@ -518,7 +512,7 @@ This function updates the `included` variable set in backward stepwise regressio
 
 # Returns
 
-  - `threshold::Real`: Updated threshold value after exclusion (if any).
+  - `threshold::Number`: Updated threshold value after exclusion (if any).
 
 # Details
 
@@ -531,9 +525,8 @@ This function updates the `included` variable set in backward stepwise regressio
   - [`StepwiseRegression`](@ref)
   - [`regression`](@ref)
 """
-function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria,
-                                value::AbstractVector, included::AbstractVector,
-                                threshold::Real)
+function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum,
+                                included::VecInt, threshold::Number)
     val, idx = findmax(value)
     if val > threshold
         i = searchsortedfirst(included, idx)
@@ -543,9 +536,8 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria,
     return threshold
 end
 """
-    _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                              <:AbstractMaxValStepwiseRegressionCriteria},
-                                      <:Backward}, x::AbstractVector, F::AbstractMatrix)
+    _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+                                      <:Backward}, x::VecNum, F::MatNum)
 
 Perform backward stepwise regression using a general criterion (minimization or maximization).
 
@@ -577,10 +569,8 @@ This method implements backward elimination for stepwise regression, where all v
   - [`Backward`](@ref)
   - [`get_backward_reg_incl!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                    <:AbstractMaxValStepwiseRegressionCriteria},
-                                            <:Backward}, x::AbstractVector,
-                     F::AbstractMatrix)
+function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
+                                            <:Backward}, x::VecNum, F::MatNum)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
@@ -611,7 +601,7 @@ function _regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegr
     return included
 end
 """
-    regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix)
+    regression(re::StepwiseRegression, X::MatNum, F::MatNum)
 
 Apply stepwise regression to each column of a response matrix.
 
@@ -642,7 +632,7 @@ This method fits a stepwise regression model (as specified by `re`) to each colu
   - [`regression`](@ref)
   - [`Regression`](@ref)
 """
-function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix)
+function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     features = 1:size(F, 2)
     cols = size(F, 2) + 1
     N, rows = size(X)

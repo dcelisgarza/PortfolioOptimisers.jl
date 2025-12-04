@@ -83,10 +83,10 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                            denoise::Union{Nothing, <:Denoise} = nothing,
-                            detone::Union{Nothing, <:Detone} = nothing,
-                            alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+    DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
+                            denoise::Option{<:Denoise} = nothing,
+                            detone::Option{<:Detone} = nothing,
+                            alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -123,30 +123,33 @@ DefaultMatrixProcessing
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
+  - [`Denoise`](@ref)
+  - [`Detone`](@ref)
+  - [`AbstractMatrixProcessingAlgorithm`](@ref)
 """
 struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
     pdm::T1
     denoise::T2
     detone::T3
     alg::T4
-    function DefaultMatrixProcessing(pdm::Union{Nothing, <:Posdef},
-                                     denoise::Union{Nothing, <:Denoise},
-                                     detone::Union{Nothing, <:Detone},
-                                     alg::Union{Nothing,
-                                                <:AbstractMatrixProcessingAlgorithm})
+    function DefaultMatrixProcessing(pdm::Option{<:Posdef}, denoise::Option{<:Denoise},
+                                     detone::Option{<:Detone},
+                                     alg::Option{<:AbstractMatrixProcessingAlgorithm})
         return new{typeof(pdm), typeof(denoise), typeof(detone), typeof(alg)}(pdm, denoise,
                                                                               detone, alg)
     end
 end
-function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                                 denoise::Union{Nothing, <:Denoise} = nothing,
-                                 detone::Union{Nothing, <:Detone} = nothing,
-                                 alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+function DefaultMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
+                                 denoise::Option{<:Denoise} = nothing,
+                                 detone::Option{<:Detone} = nothing,
+                                 alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing)
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
-                       X::AbstractMatrix, args...; kwargs...)
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
+                       kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
 
 In-place processing of a covariance or correlation matrix.
@@ -228,12 +231,14 @@ julia> sigma
   - [`denoise!`](@ref)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatNum`](@ref)
 """
 function matrix_processing!(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                            X::AbstractMatrix, args...; kwargs...)
+function matrix_processing!(mp::DefaultMatrixProcessing, sigma::MatNum, X::MatNum, args...;
+                            kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
     denoise!(mp.denoise, sigma, T / N, mp.pdm)
@@ -242,8 +247,8 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     return nothing
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
-                      X::AbstractMatrix, args...; kwargs...)
+    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
+                      kwargs...)
     matrix_processing(::Nothing, args...; kwargs...)
 
 Out-of-place version of [`matrix_processing!`](@ref).
@@ -256,12 +261,14 @@ Out-of-place version of [`matrix_processing!`](@ref).
   - [`denoise!`](@ref)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatNum`](@ref)
 """
 function matrix_processing(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                           X::AbstractMatrix, args...; kwargs...)
+function matrix_processing(mp::DefaultMatrixProcessing, sigma::MatNum, X::MatNum, args...;
+                           kwargs...)
     sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)
     return sigma

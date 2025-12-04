@@ -10,12 +10,12 @@ Container for a set of linear constraints (either equality or inequality) in the
 
 # Fields
 
-  - `A`: Coefficient matrix of the linear constraints (typically `AbstractMatrix`).
-  - `B`: Right-hand side vector of the linear constraints (typically `AbstractVector`).
+  - `A`: Coefficient matrix of the linear constraints.
+  - `B`: Right-hand side vector of the linear constraints.
 
 # Constructor
 
-    PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
+    PartialLinearConstraint(; A::MatNum, B::VecNum)
 
 Keyword arguments correspond to the fields above.
 
@@ -41,13 +41,13 @@ PartialLinearConstraint
 struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
-    function PartialLinearConstraint(A::AbstractMatrix, B::AbstractVector)
-        @argcheck(!isempty(A))
-        @argcheck(!isempty(B))
+    function PartialLinearConstraint(A::MatNum, B::VecNum)
+        @argcheck(!isempty(A), IsEmptyError)
+        @argcheck(!isempty(B), IsEmptyError)
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
-function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
+function PartialLinearConstraint(; A::MatNum, B::VecNum)
     return PartialLinearConstraint(A, B)
 end
 """
@@ -67,8 +67,8 @@ Container for a set of linear constraints, separating inequality and equality co
 
 # Constructor
 
-    LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
-                     eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
+    LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
+                     eq::Option{<:PartialLinearConstraint} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -101,17 +101,19 @@ LinearConstraint
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     ineq::T1
     eq::T2
-    function LinearConstraint(ineq::Union{Nothing, <:PartialLinearConstraint},
-                              eq::Union{Nothing, <:PartialLinearConstraint})
+    function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
+                              eq::Option{<:PartialLinearConstraint})
         @argcheck(!(isnothing(ineq) && isnothing(eq)),
-                  AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
+                  IsNothingError("ineq and eq cannot both be nothing. Got\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
         return new{typeof(ineq), typeof(eq)}(ineq, eq)
     end
 end
-function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
-                          eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
+function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
+                          eq::Option{<:PartialLinearConstraint} = nothing)
     return LinearConstraint(ineq, eq)
 end
+const VecLc = AbstractVector{<:LinearConstraint}
+const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
         isnothing(obj.ineq) ? nothing : obj.ineq.A
@@ -171,11 +173,9 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     op::T3
     rhs::T4
     eqn::T5
-    function ParsingResult(vars::AbstractVector{<:AbstractString},
-                           coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
+    function ParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                            eqn::AbstractString)
-        @argcheck(length(vars) == length(coef),
-                  DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
+        @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
                                                                                      coef,
                                                                                      op,
@@ -183,6 +183,8 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
                                                                                      eqn)
     end
 end
+const VecPR = AbstractVector{<:ParsingResult}
+const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
     struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
         vars::T1
@@ -225,22 +227,20 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     rhs::T4
     eqn::T5
     ij::T6
-    function RhoParsingResult(vars::AbstractVector{<:AbstractString},
-                              coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
+    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                               eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                                         <:Tuple{<:AbstractVector{<:Integer},
-                                                                 <:AbstractVector{<:Integer}}}})
-        @argcheck(length(vars) == length(coef),
-                  DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
+                                                         <:Tuple{<:VecInt, <:VecInt}}})
+        @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
                    typeof(ij)}(vars, coef, op, rhs, eqn, ij)
     end
 end
 """
-    struct AssetSets{T1, T2} <: AbstractEstimator
+    struct AssetSets{T1, T2, T3} <: AbstractEstimator
         key::T1
-        dict::T2
+        ukey::T2
+        dict::T3
     end
 
 Container for asset set and group information used in constraint generation.
@@ -251,20 +251,26 @@ If a key in `dict` starts with the same value as `key`, it means that the corres
 
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets.
+  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` must have the same length as `dict[key]` as their lengths are preserved across views.
+  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalent group prefixed by `key` with the same length as `dict[key]` as that group will be used to find the unique entries for the view.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
 # Constructor
 
-    AssetSets(; key::AbstractString = "nx", dict::AbstractDict{<:AbstractString, <:Any})
+    AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
+              dict::AbstractDict{<:AbstractString, <:Any})
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`. This means their lengths will be congruent when used in the `opti` field of [`NestedClustered`](@ref).
   - `!isempty(dict)`.
   - `haskey(dict, key)`.
+  - `key !== ukey`.
+  - `!startswith(key, ukey)`.
+  - `!startswith(ukey, key)`.
+  - If a key in `dict` starts with the same value as `key`, `length(dict[nx]) == length(dict[key])`.
+  - If a key in `dict` starts with the same value as `ukey`, there must be a corresponding key in `dict` where the `ukey` prefix is replaced by the `key` prefix, and `length(dict[replace(k, ukey => key)]) == length(dict[key])`.
 
 # Examples
 
@@ -272,6 +278,7 @@ Keyword arguments correspond to the fields above.
 julia> AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]))
 AssetSets
    key ┼ String: "nx"
+  ukey ┼ String: "ux"
   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
@@ -281,40 +288,47 @@ AssetSets
   - [`estimator_to_val`](@ref)
   - [`linear_constraints`](@ref)
 """
-struct AssetSets{T1, T2} <: AbstractEstimator
+struct AssetSets{T1, T2, T3} <: AbstractEstimator
     key::T1
-    dict::T2
-    function AssetSets(key::AbstractString, dict::AbstractDict{<:AbstractString, <:Any})
-        @argcheck(!isempty(dict))
-        @argcheck(haskey(dict, key))
-        for k in keys(dict)
-            if k == key
-                continue
-            elseif startswith(k, key)
-                @argcheck(length(dict[k]) == length(dict[key]),
-                          DimensionMismatch("$k starts with $key, so length(dict[$k]) => $(length(dict[k])), must be equal to length(dict[$key]) => $(length(dict[key]))"))
+    ukey::T2
+    dict::T3
+    function AssetSets(key::AbstractString, ukey::AbstractString,
+                       dict::AbstractDict{<:AbstractString, <:Any})
+        @argcheck(!isempty(dict), IsEmptyError)
+        @argcheck(haskey(dict, key), KeyError)
+        @argcheck(key !== ukey, ValueError)
+        @argcheck(!startswith(key, ukey))
+        @argcheck(!startswith(ukey, key))
+        for k in setdiff(keys(dict), (key,))
+            if startswith(k, key)
+                @argcheck(length(dict[k]) == length(dict[key]), DimensionMismatch)
+            elseif startswith(k, ukey)
+                tmp_key = replace(k, ukey => key)
+                @argcheck(haskey(dict, tmp_key), KeyError)
+                @argcheck(length(dict[tmp_key]) == length(dict[key]), DimensionMismatch)
             end
         end
-        return new{typeof(key), typeof(dict)}(key, dict)
+        return new{typeof(key), typeof(ukey), typeof(dict)}(key, ukey, dict)
     end
 end
-function AssetSets(; key::AbstractString = "nx",
+function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
                    dict::AbstractDict{<:AbstractString, <:Any})
-    return AssetSets(key, dict)
+    return AssetSets(key, ukey, dict)
 end
-function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
+function nothing_asset_sets_view(sets::AssetSets, i)
     key = sets.key
+    ukey = sets.ukey
     dict = typeof(sets.dict)()
-    dict[key] = view(sets.dict[key], i)
     for (k, v) in sets.dict
-        if k == key
-            continue
-        elseif startswith(k, key)
+        if startswith(k, key)
             v = view(v, i)
+        elseif startswith(k, ukey)
+            tmp_key = replace(k, ukey => key)
+            v = unique(view(sets.dict[tmp_key], i))
         end
         push!(dict, k => v)
     end
-    return AssetSets(; key = key, dict = dict)
+    return AssetSets(; key = key, ukey = ukey, dict = dict)
 end
 """
     nothing_asset_sets_view(::Nothing, ::Any)
@@ -329,10 +343,8 @@ function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """
-    group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
-                  dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                              <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                  arr::AbstractVector, strict::Bool)
+    group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
+                  dict::EstValType, arr::VecNum, strict::Bool)
 
 Set values in a vector for all assets belonging to a specified group.
 
@@ -362,10 +374,8 @@ Set values in a vector for all assets belonging to a specified group.
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
 """
-function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
-                       dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                       arr::AbstractVector, strict::Bool)
+function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
+                       dict::EstValType, arr::VecNum, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
         msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
@@ -385,9 +395,7 @@ function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::R
     return nothing
 end
 """
-    estimator_to_val(dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                 <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                     sets::AssetSets; val::Real = 0.0, strict::Bool = false)
+    estimator_to_val(dict::EstValType, sets::AssetSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; strict::Bool = false)
 
 Return value for assets or groups, based on a mapping and asset sets.
 
@@ -399,6 +407,7 @@ The function creates the vector and sets the values for assets or groups as spec
   - `dict`: A dictionary, vector of pairs, or single pair mapping asset or group names to values.
   - `sets`: The [`AssetSets`](@ref) containing the asset universe and group definitions.
   - `val`: The default value to assign to assets not specified in `dict`.
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
   - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning.
 
 # Details
@@ -416,7 +425,7 @@ The function creates the vector and sets the values for assets or groups as spec
 
 # Returns
 
-  - `arr::Vector{<:Real}`: Value array.
+  - `arr::VecNum`: Value array.
 
 # Related
 
@@ -424,10 +433,12 @@ The function creates the vector and sets the values for assets or groups as spec
   - [`AssetSets`](@ref)
   - [`estimator_to_val`](@ref)
 """
-function estimator_to_val(dict::Union{<:AbstractDict,
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                          sets::AssetSets, val::Real = 0.0; strict::Bool = false)
-    nx = sets.dict[sets.key]
+function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
+                          val::Option{<:Number} = nothing,
+                          key::Option{<:AbstractString} = nothing;
+                          datatype::DataType = Float64, strict::Bool = false)
+    val = ifelse(isnothing(val), zero(datatype), val)
+    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
     arr = fill(val, length(nx))
     for (key, val) in dict
         if key in nx
@@ -438,9 +449,12 @@ function estimator_to_val(dict::Union{<:AbstractDict,
     end
     return arr
 end
-function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real = 0.0;
-                          strict::Bool = false)
-    nx = sets.dict[sets.key]
+function estimator_to_val(dict::PairStrNum, sets::AssetSets,
+                          val::Option{<:Number} = nothing,
+                          key::Option{<:AbstractString} = nothing;
+                          datatype::DataType = Float64, strict::Bool = false)
+    val = ifelse(isnothing(val), zero(datatype), val)
+    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
     arr = fill(val, length(nx))
     key, val = dict
     if key in nx
@@ -451,7 +465,7 @@ function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real 
     return arr
 end
 """
-    estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...; kwargs...)
+    estimator_to_val(val::Option{<:Number}, args...; kwargs...)
 
 Fallback no-op for value mapping in asset/group estimators.
 
@@ -459,13 +473,13 @@ This method returns the input value `val` as-is, without modification or mapping
 
 # Arguments
 
-  - `val`: A value of type `Nothing`, a single numeric value, or a vector of numeric values.
+  - `val`: A value of type `Nothing` or a single numeric value.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}`: The input `val`, unchanged.
+  - `val::Option{<:Number}`: The input `val`, unchanged.
 
 # Related
 
@@ -473,8 +487,43 @@ This method returns the input value `val` as-is, without modification or mapping
   - [`group_to_val!`](@ref)
   - [`AssetSets`](@ref)
 """
-function estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
-                          kwargs...)
+function estimator_to_val(val::Option{<:Number}, args...; kwargs...)
+    return val
+end
+"""
+    estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
+                     key::Option{<:AbstractString} = nothing; kwargs...)
+
+Return a numeric vector for asset/group estimators, validating length against asset universe.
+
+This method checks that the input vector `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value vector is already constructed and requires only defensive validation.
+
+# Arguments
+
+  - `val`: Numeric vector to be mapped to assets/groups.
+  - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `::Any`: Fill value for API consistency (ignored).
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
+
+# Validation
+
+  - `length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]`.
+
+# Related
+
+  - [`estimator_to_val`](@ref)
+  - [`AssetSets`](@ref)
+  - [`group_to_val!`](@ref)
+"""
+function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
+                          key::Option{<:AbstractString} = nothing; kwargs...)
+    @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
+              DimensionMismatch)
     return val
 end
 """
@@ -492,7 +541,7 @@ Recursively evaluate numeric functions and constants in a Julia expression.
 
   - `expr`:
 
-      + `Real`: it is returned as-is.
+      + `Number`: it is returned as-is.
       + `:Inf`: returns `Inf`.
       + `Expr`: representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
       + Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
@@ -546,7 +595,7 @@ Expand and collect all terms from a Julia expression representing a linear const
 
 # Returns
 
-  - `terms::Vector{Tuple{Float64, Union{String, Nothing}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
+  - `terms::Vector{Tuple{Float64, Option{<:String}}}`: A vector of `(coefficient, variable)` pairs, where `variable` is a string for variable terms or `nothing` for constant terms.
 
 # Related
 
@@ -569,7 +618,7 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
   - `expr`: The Julia expression to traverse.
   - `coeff`: The current numeric coefficient to apply.
-  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(Float64, Union{String, Nothing})`, where `Nothing` indicates a constant term.
+  - `terms`: A vector to which `(coefficient, variable)` pairs are appended in-place. Each pair is of the form `(Float64, Option{<:String})`, where `Nothing` indicates a constant term.
 
 # Details
 
@@ -786,8 +835,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
 """
-    parse_equation(eqn::Union{<:AbstractString, Expr,
-                              <:AbstractVector{<:Union{<:AbstractString, Expr}}};
+    parse_equation(eqn::EqnType;
                    ops1::Tuple = ("==", "<=", ">="), ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                    datatype::DataType = Float64, kwargs...)
 
@@ -834,7 +882,7 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
 
 # Returns
 
-  - If `eqn::Union{<:AbstractString, Expr}`:
+  - If `eqn::Str_Expr`:
 
       + `res::ParsingResult`: Structured parsing result.
 
@@ -906,14 +954,13 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
 end
-function parse_equation(eqn::AbstractVector{<:Union{<:AbstractString, Expr}};
-                        ops1::Tuple = ("==", "<=", ">="),
+function parse_equation(eqn::VecStr_Expr; ops1::Tuple = ("==", "<=", ">="),
                         ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64)
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
 """
-    replace_group_by_assets(res::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
+    replace_group_by_assets(res::PR_VecPR,
                             sets::AssetSets; bl_flag::Bool = false, ep_flag::Bool = false,
                             rho_flag::Bool = false)
 
@@ -979,9 +1026,9 @@ ParsingResult
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
                                  ep_flag::Bool = false, rho_flag::Bool = false)
     @argcheck(!(bl_flag && (rho_flag || ep_flag)),
-              ArgumentError("`bl_flag` ($bl_flag) can only be used if `ep_flag` ($ep_flag) and `rho_flag` ($rho_flag) are false."))
+              ArgumentError("bl_flag can only be true if ep_flag and rho_flag are false. Got\nbl_flag => $(bl_flag)\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
     @argcheck(!(rho_flag && !ep_flag),
-              ArgumentError("`rho_flag` ($rho_flag) can only be used if `ep_flag` ($ep_flag) is also true."))
+              ArgumentError("rho_flag can only be true if ep_flag is also true. Got\nrho_flag => $rho_flag\nep_flag => $ep_flag"))
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -1005,9 +1052,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 push!(idx_rm, i)
             else
                 @argcheck(ep_flag && rho_flag,
-                          ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
+                          ArgumentError("The pattern '(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
                 @argcheck(!isnothing(n),
-                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
+                          ArgumentError("Correlation views can only be of the form '(a, b)'. Got\nv => $v"))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1015,16 +1062,16 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @argcheck(!isnothing(asset1))
-                @argcheck(!isnothing(asset2))
-                @argcheck(length(asset1) == length(asset2))
+                @argcheck(!isnothing(asset1), IsNothingError)
+                @argcheck(!isnothing(asset2), IsNothingError)
+                @argcheck(length(asset1) == length(asset2), DimensionMismatch)
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
                 push!(idx_rm, i)
             end
         else
             @argcheck(ep_flag,
-                      ArgumentError("`prior(a)` can only be used in entropy pooling."))
+                      ArgumentError("The pattern 'prior(a)' can only be used in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)."))
             n = match(corr_pattern, v)
             if isnothing(n) && !rho_flag
                 asset = get(sets.dict, v[7:(end - 1)], nothing)
@@ -1037,9 +1084,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 push!(idx_rm, i)
             else
                 @argcheck(rho_flag,
-                          ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
+                          ArgumentError("The pattern 'prior(a, b)' can only be used for rho_views (rho_flag is true) in entropy pooling (ep_flag is true). Got\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
                 @argcheck(!isnothing(n),
-                          ArgumentError("Correlation views can only be of the form `(a, b)`."))
+                          ArgumentError("Correlation views prior can only be of the form 'prior(a, b)'. Got\nv => $v"))
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -1047,9 +1094,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @argcheck(!isnothing(asset1))
-                @argcheck(!isnothing(asset2))
-                @argcheck(length(asset1) == length(asset2))
+                @argcheck(!isnothing(asset1), IsNothingError)
+                @argcheck(!isnothing(asset2), IsNothingError)
+                @argcheck(length(asset1) == length(asset2), DimensionMismatch)
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
@@ -1069,13 +1116,13 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
 end
-function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
-                                 args...)
+function replace_group_by_assets(res::VecPR, sets::AssetSets, args...)
     return replace_group_by_assets.(res, sets, args...)
 end
 """
-    get_linear_constraints(lcs::Union{<:ParsingResult, <:AbstractVector{<:ParsingResult}},
-                           sets::AssetSets; datatype::DataType = Float64, strict::Bool = false)
+    get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
+                           key::Option{<:AbstractString} = nothing;
+                           datatype::DataType = Float64, strict::Bool = false)
 
 Convert parsed linear constraint equations into a `LinearConstraint` object.
 
@@ -1107,18 +1154,17 @@ Convert parsed linear constraint equations into a `LinearConstraint` object.
   - [`parse_equation`](@ref)
   - [`replace_group_by_assets`](@ref)
 """
-function get_linear_constraints(lcs::Union{<:ParsingResult,
-                                           <:AbstractVector{<:ParsingResult}},
-                                sets::AssetSets; datatype::DataType = Float64,
-                                strict::Bool = false)
+function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
+                                key::Option{<:AbstractString} = nothing;
+                                datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @argcheck(!isempty(lcs), IsEmptyError(non_empty_msg("lcs") * "."))
+        @argcheck(!isempty(lcs), IsEmptyError)
     end
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    nx = sets.dict[sets.key]
+    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
     At = Vector{datatype}(undef, length(nx))
     for lc in lcs
         fill!(At, zero(eltype(At)))
@@ -1164,8 +1210,9 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
     end
 end
 """
-    struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
+    struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
         val::T1
+        key::T2
     end
 
 Container for one or more linear constraint equations to be parsed and converted into constraint matrices.
@@ -1173,12 +1220,11 @@ Container for one or more linear constraint equations to be parsed and converted
 # Fields
 
   - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
 
 # Constructor
 
-    LinearConstraintEstimator(;
-                              val::Union{<:AbstractString, Expr,
-                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+    LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -1210,25 +1256,30 @@ LinearConstraint
   - [`parse_equation`](@ref)
   - [`linear_constraints`](@ref)
 """
-struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
+struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
-    function LinearConstraintEstimator(val::Union{<:AbstractString, Expr,
-                                                  <:AbstractVector{<:Union{<:AbstractString,
-                                                                           Expr}}})
-        if isa(val, Union{<:AbstractString, <:AbstractVector})
+    key::T2
+    function LinearConstraintEstimator(val::EqnType,
+                                       key::Option{<:AbstractString} = nothing)
+        if isa(val, Str_Vec)
             @argcheck(!isempty(val))
         end
-        return new{typeof(val)}(val)
+        if !isnothing(key)
+            @argcheck(!isempty(key))
+        end
+        return new{typeof(val), typeof(key)}(val, key)
     end
 end
-function LinearConstraintEstimator(;
-                                   val::Union{<:AbstractString, Expr,
-                                              <:AbstractVector{<:Union{<:AbstractString,
-                                                                       Expr}}})
-    return LinearConstraintEstimator(val)
+function LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
+    return LinearConstraintEstimator(val, key)
 end
+const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+const VecLcE_Lc = AbstractVector{<:LcE_Lc}
+const VecLcE = AbstractVector{<:LinearConstraintEstimator}
+const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
-    linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
+    linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
 
 No-op fallback for returning an existing `LinearConstraint` object or `nothing`.
 
@@ -1250,13 +1301,13 @@ This method is used to pass through an already constructed [`LinearConstraint`](
   - [`PartialLinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
+function linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
     return lcs
 end
 """
-    linear_constraints(eqn::Union{<:AbstractString, Expr,
-                                  <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+    linear_constraints(eqn::EqnType,
                        sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+                       key::Option{<:AbstractString} = nothing;
                        ops2::Tuple = (:call, :(==), :(<=), :(>=)), datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false)
 
@@ -1310,19 +1361,18 @@ LinearConstraint
   - [`AssetSets`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(eqn::Union{<:AbstractString, Expr,
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                            sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+function linear_constraints(eqn::EqnType, sets::AssetSets,
+                            key::Option{<:AbstractString} = nothing;
+                            ops1::Tuple = ("==", "<=", ">="),
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false)
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
-    return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
+    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
 end
 """
-    linear_constraints(lcs::Union{<:LinearConstraintEstimator,
-                                  <:AbstractVector{<:LinearConstraintEstimator}},
+    linear_constraints(lcs::LcE_VecLcE,
                        sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false)
 
@@ -1330,7 +1380,7 @@ If `lcs` is a vector of [`LinearConstraintEstimator`](@ref) objects, this functi
 
 This method is a wrapper calling:
 
-    linear_constraints(lcs.val, sets; datatype = datatype, strict = strict, bl_flag = bl_flag)
+    linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict, bl_flag = bl_flag)
 
 It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simultaneously.
 
@@ -1341,11 +1391,10 @@ It is used for type stability and to provide a uniform interface for processing 
 function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false)
-    return linear_constraints(lcs.val, sets; datatype = datatype, strict = strict,
+    return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
-function linear_constraints(lcs::AbstractVector{<:LinearConstraintEstimator},
-                            sets::AssetSets; datatype::DataType = Float64,
+function linear_constraints(lcs::VecLcE, sets::AssetSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag) for lc in lcs]
@@ -1361,18 +1410,18 @@ Container for the result of a risk budget constraint.
 
 # Fields
 
-  - `val`: Vector of risk budget allocations (typically `AbstractVector{<:Real}`).
+  - `val`: Vector of risk budget allocations (typically `VecNum`).
 
 # Constructor
 
-    RiskBudgetResult(; val::AbstractVector{<:Real})
+    RiskBudgetResult(; val::VecNum)
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
   - `!isempty(val)`.
-  - `all(x -> x >= zero(x), val)`.
+  - `all(x -> zero(x) <= x, val)`.
 
 # Examples
 
@@ -1390,19 +1439,19 @@ RiskBudgetResult
 """
 struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
-    function RiskBudgetResult(val::AbstractVector{<:Real})
+    function RiskBudgetResult(val::VecNum)
         @argcheck(!isempty(val))
-        @argcheck(all(x -> x >= zero(x), val))
+        @argcheck(all(x -> zero(x) <= x, val))
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetResult(; val::AbstractVector{<:Real})
+function RiskBudgetResult(; val::VecNum)
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)
     return nothing
 end
-function risk_budget_view(rb::RiskBudgetResult, i::AbstractVector)
+function risk_budget_view(rb::RiskBudgetResult, i)
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudgetResult(; val = val)
 end
@@ -1421,15 +1470,13 @@ Container for a risk budget allocation mapping or vector.
 
 # Constructor
 
-    RiskBudgetEstimator(;
-                        val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}}})
+    RiskBudgetEstimator(; val::EstValType)
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `val` is validated with [`assert_nonneg_finite_val`](@ref).
+  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Examples
 
@@ -1451,25 +1498,21 @@ RiskBudgetEstimator
 """
 struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
     val::T1
-    function RiskBudgetEstimator(val::Union{<:AbstractDict,
-                                            <:Pair{<:AbstractString, <:Real},
-                                            <:AbstractVector{<:Pair{<:AbstractString,
-                                                                    <:Real}}})
-        assert_nonneg_finite_val(val)
+    function RiskBudgetEstimator(val::EstValType)
+        assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetEstimator(;
-                             val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
-                                        <:AbstractVector{<:Union{<:Pair{<:AbstractString,
-                                                                        <:Real}}}})
+function RiskBudgetEstimator(; val::EstValType)
     return RiskBudgetEstimator(val)
 end
+const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
+const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudgetResult}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
 end
 """
-    risk_budget_constraints(::Nothing, args...; N::Real, datatype::DataType = Float64,
+    risk_budget_constraints(::Nothing, args...; N::Number, datatype::DataType = Float64,
                             kwargs...)
 
 No-op fallback for risk budget constraint generation.
@@ -1480,7 +1523,7 @@ This method returns a uniform risk budget allocation when no explicit risk budge
 
   - `::Nothing`: Indicates that no risk budget is provided.
   - `args...`: Additional positional arguments (ignored).
-  - `N::Real`: Number of assets (required).
+  - `N::Number`: Number of assets (required).
   - `datatype::DataType`: Numeric type for the risk budget vector.
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -1501,7 +1544,7 @@ RiskBudgetResult
   - [`RiskBudgetResult`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(::Nothing, args...; N::Real, kwargs...)
+function risk_budget_constraints(::Nothing, args...; N::Number, kwargs...)
     iN = inv(N)
     return RiskBudgetResult(; val = range(iN, iN; length = N))
 end
@@ -1539,11 +1582,8 @@ function risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
     return rb
 end
 """
-    risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Real},
-                                      <:Pair{<:AbstractString, <:Real},
-                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                            sets::AssetSets; N::Real = length(sets.dict[sets.key]),
-                            strict::Bool = false)
+    risk_budget_constraints(rb::EstValType, sets::AssetSets;
+                            N::Number = length(sets.dict[sets.key]), strict::Bool = false)
 
 Generate a risk budget allocation from asset/group mappings and asset sets.
 
@@ -1584,18 +1624,15 @@ RiskBudgetResult
   - [`estimator_to_val`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Real},
-                                           <:Pair{<:AbstractString, <:Real},
-                                           <:AbstractVector{<:Pair{<:AbstractString,
-                                                                   <:Real}}},
-                                 sets::AssetSets; N::Real = length(sets.dict[sets.key]),
+function risk_budget_constraints(rb::EstValType, sets::AssetSets;
+                                 N::Number = length(sets.dict[sets.key]),
                                  strict::Bool = false)
     val = estimator_to_val(rb, sets, inv(N); strict = strict)
     return RiskBudgetResult(; val = val / sum(val))
 end
 """
     risk_budget_constraints(rb::Union{<:RiskBudgetEstimator,
-                                      <:AbstractVector{<:RiskBudgetEstimator}}, sets::AssetSets;
+                                      <:VecRkbE}, sets::AssetSets;
                             strict::Bool = false, kwargs...)
 
 If `rb` is a vector of [`RiskBudgetEstimator`](@ref) objects, this function is broadcast over the vector.
@@ -1614,8 +1651,8 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
     return risk_budget_constraints(rb.val, sets; strict = strict)
 end
-function risk_budget_constraints(rb::AbstractVector{<:RiskBudgetEstimator}, sets::AssetSets;
-                                 strict::Bool = false, kwargs...)
+function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
+                                 kwargs...)
     return [risk_budget_constraints(rbi, sets; strict = strict) for rbi in rb]
 end
 """
@@ -1646,11 +1683,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> sets = AssetSets(; key = "nx",
                         dict = Dict("nx" => ["A", "B", "C"],
-                                    "sector" => ["Tech", "Tech", "Finance"]));
+                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
 
-julia> est = AssetSetsMatrixEstimator(; val = "sector")
+julia> est = AssetSetsMatrixEstimator(; val = "nx_sector")
 AssetSetsMatrixEstimator
-  val ┴ String: "sector"
+  val ┴ String: "nx_sector"
 
 julia> asset_sets_matrix(est, sets)
 2×3 transpose(::BitMatrix) with eltype Bool:
@@ -1674,8 +1711,11 @@ end
 function AssetSetsMatrixEstimator(; val::AbstractString)
     return AssetSetsMatrixEstimator(val)
 end
+const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
+const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
+const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
 """
-    asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
+    asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
 
 Construct a binary asset-group membership matrix from asset set groupings.
 
@@ -1706,9 +1746,9 @@ Construct a binary asset-group membership matrix from asset set groupings.
 ```jldoctest
 julia> sets = AssetSets(; key = "nx",
                         dict = Dict("nx" => ["A", "B", "C"],
-                                    "sector" => ["Tech", "Tech", "Finance"]));
+                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
 
-julia> asset_sets_matrix("sector", sets)
+julia> asset_sets_matrix("nx_sector", sets)
 2×3 transpose(::BitMatrix) with eltype Bool:
  1  1  0
  0  0  1
@@ -1720,7 +1760,7 @@ julia> asset_sets_matrix("sector", sets)
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix_view`](@ref)
 """
-function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
+function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
     all_sets = sets.dict[smtx]
     @argcheck(length(sets.dict[sets.key]) == length(all_sets),
@@ -1733,15 +1773,15 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     return transpose(A)
 end
 """
-    asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
+    asset_sets_matrix(smtx::Option{<:MatNum}, args...)
 
 No-op fallback for asset set membership matrix construction.
 
-This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `AbstractMatrix` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
+This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `MatNum` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
 
 # Arguments
 
-  - `smtx`: An existing asset set membership matrix (`AbstractMatrix`) or `nothing`.
+  - `smtx`: An existing asset set membership matrix (`MatNum`) or `nothing`.
   - `args...`: Additional positional arguments (ignored).
 
 # Returns
@@ -1754,7 +1794,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
+function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
 end
 """
@@ -1774,31 +1814,25 @@ function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """
-    asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
-                                                   <:AssetSetsMatrixEstimator}},
+    asset_sets_matrix(smtx::VecMatNum_ASetMatE,
                       sets::AssetSets)
 
 Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
-function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
-                                                        <:AssetSetsMatrixEstimator}},
-                           sets::AssetSets)
+function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
 """
 """
-function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
+function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
     return view(smtx, :, i)
 end
-function asset_sets_matrix_view(smtx::Union{Nothing, AssetSetsMatrixEstimator}, ::Any;
-                                kwargs...)
+function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
     return smtx
 end
-function asset_sets_matrix_view(smtx::AbstractVector{<:Union{<:AbstractMatrix,
-                                                             <:AssetSetsMatrixEstimator}},
-                                i::AbstractVector; kwargs...)
+function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)
     return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
 end
 

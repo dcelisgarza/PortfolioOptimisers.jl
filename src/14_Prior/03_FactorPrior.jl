@@ -103,7 +103,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-function factory(pe::FactorPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(pe::FactorPrior, w::Option{<:AbstractWeights} = nothing)
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
@@ -117,7 +117,7 @@ function Base.getproperty(obj::FactorPrior, sym::Symbol)
     end
 end
 """
-    prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1, kwargs...)
+    prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -146,8 +146,7 @@ Compute factor-based prior moments for asset returns using a factor model.
   - [`EmpiricalPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
-               kwargs...)
+function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

@@ -22,7 +22,7 @@ A flexible container type for configuring and applying distance-based covariance
 # Constructor
 
     DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                       kwargs::NamedTuple = (;), w::Union{Nothing, <:AbstractWeights} = nothing,
+                       kwargs::NamedTuple = (;), w::Option{<:AbstractWeights} = nothing,
                        threads::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
@@ -53,7 +53,7 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     w::T4
     threads::T5
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Union{Nothing, <:AbstractWeights},
+                                w::Option{<:AbstractWeights},
                                 threads::FLoops.Transducers.Executor)
         return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(threads)}(dist,
                                                                                            args,
@@ -64,16 +64,16 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Union{Nothing, <:AbstractWeights} = nothing,
+                            w::Option{<:AbstractWeights} = nothing,
                             threads::FLoops.Transducers.Executor = ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, threads)
 end
-function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::DistanceCovariance, w::Option{<:AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, threads = ce.threads)
 end
 """
-    cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
+    cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
 
 Compute the distance correlation between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -103,12 +103,12 @@ This function calculates the distance correlation between `v1` and `v2` using th
 # Related
 
   - [`DistanceCovariance`](@ref)
-  - [`cor_distance(ce::DistanceCovariance, X::AbstractMatrix)`](@ref)
+  - [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
 """
-function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
+function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
     N = length(v1)
-    @argcheck(N > 1)
-    @argcheck(N == length(v2))
+    @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
+    @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
     a, b = if isnothing(ce.w)
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
@@ -128,7 +128,7 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
 """
-    cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
+    cor_distance(ce::DistanceCovariance, X::MatNum)
 
 Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -141,7 +141,7 @@ This function calculates the distance correlation between each pair of columns i
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Distance correlation matrix.
+  - `rho::Matrix{<:Number}`: Distance correlation matrix.
 
 # Details
 
@@ -151,9 +151,9 @@ This function calculates the distance correlation between each pair of columns i
 # Related
 
   - [`DistanceCovariance`](@ref)
-  - [`cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)`](@ref)
+  - [`cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref)
 """
-function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
+function cor_distance(ce::DistanceCovariance, X::MatNum)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
     @floop ce.threads for j in axes(X, 2)
@@ -165,7 +165,7 @@ function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
     return rho
 end
 """
-    Statistics.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -178,7 +178,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of pairwise distance correlations.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations.
 
 # Validation
 
@@ -206,10 +206,10 @@ julia> cor(ce, X)
 # Related
 
   - [`DistanceCovariance`](@ref)
-  - [`cor_distance(ce::DistanceCovariance, X::AbstractMatrix)`](@ref)
-  - [`cov(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
+  - [`cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -217,7 +217,7 @@ function Statistics.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1
     return cor_distance(ce, X)
 end
 """
-    cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
+    cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
 
 Compute the distance covariance between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -231,7 +231,7 @@ This function calculates the distance covariance between `v1` and `v2` using the
 
 # Returns
 
-  - `rho::Real`: The computed distance covariance between `v1` and `v2`.
+  - `rho::Number`: The computed distance covariance between `v1` and `v2`.
 
 # Details
 
@@ -247,12 +247,12 @@ This function calculates the distance covariance between `v1` and `v2` using the
 # Related
 
   - [`DistanceCovariance`](@ref)
-  - [`cov_distance(ce::DistanceCovariance, X::AbstractMatrix)`](@ref)
+  - [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
 """
-function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
+function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
     N = length(v1)
-    @argcheck(N > 1)
-    @argcheck(N == length(v2))
+    @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
+    @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
     a, b = if isnothing(ce.w)
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
@@ -270,7 +270,7 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     return sqrt(dcov2_xy)
 end
 """
-    cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
+    cov_distance(ce::DistanceCovariance, X::MatNum)
 
 Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -283,7 +283,7 @@ This function calculates the distance covariance between each pair of columns in
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
 
 # Details
 
@@ -293,9 +293,9 @@ This function calculates the distance covariance between each pair of columns in
 # Related
 
   - [`DistanceCovariance`](@ref)
-  - [`cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)`](@ref)
+  - [`cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref)
 """
-function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
+function cov_distance(ce::DistanceCovariance, X::MatNum)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
     @floop ce.threads for j in axes(X, 2)
@@ -307,7 +307,7 @@ function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
     return rho
 end
 """
-    Statistics.cov(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
@@ -320,7 +320,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
 
 # Validation
 
@@ -348,10 +348,10 @@ julia> cov(ce, X)
 # Related
 
   - [`DistanceCovariance`](@ref)
-  - [`cov_distance(ce::DistanceCovariance, X::AbstractMatrix)`](@ref)
-  - [`cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
+  - [`cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

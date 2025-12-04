@@ -188,9 +188,8 @@
               DistributionallyRobustConditionalValueatRiskRange(),
               ValueatRiskRange(; alg = DistributionValueatRisk()),
               TurnoverRiskMeasure(; w = w0),
-              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0)),
-              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0),
-                                  alg = NOCTracking())]
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking())]
 
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
@@ -260,11 +259,11 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskDT.csv.gz"), DataFrame)
-        tracking = WeightsTracking(; w = w0)
+        tr = WeightsTracking(; w = w0)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         i = 1
         for r in rs
-            r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
+            r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
                                          alg = DependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise(mr, rd)
@@ -306,7 +305,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         i = 1
         for r in rs
-            r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
+            r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
                                          alg = IndependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise(mr, rd)
@@ -1022,6 +1021,155 @@
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         @test isapprox(res.w, optimise(mre, rd).w)
+
+        sets.dict["nx_industries"] = ["Technology", "Technology", "Financials",
+                                      "Consumer_Discretionary", "Energy", "Industrials",
+                                      "Consumer_Discretionary", "Healthcare", "Financials",
+                                      "Consumer_Staples", "Healthcare", "Healthcare",
+                                      "Technology", "Consumer_Staples", "Healthcare",
+                                      "Consumer_Staples", "Energy", "Healthcare",
+                                      "Consumer_Staples", "Energy"]
+        sets.dict["ux_industries"] = unique(sets.dict["nx_industries"])
+        idx = [sets.dict["nx_industries"] .== i for i in sets.dict["ux_industries"]]
+        for (i, ui) in zip(idx, sets.dict["ux_industries"])
+            sets.dict[ui] = sets.dict["nx"][i]
+        end
+        m_idx = hcat(idx...)'
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(nx ==
+                                                                                              8)))),
+                       rd)
+
+        @test count(res.w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 8
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(nx >=
+                                                                                              11)))),
+                       rd)
+        @test count(res.w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) >= 20
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(JNJ +
+                                                                                              MRK <=
+                                                                                              1)))),
+                       rd)
+        @test count(res.w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 1
+        @test count(res.w[rd.nx .== "JNJ" .|| rd.nx .== "MRK"] .> 1e-10) <= 1
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    lt = BuyInThreshold(; val = 0.000001),
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(JNJ <=
+                                                                                              BAC)))),
+                       rd)
+        @test count(res.w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) >= 2
+        @test count(res.w[rd.nx .== "JNJ" .|| rd.nx .== "BAC"] .> 1e-10) >= 2
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv,
+                                                    sglt = BuyInThreshold(0.015),
+                                                    sgcard = LinearConstraintEstimator(;
+                                                                                       key = "ux_industries",
+                                                                                       val = [:(ux_industries ==
+                                                                                                4)]),
+                                                    sgmtx = AssetSetsMatrixEstimator(;
+                                                                                     val = "nx_industries"),
+                                                    sets = sets)), rd)
+        @test count((m_idx * res.w) .> 1e-10) == 4
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv,
+                                                    sglt = [BuyInThreshold(0.015)],
+                                                    sgcard = [LinearConstraintEstimator(;
+                                                                                        key = "ux_industries",
+                                                                                        val = [:(ux_industries >=
+                                                                                                 4),
+                                                                                               :(ux_industries <=
+                                                                                                 6)])],
+                                                    sgmtx = [AssetSetsMatrixEstimator(;
+                                                                                      val = "nx_industries")],
+                                                    sets = sets)), rd)
+        @test 4 <= count((m_idx * res.w) .> 5e-10) <= 6
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(4 *
+                                                                                              MRK +
+                                                                                              Consumer_Staples ==
+                                                                                              4)))),
+                       rd)
+        @test (all(res.w[rd.nx .== "MRK"] .<= 1e-10) &&
+               all(res.w[sets.dict["nx_industries"] .== "Consumer_Staples"] .> 1e-10) ||
+               all(res.w[rd.nx .== "MRK"] .> 1e-10) &&
+               all(res.w[sets.dict["nx_industries"] .== "Consumer_Staples"] .<= 1e-10))
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(3 *
+                                                                                              JNJ +
+                                                                                              Energy ==
+                                                                                              3)))),
+                       rd)
+        @test (all(res.w[rd.nx .== "JNJ"] .<= 1e-10) &&
+               all(res.w[sets.dict["nx_industries"] .== "Energy"] .> 1e-10) ||
+               all(res.w[rd.nx .== "JNJ"] .> 1e-10) &&
+               all(res.w[sets.dict["nx_industries"] .== "Energy"] .<= 1e-10))
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    lt = BuyInThreshold(0.05),
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = [:(4 *
+                                                                                               BAC +
+                                                                                               Consumer_Staples ==
+                                                                                               4),
+                                                                                             :(4 *
+                                                                                               JPM +
+                                                                                               Consumer_Staples ==
+                                                                                               4)]))),
+                       rd)
+        @test (all(res.w[sets.dict["nx_industries"] .== "Financials"] .<= 1e-10) &&
+               all(res.w[sets.dict["nx_industries"] .== "Consumer_Staples"] .> 1e-10) ||
+               all(res.w[sets.dict["nx_industries"] .== "Financials"] .> 1e-10) &&
+               all(res.w[sets.dict["nx_industries"] .== "Consumer_Staples"] .<= 1e-10))
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    lt = BuyInThreshold(0.05),
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = :(AMD +
+                                                                                              Consumer_Staples >=
+                                                                                              5)))),
+                       rd)
+        @test all(res.w[rd.nx .== "AMD" .|| sets.dict["nx_industries"] .== "Consumer_Staples"] .>=
+                  0.05)
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    lt = BuyInThreshold(0.05),
+                                                    gcard = LinearConstraintEstimator(;
+                                                                                      val = [:(AMD +
+                                                                                               Consumer_Staples >=
+                                                                                               5),
+                                                                                             :(AAPL +
+                                                                                               Consumer_Staples >=
+                                                                                               5),
+                                                                                             :(MSFT +
+                                                                                               Consumer_Staples >=
+                                                                                               5)]))),
+                       rd)
+        @test all(res.w[sets.dict["nx_industries"] .== "Technology" .|| sets.dict["nx_industries"] .== "Consumer_Staples"] .>=
+                  0.05)
     end
     @testset "Buy-in threshold" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
@@ -1177,7 +1325,7 @@
                             wb = WeightBounds(; lb = -1, ub = 1),
                             tn = [TurnoverEstimator(; w = w0,
                                                     val = ["AAPL" => 0, "MRK" => 0.05],
-                                                    default = Inf)])
+                                                    dval = Inf)])
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,
@@ -1203,36 +1351,34 @@
                                                             "./assets/SP500_idx.csv.gz"));
                                           timestamp = :Date)[(end - 252):end])
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            te = TrackingError(;
-                                               tracking = ReturnsTracking(; w = vec(rdb.X)),
+                            te = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 3e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            te = TrackingError(;
-                                               tracking = ReturnsTracking(; w = vec(rdb.X)),
+                            te = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 2.5e-3, alg = NOCTracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            te = TrackingError(; tracking = WeightsTracking(; w = w0),
+                            te = TrackingError(; tr = WeightsTracking(; w = w0),
                                                err = 2e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            te = [TrackingError(; tracking = WeightsTracking(; w = w0),
+                            te = [TrackingError(; tr = WeightsTracking(; w = w0),
                                                 err = 2e-3, alg = NOCTracking())])
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
 
-        tr = RiskTrackingError(; err = 0.0, tracking = WeightsTracking(; w = w0),
+        tr = RiskTrackingError(; err = 0.0, tr = WeightsTracking(; w = w0),
                                alg = DependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         mre = MeanRisk(; r = ConditionalValueatRisk(), opt = opt)
@@ -1242,7 +1388,7 @@
                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
                        rtol = 1e-6)
 
-        tr = RiskTrackingError(; err = 0.5, tracking = WeightsTracking(; w = w0),
+        tr = RiskTrackingError(; err = 0.5, tr = WeightsTracking(; w = w0),
                                alg = IndependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
@@ -1252,7 +1398,7 @@
                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
                        rtol = 5e-4)
 
-        tr = RiskTrackingError(; err = 0, tracking = WeightsTracking(; w = w0),
+        tr = RiskTrackingError(; err = 0, tr = WeightsTracking(; w = w0),
                                alg = IndependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         mre = MeanRisk(; obj = MaximumRatio(), opt = opt)

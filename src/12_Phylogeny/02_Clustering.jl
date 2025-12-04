@@ -48,6 +48,7 @@ All concrete types implementing specific algorithms for determining the optimal 
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
     abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
@@ -61,6 +62,8 @@ All concrete types representing the result of a clustering estimation should sub
   - [`AbstractClusteringAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+const ClE_Cl = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
+const PhE_Cl = Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult}
 """
     struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
         clustering::T1
@@ -82,8 +85,8 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                           D::AbstractMatrix, k::Integer)
+    HierarchicalClustering(; clustering::Clustering.Hclust, S::MatNum,
+                           D::MatNum, k::Integer)
 
 Keyword arguments correspond to the fields above.
 
@@ -104,17 +107,17 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     S::T2
     D::T3
     k::T4
-    function HierarchicalClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
-                                    D::AbstractMatrix, k::Integer)
-        @argcheck(!isempty(S))
-        @argcheck(!isempty(D))
-        @argcheck(size(S) == size(D))
-        @argcheck(k >= one(k))
+    function HierarchicalClustering(clustering::Clustering.Hclust, S::MatNum, D::MatNum,
+                                    k::Integer)
+        @argcheck(!isempty(S), IsEmptyError)
+        @argcheck(!isempty(D), IsEmptyError)
+        @argcheck(size(S) == size(D), DimensionMismatch)
+        @argcheck(one(k) <= k, DomainError)
         return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
     end
 end
-function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                                D::AbstractMatrix, k::Integer)
+function HierarchicalClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum,
+                                k::Integer)
     return HierarchicalClustering(clustering, S, D, k)
 end
 """
@@ -169,7 +172,7 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Constructor
 
-    StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+    StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -189,12 +192,11 @@ StandardisedSilhouetteScore
 """
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
-    function StandardisedSilhouetteScore(metric::Union{Nothing, <:Distances.SemiMetric})
+    function StandardisedSilhouetteScore(metric::Option{<:Distances.SemiMetric})
         return new{typeof(metric)}(metric)
     end
 end
-function StandardisedSilhouetteScore(;
-                                     metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+function StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
     return StandardisedSilhouetteScore(metric)
 end
 """
@@ -214,8 +216,8 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 
 # Constructor
 
-    OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                          alg::Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
+    OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
+                          alg::Int_ONC = SecondOrderDifference())
 
 Keyword arguments correspond to the fields above.
 
@@ -241,23 +243,18 @@ OptimalNumberClusters
 struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     max_k::T1
     alg::T2
-    function OptimalNumberClusters(max_k::Union{Nothing, <:Integer},
-                                   alg::Union{<:Integer,
-                                              <:AbstractOptimalNumberClustersAlgorithm})
+    function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
-            @argcheck(max_k >= one(max_k),
-                      DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
+            @argcheck(one(max_k) <= max_k, DomainError)
         end
         if isa(alg, Integer)
-            @argcheck(alg >= one(alg),
-                      DomainError("`alg` must be greater than or equal to 1:\nalg => $alg"))
+            @argcheck(one(alg) <= alg, DomainError)
         end
         return new{typeof(max_k), typeof(alg)}(max_k, alg)
     end
 end
-function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                               alg::Union{<:Integer,
-                                          <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
+function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
+                               alg::Int_ONC = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)
 end
 """

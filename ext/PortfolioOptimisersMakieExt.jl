@@ -1,8 +1,8 @@
 #=
-function plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractMatrix,
-                                     fees::Union{Nothing, <:Fees} = nothing;
+function plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
+                                     fees::Option{<:Fees} = nothing;
                                      ts::AbstractVector = 1:size(X, 1),
-                                     f::Union{Nothing, Figure} = Figure(),
+                                     f::Option{<:Figure} = Figure(),
                                      fpos::Tuple = (1, 1), compound::Bool = false,
                                      ax_kwargs::NamedTuple = (; xlabel = "Date",
                                                               ylabel = "$(compound ? "Compound " : "Simple ") Portfolio Cumulative ReturnsResult"),
@@ -15,7 +15,7 @@ function plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractMatrix,
     axislegend(; legend_kwargs...)
     return f
 end
-function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
+function compute_relevant_assets(w::AbstractVector, M::Number, N::Number)
     abs_w = abs.(w)
     idx = sortperm(abs_w; rev = true)
     abs_w /= sum(abs_w)
@@ -28,12 +28,12 @@ function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
     end
     return N, idx
 end
-function plot_asset_cumulative_returns(w::AbstractVector, X::AbstractMatrix,
-                                       fees::Union{Nothing, <:Fees} = nothing;
+function plot_asset_cumulative_returns(w::AbstractVector, X::MatNum,
+                                       fees::Option{<:Fees} = nothing;
                                        ts::AbstractVector = 1:size(X, 1),
                                        nx::AbstractVector = 1:size(X, 2),
-                                       N::Union{Nothing, <:Real} = nothing,
-                                       f::Union{Nothing, Figure} = Figure(),
+                                       N::Option{<:Number} = nothing,
+                                       f::Option{<:Figure} = Figure(),
                                        fpos::Tuple = (1, 1), compound::Bool = false,
                                        ax_kwargs::NamedTuple = (; xlabel = "Date",
                                                                 ylabel = "$(compound ? "Compound " : "Simple ") Asset Cumulative ReturnsResult"),
@@ -63,9 +63,9 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::AbstractMatrix,
     axislegend(; legend_kwargs...)
     return f
 end
-function plot_composition(w::AbstractVector{<:Real}, nx::AbstractVector = 1:length(w);
-                          N::Union{Nothing, <:Real} = nothing,
-                          f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
+function plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
+                          N::Option{<:Number} = nothing,
+                          f::Option{<:Figure} = Figure(), fpos::Tuple = (1, 1),
                           ax_kwargs::NamedTuple = (; xlabel = "Asset", ylabel = "Weight",
                                                    title = "Portfolio Composition",
                                                    xticklabelrotation = pi / 3),
@@ -85,8 +85,8 @@ function plot_composition(w::AbstractVector{<:Real}, nx::AbstractVector = 1:leng
     end
     return f
 end
-function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:size(w, 1);
-                                      f::Union{Nothing, Figure} = Figure(),
+function plot_stacked_bar_composition(w::ArrNum, nx::AbstractVector = 1:size(w, 1);
+                                      f::Option{<:Figure} = Figure(),
                                       fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                       ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
                                                                ylabel = "Weight",
@@ -95,7 +95,7 @@ function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:s
                                                                                         2))),
                                                                title = "Portfolio Composition"),
                                       bar_kwargs::NamedTuple = (; colormap = :viridis))
-    if isa(w, AbstractVector{<:AbstractVector})
+    if isa(w, VecVecNum)
         w = hcat(w...)
     end
     ax = Axis(f[fpos...]; ax_kwargs...)
@@ -115,8 +115,8 @@ function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:s
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
-function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:size(w, 1);
-                                       f::Union{Nothing, Figure} = Figure(),
+function plot_stacked_area_composition(w::ArrNum, nx::AbstractVector = 1:size(w, 1);
+                                       f::Option{<:Figure} = Figure(),
                                        fpos::Tuple = (1, 1), lpos::Tuple = (1, 2),
                                        ax_kwargs::NamedTuple = (; xlabel = "Portfolios",
                                                                 ylabel = "Weight",
@@ -125,7 +125,7 @@ function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:
                                                                                          2))),
                                                                 title = "Portfolio Composition"),
                                        band_kwargs::NamedTuple = (; colormap = :viridis))
-    if isa(w, AbstractVector{<:AbstractVector})
+    if isa(w, VecVecNum)
         w = hcat(w...)
     end
     cw = cumsum(w; dims = 1)
@@ -172,7 +172,7 @@ function hcl_nodes(hcl; useheight = false)
 end
 function plot_dendrogram(clr::AbstractClusteringResult,
                          nx::AbstractVector = 1:length(clr.clustering.order),
-                         f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
+                         f::Option{<:Figure} = Figure(), fpos::Tuple = (1, 1),
                          ax_kwargs::NamedTuple = (; title = "Dendrogram"),
                          node_kwargs::NamedTuple = (; useheight = true),
                          dendrogram_kwargs::NamedTuple = (; colormap = :seaborn_colorblind,
@@ -189,9 +189,9 @@ function plot_dendrogram(clr::AbstractClusteringResult,
     ax.xticks = xticks
     return f
 end
-function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
+function plot_clusters(clr::AbstractClusteringResult, X::MatNum,
                        nx::AbstractVector = 1:size(X, 1);
-                       f::Union{Nothing, Figure} = Figure(),
+                       f::Option{<:Figure} = Figure(),
                        ax_kwargs::NamedTuple = (; yreversed = true,
                                                 xticklabelrotation = pi / 2, aspect = 1),
                        color_func = x -> if any(x .< zero(eltype(x)))

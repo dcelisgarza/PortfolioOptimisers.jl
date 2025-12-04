@@ -6,14 +6,14 @@ struct ImpliedVolatilityRegression{T1, T2,
     ws::T2
     # crit::T3
     re::T3
-    function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Real,
+    function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
-        @argcheck(ws > 2)
+        @argcheck(2 < ws, DomainError)
         return new{typeof(ve), typeof(ws), typeof(re)}(ve, ws, re)
     end
 end
 function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                                     ws::Real = 20,
+                                     ws::Number = 20,
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
                                      re::AbstractRegressionTarget = LinearModel())
     return ImpliedVolatilityRegression(ve, ws, re)
@@ -26,25 +26,23 @@ struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     af::T4
     function ImpliedVolatility(ce::AbstractCovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
-                               alg::ImpliedVolatilityAlgorithm, af::Real)
-        @argcheck(isfinite(af))
-        @argcheck(af > zero(af))
+                               alg::ImpliedVolatilityAlgorithm, af::Number)
+        @argcheck(zero(af) < af, DomainError)
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
 function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-                           af::Real = 252)
+                           af::Number = 252)
     return ImpliedVolatility(ce, mp, alg, af)
 end
-function factory(ce::ImpliedVolatility, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::ImpliedVolatility, w::Option{<:AbstractWeights} = nothing)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
-function realised_vol(ce::AbstractVarianceEstimator, X::AbstractMatrix, ws::Integer,
-                      chunk::Union{Nothing, <:Integer} = nothing,
-                      T::Union{Nothing, <:Integer} = nothing,
-                      N::Union{Nothing, <:Integer} = nothing)
+function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
+                      chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
+                      N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
         T, N = size(X)
         chunk = div(T, ws)
@@ -53,32 +51,29 @@ function realised_vol(ce::AbstractVarianceEstimator, X::AbstractMatrix, ws::Inte
                                    reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk,
                                            N); dims = 1); dims = 1)
 end
-function implied_vol(X::AbstractMatrix, ws::Integer,
-                     chunk::Union{Nothing, <:Integer} = nothing,
-                     T::Union{Nothing, <:Integer} = nothing,
-                     N::Union{Nothing, <:Integer} = nothing)
+function implied_vol(X::MatNum, ws::Integer, chunk::Option{<:Integer} = nothing,
+                     T::Option{<:Integer} = nothing, N::Option{<:Integer} = nothing)
     if isnothing(chunk) || isnothing(T) || isnothing(N)
         T, N = size(X)
         chunk = div(T, ws)
     end
     return view(X, (T - (chunk - 1) * ws):ws:T, :)
 end
-function predict_realised_vols(::ImpliedVolatilityPremium, iv::AbstractMatrix, ::Any,
-                               ivpa::Nothing)
-    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Real` or `<:AbstractVector{<:Real}`"))
+function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any, ivpa::Nothing)
+    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Number` or `<:VecNum`"))
 end
-function predict_realised_vols(::ImpliedVolatilityPremium, iv::AbstractMatrix, ::Any,
-                               ivpa::Union{<:Real, <:AbstractVector{<:Real}})
+function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,
+                               ivpa::Num_VecNum)
     return view(iv, size(iv, 1), :) ⊘ ivpa
 end
-function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMatrix,
-                               X::AbstractMatrix, ::Any)
+function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::MatNum,
+                               ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
-    @argcheck(chunk > 2)
+    @argcheck(2 < chunk, DomainError)
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
-    @argcheck(size(rv) == size(iv))
+    @argcheck(size(rv) == size(iv), DimensionMismatch)
     T2 = size(iv, 1)
     rv = log.(rv)
     iv = log.(iv)
@@ -106,10 +101,8 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
     #, Regression(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, fr
     return rv_p
 end
-function Statistics.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
-                        mean = nothing, iv::AbstractMatrix,
-                        ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                        kwargs...)
+function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
+                        iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     sigma = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
@@ -117,10 +110,8 @@ function Statistics.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
-function Statistics.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
-                        mean = nothing, iv::AbstractMatrix,
-                        ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                        kwargs...)
+function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
+                        iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)

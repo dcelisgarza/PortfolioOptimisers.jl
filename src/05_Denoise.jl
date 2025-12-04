@@ -79,7 +79,7 @@ A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a c
 
 # Constructor
 
-    ShrunkDenoise(; alpha::Real = 0.0)
+    ShrunkDenoise(; alpha::Number = 0.0)
 
 Keyword arguments correspond to the fields above.
 
@@ -103,15 +103,13 @@ ShrunkDenoise
 """
 struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
     alpha::T1
-    function ShrunkDenoise(alpha::Real)
+    function ShrunkDenoise(alpha::Number)
         @argcheck(zero(alpha) <= alpha <= one(alpha),
-                  DomainError(alpha,
-                              range_msg("`alpha`", zero(alpha), one(alpha), nothing, true,
-                                        true) * "."))
+                  DomainError("0 <= alpha <= 1 must hold. Got\nalpha => $alpha"))
         return new{typeof(alpha)}(alpha)
     end
 end
-function ShrunkDenoise(; alpha::Real = 0.0)
+function ShrunkDenoise(; alpha::Number = 0.0)
     return ShrunkDenoise(alpha)
 end
 """
@@ -176,6 +174,7 @@ Denoise
   - [`ShrunkDenoise`](@ref)
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
+  - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
 """
 struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     alg::T1
@@ -186,8 +185,8 @@ struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     n::T6
     function Denoise(alg::AbstractDenoiseAlgorithm, args::Tuple, kwargs::NamedTuple, kernel,
                      m::Integer, n::Integer)
-        @argcheck(m > 1, DomainError(m, comp_msg("`m`", 1, :gt, m) * "."))
-        @argcheck(n > 1, DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
+        @argcheck(1 < m, DomainError)
+        @argcheck(1 < n, DomainError)
         return new{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
                    typeof(n)}(alg, args, kwargs, kernel, m, n)
     end
@@ -199,8 +198,8 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise(alg, args, kwargs, kernel, m, n)
 end
 """
-    _denoise!(alg::AbstractDenoiseAlgorithm, X::AbstractMatrix, vals::AbstractVector,
-              vecs::AbstractMatrix, num_factors::Integer)
+    _denoise!(de::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
+              num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
 
@@ -230,21 +229,23 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - [`SpectralDenoise`](@ref)
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecNum`](@ref)
 """
-function _denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
-                   vecs::AbstractMatrix, num_factors::Integer)
+function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
+                   num_factors::Integer)
     vals[1:num_factors] .= zero(eltype(X))
     X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
-                   vecs::AbstractMatrix, num_factors::Integer)
+function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
+                   num_factors::Integer)
     vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
     X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
-                   vecs::AbstractMatrix, num_factors::Integer)
+function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
+                   num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
     vecs_l = vecs[:, 1:num_factors]
@@ -260,7 +261,7 @@ function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
     return nothing
 end
 """
-    errPDF(x::Real, vals::AbstractVector, q::Real;
+    errPDF(x::Number, vals::VecNum, q::Number;
            kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
            n::Integer = 1000)
 
@@ -279,14 +280,16 @@ This function is used internally to fit the MP distribution to the observed spec
 
 # Returns
 
-  - `sse::Real`: The sum of squared errors between the empirical and theoretical densities.
+  - `sse::Number`: The sum of squared errors between the empirical and theoretical densities.
 
 # Related
 
   - [`find_max_eval`](@ref)
   - [`Denoise`](@ref)
+  - [`VecNum`](@ref)
+  - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
 """
-function errPDF(x::Real, vals::AbstractVector, q::Real;
+function errPDF(x::Number, vals::VecNum, q::Number;
                 kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                 n::Integer = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
@@ -301,7 +304,7 @@ function errPDF(x::Real, vals::AbstractVector, q::Real;
     return sse
 end
 """
-    find_max_eval(vals::AbstractVector, q::Real;
+    find_max_eval(vals::VecNum, q::Number;
                   kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                   n::Integer = 1000, args::Tuple = (), kwargs::NamedTuple = (;))
 
@@ -321,14 +324,16 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
 # Returns
 
-  - `(e_max::Real, x::Real)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
+  - `(e_max::Number, x::Number)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
 
 # Related
 
   - [`errPDF`](@ref)
   - [`Denoise`](@ref)
+  - [`VecNum`](@ref)
+  - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
 """
-function find_max_eval(vals::AbstractVector, q::Real;
+function find_max_eval(vals::VecNum, q::Number;
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
                        m::Integer = 10, n::Integer = 1000, args::Tuple = (),
                        kwargs::NamedTuple = (;))
@@ -339,7 +344,7 @@ function find_max_eval(vals::AbstractVector, q::Real;
     return e_max, x
 end
 """
-    denoise!(de::Denoise, X::AbstractMatrix, q::Real; pdm::Union{Nothing, <:Posdef} = Posdef())
+    denoise!(de::Denoise, X::MatNum, q::Number; pdm::Option{<:Posdef} = Posdef())
     denoise!(::Nothing, args...)
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
@@ -397,13 +402,15 @@ julia> X
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
   - [`posdef!`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function denoise!(::Nothing, args...)
     return nothing
 end
-function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
-                  pdm::Union{Nothing, <:Posdef} = Posdef())
-    assert_matrix_issquare(X)
+function denoise!(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Posdef())
+    assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -422,7 +429,7 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
     return nothing
 end
 """
-    denoise(de::Denoise, X::AbstractMatrix, q::Real; pdm::Union{Nothing, <:Posdef} = Posdef())
+    denoise(de::Denoise, X::MatNum, q::Number; pdm::Option{<:Posdef} = Posdef())
     denoise(::Nothing, args...)
 
 Out-of-place version of [`denoise!`](@ref).
@@ -435,12 +442,14 @@ Out-of-place version of [`denoise!`](@ref).
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
   - [`posdef`](@ref)
+  - [`MatNum`](@ref)
+  - [`Option`](@ref)
+  - [`Posdef`](@ref)
 """
 function denoise(::Nothing, args...)
     return nothing
 end
-function denoise(de::Denoise, X::AbstractMatrix, q::Real,
-                 pdm::Union{Nothing, <:Posdef} = Posdef())
+function denoise(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Posdef())
     X = copy(X)
     denoise!(de, X, q, pdm)
     return X

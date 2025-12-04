@@ -6,6 +6,7 @@ applyTo: '**'
 
 ## General Guidelines
 
+  - Look at how other docstrings are implemented and try to follow similar patterns.
   - Write clear and concise documentation.
   - Use consistent terminology and style.
   - Include code examples where applicable.

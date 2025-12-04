@@ -8,7 +8,7 @@ struct HierarchicalOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationR
     w::T7
     fb::T8
 end
-function opt_attempt_factory(res::HierarchicalOptimisation, fb)
+function factory(res::HierarchicalOptimisation, fb)
     return HierarchicalOptimisation(res.oe, res.pr, res.fees, res.wb, res.clr, res.retcode,
                                     res.w, fb)
 end
@@ -22,16 +22,9 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sets::T6
     cwf::T7
     strict::T8
-    function HierarchicalOptimiser(pe::Union{<:AbstractPriorEstimator,
-                                             <:AbstractPriorResult},
-                                   cle::Union{<:ClusteringEstimator,
-                                              <:AbstractClusteringResult},
-                                   slv::Union{Nothing, <:Solver,
-                                              <:AbstractVector{<:Solver}},
-                                   fees::Union{Nothing, <:FeesEstimator, <:Fees},
-                                   wb::Union{Nothing, <:WeightBoundsEstimator,
-                                             <:WeightBounds},
-                                   sets::Union{Nothing, <:AssetSets}, cwf::WeightFinaliser,
+    function HierarchicalOptimiser(pe::PrE_Pr, cle::ClE_Cl, slv::Option{<:Slv_VecSlv},
+                                   fees::Option{<:FeesE_Fees}, wb::Option{<:WbE_Wb},
+                                   sets::Option{<:AssetSets}, cwf::WeightFinaliser,
                                    strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -41,19 +34,17 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
                                                               cwf, strict)
     end
 end
-function HierarchicalOptimiser(;
-                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                               cle::Union{<:ClusteringEstimator,
-                                          <:AbstractClusteringResult} = ClusteringEstimator(),
-                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
-                               fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
-                               wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
-                               sets::Union{Nothing, <:AssetSets} = nothing,
+function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
+                               cle::ClE_Cl = ClusteringEstimator(),
+                               slv::Option{<:Slv_VecSlv} = nothing,
+                               fees::Option{<:FeesE_Fees} = nothing,
+                               wb::Option{<:WbE_Wb} = WeightBounds(),
+                               sets::Option{<:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
 end
-function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
+function opt_view(hco::HierarchicalOptimiser, i)
     pe = prior_view(hco.pe, i)
     fees = fees_view(hco.fees, i)
     wb = weight_bounds_view(hco.wb, i)
@@ -61,8 +52,8 @@ function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, fees = fees, slv = hco.slv,
                                  wb = wb, cwf = hco.cwf, sets = sets, strict = hco.strict)
 end
-function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
-                                fees::Union{Nothing, <:Fees} = nothing)
+function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
+                                fees::Option{<:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
     for i in eachindex(wk)
@@ -72,9 +63,8 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
     end
     return rk
 end
-function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
-                                 r::OptimisationRiskMeasure, X::AbstractMatrix,
-                                 fees::Union{Nothing, <:Fees} = nothing)
+function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
+                                 X::MatNum, fees::Option{<:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
     for i in eachindex(wk)
         wk[i] = one(eltype(X))

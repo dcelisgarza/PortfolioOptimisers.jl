@@ -1,87 +1,73 @@
+const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult}
+const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
+                        <:ConditionalValueatRisk,
+                        <:DistributionallyRobustConditionalValueatRisk,
+                        <:DistributionallyRobustConditionalValueatRiskRange,
+                        <:EntropicValueatRisk, <:EntropicValueatRiskRange,
+                        <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
+                        <:DrawdownatRisk, <:MaximumDrawdown, <:AverageDrawdown,
+                        <:ConditionalDrawdownatRisk, <:UlcerIndex, <:EntropicDrawdownatRisk,
+                        <:RelativisticDrawdownatRisk, <:RelativeDrawdownatRisk,
+                        <:RelativeMaximumDrawdown, <:RelativeAverageDrawdown,
+                        <:RelativeConditionalDrawdownatRisk, <:RelativeUlcerIndex,
+                        <:RelativeEntropicDrawdownatRisk,
+                        <:RelativeRelativisticDrawdownatRisk, <:Range,
+                        <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
+                        <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
+                        <:MeanReturn}
+const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
+                        <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
+                        <:Skewness, <:MedianAbsoluteDeviation}
+const ERkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
+                   <:Variance, <:UncertaintySetVariance, <:EqualRiskMeasure}
 """
 """
-function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
-                                <:ConditionalValueatRisk,
-                                <:DistributionallyRobustConditionalValueatRisk,
-                                <:DistributionallyRobustConditionalValueatRiskRange,
-                                <:EntropicValueatRisk, <:EntropicValueatRiskRange,
-                                <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
-                                <:DrawdownatRisk, <:MaximumDrawdown, <:AverageDrawdown,
-                                <:ConditionalDrawdownatRisk, <:UlcerIndex,
-                                <:EntropicDrawdownatRisk, <:RelativisticDrawdownatRisk,
-                                <:RelativeDrawdownatRisk, <:RelativeMaximumDrawdown,
-                                <:RelativeAverageDrawdown,
-                                <:RelativeConditionalDrawdownatRisk, <:RelativeUlcerIndex,
-                                <:RelativeEntropicDrawdownatRisk,
-                                <:RelativeRelativisticDrawdownatRisk, <:Range,
-                                <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
-                                <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
-                                <:MeanReturn}, w::AbstractVector{<:Real}, X::AbstractMatrix,
-                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
+"""
+"""
+const SlvRM = Union{<:EntropicValueatRisk, <:EntropicValueatRiskRange,
+                    <:EntropicDrawdownatRisk, <:RelativeEntropicDrawdownatRisk,
+                    <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
+                    <:RelativisticDrawdownatRisk, <:RelativeRelativisticDrawdownatRisk}
+"""
+"""
+function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
+                       kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
-function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
-                                <:ConditionalValueatRisk,
-                                <:DistributionallyRobustConditionalValueatRisk,
-                                <:DistributionallyRobustConditionalValueatRiskRange,
-                                <:EntropicValueatRisk, <:EntropicValueatRiskRange,
-                                <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
-                                <:DrawdownatRisk, <:MaximumDrawdown, <:AverageDrawdown,
-                                <:ConditionalDrawdownatRisk, <:UlcerIndex,
-                                <:EntropicDrawdownatRisk, <:RelativisticDrawdownatRisk,
-                                <:RelativeDrawdownatRisk, <:RelativeMaximumDrawdown,
-                                <:RelativeAverageDrawdown,
-                                <:RelativeConditionalDrawdownatRisk, <:RelativeUlcerIndex,
-                                <:RelativeEntropicDrawdownatRisk,
-                                <:RelativeRelativisticDrawdownatRisk, <:Range,
-                                <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
-                                <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
-                                <:MeanReturn}, w::AbstractVector{<:Real},
-                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
-                       kwargs...)
+function expected_risk(r::ERkNetRet, w::VecNum, pr::AbstractPriorResult,
+                       fees::Option{<:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, pr.X, fees))
 end
-function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
-                                <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
-                                <:Skewness, <:MedianAbsoluteDeviation},
-                       w::AbstractVector{<:Real}, X::AbstractMatrix,
-                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+function expected_risk(r::ERkwXFees, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
+                       kwargs...)
     return r(w, X, fees)
 end
-function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
-                                <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
-                                <:Skewness, <:MedianAbsoluteDeviation},
-                       w::AbstractVector{<:Real}, pr::AbstractPriorResult,
-                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+function expected_risk(r::ERkwXFees, w::VecNum, pr::AbstractPriorResult,
+                       fees::Option{<:Fees} = nothing; kwargs...)
     return r(w, pr.X, fees)
 end
-function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
-                                <:TurnoverRiskMeasure, <:Variance, <:UncertaintySetVariance,
-                                <:EqualRiskMeasure}, w::AbstractVector{<:Real}, args...;
-                       kwargs...)
+function expected_risk(r::ERkw, w::VecNum, args...; kwargs...)
     return r(w)
 end
-function expected_risk(r::RiskRatioRiskMeasure, w::AbstractVector{<:Real},
-                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, X, fees; kwargs...) /
            expected_risk(r.r2, w, X, fees; kwargs...)
 end
-function expected_risk(r::RiskRatioRiskMeasure, w::AbstractVector{<:Real},
-                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
-                       kwargs...)
+function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
+                       fees::Option{<:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, pr.X, fees; kwargs...) /
            expected_risk(r.r2, w, pr.X, fees; kwargs...)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractVector},
-                       args...; kwargs...)
+function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
-function number_effective_assets(w::AbstractVector)
+function number_effective_assets(w::VecNum)
     return inv(dot(w, w))
 end
-function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
-                           X::Union{<:AbstractMatrix, <:AbstractPriorResult},
-                           fees::Union{Nothing, <:Fees} = nothing; delta::Real = 1e-6,
+function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
+                           fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
     N = length(w)
     rc = Vector{eltype(w)}(undef, N)
@@ -105,11 +91,10 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
     end
     return rc
 end
-function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
-                                  X::Union{<:AbstractMatrix, <:AbstractPriorResult},
-                                  fees::Union{Nothing, <:Fees} = nothing;
-                                  re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
-                                  rd::ReturnsResult = ReturnsResult(), delta::Real = 1e-6,
+function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
+                                  fees::Option{<:Fees} = nothing;
+                                  re::RegE_Reg = StepwiseRegression(),
+                                  rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
     rr = regression(re, rd.X, rd.F)

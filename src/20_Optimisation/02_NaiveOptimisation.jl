@@ -12,23 +12,21 @@ struct NaiveOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
     retcode::T4
     fb::T5
 end
-function opt_attempt_factory(res::NaiveOptimisation, fb)
+function factory(res::NaiveOptimisation, fb)
     return NaiveOptimisation(res.oe, res.pr, res.w, res.retcode, fb)
 end
 struct InverseVolatility{T1, T2} <: NaiveOptimisationEstimator
     pe::T1
     fb::T2
-    function InverseVolatility(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                               fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+    function InverseVolatility(pe::PrE_Pr, fb::Option{<:OptimisationEstimator} = nothing)
         return new{typeof(pe), typeof(fb)}(pe, fb)
     end
 end
-function InverseVolatility(;
-                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                           fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
+                           fb::Option{<:OptimisationEstimator} = nothing)
     return InverseVolatility(pe, fb)
 end
-function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
+function opt_view(opt::InverseVolatility, i, args...)
     pe = prior_view(opt.pe, i)
     return InverseVolatility(; pe = pe, fb = opt.fb)
 end
@@ -61,11 +59,11 @@ function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...
 end
 struct RandomWeighted{T1} <: NaiveOptimisationEstimator
     rng::T1
-    function RandomWeighted(rng::Union{Nothing, <:AbstractRNG})
+    function RandomWeighted(rng::Option{<:AbstractRNG})
         return new{typeof(rng)}(rng)
     end
 end
-function RandomWeighted(; rng::Union{Nothing, <:AbstractRNG} = nothing)
+function RandomWeighted(; rng::Option{<:AbstractRNG} = nothing)
     return RandomWeighted(rng)
 end
 function optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)

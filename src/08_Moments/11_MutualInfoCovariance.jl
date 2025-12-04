@@ -18,7 +18,7 @@ Covariance estimator based on mutual information.
 # Constructor
 
     MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                         bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                         bins::Int_Bin = HacineGharbiRavier(),
                          normalise::Bool = true)
 
 Keyword arguments correspond to the fields above.
@@ -50,25 +50,24 @@ struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
-    function MutualInfoCovariance(ve::AbstractVarianceEstimator,
-                                  bins::Union{<:AbstractBins, <:Integer}, normalise::Bool)
+    function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
+                                  normalise::Bool)
         if isa(bins, Integer)
-            @argcheck(bins > zero(bins))
+            @argcheck(zero(bins) < bins)
         end
         return new{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins, normalise)
     end
 end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                              bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                              normalise::Bool = true)
+                              bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true)
     return MutualInfoCovariance(ve, bins, normalise)
 end
-function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::MutualInfoCovariance, w::Option{<:AbstractWeights} = nothing)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end
 """
-    cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -83,7 +82,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of mutual information-based correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
 
 # Validation
 
@@ -93,10 +92,9 @@ This method computes the pairwise mutual information correlation matrix for the 
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
-                        kwargs...)
+function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -104,7 +102,7 @@ function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int =
     return mutual_info(X, ce.bins, ce.normalise)
 end
 """
-    cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -119,7 +117,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of mutual information-based covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of mutual information-based covariances.
 
 # Validation
 
@@ -131,10 +129,9 @@ This method computes the pairwise mutual information covariance matrix for the i
 
   - [`MutualInfoCovariance`](@ref)
   - [`mutual_info`](@ref)
-  - [`cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
-                        kwargs...)
+function Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

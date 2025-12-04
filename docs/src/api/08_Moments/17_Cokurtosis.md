@@ -3,6 +3,6 @@
 ```@docs
 Cokurtosis
 cokurtosis
-PortfolioOptimisers.CokurtosisEstimator
-PortfolioOptimisers._cokurtosis
+CokurtosisEstimator
+_cokurtosis
 ```

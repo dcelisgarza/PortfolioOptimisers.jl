@@ -1,39 +1,94 @@
-function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bool = false)
+"""
+    drop_incomplete(X::AbstractMatrix)
+
+Return the indices of columns in matrix `X` that do not contain missing or NaN values, optionally filtering based on whether any missing value is present in a column.
+
+# Arguments
+
+  - `X`: Input matrix of numeric values (observations × assets).
+  - `any_missing`: Boolean flag for dropping columns with missing or NaN values.
+
+# Returns
+
+  - `res::Vector{Int}`: Indices of columns in `X` that are complete according to the specified rule.
+
+# Examples
+
+```jldoctest
+julia> X = [1.0 2.0 NaN; 4.0 missing 6.0];
+
+julia> drop_incomplete(X)
+1-element Vector{Int64}:
+ 1
+```
+
+# Related
+
+  - [`drop_correlated`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
+function drop_incomplete(X::AbstractMatrix)
     N = size(X, 2)
-    rho = !absolute ? cor(X) : abs.(cor(X))
-    mean_rho = mean(rho; dims = 1)
-    tril_idx = findall(tril!(trues(size(rho)), -1))
-    candidate_idx = findall(rho[tril_idx] .>= threshold)
-    candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
-    to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
-    for idx in candidate_idx
-        i, j = tril_idx[idx][1], tril_idx[idx][2]
-        if i ∉ to_remove && j ∉ to_remove
-            if mean_rho[i] > mean_rho[j]
-                push!(to_remove, i)
-            else
-                push!(to_remove, j)
-            end
+    to_remove = Vector{Int}(undef, 0)
+    for i in axes(X, 2)
+        if any(map(ismissing, X[:, i])) || any(map(isnan, X[:, i]))
+            push!(to_remove, i)
         end
     end
     return setdiff(1:N, to_remove)
 end
-function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
-    N = size(X, 2)
-    return if any_missing
-        to_remove = Vector{Int}(undef, 0)
-        for i in axes(X, 2)
-            if any(isnan, view(X, :, i)) || any(ismissing, view(X, :, i))
-                push!(to_remove, i)
-            end
-        end
-        setdiff(1:N, to_remove)
-    else
-        (1:N)[(.!isnan.(X[1, :]) .|| ismissing.(X[1, :])) .& (.!isnan.(X[end, :]) .|| ismissing.(X[end,
-                                                                                                   :]))]
+"""
+!!! note
+
+    Not implemented yet, still unexported.
+"""
+function select_k_extremes(X::MatNum) end
+"""
+    _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
+                                    names_sym::Symbol, mat_sym::Symbol)
+
+Validate that asset or factor names and their corresponding returns matrix are provided and consistent.
+
+# Arguments
+
+  - `names`: Asset or factor names.
+  - `mat`: Returns matrix.
+  - `names_sym`: Symbolic name for the names argument displayed in error messages.
+  - `mat_sym`: Symbolic name for the matrix argument displayed in error messages.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Details
+
+  - If either `names` or `mat` is not `nothing`:
+
+      + `!isnothing(names)` and `!isnothing(mat)`.
+      + `!isempty(names)` and `!isempty(mat)`.
+      + `length(names) == size(mat, 2)`.
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+"""
+function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
+                                         names_sym::Symbol, mat_sym::Symbol)
+    if !(isnothing(names) && isnothing(mat))
+        @argcheck(!isnothing(names),
+                  IsNothingError("$names_sym cannot be nothing if $mat_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+        @argcheck(!isnothing(mat),
+                  IsNothingError("$mat_sym cannot be nothing if $names_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+        @argcheck(!isempty(names), IsEmptyError("$names_sym cannot be empty."))
+        @argcheck(!isempty(mat), IsEmptyError("$mat_sym cannot be empty."))
+        @argcheck(length(names) == size(mat, 2),
+                  DimensionMismatch("length($names_sym) == size($mat_sym, 2) must hold. Got\nlength($names_sym) => $(length(names))\nsize($mat_sym, 2) => $(size(mat, 2))"))
     end
 end
-function select_kextremes(X::AbstractMatrix) end
 """
     struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
         nx::T1
@@ -62,13 +117,10 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                  X::Union{Nothing, <:AbstractMatrix} = nothing,
-                  nf::Union{Nothing, <:AbstractVector} = nothing,
-                  F::Union{Nothing, <:AbstractMatrix} = nothing,
-                  ts::Union{Nothing, <:AbstractVector} = nothing,
-                  iv::Union{Nothing, <:AbstractMatrix} = nothing,
-                  ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+    ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
+                  nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
+                  ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
+                  ivpa::Option{<:Num_VecNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -98,6 +150,11 @@ ReturnsResult
 
   - [`AbstractReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecDate`](@ref)
+  - [`Num_VecNum`](@ref)
 """
 struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     nx::T1
@@ -107,113 +164,96 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
-    function ReturnsResult(nx::Union{Nothing, <:AbstractVector},
-                           X::Union{Nothing, <:AbstractMatrix},
-                           nf::Union{Nothing, <:AbstractVector},
-                           F::Union{Nothing, <:AbstractMatrix},
-                           ts::Union{Nothing, <:AbstractVector},
-                           iv::Union{Nothing, <:AbstractMatrix},
-                           ivpa::Union{Nothing, <:Real, <:AbstractVector})
-        nxs_flag = !isnothing(nx)
-        X_flag = !isnothing(X)
-        if nxs_flag || X_flag
-            @argcheck((nxs_flag && X_flag),
-                      IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nx`", nx),
-                                                                 some_msg("`X`", X)))))
-            @argcheck(!isempty(nx) && !isempty(X),
-                      IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nx`, nx),
-                                                               non_empty_msg("`X`", X)))))
-            @argcheck(length(nx) == size(X, 2),
-                      DimensionMismatch(comp_msg("length of `nx`",
-                                                 "number of columns of `X`", :eq,
-                                                 length(nx), size(X, 2)) * "."))
-        end
-        nfs_flag = !isnothing(nf)
-        F_flag = !isnothing(F)
-        if nfs_flag || F_flag
-            @argcheck(nfs_flag && F_flag,
-                      IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nf`", nf),
-                                                                 some_msg("`F`", F)))))
-            @argcheck(!isempty(nf) && !isempty(F),
-                      IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nf`, nf),
-                                                               non_empty_msg("`F`", F)))))
-            @argcheck(length(nf) == size(F, 2),
-                      DimensionMismatch(comp_msg("length of `nf`",
-                                                 "number of columns of `F`", :eq,
-                                                 length(nf), size(F, 2)) * "."))
-        end
-        if X_flag && F_flag
-            @argcheck(size(X, 1) == size(F, 1),
-                      DimensionMismatch(comp_msg("number of rows of `X`",
-                                                 "number of rows of `F`", :eq, size(X, 1),
-                                                 size(F, 1)) * "."))
+    function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
+                           F::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
+                           ivpa::Option{<:Num_VecNum})
+        _check_names_and_returns_matrix(nx, X, :nx, :X)
+        _check_names_and_returns_matrix(nf, F, :nf, :F)
+        if !isnothing(X) && !isnothing(F)
+            @argcheck(size(X, 1) == size(F, 1), DimensionMismatch)
         end
         if !isnothing(ts)
-            @argcheck(!isempty(ts), IsEmptyError(non_empty_msg("`ts`") * "."))
-            if X_flag
-                @argcheck(length(ts) == size(X, 1),
-                          DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
-                                                                    "number of rows of `X`",
-                                                                    :eq, length(ts),
-                                                                    size(X, 1))) * "."))
-            elseif F_flag
-                @argcheck(length(ts) == size(F, 1),
-                          DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
-                                                                    "number of rows of `F`",
-                                                                    :eq, length(ts),
-                                                                    size(F, 1))) * "."))
-            else
-                throw(IsNothingEmptyError(uppercasefirst("at least one of " *
-                                                         mul_cond_msg(nothing_non_empty_msg("`X`",
-                                                                                            X),
-                                                                      nothing_non_empty_msg("`F`",
-                                                                                            F))) *
-                                          "."))
+            @argcheck(!isempty(ts), IsEmptyError)
+            @argcheck(!(isnothing(X) && isnothing(F)),
+                      IsNothingError("at least one of `X` or `F` must be provided. Got\n!isnothing(X) => $(isnothing(X))\n!isnothing(F) => $(isnothing(F))"))
+            if !isnothing(X)
+                @argcheck(length(ts) == size(X, 1), DimensionMismatch)
+            end
+            if !isnothing(F)
+                @argcheck(length(ts) == size(F, 1), DimensionMismatch)
             end
         end
         if !isnothing(iv)
-            @argcheck(!isempty(iv), IsEmptyError(non_empty_msg("`iv`") * "."))
-            @argcheck(size(iv) == size(X),
-                      DimensionMismatch(uppercasefirst(comp_msg("size of `iv`",
-                                                                "size of `X`", :eq,
-                                                                size(iv), size(X))) * "."))
-            @argcheck(all(x -> x >= zero(eltype(iv)), iv),
-                      DomainError(iv, "all entries of " * non_neg_msg("`iv`") * "."))
-            if isa(ivpa, Real)
-                @argcheck(isfinite(ivpa), DomainError(ivpa, non_finite_msg("`ivpa`") * "."))
-                @argcheck(ivpa > zero(ivpa),
-                          DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * "."))
-            elseif isa(ivpa, AbstractVector)
-                @argcheck(!isempty(ivpa), IsEmptyError(non_empty_msg("`ivpa`") * "."))
-                @argcheck(length(ivpa) == size(iv, 2),
-                          DimensionMismatch(uppercasefirst(comp_msg("length of `ivpa`",
-                                                                    "number of columns of `iv`",
-                                                                    :eq, length(ivpa),
-                                                                    size(iv, 2))) * "."))
-                @argcheck(all(x -> isfinite(x), ivpa),
-                          DomainError(ivpa,
-                                      "all entries of " * non_finite_msg("`ivpa`") * "."))
-                @argcheck(all(x -> x > zero(eltype(ivpa)), ivpa),
-                          DomainError(ivpa,
-                                      "all entries of " *
-                                      comp_msg("`ivpa`", "0", :geq) *
-                                      "."))
+            assert_nonempty_nonneg_finite_val(iv, :iv)
+            assert_nonempty_geq0_finite_val(ivpa, :ivpa)
+            @argcheck(size(iv) == size(X), DimensionMismatch)
+            if isa(ivpa, VecNum)
+                @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
             end
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts), typeof(iv),
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
-function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                       X::Union{Nothing, <:AbstractMatrix} = nothing,
-                       nf::Union{Nothing, <:AbstractVector} = nothing,
-                       F::Union{Nothing, <:AbstractMatrix} = nothing,
-                       ts::Union{Nothing, <:AbstractVector} = nothing,
-                       iv::Union{Nothing, <:AbstractMatrix} = nothing,
-                       ivpa::Union{Nothing, <:Real, <:AbstractVector} = nothing)
+function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
+                       nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
+                       ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
+                       ivpa::Option{<:Num_VecNum} = nothing)
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
-function returns_result_view(rd::ReturnsResult, i::AbstractVector)
+"""
+    returns_result_view(rd::ReturnsResult, i)
+
+Return a view of the `ReturnsResult` object for the asset or factor at index `i`.
+
+# Arguments
+
+  - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
+  - `i`: Index of the asset or factor to view.
+
+# Returns
+
+  - `ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
+
+# Details
+
+  - Extracts the asset/factor name, returns, implied volatility, and risk premium adjustment for index `i`.
+  - Preserves factor, timestamp, and other fields from the original object.
+  - Returns `nothing` for fields that are not present.
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> PortfolioOptimisers.returns_result_view(rd, 2:2)
+ReturnsResult
+    nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
+     X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, UnitRange{Int64}}, true}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+```
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+"""
+function returns_result_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
@@ -223,14 +263,12 @@ function returns_result_view(rd::ReturnsResult, i::AbstractVector)
 end
 """
     prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
-                      iv::Union{Nothing, <:TimeArray} = nothing,
-                      ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                      ret_method::Symbol = :simple, padding::Bool = false,
-                      missing_col_percent::Real = 1.0,
-                      missing_row_percent::Union{Nothing, <:Real} = 1.0,
-                      collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
-                      join_method::Symbol = :outer,
-                      impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+                      Rb::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
+                      ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
+                      padding::Bool = false, missing_col_percent::Number = 1.0,
+                      missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
+                      map_func::Option{<:Function} = nothing, join_method::Symbol = :outer,
+                      impute_method::Option{<:Impute.Imputor} = nothing)
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
@@ -240,6 +278,7 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
 
   - `X`: Asset price data (timestamps × assets).
   - `F`: Optional Factor price data (timestamps × factors).
+  - `Rb`: Optional Benchmark price data (timestamps × assets) or (timestamps × 1).
   - `iv`: Optional Implied volatility data.
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
@@ -285,29 +324,32 @@ ReturnsResult
 # Related
 
   - [`ReturnsResult`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+  - [`VecDate`](@ref)
+  - [`Num_VecNum`](@ref)
+  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+  - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                           iv::Union{Nothing, <:TimeArray} = nothing,
-                           ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                           Rb::Option{<:TimeArray} = nothing,
+                           iv::Option{<:TimeArray} = nothing,
+                           ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
-                           missing_col_percent::Real = 1.0,
-                           missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                           missing_col_percent::Number = 1.0,
+                           missing_row_percent::Option{<:Number} = 1.0,
                            collapse_args::Tuple = (),
-                           map_func::Union{Nothing, Function} = nothing,
+                           map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer,
-                           impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+                           impute_method::Option{<:Impute.Imputor} = nothing)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
-              DomainError(missing_col_percent,
-                          range_msg("`missing_col_percent`", zero(missing_col_percent),
-                                    one(missing_col_percent), nothing, false, true) * "."))
+              DomainError("0 < missing_col_percent <= 1 must hold. Got\nmissing_col_percent => $missing_col_percent"))
     if !isnothing(missing_row_percent)
         @argcheck(zero(missing_row_percent) <
                   missing_row_percent <=
                   one(missing_row_percent),
-                  DomainError(missing_row_percent,
-                              range_msg("`missing_row_percent`", nothing,
-                                        zero(missing_row_percent), one(missing_row_percent),
-                                        false, true) * "."))
+                  DomainError("0 < missing_row_percent <= 1 must hold. Got\nmissing_row_percent => $missing_row_percent"))
     end
     if !isempty(F)
         asset_names = string.(colnames(X))
@@ -344,8 +386,15 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     X = X[!, [true; keep_cols]]
     select!(X, Not(names(X, Missing)))
     dropmissing!(X)
-    X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
-                                padding = padding))
+    X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
+    if !isnothing(Rb)
+        @argcheck(timestamp(X) == timestamp(Rb))
+        Rb_v = values(Rb)
+        X_v = values(X)
+        X = TimeArray(isa(Rb_v, AbstractMatrix) ? X_v - Rb_v : X_v .- Rb_v;
+                      timestamp = :timestamp)
+    end
+    X = DataFrame(X)
     col_names = names(X)
     nx = intersect(col_names, asset_names)
     nf = intersect(col_names, factor_names)
@@ -370,4 +419,4 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                          ivpa = ivpa)
 end
 
-export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns
+export drop_incomplete, ReturnsResult, prices_to_returns

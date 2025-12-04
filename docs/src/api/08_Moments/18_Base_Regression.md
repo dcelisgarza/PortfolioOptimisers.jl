@@ -1,10 +1,10 @@
-# Regression
+# [Regression](@id api-regression)
 
 ```@docs
 LinearModel
-PortfolioOptimisers.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+fit(target::LinearModel, X::MatNum, y::VecNum)
 GeneralisedLinearModel
-PortfolioOptimisers.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
 AIC
 AICC
 BIC
@@ -12,15 +12,16 @@ RSquared
 AdjustedRSquared
 Regression
 regression(re::Regression, args...)
-regression(re::PortfolioOptimisers.AbstractRegressionEstimator, rd::ReturnsResult)
-PortfolioOptimisers.AbstractRegressionEstimator
-PortfolioOptimisers.AbstractRegressionResult
-PortfolioOptimisers.AbstractRegressionAlgorithm
-PortfolioOptimisers.AbstractStepwiseRegressionAlgorithm
-PortfolioOptimisers.AbstractStepwiseRegressionCriterion
-PortfolioOptimisers.AbstractRegressionTarget
-PortfolioOptimisers.AbstractMinValStepwiseRegressionCriterion
-PortfolioOptimisers.AbstractMaxValStepwiseRegressionCriteria
-PortfolioOptimisers.regression_view
-PortfolioOptimisers.regression_criterion_func
+regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+AbstractRegressionEstimator
+AbstractRegressionResult
+AbstractRegressionAlgorithm
+AbstractStepwiseRegressionAlgorithm
+AbstractStepwiseRegressionCriterion
+AbstractMinMaxValStepwiseRegressionCriterion
+AbstractRegressionTarget
+AbstractMinValStepwiseRegressionCriterion
+AbstractMaxValStepwiseRegressionCriteria
+regression_view
+regression_criterion_func
 ```

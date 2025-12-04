@@ -30,7 +30,7 @@ We will use the same data as the previous example.
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
-pretty_table(X[(end - 5):end]; formatters = tsfmt)
+pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
 rd = prices_to_returns(X)

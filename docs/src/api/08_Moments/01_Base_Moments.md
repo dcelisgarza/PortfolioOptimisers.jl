@@ -1,13 +1,20 @@
 # Base Moments
 
+## Public
+
 ```@docs
 Full
 Semi
-PortfolioOptimisers.AbstractExpectedReturnsEstimator
-PortfolioOptimisers.AbstractExpectedReturnsAlgorithm
-PortfolioOptimisers.AbstractMomentAlgorithm
-PortfolioOptimisers.AbstractCovarianceEstimator
-PortfolioOptimisers.AbstractVarianceEstimator
-PortfolioOptimisers.robust_cov
-PortfolioOptimisers.robust_cor
+```
+
+## Private
+
+```@docs
+AbstractExpectedReturnsEstimator
+AbstractExpectedReturnsAlgorithm
+AbstractMomentAlgorithm
+AbstractCovarianceEstimator
+AbstractVarianceEstimator
+robust_cov
+robust_cor
 ```

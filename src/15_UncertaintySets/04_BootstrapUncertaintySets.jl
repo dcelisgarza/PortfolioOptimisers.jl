@@ -125,8 +125,8 @@ Estimator for box or ellipse uncertainty sets using bootstrap methods for time s
 
     ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                       n_sim::Integer = 3_000, block_size::Integer = 3, q::Real = 0.05,
-                       seed::Union{Nothing, <:Integer} = nothing,
+                       n_sim::Integer = 3_000, block_size::Integer = 3, q::Number = 0.05,
+                       seed::Option{<:Integer} = nothing,
                        bootstrap::ARCHBootstrapSet = StationaryBootstrap())
 
 Keyword arguments correspond to the fields above.
@@ -188,8 +188,7 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
     bootstrap::T7
     function ARCHUncertaintySet(pe::AbstractPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
-                                block_size::Integer, q::Real,
-                                seed::Union{Nothing, <:Integer},
+                                block_size::Integer, q::Number, seed::Option{<:Integer},
                                 bootstrap::ARCHBootstrapSet)
         @argcheck(n_sim > zero(n_sim))
         @argcheck(block_size > zero(block_size))
@@ -201,13 +200,13 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
 end
 function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                            n_sim::Integer = 3_000, block_size::Integer = 3, q::Real = 0.05,
-                            seed::Union{Nothing, <:Integer} = nothing,
+                            n_sim::Integer = 3_000, block_size::Integer = 3,
+                            q::Number = 0.05, seed::Option{<:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap())
     return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
 end
 """
-    bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
+    bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
 
 Generates bootstrapped samples of expected returns and covariance statistics for time series data using the specified bootstrap algorithm.
 
@@ -218,7 +217,7 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 
 # Returns
 
-  - `(mus::Matrix{<:Real}, sigmas::Array{<:Real, 3})`: Tuple containing the matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`), array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
+  - `(mus::Matrix{<:Number}, sigmas::Array{<:Number, 3})`: Tuple containing the matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`), array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
 
 # Details
 
@@ -233,7 +232,7 @@ Generates bootstrapped samples of expected returns and covariance statistics for
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
+function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
@@ -246,7 +245,7 @@ function bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs..
     return mus, sigmas
 end
 """
-    mu_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
+    mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
 
 Generates bootstrap samples of expected return vectors for returns data using the specified bootstrap algorithm.
 
@@ -257,7 +256,7 @@ Generates bootstrap samples of expected return vectors for returns data using th
 
 # Returns
 
-  - `mus::Matrix{<:Real}`: Matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`).
+  - `mus::Matrix{<:Number}`: Matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`).
 
 # Details
 
@@ -272,7 +271,7 @@ Generates bootstrap samples of expected return vectors for returns data using th
   - [`bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
+function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
@@ -283,7 +282,7 @@ function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwarg
     return mus
 end
 """
-    sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
+    sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
 
 Generates bootstrap samples of covariance matrices for time series data using the specified bootstrap algorithm.
 
@@ -294,7 +293,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
 
 # Returns
 
-    - `sigmas::Array{<:Real, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
+    - `sigmas::Array{<:Number, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
 
 # Details
 
@@ -309,7 +308,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
   - [`bootstrap_generator`](@ref)
   - [`mu_bootstrap_generator`](@ref)
 """
-function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
+function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
@@ -320,8 +319,8 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kw
 end
 """
     ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                               <:Any, <:Any, <:Any}, X::AbstractMatrix,
-        F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                               <:Any, <:Any, <:Any}, X::MatNum,
+        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
@@ -353,8 +352,8 @@ Constructs box uncertainty sets for expected returns and covariance statistics u
   - [`sigma_bootstrap_generator`](@ref)
 """
 function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::AbstractMatrix,
-             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                    <:Any, <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
@@ -378,8 +377,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
 end
 """
     mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any}, X::AbstractMatrix,
-           F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                  <:Any, <:Any, <:Any}, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
@@ -411,8 +410,8 @@ Constructs a box uncertainty set for expected returns using bootstrap resampling
   - [`sigma_bootstrap_generator`](@ref)
 """
 function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
@@ -428,8 +427,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
 end
 """
     sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                     <:Any, <:Any, <:Any}, X::AbstractMatrix,
-              F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                     <:Any, <:Any, <:Any}, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
 
@@ -461,8 +460,8 @@ Constructs a box uncertainty set for covariance using bootstrap resampling for t
   - [`sigma_bootstrap_generator`](@ref)
 """
 function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                          <:Any, <:Any, <:Any}, X::MatNum,
+                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
@@ -480,8 +479,8 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
 end
 """
     ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                               <:Any, <:Any, <:Any}, X::AbstractMatrix,
-        F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                               <:Any, <:Any, <:Any}, X::MatNum,
+        F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipse uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
@@ -514,8 +513,8 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
   - [`sigma_bootstrap_generator`](@ref)
 """
 function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::AbstractMatrix,
-             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                    <:Any, <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
@@ -542,8 +541,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:A
 end
 """
     mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                                  <:Any, <:Any, <:Any}, X::AbstractMatrix,
-           F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                  <:Any, <:Any, <:Any}, X::MatNum,
+           F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for expected returns using bootstrap resampling for time series data.
 
@@ -576,8 +575,8 @@ Constructs an ellipse uncertainty set for expected returns using bootstrap resam
   - [`sigma_bootstrap_generator`](@ref)
 """
 function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
@@ -596,8 +595,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, 
 end
 """
     sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                                     <:Any, <:Any, <:Any}, X::AbstractMatrix,
-              F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                     <:Any, <:Any, <:Any}, X::MatNum,
+              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs an ellipse uncertainty set for covariance using bootstrap resampling for time series data.
 
@@ -630,8 +629,8 @@ Constructs an ellipse uncertainty set for covariance using bootstrap resampling 
   - [`sigma_bootstrap_generator`](@ref)
 """
 function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+                                          <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+                   F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)

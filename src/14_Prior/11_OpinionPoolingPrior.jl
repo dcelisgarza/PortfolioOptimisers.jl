@@ -111,7 +111,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
           │            pe ┼ EmpiricalPrior
           │               │        ce ┼ PortfolioOptimisersCovariance
           │               │           │   ce ┼ Covariance
@@ -131,7 +131,8 @@ OpinionPoolingPrior
           │               │           │   w ┴ nothing
           │               │   horizon ┴ nothing
           │      mu_views ┼ LinearConstraintEstimator
-          │               │   val ┴ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+          │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+          │               │   key ┴ nothing
           │     var_views ┼ nothing
           │    cvar_views ┼ nothing
           │   sigma_views ┼ nothing
@@ -142,6 +143,7 @@ OpinionPoolingPrior
           │    cvar_alpha ┼ nothing
           │          sets ┼ AssetSets
           │               │    key ┼ String: "nx"
+          │               │   ukey ┼ String: "ux"
           │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
           │        ds_opt ┼ nothing
           │        dm_opt ┼ nothing
@@ -173,7 +175,8 @@ OpinionPoolingPrior
           │               │           │   w ┴ nothing
           │               │   horizon ┴ nothing
           │      mu_views ┼ LinearConstraintEstimator
-          │               │   val ┴ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
+          │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
+          │               │   key ┴ nothing
           │     var_views ┼ nothing
           │    cvar_views ┼ nothing
           │   sigma_views ┼ nothing
@@ -184,6 +187,7 @@ OpinionPoolingPrior
           │    cvar_alpha ┼ nothing
           │          sets ┼ AssetSets
           │               │    key ┼ String: "nx"
+          │               │   ukey ┼ String: "ux"
           │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
           │        ds_opt ┼ nothing
           │        dm_opt ┼ nothing
@@ -236,43 +240,37 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
     w::T5
     alg::T6
     threads::T7
-    function OpinionPoolingPrior(pes::AbstractVector{<:EntropyPoolingPrior},
-                                 pe1::Union{Nothing,
-                                            <:AbstractLowOrderPriorEstimator_A_F_AF},
+    function OpinionPoolingPrior(pes::VecEP,
+                                 pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
-                                 p::Union{Nothing, <:Real},
-                                 w::Union{Nothing, <:AbstractVector},
+                                 p::Option{<:Number}, w::Option{<:VecNum},
                                  alg::OpinionPoolingAlgorithm,
                                  threads::FLoops.Transducers.Executor)
         @argcheck(!isempty(pes))
         if !isnothing(p)
             @argcheck(p > zero(p))
         end
-        if isa(w, AbstractVector)
+        if !isnothing(w)
             @argcheck(!isempty(w))
             @argcheck(length(w) == length(pes))
-            @argcheck(all(x -> zero(x) <= x <= one(x), w),
-                      DomainError(w,
-                                  range_msg("all entries of `w`", zero(w), one(w), nothing,
-                                            true, true) * "."))
+            @argcheck(all(x -> zero(x) <= x <= one(x), w), DomainError)
             @argcheck(sum(w) <= one(eltype(w)))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
                    typeof(threads)}(pes, pe1, pe2, p, w, alg, threads)
     end
 end
-function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
-                             pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+function OpinionPoolingPrior(; pes::VecEP,
+                             pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                             p::Union{Nothing, <:Real} = nothing,
-                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
 """
-    robust_probabilities(ow::AbstractVector, args...)
-    robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
+    robust_probabilities(ow::VecNum, args...)
+    robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
 
 Compute robust opinion probabilities for consensus formation in opinion pooling.
 
@@ -286,7 +284,7 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 
 # Returns
 
-  - `ow::AbstractVector`: Opinion probabilities for pooling.
+  - `ow::VecNum`: Opinion probabilities for pooling.
 
 # Details
 
@@ -298,10 +296,10 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 
   - [`OpinionPoolingPrior`](@ref)
 """
-function robust_probabilities(ow::AbstractVector, args...)
+function robust_probabilities(ow::VecNum, args...)
     return ow
 end
-function robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
+function robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
     c = pw * ow
     kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
@@ -309,8 +307,8 @@ function robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
     return ow
 end
 """
-    compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
-    compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
+    compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
+    compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
 
 Compute the consensus posterior return distribution from individual prior distributions using opinion pooling.
 
@@ -338,18 +336,17 @@ Compute the consensus posterior return distribution from individual prior distri
   - [`LinearOpinionPooling`](@ref)
   - [`LogarithmicOpinionPooling`](@ref)
 """
-function compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
+function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
     return pweights(pw * ow)
 end
-function compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector,
-                         pw::AbstractMatrix)
+function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     u = log.(pw) * ow
     lse = logsumexp(u)
     return pweights(vec(exp.(u .- lse)))
 end
 """
-    prior(pe::OpinionPoolingPrior, X::AbstractMatrix;
-          F::Union{Nothing, <:AbstractMatrix} = nothing, dims::Int = 1, strict::Bool = false,
+    prior(pe::OpinionPoolingPrior, X::MatNum;
+          F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
           kwargs...)
 
 Compute opinion pooling prior moments for asset returns.
@@ -392,9 +389,8 @@ Compute opinion pooling prior moments for asset returns.
   - [`compute_pooling`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

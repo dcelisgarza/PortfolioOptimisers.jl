@@ -2,15 +2,15 @@
 
 ```@docs
 HierarchicalClustering
-clusterise(cle::PortfolioOptimisers.AbstractClusteringResult, args...; kwargs...)
+clusterise(cle::AbstractClusteringResult, args...; kwargs...)
 SecondOrderDifference
 StandardisedSilhouetteScore
 OptimalNumberClusters
 HClustAlgorithm
 ClusteringEstimator
-PortfolioOptimisers.AbstractClusteringEstimator
-PortfolioOptimisers.AbstractClusteringAlgorithm
-PortfolioOptimisers.AbstractOptimalNumberClustersEstimator
-PortfolioOptimisers.AbstractOptimalNumberClustersAlgorithm
-PortfolioOptimisers.AbstractClusteringResult
+AbstractClusteringEstimator
+AbstractClusteringAlgorithm
+AbstractOptimalNumberClustersEstimator
+AbstractOptimalNumberClustersAlgorithm
+AbstractClusteringResult
 ```

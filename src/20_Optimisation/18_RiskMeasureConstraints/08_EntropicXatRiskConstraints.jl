@@ -12,7 +12,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                                                  (lower_bound = 0)
                                                                                                                                  [1:T]
                                                                                                                              end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     at = if isnothing(wi)
         model[Symbol(:cevar_, i)] = @constraint(model, sc * (sum(u_evar) - z_evar) <= 0)
         r.alpha * T
@@ -47,7 +47,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                                                                                                                                                                                      (upper_bound = 0)
                                                                                                                                                                                                                                                                      [1:T]
                                                                                                                                                                                                                                                                  end)
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     at, bt = if isnothing(wi)
         model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = @constraints(model,
                                                                                 begin

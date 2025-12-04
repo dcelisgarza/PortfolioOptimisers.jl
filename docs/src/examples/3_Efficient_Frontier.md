@@ -36,7 +36,7 @@ We will use the same data as the previous example.
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
-pretty_table(X[(end - 5):end]; formatters = tsfmt)
+pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 # Compute the returns
 rd = prices_to_returns(X)
@@ -88,7 +88,7 @@ We can view how the weights evolve along the frontier.
 
 ````@example 3_Efficient_Frontier
 pretty_table(DataFrame([rd.nx hcat(res1.w...)], Symbol.([:assets; 1:30]));
-             formatters = resfmt)
+             formatters = [resfmt])
 ````
 
 ## 3. Visualising the efficient frontier

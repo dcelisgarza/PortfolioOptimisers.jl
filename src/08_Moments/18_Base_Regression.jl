@@ -26,6 +26,7 @@ All concrete types representing the output of regression-based moment estimation
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
+const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
     abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 
@@ -114,7 +115,7 @@ LinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`GeneralisedLinearModel`](@ref)
-  - [`StatsAPI.fit(::LinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 struct LinearModel{T1} <: AbstractRegressionTarget
     kwargs::T1
@@ -125,7 +126,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(re::LinearModel, w::Option{<:AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -139,7 +140,7 @@ function factory(re::LinearModel, w::Union{Nothing, <:AbstractWeights} = nothing
     return LinearModel(; kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+    StatsAPI.fit(target::LinearModel, X::MatNum, y::VecNum)
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
@@ -160,7 +161,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`LinearModel`](@ref)
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
-function StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+function StatsAPI.fit(target::LinearModel, X::MatNum, y::VecNum)
     return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
 end
 """
@@ -197,7 +198,7 @@ GeneralisedLinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
-  - [`StatsAPI.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
     args::T1
@@ -209,7 +210,7 @@ end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -223,7 +224,7 @@ function factory(re::GeneralisedLinearModel, w::Union{Nothing, <:AbstractWeights
     return GeneralisedLinearModel(; args = re.args, kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+    StatsAPI.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
 
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
@@ -244,12 +245,26 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GeneralisedLinearModel`](@ref)
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
-function StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+function StatsAPI.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
     return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
 end
 """
+    abstract type AbstractMinMaxValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end
+
+Abstract supertype for all stepwise regression criteria in PortfolioOptimisers.jl where model fit is evaluated by either minimising or maximising the criterion value.
+
+All concrete types representing stepwise regression criteria (such as AIC, BIC, R², or Adjusted R²) should subtype `AbstractMinMaxValStepwiseRegressionCriterion`. This enables unified dispatch and extension for stepwise regression algorithms that select variables based on criterion values.
+
+# Related Types
+
+  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+"""
+abstract type AbstractMinMaxValStepwiseRegressionCriterion <:
+              AbstractStepwiseRegressionCriterion end
+"""
     abstract type AbstractMinValStepwiseRegressionCriterion <:
-                  AbstractStepwiseRegressionCriterion end
+                  AbstractMinMaxValStepwiseRegressionCriterion end
 
 Abstract supertype for all stepwise regression criteria where lower values indicate better model fit in PortfolioOptimisers.jl.
 
@@ -257,16 +272,16 @@ All concrete types implementing minimisation-based stepwise regression criteria 
 
 # Related
 
-  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref)
   - [`AIC`](@ref)
   - [`AICC`](@ref)
   - [`BIC`](@ref)
 """
 abstract type AbstractMinValStepwiseRegressionCriterion <:
-              AbstractStepwiseRegressionCriterion end
+              AbstractMinMaxValStepwiseRegressionCriterion end
 """
     abstract type AbstractMaxValStepwiseRegressionCriteria <:
-                  AbstractStepwiseRegressionCriterion end
+                  AbstractMinMaxValStepwiseRegressionCriterion end
 
 Abstract supertype for all stepwise regression criteria where higher values indicate better model fit in PortfolioOptimisers.jl.
 
@@ -274,12 +289,12 @@ All concrete types implementing maximisation-based stepwise regression criteria 
 
 # Related
 
-  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMinMaxValStepwiseRegressionCriterion`](@ref)
   - [`RSquared`](@ref)
   - [`AdjustedRSquared`](@ref)
 """
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
-              AbstractStepwiseRegressionCriterion end
+              AbstractMinMaxValStepwiseRegressionCriterion end
 """
     struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 
@@ -416,8 +431,8 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
-               b::Union{Nothing, <:AbstractVector} = nothing)
+    Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
+               b::Option{<:VecNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -445,21 +460,20 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
-    function Regression(M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix},
-                        b::Union{Nothing, <:AbstractVector})
-        @argcheck(!isempty(M))
-        if isa(b, AbstractVector)
-            @argcheck(!isempty(b))
-            @argcheck(length(b) == size(M, 1))
+    function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
+        @argcheck(!isempty(M), IsEmptyError)
+        if isa(b, VecNum)
+            @argcheck(!isempty(b), IsEmptyError)
+            @argcheck(length(b) == size(M, 1), DimensionMismatch)
         end
         if !isnothing(L)
-            @argcheck(size(L, 1) == size(M, 1))
+            @argcheck(size(L, 1) == size(M, 1), DimensionMismatch)
         end
         return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
     end
 end
-function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
-                    b::Union{Nothing, <:AbstractVector} = nothing)
+function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
+                    b::Option{<:VecNum} = nothing)
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
@@ -469,7 +483,7 @@ function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
-function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :L)
     else
@@ -477,7 +491,7 @@ function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::S
     end
 end
 """
-    regression_view(re::Regression, i::AbstractVector)
+    regression_view(re::Regression, i)
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
@@ -512,12 +526,12 @@ Regression
 
   - [`Regression`](@ref)
 """
-function regression_view(re::Regression, i::AbstractVector)
+function regression_view(re::Regression, i)
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
-    regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+    regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
 
 No-op fallback for `regression_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
 
@@ -534,9 +548,9 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
 # Related
 
-  - [`regression_view(::Regression, ::AbstractVector)`](@ref)
+  - [`regression_view(::Regression, ::VecNum)`](@ref)
 """
-function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+function regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
     return re
 end
 """

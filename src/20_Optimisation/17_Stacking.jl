@@ -10,7 +10,7 @@ struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: OptimisationR
     w::T8
     fb::T9
 end
-function opt_attempt_factory(res::StackingOptimisation, fb)
+function factory(res::StackingOptimisation, fb)
     return StackingOptimisation(res.oe, res.pr, res.wb, res.resi, res.reso, res.cv,
                                 res.retcode, res.w, fb)
 end
@@ -26,15 +26,11 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     strict::T8
     threads::T9
     fb::T10
-    function Stacking(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                      wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
-                      sets::Union{Nothing, <:AssetSets},
-                      opti::AbstractVector{<:Union{<:OptimisationEstimator,
-                                                   <:OptimisationResult}},
-                      opto::OptimisationEstimator,
-                      cv::Union{Nothing, <:CrossValidationEstimator}, cwf::WeightFinaliser,
+    function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+                      opti::VecOptE_Opt, opto::OptimisationEstimator,
+                      cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
                       strict::Bool, threads::FLoops.Transducers.Executor,
-                      fb::Union{Nothing, <:OptimisationEstimator})
+                      fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -52,17 +48,13 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                                                                                          fb)
     end
 end
-function Stacking(;
-                  pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                  wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                  sets::Union{Nothing, <:AssetSets} = nothing,
-                  opti::AbstractVector{<:Union{<:OptimisationEstimator,
-                                               <:OptimisationResult}},
+function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
+                  sets::Option{<:AssetSets} = nothing, opti::VecOptE_Opt,
                   opto::OptimisationEstimator,
-                  cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
+                  cv::Option{<:CrossValidationEstimator} = nothing,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   threads::FLoops.Transducers.Executor = ThreadedEx(),
-                  fb::Union{Nothing, <:OptimisationEstimator} = nothing)
+                  fb::Option{<:OptimisationEstimator} = nothing)
     return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, threads, fb)
 end
 function assert_external_optimiser(opt::Stacking)
@@ -81,7 +73,7 @@ function assert_internal_optimiser(opt::Stacking)
     end
     return nothing
 end
-function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
+function opt_view(st::Stacking, i, X::MatNum)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = prior_view(st.pe, i)
     wb = weight_bounds_view(st.wb, i)
@@ -107,9 +99,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         wi[:, i] = res.w
         resi[i] = res
     end
-    X, F, ts, iv, ivpa = predict_outer_estimator_returns(st, rd, pr, wi, resi)
-    rdo = ReturnsResult(; nx = ["_$i" for i in 1:Ni], X = X, nf = rd.nf, F = F, ts = ts,
-                        iv = iv, ivpa = ivpa)
+    rdo = predict_outer_estimator_returns(st, rd, pr, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,

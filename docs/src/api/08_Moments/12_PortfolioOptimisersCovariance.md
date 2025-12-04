@@ -2,6 +2,7 @@
 
 ```@docs
 PortfolioOptimisersCovariance
-cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
-cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
+cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
+drop_correlated
 ```

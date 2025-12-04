@@ -7,6 +7,6 @@ LogDistance
 CorrelationDistance
 VariationInfoDistance
 CanonicalDistance
-PortfolioOptimisers.AbstractDistanceEstimator
-PortfolioOptimisers.AbstractDistanceAlgorithm
+AbstractDistanceEstimator
+AbstractDistanceAlgorithm
 ```

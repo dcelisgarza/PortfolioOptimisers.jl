@@ -8,12 +8,11 @@ SOCRiskExpr
 Variance
 StandardDeviation
 UncertaintySetVariance
-factory(r::Variance, prior::PortfolioOptimisers.AbstractPriorResult, args...; kwargs...)
-factory(r::StandardDeviation, prior::PortfolioOptimisers.AbstractPriorResult, args...; kwargs...)
-factory(r::UncertaintySetVariance, prior::PortfolioOptimisers.AbstractPriorResult, ::Any,
-                 ucs::Union{Nothing, <:PortfolioOptimisers.AbstractUncertaintySetResult,
-                            <:PortfolioOptimisers.AbstractUncertaintySetEstimator} = nothing, args...;
+factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
+factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
+                 ucs::Option{<:UcSE_UcS} = nothing, args...;
                  kwargs...)
-PortfolioOptimisers.SecondMomentFormulation
-PortfolioOptimisers.VarianceFormulation
+SecondMomentFormulation
+VarianceFormulation
 ```

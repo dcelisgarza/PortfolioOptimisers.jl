@@ -282,7 +282,7 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::AbstractArray, sigma::AbstractMatrix;
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum;
                 kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
@@ -303,7 +303,7 @@ Compute the shrinkage target vector for expected returns estimation.
 
 # Returns
 
-  - `b::AbstractArray`: Target vector for shrinkage estimation.
+  - `b::ArrNum`: Target vector for shrinkage estimation.
 
 # Related
 
@@ -312,25 +312,24 @@ Compute the shrinkage target vector for expected returns estimation.
   - [`MeanSquaredError`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
-function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
+function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum; kwargs...)
     val = mean(mu)
     return range(val, val; length = length(mu))
 end
-function target_mean(::VolatilityWeighted, mu::AbstractArray, sigma::AbstractMatrix;
-                     isigma = nothing, kwargs...)
+function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum; isigma = nothing,
+                     kwargs...)
     if isnothing(isigma)
         isigma = sigma \ I
     end
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
-function target_mean(::MeanSquaredError, mu::AbstractArray, sigma::AbstractMatrix;
-                     T::Integer, kwargs...)
+function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum; T::Integer, kwargs...)
     val = tr(sigma) / T
     return range(val, val; length = length(mu))
 end
 """
-    mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute shrunk expected returns using the specified estimator.
 
@@ -350,7 +349,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 
 # Returns
 
-  - `mu::AbstractArray`: Shrunk expected returns vector.
+  - `mu::ArrNum`: Shrunk expected returns vector.
 
 # Details
 
@@ -372,8 +371,8 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - [`ShrunkExpectedReturns`](@ref)
   - [`target_mean`](@ref)
 """
-function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
+                         dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -387,8 +386,8 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
     alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
+                         dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -403,7 +402,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+                         X::MatNum; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -421,7 +420,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::ShrunkExpectedReturns, w::Option{<:AbstractWeights} = nothing)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)
 end

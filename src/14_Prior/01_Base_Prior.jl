@@ -70,8 +70,8 @@ Low order prior estimator using both asset and factor returns.
 """
 abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
 """
-    const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                      AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                      <:AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only and asset-and-factor low order prior estimators.
 
@@ -84,12 +84,11 @@ Union type for asset-only and asset-and-factor low order prior estimators.
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
   - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
 """
-const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                  AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                  <:AbstractLowOrderPriorEstimator_AF}
 """
-    const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
-
-                                                  AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_F_AF = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                      <:AbstractLowOrderPriorEstimator_AF}
 
 Union type for factor-only and asset-and-factor low order prior estimators.
 
@@ -102,12 +101,12 @@ Union type for factor-only and asset-and-factor low order prior estimators.
   - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
   - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
 """
-const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
-                                                  AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_F_AF = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                  <:AbstractLowOrderPriorEstimator_AF}
 """
-    const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                        AbstractLowOrderPriorEstimator_F,
-                                                        AbstractLowOrderPriorEstimator_AF}
+    const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                        <:AbstractLowOrderPriorEstimator_F,
+                                                        <:AbstractLowOrderPriorEstimator_AF}
 
 Union type for asset-only, factor-only, and asset-and-factor low order prior estimators.
 
@@ -121,9 +120,9 @@ Union type for asset-only, factor-only, and asset-and-factor low order prior est
   - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
 """
-const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
-                                                    AbstractLowOrderPriorEstimator_F,
-                                                    AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstimator_A,
+                                                    <:AbstractLowOrderPriorEstimator_F,
+                                                    <:AbstractLowOrderPriorEstimator_AF}
 """
     abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 
@@ -152,6 +151,7 @@ Abstract supertype for all prior result types.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractPriorResult <: AbstractResult end
+const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 
@@ -233,8 +233,7 @@ function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-    phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
-                                  <:AbstractClusteringResult}, pr::AbstractPriorResult;
+    phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult;
                      kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
@@ -258,10 +257,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator,
-                                       <:AbstractClusteringEstimator,
-                                       <:AbstractClusteringResult}, pr::AbstractPriorResult;
-                          kwargs...)
+function phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """
@@ -291,8 +287,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
-                                <:AbstractClusteringResult}, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -317,16 +312,13 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
-                                     <:AbstractClusteringEstimator,
-                                     <:AbstractClusteringResult},
-                           cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;
-                           kwargs...)
+function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+                           pr::AbstractPriorResult; kwargs...)
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end
 """
-    average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
-                       cent::AbstractCentralityAlgorithm, w::AbstractVector,
+    average_centrality(ne::PhE_Ph,
+                       cent::AbstractCentralityAlgorithm, w::VecNum,
                        pr::AbstractPriorResult; kwargs...)
 
 Compute the weighted average centrality for a network or phylogeny result.
@@ -343,7 +335,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 
 # Returns
 
-  - `ac::Real`: Weighted average centrality.
+  - `ac::Number`: Weighted average centrality.
 
 # Related
 
@@ -352,14 +344,12 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
-                                      <:AbstractPhylogenyResult},
-                            cent::AbstractCentralityAlgorithm, w::AbstractVector,
+function average_centrality(ne::PhE_Ph, cent::AbstractCentralityAlgorithm, w::VecNum,
                             pr::AbstractPriorResult; kwargs...)
     return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
 """
-    average_centrality(cte::CentralityEstimator, w::AbstractVector, pr::AbstractPriorResult;
+    average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
                        kwargs...)
 
 Compute the weighted average centrality for a centrality estimator.
@@ -375,7 +365,7 @@ Compute the weighted average centrality for a centrality estimator.
 
 # Returns
 
-  - `ac::Real`: Weighted average centrality.
+  - `ac::Number`: Weighted average centrality.
 
 # Related
 
@@ -383,13 +373,13 @@ Compute the weighted average centrality for a centrality estimator.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(cte::CentralityEstimator, w::AbstractVector,
-                            pr::AbstractPriorResult; kwargs...)
+function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
+                            kwargs...)
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
 end
 """
-    asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator, <:AbstractClusteringResult},
-                    w::AbstractVector, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
+    asset_phylogeny(cle::PhE_Cl,
+                    w::VecNum, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
 
@@ -405,7 +395,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 
 # Returns
 
-  - `score::Real`: Asset phylogeny score.
+  - `score::Number`: Asset phylogeny score.
 
 # Details
 
@@ -422,9 +412,8 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
-                                    <:AbstractClusteringResult}, w::AbstractVector,
-                         pr::AbstractPriorResult; dims::Int = 1, kwargs...)
+function asset_phylogeny(cle::PhE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
+                         kwargs...)
     return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
 end
 """
@@ -465,16 +454,16 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                  chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                  w::Union{Nothing, <:AbstractWeights} = nothing,
-                  ens::Union{Nothing, <:Real} = nothing,
-                  kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                  ow::Union{Nothing, <:AbstractVector} = nothing,
-                  rr::Union{Nothing, <:Regression} = nothing,
-                  f_mu::Union{Nothing, <:AbstractVector} = nothing,
-                  f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                  f_w::Union{Nothing, <:AbstractVector} = nothing)
+    LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
+                  chol::Option{<:MatNum} = nothing,
+                  w::Option{<:AbstractWeights} = nothing,
+                  ens::Option{<:Number} = nothing,
+                  kld::Option{<:Num_VecNum} = nothing,
+                  ow::Option{<:VecNum} = nothing,
+                  rr::Option{<:Regression} = nothing,
+                  f_mu::Option{<:VecNum} = nothing,
+                  f_sigma::Option{<:MatNum} = nothing,
+                  f_w::Option{<:VecNum} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -531,26 +520,21 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_mu::T10
     f_sigma::T11
     f_w::T12
-    function LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                           chol::Union{Nothing, <:AbstractMatrix},
-                           w::Union{Nothing, <:AbstractWeights},
-                           ens::Union{Nothing, <:Real},
-                           kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                           ow::Union{Nothing, <:AbstractVector},
-                           rr::Union{Nothing, <:Regression},
-                           f_mu::Union{Nothing, <:AbstractVector},
-                           f_sigma::Union{Nothing, <:AbstractMatrix},
-                           f_w::Union{Nothing, <:AbstractVector})
+    function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
+                           w::Option{<:AbstractWeights}, ens::Option{<:Number},
+                           kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
+                           rr::Option{<:Regression}, f_mu::Option{<:VecNum},
+                           f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
         @argcheck(!isempty(X))
         @argcheck(!isempty(mu))
         @argcheck(!isempty(sigma))
-        assert_matrix_issquare(sigma)
+        assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
         if !isnothing(w)
             @argcheck(!isempty(w))
             @argcheck(length(w) == size(X, 1))
         end
-        if isa(kld, AbstractVector)
+        if isa(kld, VecNum)
             @argcheck(!isempty(kld))
         end
         if !isnothing(ow)
@@ -565,7 +549,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
             @argcheck(f_sigma_flag)
             @argcheck(!isempty(f_mu))
             @argcheck(!isempty(f_sigma))
-            assert_matrix_issquare(f_sigma)
+            assert_matrix_issquare(f_sigma, :f_sigma)
             @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
             @argcheck(size(rr.M, 1) == length(mu))
         end
@@ -583,19 +567,16 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                                                  f_mu, f_sigma, f_w)
     end
 end
-function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                       chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                       w::Union{Nothing, <:AbstractWeights} = nothing,
-                       ens::Union{Nothing, <:Real} = nothing,
-                       kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       ow::Union{Nothing, <:AbstractVector} = nothing,
-                       rr::Union{Nothing, <:Regression} = nothing,
-                       f_mu::Union{Nothing, <:AbstractVector} = nothing,
-                       f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                       f_w::Union{Nothing, <:AbstractVector} = nothing)
+function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
+                       chol::Option{<:MatNum} = nothing,
+                       w::Option{<:AbstractWeights} = nothing,
+                       ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
+                       ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
+                       f_mu::Option{<:VecNum} = nothing,
+                       f_sigma::Option{<:MatNum} = nothing, f_w::Option{<:VecNum} = nothing)
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
-function prior_view(pr::LowOrderPrior, i::AbstractVector)
+function prior_view(pr::LowOrderPrior, i)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
@@ -629,12 +610,12 @@ Container type for high order prior results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix} = nothing,
-                   L2::Union{Nothing, <:AbstractMatrix} = nothing,
-                   S2::Union{Nothing, <:AbstractMatrix} = nothing,
-                   sk::Union{Nothing, <:AbstractMatrix} = nothing,
-                   V::Union{Nothing, <:AbstractMatrix} = nothing,
-                   skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
+    HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
+                   L2::Option{<:MatNum} = nothing,
+                   S2::Option{<:MatNum} = nothing,
+                   sk::Option{<:MatNum} = nothing,
+                   V::Option{<:MatNum} = nothing,
+                   skmp::Option{<:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
 
@@ -691,16 +672,14 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     sk::T5
     V::T6
     skmp::T7
-    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
-                            L2::Union{Nothing, <:AbstractMatrix},
-                            S2::Union{Nothing, <:AbstractMatrix},
-                            sk::Union{Nothing, <:AbstractMatrix},
-                            V::Union{Nothing, <:AbstractMatrix},
-                            skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+    function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
+                            L2::Option{<:MatNum}, S2::Option{<:MatNum},
+                            sk::Option{<:MatNum}, V::Option{<:MatNum},
+                            skmp::Option{<:AbstractMatrixProcessingEstimator})
         N = length(pr.mu)
-        kt_flag = isa(kt, AbstractMatrix)
-        L2_flag = isa(L2, AbstractMatrix)
-        S2_flag = isa(S2, AbstractMatrix)
+        kt_flag = isa(kt, MatNum)
+        L2_flag = isa(L2, MatNum)
+        S2_flag = isa(S2, MatNum)
         if kt_flag || L2_flag || S2_flag
             @argcheck(kt_flag)
             @argcheck(L2_flag)
@@ -711,8 +690,8 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
             @argcheck(size(kt) == (N^2, N^2))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
         end
-        sk_flag = isa(sk, AbstractMatrix)
-        V_flag = isa(V, AbstractMatrix)
+        sk_flag = isa(sk, MatNum)
+        V_flag = isa(V, MatNum)
         if sk_flag || V_flag
             @argcheck(sk_flag)
             @argcheck(V_flag)
@@ -725,13 +704,10 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
                    typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
     end
 end
-function HighOrderPrior(; pr::AbstractPriorResult,
-                        kt::Union{Nothing, <:AbstractMatrix} = nothing,
-                        L2::Union{Nothing, <:AbstractMatrix} = nothing,
-                        S2::Union{Nothing, <:AbstractMatrix} = nothing,
-                        sk::Union{Nothing, <:AbstractMatrix} = nothing,
-                        V::Union{Nothing, <:AbstractMatrix} = nothing,
-                        skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
+function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
+                        L2::Option{<:MatNum} = nothing, S2::Option{<:MatNum} = nothing,
+                        sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
+                        skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing)
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
 

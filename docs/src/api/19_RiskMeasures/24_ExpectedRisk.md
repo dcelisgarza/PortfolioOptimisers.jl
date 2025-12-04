@@ -2,4 +2,6 @@
 
 ```@docs
 expected_risk
+TnTrRM
+SlvRM
 ```

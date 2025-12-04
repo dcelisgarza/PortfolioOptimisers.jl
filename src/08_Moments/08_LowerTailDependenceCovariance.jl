@@ -17,7 +17,7 @@ Lower tail dependence covariance estimator.
 
 # Constructor
 
-    LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Real = 0.05,
+    LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Number = 0.05,
                   threads::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
@@ -51,24 +51,24 @@ struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     alpha::T2
     threads::T3
-    function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Real,
+    function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
                                            threads::FLoops.Transducers.Executor)
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
         return new{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
     end
 end
 function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                                       alpha::Real = 0.05,
+                                       alpha::Number = 0.05,
                                        threads::FLoops.Transducers.Executor = ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, threads)
 end
-function factory(ce::LowerTailDependenceCovariance,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::LowerTailDependenceCovariance, w::Option{<:AbstractWeights} = nothing)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          threads = ce.threads)
 end
 """
-    lower_tail_dependence(X::AbstractMatrix; alpha::Real = 0.05,
+    lower_tail_dependence(X::MatNum; alpha::Number = 0.05,
                           threads::FLoops.Transducers.Executor = SequentialEx())
 
 Compute the lower tail dependence matrix for a set of asset returns.
@@ -83,7 +83,7 @@ The lower tail dependence (LTD) between two assets quantifies the probability th
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
 
 # Details
 
@@ -96,7 +96,7 @@ The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
   - [`LowerTailDependenceCovariance`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
+function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                                threads::FLoops.Transducers.Executor = SequentialEx())
     T, N = size(X)
     k = ceil(Int, T * alpha)
@@ -119,7 +119,7 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
     return rho
 end
 """
-    cor(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -134,7 +134,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Real}`: Symmetric matrix of lower tail dependence correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence correlation coefficients.
 
 # Validation
 
@@ -145,7 +145,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
   - [`LowerTailDependenceCovariance`](@ref)
   - [`lower_tail_dependence`](@ref)
 """
-function Statistics.cor(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1,
+function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
@@ -154,7 +154,7 @@ function Statistics.cor(ce::LowerTailDependenceCovariance, X::AbstractMatrix; di
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
 """
-    cov(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence covariance matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -169,7 +169,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: Symmetric matrix of lower tail dependence covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of lower tail dependence covariances.
 
 # Validation
 
@@ -180,7 +180,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
   - [`LowerTailDependenceCovariance`](@ref)
   - [`lower_tail_dependence`](@ref)
 """
-function Statistics.cov(ce::LowerTailDependenceCovariance, X::AbstractMatrix; dims::Int = 1,
+function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2

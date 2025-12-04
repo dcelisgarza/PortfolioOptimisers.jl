@@ -391,7 +391,6 @@
                 end
             end
         end
-
         opt = NestedClustered(; cle = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
                                               opt = JuMPOptimiser(; pe = pr, slv = mip_slv,

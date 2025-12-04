@@ -1,5 +1,5 @@
 """
-    block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
+    block_vec_pq(A::MatNum, p::Integer, q::Integer)
 
 Block vectorisation operator.
 
@@ -37,7 +37,7 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 
   - [`dup_elim_sum_matrices`](@ref)
 """
-function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
+function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     mp, nq = size(A)
     @argcheck(mod(mp, p) == 0)
     @argcheck(mod(nq, q) == 0)
@@ -282,11 +282,11 @@ end
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
-function dup_elim_sum_view(::AbstractMatrix, N)
+function dup_elim_sum_view(::MatNum, N)
     return dup_elim_sum_matrices(N)
 end
-function prior_view(pr::HighOrderPrior, i::AbstractVector)
-    idx = fourth_moment_index_factory(length(pr.mu), i)
+function prior_view(pr::HighOrderPrior, i)
+    idx = fourth_moment_index_generator(length(pr.mu), i)
     kt = pr.kt
     L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
     sk = pr.sk
@@ -344,9 +344,9 @@ High order prior estimator for asset returns.
 # Constructor
 
     HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                            kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
+                            kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                     alg = Full()),
-                            ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
+                            ske::Option{<:CoskewnessEstimator} = Coskewness(;
                                                                                     alg = Full()))
 
 Keyword arguments correspond to the fields above.
@@ -413,21 +413,20 @@ struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     kte::T2
     ske::T3
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
-                                     kte::Union{Nothing, <:CokurtosisEstimator},
-                                     ske::Union{Nothing, <:CoskewnessEstimator})
+                                     kte::Option{<:CokurtosisEstimator},
+                                     ske::Option{<:CoskewnessEstimator})
         return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
     end
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                                 kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
-                                                                                         alg = Full()),
-                                 ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
-                                                                                         alg = Full()))
+                                 kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
+                                                                                 alg = Full()),
+                                 ske::Option{<:CoskewnessEstimator} = Coskewness(;
+                                                                                 alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(pe::HighOrderPriorEstimator, w::Option{<:AbstractWeights} = nothing)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end
@@ -441,7 +440,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     end
 end
 """
-    prior(pe::HighOrderPriorEstimator, X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Compute high order prior moments for asset returns using a composite estimator.
 
@@ -469,8 +468,8 @@ Compute high order prior moments for asset returns using a composite estimator.
   - [`HighOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing;
+               dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

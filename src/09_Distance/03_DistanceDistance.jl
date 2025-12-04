@@ -30,7 +30,7 @@ where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}
 # Constructor
 
     DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                     kwargs::NamedTuple = (;), power::Union{Nothing, <:Integer} = 1,
+                     kwargs::NamedTuple = (;), power::Option{<:Integer} = 1,
                      alg::AbstractDistanceAlgorithm = SimpleDistance())
 
 Keyword arguments correspond to the fields above.
@@ -64,10 +64,9 @@ struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
     power::T4
     alg::T5
     function DistanceDistance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                              power::Union{Nothing, <:Integer},
-                              alg::AbstractDistanceAlgorithm)
+                              power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
-            @argcheck(power >= one(power))
+            @argcheck(one(power) <= power, DomainError)
         end
         return new{typeof(dist), typeof(args), typeof(kwargs), typeof(power), typeof(alg)}(dist,
                                                                                            args,
@@ -78,12 +77,12 @@ struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
 end
 function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                           args::Tuple = (), kwargs::NamedTuple = (;),
-                          power::Union{Nothing, <:Integer} = nothing,
+                          power::Option{<:Integer} = nothing,
                           alg::AbstractDistanceAlgorithm = SimpleDistance())
     return DistanceDistance(dist, args, kwargs, power, alg)
 end
 """
-    distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
+    distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
              dims::Int = 1, kwargs...)
 
 Compute the distance-of-distances matrix from a covariance estimator and data matrix.
@@ -100,7 +99,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 
 # Returns
 
-  - `dist::Matrix{<:Real}`: Matrix of pairwise distances of distances.
+  - `dist::Matrix{<:Number}`: Matrix of pairwise distances of distances.
 
 # Related
 
@@ -108,14 +107,14 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
   - [`Distance`](@ref)
   - [`distance`](@ref)
 """
-function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
+                  dims::Int = 1, kwargs...)
     dist = distance(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+    distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
 
 Compute the distance-of-distances matrix from a correlation or covariance matrix.
 
@@ -130,7 +129,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 
 # Returns
 
-  - `dist::Matrix{<:Real}`: Matrix of pairwise distances of distances.
+  - `dist::Matrix{<:Number}`: Matrix of pairwise distances of distances.
 
 # Related
 
@@ -141,12 +140,12 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 ```
 ```
 """
-function distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
     dist = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
+    cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                  dims::Int = 1, kwargs...)
 
 Compute both the correlation matrix and the distance-of-distances matrix from a covariance estimator and data matrix.
@@ -163,7 +162,7 @@ This method first computes the correlation and base distance matrices using [`Di
 
 # Returns
 
-  - `(rho::Matrix{<:Real}, D::Matrix{<:Real})`: Tuple of correlation matrix and distance-of-distances matrix.
+  - `(rho::Matrix{<:Number}, D::Matrix{<:Number})`: Tuple of correlation matrix and distance-of-distances matrix.
 
 # Related
 
@@ -171,8 +170,8 @@ This method first computes the correlation and base distance matrices using [`Di
   - [`Distance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
+                      dims::Int = 1, kwargs...)
     rho, dist = cor_and_dist(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
                              kwargs...)
     return rho, Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)

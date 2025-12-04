@@ -16,7 +16,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                              (binary = true)
                                                                          end)
     alpha = r.alpha
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     if isnothing(wi)
         model[Symbol(:csvar_, i)] = @constraint(model,
                                                 sc * (sum(z_var) - alpha * T + s * T) <= 0)
@@ -54,7 +54,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                      end)
     alpha = r.alpha
     beta = r.beta
-    wi = nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
     if isnothing(wi)
         model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = @constraints(model,
                                                                                 begin
@@ -102,26 +102,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
-function compute_value_at_risk_z(dist::Normal, alpha::Real)
+function compute_value_at_risk_z(dist::Normal, alpha::Number)
     return cquantile(dist, alpha)
 end
-function compute_value_at_risk_z(dist::TDist, alpha::Real)
+function compute_value_at_risk_z(dist::TDist, alpha::Number)
     d = dof(dist)
     @argcheck(d > 2)
     return cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_z(::Laplace, alpha::Real)
+function compute_value_at_risk_z(::Laplace, alpha::Number)
     return -log(2 * alpha) / sqrt(2)
 end
-function compute_value_at_risk_cz(dist::Normal, alpha::Real)
+function compute_value_at_risk_cz(dist::Normal, alpha::Number)
     return quantile(dist, alpha)
 end
-function compute_value_at_risk_cz(dist::TDist, alpha::Real)
+function compute_value_at_risk_cz(dist::TDist, alpha::Number)
     d = dof(dist)
     @argcheck(d > 2)
     return quantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_cz(::Laplace, alpha::Real)
+function compute_value_at_risk_cz(::Laplace, alpha::Number)
     return -log(2 * (one(alpha) - alpha)) / sqrt(2)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -130,7 +130,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    mu = nothing_scalar_array_factory(alg.mu, pr.mu)
+    mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
@@ -150,7 +150,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    mu = nothing_scalar_array_factory(alg.mu, pr.mu)
+    mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
