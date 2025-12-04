@@ -460,7 +460,6 @@ function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
 function k_ucs(type::Number, args...)
-    ArrNum
     return type
 end
 """

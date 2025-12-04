@@ -412,10 +412,8 @@ function LogSumExpScalariser(; gamma::Number = 1.0)
 end
 """
     nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Nothing)
-    nothing_scalar_array_selector(risk_variable::Num_ArrNum_VecScalar,
-                                 ::Any)
-    nothing_scalar_array_selector(risk_variable::Nothing,
-                                 prior_variable::Num_ArrNum_VecScalar)
+    nothing_scalar_array_selector(risk_variable::Num_ArrNum_VecScalar, ::Any)
+    nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Num_ArrNum_VecScalar)
 
 Function for selecting a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
 
