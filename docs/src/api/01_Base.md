@@ -34,6 +34,14 @@ IsEmptyError
 IsNonFiniteError
 ```
 
+## Types
+
+Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types non-specific and used throughout the library.
+
+```@docs
+VecScalar
+```
+
 ## Base type aliases
 
 `PortfolioOptimisers.jl` heavily relies on `Julia`'s dispatch and type system to ensure data validity. Many custom types and functions/methods can accept different data types. These can be represented as type unions, many of which are used throughout the library. The following type aliases centralise these union definitions, as well as improving correctness and maintainability.
@@ -66,4 +74,6 @@ VecDate
 Dict_Vec
 Sym_Str
 Str_Vec
+Num_VecNum_VecScalar
+Num_ArrNum_VecScalar
 ```

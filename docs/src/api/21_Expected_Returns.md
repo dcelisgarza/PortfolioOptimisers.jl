@@ -26,4 +26,5 @@ factory(r::RatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
                  kwargs...)
 factory(r::RatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
 factory(r::RatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
+brinson_attribution
 ```
