@@ -1,8 +1,17 @@
 # Tools
 
-`PorfolioOptimisers.jl` is a complex codebase which uses a variety of general purpose functions, constants and types.
+`PorfolioOptimisers.jl` is a complex codebase which uses a variety of general purpose tools including functions, constants and types.
 
 ## Assertions
+
+In order to increase correctness, robustness, and safety, we make extensive use of [defensive programming](https://en.wikipedia.org/wiki/Defensive_programming). The following functions perform some of these validations and are usually called at variable instantiation.
+
+```@docs
+assert_nonempty_nonneg_finite_val
+assert_nonempty_gt0_finite_val
+assert_nonempty_finite_val
+assert_matrix_issquare
+```
 
 ## Public
 
@@ -21,7 +30,7 @@ Num_VecNum_VecScalar
 Num_ArrNum_VecScalar
 assert_nonempty_nonneg_finite_val
 assert_nonempty_finite_val
-assert_nonempty_geq0_finite_val
+assert_nonempty_gt0_finite_val
 assert_matrix_issquare
 :⊗
 :⊙

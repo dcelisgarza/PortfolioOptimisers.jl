@@ -198,7 +198,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
         end
         if !isnothing(iv)
             assert_nonempty_nonneg_finite_val(iv, :iv)
-            assert_nonempty_geq0_finite_val(ivpa, :ivpa)
+            assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
             if isa(ivpa, VecNum)
                 @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)

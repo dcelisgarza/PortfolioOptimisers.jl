@@ -184,8 +184,8 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
         end
         @argcheck(zero(max_phi) < max_phi < one(max_phi),
                   DomainError("0 < max_phi < 1 must hold. Got\nmax_phi => $max_phi"))
-        assert_nonempty_geq0_finite_val(sc, :sc)
-        assert_nonempty_geq0_finite_val(so, :so)
+        assert_nonempty_gt0_finite_val(sc, :sc)
+        assert_nonempty_gt0_finite_val(so, :so)
         return new{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
                                                                                       max_phi,
                                                                                       sc,
