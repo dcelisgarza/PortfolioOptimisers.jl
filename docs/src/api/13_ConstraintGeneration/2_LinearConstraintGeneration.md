@@ -25,4 +25,5 @@ _collect_terms!
 _collect_terms
 _eval_numeric_functions
 asset_sets_matrix_view
+nothing_asset_sets_view
 ```

@@ -1,48 +1,16 @@
 """
-    drop_incomplete(X::AbstractMatrix)
+    abstract type AbstractReturnsResult <: AbstractResult end
 
-Return the indices of columns in matrix `X` that do not contain missing or NaN values, optionally filtering based on whether any missing value is present in a column.
+Abstract supertype for all returns result types in PortfolioOptimisers.jl.
 
-# Arguments
-
-  - `X`: Input matrix of numeric values (observations × assets).
-  - `any_missing`: Boolean flag for dropping columns with missing or NaN values.
-
-# Returns
-
-  - `res::Vector{Int}`: Indices of columns in `X` that are complete according to the specified rule.
-
-# Examples
-
-```jldoctest
-julia> X = [1.0 2.0 NaN; 4.0 missing 6.0];
-
-julia> drop_incomplete(X)
-1-element Vector{Int64}:
- 1
-```
+All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
 
 # Related
 
-  - [`drop_correlated`](@ref)
-  - [`prices_to_returns`](@ref)
+  - [`AbstractResult`](@ref)
+  - [`ReturnsResult`](@ref)
 """
-function drop_incomplete(X::AbstractMatrix)
-    N = size(X, 2)
-    to_remove = Vector{Int}(undef, 0)
-    for i in axes(X, 2)
-        if any(map(ismissing, X[:, i])) || any(map(isnan, X[:, i]))
-            push!(to_remove, i)
-        end
-    end
-    return setdiff(1:N, to_remove)
-end
-"""
-!!! note
-
-    Not implemented yet, still unexported.
-"""
-function select_k_extremes(X::MatNum) end
+abstract type AbstractReturnsResult <: AbstractResult end
 """
     _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
                                     names_sym::Symbol, mat_sym::Symbol)
@@ -74,7 +42,6 @@ Validate that asset or factor names and their corresponding returns matrix are p
   - [`Option`](@ref)
   - [`VecStr`](@ref)
   - [`MatNum`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
 """
 function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
                                          names_sym::Symbol, mat_sym::Symbol)
@@ -174,8 +141,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
         end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
-            @argcheck(!(isnothing(X) && isnothing(F)),
-                      IsNothingError("at least one of `X` or `F` must be provided. Got\n!isnothing(X) => $(isnothing(X))\n!isnothing(F) => $(isnothing(F))"))
+            @argcheck(!(isnothing(X) && isnothing(F)), IsNothingError)
             if !isnothing(X)
                 @argcheck(length(ts) == size(X, 1), DimensionMismatch)
             end
@@ -185,7 +151,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
         end
         if !isnothing(iv)
             assert_nonempty_nonneg_finite_val(iv, :iv)
-            assert_nonempty_geq0_finite_val(ivpa, :ivpa)
+            assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
             if isa(ivpa, VecNum)
                 @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
@@ -329,8 +295,8 @@ ReturnsResult
   - [`MatNum`](@ref)
   - [`VecDate`](@ref)
   - [`Num_VecNum`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
+  - [`Impute`](https://github.com/invenia/Impute.jl)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            Rb::Option{<:TimeArray} = nothing,
@@ -344,12 +310,11 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            join_method::Symbol = :outer,
                            impute_method::Option{<:Impute.Imputor} = nothing)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
-              DomainError("0 < missing_col_percent <= 1 must hold. Got\nmissing_col_percent => $missing_col_percent"))
+              DomainError)
     if !isnothing(missing_row_percent)
         @argcheck(zero(missing_row_percent) <
                   missing_row_percent <=
-                  one(missing_row_percent),
-                  DomainError("0 < missing_row_percent <= 1 must hold. Got\nmissing_row_percent => $missing_row_percent"))
+                  one(missing_row_percent), DomainError)
     end
     if !isempty(F)
         asset_names = string.(colnames(X))
@@ -391,8 +356,8 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
         @argcheck(timestamp(X) == timestamp(Rb))
         Rb_v = values(Rb)
         X_v = values(X)
-        X = TimeArray(isa(Rb_v, AbstractMatrix) ? X_v - Rb_v : X_v .- Rb_v;
-                      timestamp = :timestamp)
+        X = TimeArray(timestamp(X), isa(Rb_v, AbstractMatrix) ? X_v - Rb_v : X_v .- Rb_v;
+                      colnames = colnames(X))
     end
     X = DataFrame(X)
     col_names = names(X)
@@ -418,5 +383,69 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
                          ivpa = ivpa)
 end
+"""
+    find_complete_indices(X::AbstractMatrix; dims::Int = 1)
 
-export drop_incomplete, ReturnsResult, prices_to_returns
+Return the indices of columns (or rows) in matrix `X` that do not contain any missing or NaN values.
+
+This function scans the specified dimension of the input matrix and returns the indices of columns (or rows) that are complete, i.e., contain no `missing` or `NaN` values.
+
+# Arguments
+
+  - `X`: Input matrix of numeric values (observations × assets).
+  - `dims`: Dimension along which to check for completeness (`1` for columns, `2` for rows). Default is `1`.
+
+# Returns
+
+  - `res::Vector{Int}`: Indices of columns (or rows) in `X` that are complete.
+
+# Validation
+
+  - `dims` must be either `1` (columns) or `2` (rows).
+
+# Details
+
+  - If `dims == 2`, the matrix is transposed and columns are checked.
+  - Any column (or row) containing at least one `missing` or `NaN` value is excluded.
+  - The result is a vector of indices of complete columns (or rows).
+
+# Examples
+
+```jldoctest
+julia> X = [1.0 2.0 NaN; 4.0 missing 6.0];
+
+julia> find_complete_indices(X)
+1-element Vector{Int64}:
+ 1
+
+julia> find_complete_indices(X; dims = 2)
+Int64[]
+```
+
+# Related
+
+  - [`find_correlated_indices`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
+function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
+    @argcheck(dims in (1, 2), DomainError)
+    if dims == 2
+        X = transpose(X)
+    end
+    N = size(X, 2)
+    to_remove = Vector{Int}(undef, 0)
+    for i in axes(X, 2)
+        if any(map(ismissing, X[:, i])) || any(map(isnan, X[:, i]))
+            push!(to_remove, i)
+        end
+    end
+    return setdiff(1:N, to_remove)
+end
+"""
+!!! note
+
+    Not implemented yet, still unexported.
+"""
+function select_k_extremes(X::MatNum) end
+
+export ReturnsResult, prices_to_returns, find_complete_indices

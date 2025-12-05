@@ -592,6 +592,91 @@ function expected_risk(r::RatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
 end
+"""
+    brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
+                        asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
+
+Compute Brinson performance attribution aggregated per asset class [brinson_attribution](@cite).
+
+`brinson_attribution` generates a DataFrame summarizing the Brinson performance attribution, decomposing total excess return into asset allocation, security selection, interaction, and total effect for each asset class. The calculation is performed over the specified date range, using the provided asset weights, benchmark weights, and asset class assignments.
+
+# Arguments
+
+  - `X`: TimeArray of asset prices or returns.
+  - `w`: Vector of portfolio weights.
+  - `wb`: Vector of benchmark weights.
+  - `asset_classes`: DataFrame containing asset class assignments for each asset.
+  - `col`: Column in `asset_classes` specifying the class for each asset.
+  - `date0`: (Optional) Start date for the attribution period.
+  - `date1`: (Optional) End date for the attribution period.
+
+# Returns
+
+  - `df::DataFrame`: DataFrame with rows for asset allocation, security selection, interaction, and total effect, and columns for each asset class and the total.
+
+# Details
+
+  - Computes returns for the specified period.
+  - Aggregates attribution effects by asset class.
+  - Supports custom date ranges via `date0` and `date1`.
+  - Returns a DataFrame with attribution breakdown for each class and the total.
+
+# Related
+
+  - [`VecNum`](@ref)
+
+# References
+
+  - [brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).
+"""
+function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum, asset_classes::DataFrame,
+                             col, date0 = nothing, date1 = nothing)
+    # Efficient filtering of date range
+    idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
+        timestamps = timestamp(X)
+        idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
+        findfirst(idx), findlast(idx)
+    else
+        1, length(X)
+    end
+
+    ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
+    ret_b = dot(ret, wb)
+
+    classes = asset_classes[!, col]
+    unique_classes = unique(classes)
+
+    df = DataFrame(;
+                   index = ["Asset Allocation", "Security Selection", "Interaction",
+                            "Total Excess Return"])
+
+    # Precompute class membership matrix for efficiency
+    sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]
+
+    for (i, class_i) in enumerate(unique_classes)
+        sets_i = view(sets_mat, :, i)
+
+        w_i = dot(sets_i, w)
+        wb_i = dot(sets_i, wb)
+
+        ret_i = dot(ret .* sets_i, w) / w_i
+        ret_b_i = dot(ret .* sets_i, wb) / wb_i
+
+        w_diff_i = w_i - wb_i
+        ret_diff_i = ret_i - ret_b_i
+
+        AA_i = w_diff_i * (ret_b_i - ret_b)
+        SS_i = wb_i * ret_diff_i
+        I_i = w_diff_i * ret_diff_i
+        TER_i = AA_i + SS_i + I_i
+
+        df[!, class_i] = [AA_i, SS_i, I_i, TER_i]
+    end
+
+    df[!, "Total"] = sum(eachcol(df[!, 2:end]))
+
+    return df
+end
 
 export expected_return, expected_ratio, expected_risk_ret_ratio, expected_sric,
-       expected_risk_ret_sric, RatioRiskMeasure, ReturnRiskMeasure
+       expected_risk_ret_sric, RatioRiskMeasure, ReturnRiskMeasure, brinson_attribution

@@ -1,17 +1,4 @@
 """
-    abstract type AbstractReturnsResult <: AbstractResult end
-
-Abstract supertype for all returns result types in PortfolioOptimisers.jl.
-
-All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
-
-# Related
-
-  - [`AbstractResult`](@ref)
-  - [`ReturnsResult`](@ref)
-"""
-abstract type AbstractReturnsResult <: AbstractResult end
-"""
     assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Symbol = :val)
     assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Symbol = :val)
@@ -44,8 +31,7 @@ Validate that the input value is non-empty, non-negative and finite.
 # Related
 
   - [`assert_nonempty_finite_val`](@ref)
-  - [`assert_nonempty_geq0_finite_val`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
 """
 function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -91,6 +77,84 @@ function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
 """
+    assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
+    assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Symbol = :val)
+    assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Symbol = :val)
+    assert_nonempty_gt0_finite_val(val::Pair, val_sym::Symbol = :val)
+    assert_nonempty_gt0_finite_val(val::Number, val_sym::Symbol = :val)
+    assert_nonempty_gt0_finite_val(args...)
+
+Validate that the input value is non-empty, greater than zero, and finite.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes.
+
+# Details
+
+  - `val`: input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
+      + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
+      + `::Number`: `isfinite(val)` and `val > 0`.
+      + `args...`: always passes.
+
+# Related
+
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+"""
+function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, values(val)),
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
+    @argcheck(all(x -> zero(x) < x, values(val)),
+              DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Symbol = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, getindex.(val, 2)),
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    @argcheck(all(x -> zero(x[2]) < x[2], val),
+              DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Symbol = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, val),
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
+    @argcheck(all(x -> zero(x) < x, val),
+              DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::Pair, val_sym::Symbol = :val)
+    @argcheck(isfinite(val[2]),
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+    @argcheck(zero(val[2]) < val[2],
+              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::Number, val_sym::Symbol = :val)
+    @argcheck(isfinite(val),
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(args...)
+    return nothing
+end
+"""
     assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     assert_nonempty_finite_val(val::VecPair, val_sym::Symbol = :val)
     assert_nonempty_finite_val(val::ArrNum, val_sym::Symbol = :val)
@@ -123,8 +187,7 @@ Validate that the input value is non-empty and finite.
 # Related
 
   - [`assert_nonempty_nonneg_finite_val`](@ref)
-  - [`assert_nonempty_geq0_finite_val`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
 """
 function assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -161,85 +224,6 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_geq0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
-    assert_nonempty_geq0_finite_val(val::VecPair, val_sym::Symbol = :val)
-    assert_nonempty_geq0_finite_val(val::ArrNum, val_sym::Symbol = :val)
-    assert_nonempty_geq0_finite_val(val::Pair, val_sym::Symbol = :val)
-    assert_nonempty_geq0_finite_val(val::Number, val_sym::Symbol = :val)
-    assert_nonempty_geq0_finite_val(args...)
-
-Validate that the input value is non-empty, greater than zero, and finite.
-
-# Arguments
-
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`: Returns nothing if validation passes.
-
-# Details
-
-  - `val`: input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
-      + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
-      + `::Number`: `isfinite(val)` and `val > 0`.
-      + `args...`: always passes.
-
-# Related
-
-  - [`assert_nonempty_nonneg_finite_val`](@ref)
-  - [`assert_nonempty_finite_val`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
-"""
-function assert_nonempty_geq0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    @argcheck(all(x -> zero(x) < x, values(val)),
-              DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
-    return nothing
-end
-function assert_nonempty_geq0_finite_val(val::VecPair, val_sym::Symbol = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    @argcheck(all(x -> zero(x[2]) < x[2], val),
-              DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
-    return nothing
-end
-function assert_nonempty_geq0_finite_val(val::ArrNum, val_sym::Symbol = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    @argcheck(all(x -> zero(x) < x, val),
-              DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
-    return nothing
-end
-function assert_nonempty_geq0_finite_val(val::Pair, val_sym::Symbol = :val)
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    @argcheck(zero(val[2]) < val[2],
-              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
-    return nothing
-end
-function assert_nonempty_geq0_finite_val(val::Number, val_sym::Symbol = :val)
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
-    return nothing
-end
-function assert_nonempty_geq0_finite_val(args...)
-    return nothing
-end
-"""
     assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
 
 Assert that the input matrix is square.
@@ -265,58 +249,6 @@ function assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
     @argcheck(size(A, 1) == size(A, 2),
               DimensionMismatch("size($A_sym, 1) == size($A_sym, 2) must hold. Got\nsize($A_sym, 1) => $(size(A, 1))\nsize($A_sym, 2) => $(size(A, 2))."))
     return nothing
-end
-"""
-    brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
-                        asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
-"""
-function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum, asset_classes::DataFrame,
-                             col, date0 = nothing, date1 = nothing)
-    # Efficient filtering of date range
-    idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
-        timestamps = timestamp(X)
-        idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
-        findfirst(idx), findlast(idx)
-    else
-        1, length(X)
-    end
-
-    ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
-    ret_b = dot(ret, wb)
-
-    classes = asset_classes[!, col]
-    unique_classes = unique(classes)
-
-    df = DataFrame(;
-                   index = ["Asset Allocation", "Security Selection", "Interaction",
-                            "Total Excess Return"])
-
-    # Precompute class membership matrix for efficiency
-    sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]
-
-    for (i, class_i) in enumerate(unique_classes)
-        sets_i = view(sets_mat, :, i)
-
-        w_i = dot(sets_i, w)
-        wb_i = dot(sets_i, wb)
-
-        ret_i = dot(ret .* sets_i, w) / w_i
-        ret_b_i = dot(ret .* sets_i, wb) / wb_i
-
-        w_diff_i = w_i - wb_i
-        ret_diff_i = ret_i - ret_b_i
-
-        AA_i = w_diff_i * (ret_b_i - ret_b)
-        SS_i = wb_i * ret_diff_i
-        I_i = w_diff_i * ret_diff_i
-        TER_i = AA_i + SS_i + I_i
-
-        df[!, class_i] = [AA_i, SS_i, I_i, TER_i]
-    end
-
-    df[!, "Total"] = sum(eachcol(df[!, 2:end]))
-
-    return df
 end
 """
     ⊗(A::ArrNum, B::ArrNum)
@@ -503,80 +435,6 @@ end
 function dot_scalar(a::VecNum, b::VecNum)
     return dot(a, b)
 end
-"""
-    struct VecScalar{T1, T2} <: AbstractResult
-        v::T1
-        s::T2
-    end
-
-Represents a composite result containing a vector and a scalar in PortfolioOptimisers.jl.
-
-Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
-
-# Fields
-
-  - `v`: Vector value.
-  - `s`: Scalar value.
-
-# Constructors
-
-    VecScalar(; v::VecNum, s::Number)
-
-Keyword arguments correspond to the fields above.
-
-## Validation
-
-  - `v`: `!isempty(v)` and `all(isfinite, v)`.
-  - `s`: `isfinite(s)`.
-
-# Examples
-
-```jldoctest
-julia> VecScalar([1.0, 2.0, 3.0], 4.2)
-VecScalar
-  v ┼ Vector{Float64}: [1.0, 2.0, 3.0]
-  s ┴ Float64: 4.2
-```
-
-# Related
-
-  - [`AbstractResult`](@ref)
-  - [`VecNum`](@ref)
-"""
-struct VecScalar{T1, T2} <: AbstractResult
-    v::T1
-    s::T2
-    function VecScalar(v::VecNum, s::Number)
-        assert_nonempty_finite_val(v, :v)
-        assert_nonempty_finite_val(s, :s)
-        return new{typeof(v), typeof(s)}(v, s)
-    end
-end
-function VecScalar(; v::VecNum, s::Number)
-    return VecScalar(v, s)
-end
-"""
-    const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
-
-Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar` result.
-
-# Related Types
-
-  - [`Num_VecNum`](@ref)
-  - [`VecScalar`](@ref)
-"""
-const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
-"""
-    const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
-
-Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
-
-# Related Types
-
-  - [`Num_ArrNum`](@ref)
-  - [`VecScalar`](@ref)
-"""
-const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 """
     nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any)
     nothing_scalar_array_view(x::AbstractVector, i)
@@ -895,5 +753,4 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes,
-       concrete_typed_array
+export factory, traverse_concrete_subtypes, concrete_typed_array

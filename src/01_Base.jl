@@ -593,5 +593,79 @@ Alias for a union of an abstract string or an abstract vector.
   - [`Str_Expr`](@ref)
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+"""
+    struct VecScalar{T1, T2} <: AbstractResult
+        v::T1
+        s::T2
+    end
 
-export IsEmptyError, IsNothingError, IsNonFiniteError
+Represents a composite result containing a vector and a scalar in PortfolioOptimisers.jl.
+
+Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
+
+# Fields
+
+  - `v`: Vector value.
+  - `s`: Scalar value.
+
+# Constructors
+
+    VecScalar(; v::VecNum, s::Number)
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `v`: `!isempty(v)` and `all(isfinite, v)`.
+  - `s`: `isfinite(s)`.
+
+# Examples
+
+```jldoctest
+julia> VecScalar([1.0, 2.0, 3.0], 4.2)
+VecScalar
+  v ┼ Vector{Float64}: [1.0, 2.0, 3.0]
+  s ┴ Float64: 4.2
+```
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`VecNum`](@ref)
+"""
+struct VecScalar{T1, T2} <: AbstractResult
+    v::T1
+    s::T2
+    function VecScalar(v::VecNum, s::Number)
+        assert_nonempty_finite_val(v, :v)
+        assert_nonempty_finite_val(s, :s)
+        return new{typeof(v), typeof(s)}(v, s)
+    end
+end
+function VecScalar(; v::VecNum, s::Number)
+    return VecScalar(v, s)
+end
+"""
+    const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+
+Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar` result.
+
+# Related Types
+
+  - [`Num_VecNum`](@ref)
+  - [`VecScalar`](@ref)
+"""
+const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
+"""
+    const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+
+Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
+
+# Related Types
+
+  - [`Num_ArrNum`](@ref)
+  - [`VecScalar`](@ref)
+"""
+const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+
+export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar
