@@ -254,60 +254,6 @@ function assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
     return nothing
 end
 """
-    brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
-                        asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
-
-Generates a dataframe with the Brinson Performance Attribution agreggated per class according to [brinson_attribution](@cite).
-"""
-function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum, asset_classes::DataFrame,
-                             col, date0 = nothing, date1 = nothing)
-    # Efficient filtering of date range
-    idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
-        timestamps = timestamp(X)
-        idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
-        findfirst(idx), findlast(idx)
-    else
-        1, length(X)
-    end
-
-    ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
-    ret_b = dot(ret, wb)
-
-    classes = asset_classes[!, col]
-    unique_classes = unique(classes)
-
-    df = DataFrame(;
-                   index = ["Asset Allocation", "Security Selection", "Interaction",
-                            "Total Excess Return"])
-
-    # Precompute class membership matrix for efficiency
-    sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]
-
-    for (i, class_i) in enumerate(unique_classes)
-        sets_i = view(sets_mat, :, i)
-
-        w_i = dot(sets_i, w)
-        wb_i = dot(sets_i, wb)
-
-        ret_i = dot(ret .* sets_i, w) / w_i
-        ret_b_i = dot(ret .* sets_i, wb) / wb_i
-
-        w_diff_i = w_i - wb_i
-        ret_diff_i = ret_i - ret_b_i
-
-        AA_i = w_diff_i * (ret_b_i - ret_b)
-        SS_i = wb_i * ret_diff_i
-        I_i = w_diff_i * ret_diff_i
-        TER_i = AA_i + SS_i + I_i
-
-        df[!, class_i] = [AA_i, SS_i, I_i, TER_i]
-    end
-
-    df[!, "Total"] = sum(eachcol(df[!, 2:end]))
-
-    return df
-end
-"""
     ⊗(A::ArrNum, B::ArrNum)
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
@@ -884,5 +830,4 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export VecScalar, brinson_attribution, factory, traverse_concrete_subtypes,
-       concrete_typed_array
+export VecScalar, factory, traverse_concrete_subtypes, concrete_typed_array

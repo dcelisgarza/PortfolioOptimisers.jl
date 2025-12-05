@@ -13,6 +13,30 @@ assert_nonempty_finite_val
 assert_matrix_issquare
 ```
 
+## Mathematical functions
+
+`PortfolioOptimisers.jl` makes use of various mathematical operators, some of which are generic to support the variety of inputs supported by the library.
+
+```@docs
+:⊗
+:⊙
+:⊘
+:⊕
+:⊖
+dot_scalar
+```
+
+## View functions
+
+[`NestedClustered`](@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views and custom index generators.
+
+```@docs
+nothing_scalar_array_view
+nothing_scalar_array_view_odd_order
+nothing_scalar_array_getindex
+nothing_scalar_array_getindex_odd_order
+```
+
 ## Public
 
 ```@docs
@@ -28,20 +52,5 @@ factory(::Nothing, args...; kwargs...)
 ```@docs
 Num_VecNum_VecScalar
 Num_ArrNum_VecScalar
-assert_nonempty_nonneg_finite_val
-assert_nonempty_finite_val
-assert_nonempty_gt0_finite_val
-assert_matrix_issquare
-:⊗
-:⊙
-:⊘
-:⊕
-:⊖
-dot_scalar
-nothing_scalar_array_view
-nothing_scalar_array_view_odd_order
-nothing_scalar_array_getindex
-nothing_scalar_array_getindex_odd_order
-nothing_asset_sets_view
 fourth_moment_index_generator
 ```
