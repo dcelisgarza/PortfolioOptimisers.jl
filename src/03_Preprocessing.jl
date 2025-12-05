@@ -419,8 +419,7 @@ julia> find_complete_indices(X)
  1
 
 julia> find_complete_indices(X; dims = 2)
-1-element Vector{Int64}:
- 2
+Int64[]
 ```
 
 # Related
