@@ -38,7 +38,7 @@ dot_scalar
 
 ## View functions
 
-[`NestedClustered`](@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views and custom index generators.
+[`NestedClustered`](@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views, indexing, and custom index generators.
 
 ```@docs
 nothing_scalar_array_view
