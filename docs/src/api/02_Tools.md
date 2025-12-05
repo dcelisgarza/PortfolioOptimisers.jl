@@ -4,7 +4,7 @@
 
 ## Utility functions
 
-We strive to be as type-stable, inferrable, immutable as possible in order to improve robustness, performance, and correctness. These functions help us achieve these goals.
+We strive to be as type-stable, inferrable, and immutable as possible in order to improve robustness, performance, and correctness. These functions help us achieve these goals.
 
 ```@docs
 traverse_concrete_subtypes
