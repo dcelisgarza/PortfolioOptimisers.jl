@@ -1,6 +1,6 @@
 name = "PortfolioOptimisers"
 uuid = "e0036ec9-05e5-505d-a6a9-07af41c94861"
-version = "0.11.0"
+version = "0.11.1"
 authors = ["Daniel Celis Garza <daniel.celis.garza@gmail.com>"]
 
 [deps]

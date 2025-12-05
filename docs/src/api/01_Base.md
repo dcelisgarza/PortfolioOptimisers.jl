@@ -34,7 +34,7 @@ IsEmptyError
 IsNonFiniteError
 ```
 
-## Types
+## Utility types
 
 Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types non-specific and used throughout the library.
 

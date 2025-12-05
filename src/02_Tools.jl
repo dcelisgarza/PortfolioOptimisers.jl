@@ -32,7 +32,6 @@ Validate that the input value is non-empty, non-negative and finite.
 
   - [`assert_nonempty_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
 """
 function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -111,7 +110,6 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`assert_nonempty_finite_val`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
 """
 function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
@@ -190,7 +188,6 @@ Validate that the input value is non-empty and finite.
 
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
-  - [`@argcheck`](https://github.com/jw3126/ArgCheck.jl)
 """
 function assert_nonempty_finite_val(val::AbstractDict, val_sym::Symbol = :val)
     @argcheck(!isempty(val),
