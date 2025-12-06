@@ -615,7 +615,7 @@ Container type for high order prior results in PortfolioOptimisers.jl.
                    S2::Option{<:MatNum} = nothing,
                    sk::Option{<:MatNum} = nothing,
                    V::Option{<:MatNum} = nothing,
-                   skmp::Option{<:AbstractMatrixProcessingEstimator} = DefaultMatrixProcessing())
+                   skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
 

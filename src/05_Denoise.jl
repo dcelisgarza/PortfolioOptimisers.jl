@@ -3,7 +3,7 @@
 
 Abstract supertype for all denoising estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement denoising of covariance or correlation matrices (e.g., via spectral, fixed, or shrinkage methods) should subtype `AbstractDenoiseEstimator`. This enables a consistent interface for denoising routines throughout the package.
+All concrete types that implement denoising of covariance or correlation matrices should subtype `AbstractDenoiseEstimator`. This enables a consistent interface for denoising routines throughout the package.
 
 # Related
 
@@ -18,7 +18,7 @@ abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 
 Abstract supertype for all denoising algorithm types in PortfolioOptimisers.jl.
 
-All concrete types that implement a specific denoising algorithm (e.g., spectral, fixed, shrinkage) should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
+All concrete types that implement a specific denoising algorithm should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
 
 # Related
 
@@ -45,6 +45,11 @@ SpectralDenoise()
   - [`AbstractDenoiseAlgorithm`](@ref)
   - [`denoise!`](@ref)
   - [`Denoise`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -64,6 +69,11 @@ FixedDenoise()
   - [`AbstractDenoiseAlgorithm`](@ref)
   - [`denoise!`](@ref)
   - [`Denoise`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -100,6 +110,11 @@ ShrunkDenoise
   - [`AbstractDenoiseAlgorithm`](@ref)
   - [`denoise!`](@ref)
   - [`Denoise`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
     alpha::T1
@@ -146,7 +161,7 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> Denoise(;)
+julia> Denoise()
 Denoise
      alg ┼ ShrunkDenoise
          │   alpha ┴ Float64: 0.0
@@ -175,6 +190,11 @@ Denoise
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
   - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     alg::T1
@@ -231,6 +251,11 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - [`ShrunkDenoise`](@ref)
   - [`MatNum`](@ref)
   - [`VecNum`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -288,6 +313,10 @@ This function is used internally to fit the MP distribution to the observed spec
   - [`Denoise`](@ref)
   - [`VecNum`](@ref)
   - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
+
+# References
+
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function errPDF(x::Number, vals::VecNum, q::Number;
                 kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
@@ -332,6 +361,10 @@ This function fits the MP distribution to the observed spectrum by minimizing th
   - [`Denoise`](@ref)
   - [`VecNum`](@ref)
   - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)
+
+# References
+
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function find_max_eval(vals::VecNum, q::Number;
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
@@ -405,6 +438,11 @@ julia> X
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function denoise!(::Nothing, args...)
     return nothing
@@ -445,6 +483,11 @@ Out-of-place version of [`denoise!`](@ref).
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function denoise(::Nothing, args...)
     return nothing

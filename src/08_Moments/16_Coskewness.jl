@@ -31,7 +31,7 @@ Container type for coskewness estimators.
 # Constructor
 
     Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+               mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                alg::AbstractMomentAlgorithm = Full())
 
 Keyword arguments correspond to the fields above.
@@ -43,9 +43,10 @@ julia> Coskewness()
 Coskewness
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
-   mp ┼ DefaultMatrixProcessing
+   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       pdm ┼ Posdef
-      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │   denoise ┼ nothing
       │    detone ┼ nothing
       │       alg ┴ nothing
@@ -69,7 +70,7 @@ struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
     end
 end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                    mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end

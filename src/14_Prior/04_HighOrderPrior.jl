@@ -365,9 +365,10 @@ HighOrderPriorEstimator
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
-      │           │   mp ┼ DefaultMatrixProcessing
+      │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │       pdm ┼ Posdef
-      │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │   denoise ┼ nothing
       │           │      │    detone ┼ nothing
       │           │      │       alg ┴ nothing
@@ -377,9 +378,10 @@ HighOrderPriorEstimator
   kte ┼ Cokurtosis
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DefaultMatrixProcessing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │       pdm ┼ Posdef
-      │       │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │   denoise ┼ nothing
       │       │    detone ┼ nothing
       │       │       alg ┴ nothing
@@ -387,9 +389,10 @@ HighOrderPriorEstimator
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DefaultMatrixProcessing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │       pdm ┼ Posdef
-      │       │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+      │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │   denoise ┼ nothing
       │       │    detone ┼ nothing
       │       │       alg ┴ nothing

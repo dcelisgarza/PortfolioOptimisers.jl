@@ -13,7 +13,7 @@
         pes = [HighOrderPriorEstimator(; pe = EmpiricalPrior()),
                HighOrderPriorEstimator(;
                                        kte = Cokurtosis(; alg = Semi(),
-                                                        mp = DefaultMatrixProcessing()),
+                                                        mp = DenoiseDetoneAlgMatrixProcessing()),
                                        ske = Coskewness(; alg = Semi()),
                                        pe = EmpiricalPrior(;
                                                            me = SimpleExpectedReturns(;
@@ -27,7 +27,7 @@
                                                                                                                                                                    corrected = false),
                                                                                                                                              w = ew),
                                                                                                               alg = Semi()),
-                                                                                              mp = DefaultMatrixProcessing(;
+                                                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                                            denoise = Denoise(),
                                                                                                                            detone = Detone(),
                                                                                                                            alg = LoGo())),
@@ -38,7 +38,7 @@
                                                                                   ce = GerberCovariance(;
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns())),
-                                                                                  mp = DefaultMatrixProcessing(;
+                                                                                  mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                                denoise = Denoise(;
                                                                                                                                  alg = SpectralDenoise()))))),
                FactorPrior(;
@@ -50,12 +50,12 @@
                                                                                                                             me = ShrunkExpectedReturns(;
                                                                                                                                                        alg = BayesStein(;
                                                                                                                                                                         target = VolatilityWeighted())))),
-                                                                                  mp = DefaultMatrixProcessing(;
+                                                                                  mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                                denoise = Denoise(;
                                                                                                                                  alg = FixedDenoise())))),
                            re = StepwiseRegression(; target = GeneralisedLinearModel(),
                                                    crit = AIC(), alg = Backward()),
-                           mp = DefaultMatrixProcessing()),
+                           mp = DenoiseDetoneAlgMatrixProcessing()),
                FactorPrior(;
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;

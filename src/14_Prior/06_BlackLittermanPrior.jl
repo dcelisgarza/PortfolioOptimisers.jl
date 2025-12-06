@@ -28,7 +28,7 @@ Black-Litterman prior estimator for asset returns.
     BlackLittermanPrior(;
                         pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
                                                                                    me = EquilibriumExpectedReturns()),
-                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                         views::Lc_BLV,
                         sets::Option{<:AssetSets} = nothing,
                         views_conf::Option{<:Num_VecNum} = nothing,
@@ -58,9 +58,10 @@ BlackLittermanPrior
              │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
-             │           │   mp ┼ DefaultMatrixProcessing
+             │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
              │           │      │       alg ┴ nothing
@@ -73,18 +74,20 @@ BlackLittermanPrior
              │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              │           │      │      │       │    w ┴ nothing
              │           │      │      │   alg ┴ Full()
-             │           │      │   mp ┼ DefaultMatrixProcessing
+             │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │      │       pdm ┼ Posdef
-             │           │      │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │      │   denoise ┼ nothing
              │           │      │      │    detone ┼ nothing
              │           │      │      │       alg ┴ nothing
              │           │    w ┼ nothing
              │           │    l ┴ Int64: 1
              │   horizon ┴ nothing
-          mp ┼ DefaultMatrixProcessing
+          mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       pdm ┼ Posdef
-             │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
              │       alg ┴ nothing
@@ -136,7 +139,7 @@ end
 function BlackLittermanPrior(;
                              pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
                                                                                         me = EquilibriumExpectedReturns()),
-                             mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                             mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                              views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
                              tau::Option{<:Number} = nothing)

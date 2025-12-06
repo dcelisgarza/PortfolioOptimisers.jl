@@ -171,8 +171,8 @@
         end
         @test isapprox(df[!, "40"],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DefaultMatrixProcessing(;
-                                                                                          alg = LoGo())),
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = LoGo())),
                                rd.X)))
         @test isapprox(var(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1),
                        std(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1) .^

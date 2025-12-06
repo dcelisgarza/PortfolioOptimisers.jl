@@ -39,8 +39,8 @@ Factor Black-Litterman prior estimator for asset returns.
 # Constructor
 
     FactorBlackLittermanPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                              f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                              f_mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                              mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                               re::AbstractRegressionEstimator = StepwiseRegression(),
                               ve::AbstractVarianceEstimator = SimpleVariance(),
                               views::Lc_BLV,
@@ -78,24 +78,27 @@ FactorBlackLittermanPrior
              │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
-             │           │   mp ┼ DefaultMatrixProcessing
+             │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
              │           │      │       alg ┴ nothing
              │        me ┼ SimpleExpectedReturns
              │           │   w ┴ nothing
              │   horizon ┴ nothing
-        f_mp ┼ DefaultMatrixProcessing
+        f_mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       pdm ┼ Posdef
-             │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
              │       alg ┴ nothing
-          mp ┼ DefaultMatrixProcessing
+          mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       pdm ┼ Posdef
-             │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
              │       alg ┴ nothing
@@ -173,8 +176,8 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
 end
 function FactorBlackLittermanPrior(;
                                    pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                   f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                   mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                   f_mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                                   mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
                                    views::Lc_BLV, sets::Option{<:AssetSets} = nothing,

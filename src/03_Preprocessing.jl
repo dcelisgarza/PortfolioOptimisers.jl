@@ -401,7 +401,7 @@ This function scans the specified dimension of the input matrix and returns the 
 
 # Validation
 
-  - `dims` must be either `1` (columns) or `2` (rows).
+  - `dims in (1, 2)`.
 
 # Details
 
