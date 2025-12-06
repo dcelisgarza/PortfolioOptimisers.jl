@@ -276,8 +276,6 @@ function matrix_processing(mp::DenoiseDetoneAlgMatrixProcessing, sigma::MatNum, 
     matrix_processing!(mp, sigma, X, args...; kwargs...)
     return sigma
 end
-
-#########
 struct DenoiseAlgDetoneMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
     pdm::T1
     denoise::T2
@@ -420,6 +418,8 @@ function matrix_processing!(mp::AlgDetoneDenoiseMatrixProcessing, sigma::MatNum,
     denoise!(mp.denoise, sigma, T / N, mp.pdm)
     return nothing
 end
-#########
 
-export DenoiseDetoneAlgMatrixProcessing, matrix_processing, matrix_processing!
+export DenoiseDetoneAlgMatrixProcessing, DenoiseAlgDetoneMatrixProcessing,
+       DetoneDenoiseAlgMatrixProcessing, DetoneAlgDenoiseMatrixProcessing,
+       AlgDenoiseDetoneMatrixProcessing, AlgDetoneDenoiseMatrixProcessing,
+       matrix_processing, matrix_processing!
