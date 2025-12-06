@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPosdefEstimator <: AbstractEstimator end```
+    abstract type AbstractPosdefEstimator <: AbstractEstimator end
 
 Abstract supertype for all positive definite matrix estimator types in PortfolioOptimisers.jl.
 
@@ -14,30 +14,31 @@ All concrete types that implement positive definite matrix projection or estimat
 """
 abstract type AbstractPosdefEstimator <: AbstractEstimator end
 """
-    struct Posdef{T1} <: AbstractPosdefEstimator
+    struct Posdef{T1, T2} <: AbstractPosdefEstimator
         alg::T1
+        kwargs::T2
     end
 
-A concrete estimator type for projecting a matrix to the nearest positive definite (PD) matrix, typically used for covariance or correlation matrices.
+A concrete estimator type for projecting a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
 
 # Fields
 
   - `alg`: The algorithm used for the nearest correlation matrix projection.
+  - `kwargs`: A named tuple of keyword arguments to be passed to the algorithm.
 
 # Constructor
 
-    Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
+    Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple = (;))
 
 Keyword arguments correspond to the fields above.
 
 # Examples
 
 ```jldoctest
-julia> using LinearAlgebra
-
 julia> Posdef()
 Posdef
-  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+     alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -45,18 +46,23 @@ Posdef
   - [`AbstractPosdefEstimator`](@ref)
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
+  - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
 """
-struct Posdef{T1} <: AbstractPosdefEstimator
+struct Posdef{T1, T2} <: AbstractPosdefEstimator
     alg::T1
+    kwargs::T2
+    function Posdef(alg::Any, kwargs::NamedTuple)
+        return new{typeof(alg), typeof(kwargs)}(alg, kwargs)
+    end
 end
-function Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
-    return Posdef(alg)
+function Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple = (;))
+    return Posdef(alg, kwargs)
 end
 """
     posdef!(pdm::Posdef, X::MatNum)
     posdef!(::Nothing, args...)
 
-In-place projection of a matrix to the nearest positive definite (PD) matrix using the specified estimator.
+In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
 
 For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
 
@@ -82,9 +88,7 @@ For covariance matrices, the function internally converts to a correlation matri
 ```jldoctest
 julia> using LinearAlgebra
 
-julia> est = Posdef()
-Posdef
-  alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+julia> est = Posdef();
 
 julia> X = [1.0 0.9; 0.9 1.0];
 
@@ -121,7 +125,7 @@ function posdef!(pdm::Posdef, X::MatNum)
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)
     end
-    nearest_cor!(X, pdm.alg)
+    nearest_cor!(X, pdm.alg; pdm.kwargs...)
     if !isposdef(X)
         @warn("Matrix could not be made positive definite.")
     end
