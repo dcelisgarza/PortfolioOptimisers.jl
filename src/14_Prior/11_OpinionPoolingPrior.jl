@@ -111,7 +111,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+      pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DefaultMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
           │            pe ┼ EmpiricalPrior
           │               │        ce ┼ PortfolioOptimisersCovariance
           │               │           │   ce ┼ Covariance
@@ -123,7 +123,8 @@ OpinionPoolingPrior
           │               │           │      │   alg ┴ Full()
           │               │           │   mp ┼ DefaultMatrixProcessing
           │               │           │      │       pdm ┼ Posdef
-          │               │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
           │               │           │      │   denoise ┼ nothing
           │               │           │      │    detone ┼ nothing
           │               │           │      │       alg ┴ nothing
@@ -167,7 +168,8 @@ OpinionPoolingPrior
           │               │           │      │   alg ┴ Full()
           │               │           │   mp ┼ DefaultMatrixProcessing
           │               │           │      │       pdm ┼ Posdef
-          │               │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
           │               │           │      │   denoise ┼ nothing
           │               │           │      │    detone ┼ nothing
           │               │           │      │       alg ┴ nothing
@@ -212,7 +214,8 @@ OpinionPoolingPrior
           │           │      │   alg ┴ Full()
           │           │   mp ┼ DefaultMatrixProcessing
           │           │      │       pdm ┼ Posdef
-          │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
           │           │      │   denoise ┼ nothing
           │           │      │    detone ┼ nothing
           │           │      │       alg ┴ nothing

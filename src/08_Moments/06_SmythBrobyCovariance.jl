@@ -285,7 +285,8 @@ SmythBrobyCovariance
             │           w ┼ nothing
             │   corrected ┴ Bool: true
         pdm ┼ Posdef
-            │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+            │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+            │   kwargs ┴ @NamedTuple{}: NamedTuple()
   threshold ┼ Float64: 0.5
          c1 ┼ Float64: 0.5
          c2 ┼ Float64: 0.5

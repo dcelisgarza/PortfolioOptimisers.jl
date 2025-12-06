@@ -66,7 +66,8 @@ BayesianBlackLittermanPrior
              │       │           │      │   alg ┴ Full()
              │       │           │   mp ┼ DefaultMatrixProcessing
              │       │           │      │       pdm ┼ Posdef
-             │       │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │           │      │   denoise ┼ nothing
              │       │           │      │    detone ┼ nothing
              │       │           │      │       alg ┴ nothing
@@ -76,12 +77,13 @@ BayesianBlackLittermanPrior
              │       │           │      │      │    me ┼ SimpleExpectedReturns
              │       │           │      │      │       │   w ┴ nothing
              │       │           │      │      │    ce ┼ GeneralCovariance
-             │       │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │       │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)       
              │       │           │      │      │       │    w ┴ nothing
              │       │           │      │      │   alg ┴ Full()
              │       │           │      │   mp ┼ DefaultMatrixProcessing
              │       │           │      │      │       pdm ┼ Posdef
-             │       │           │      │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │           │      │      │   denoise ┼ nothing
              │       │           │      │      │    detone ┼ nothing
              │       │           │      │      │       alg ┴ nothing
@@ -90,7 +92,8 @@ BayesianBlackLittermanPrior
              │       │   horizon ┴ nothing
              │    mp ┼ DefaultMatrixProcessing
              │       │       pdm ┼ Posdef
-             │       │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │   denoise ┼ nothing
              │       │    detone ┼ nothing
              │       │       alg ┴ nothing
@@ -108,7 +111,8 @@ BayesianBlackLittermanPrior
              │   rsd ┴ Bool: true
           mp ┼ DefaultMatrixProcessing
              │       pdm ┼ Posdef
-             │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
              │       alg ┴ nothing

@@ -96,7 +96,8 @@ Keyword arguments correspond to the fields above.
 julia> DefaultMatrixProcessing()
 DefaultMatrixProcessing
       pdm ┼ Posdef
-          │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │   kwargs ┴ @NamedTuple{}: NamedTuple()
   denoise ┼ nothing
    detone ┼ nothing
       alg ┴ nothing
@@ -104,7 +105,8 @@ DefaultMatrixProcessing
 julia> DefaultMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
 DefaultMatrixProcessing
       pdm ┼ Posdef
-          │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │   kwargs ┴ @NamedTuple{}: NamedTuple()
   denoise ┼ Denoise
           │      alg ┼ ShrunkDenoise
           │          │   alpha ┴ Float64: 0.0

@@ -82,6 +82,17 @@ julia> AugmentedBlackLittermanPrior(;
                                     f_views = LinearConstraintEstimator(;
                                                                         val = ["F1 == 0.01",
                                                                                "F2 == 0.02"]))
+AugmentedBlackLittermanPrior(;
+                                           a_sets = AssetSets(; key = "nx",
+                                                              dict = Dict("nx" => ["A", "B", "C"])),
+                                           f_sets = AssetSets(; key = "nx",
+                                                              dict = Dict("nx" => ["F1", "F2"])),
+                                           a_views = LinearConstraintEstimator(;
+                                                                               val = ["A == 0.03",
+                                                                                      "B + C == 0.04"]),
+                                           f_views = LinearConstraintEstimator(;
+                                                                                                                   val = ["F1 == 0.01",
+                                                                                      "F2 == 0.02"]))
 AugmentedBlackLittermanPrior
           a_pe ┼ EmpiricalPrior
                │        ce ┼ PortfolioOptimisersCovariance
@@ -94,7 +105,8 @@ AugmentedBlackLittermanPrior
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DefaultMatrixProcessing
                │           │      │       pdm ┼ Posdef
-               │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │           │      │   denoise ┼ nothing
                │           │      │    detone ┼ nothing
                │           │      │       alg ┴ nothing
@@ -112,7 +124,8 @@ AugmentedBlackLittermanPrior
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DefaultMatrixProcessing
                │           │      │       pdm ┼ Posdef
-               │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │           │      │   denoise ┼ nothing
                │           │      │    detone ┼ nothing
                │           │      │       alg ┴ nothing
@@ -121,7 +134,8 @@ AugmentedBlackLittermanPrior
                │   horizon ┴ nothing
             mp ┼ DefaultMatrixProcessing
                │       pdm ┼ Posdef
-               │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │   denoise ┼ nothing
                │    detone ┼ nothing
                │       alg ┴ nothing

@@ -60,7 +60,8 @@ BlackLittermanPrior
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DefaultMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
              │           │      │       alg ┴ nothing
@@ -75,7 +76,8 @@ BlackLittermanPrior
              │           │      │      │   alg ┴ Full()
              │           │      │   mp ┼ DefaultMatrixProcessing
              │           │      │      │       pdm ┼ Posdef
-             │           │      │      │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │      │   denoise ┼ nothing
              │           │      │      │    detone ┼ nothing
              │           │      │      │       alg ┴ nothing
@@ -84,7 +86,8 @@ BlackLittermanPrior
              │   horizon ┴ nothing
           mp ┼ DefaultMatrixProcessing
              │       pdm ┼ Posdef
-             │           │   alg ┴ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
              │       alg ┴ nothing
