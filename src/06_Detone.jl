@@ -17,7 +17,11 @@ abstract type AbstractDetoneEstimator <: AbstractEstimator end
         n::T1
     end
 
-A concrete detoning estimator for removing the top `n` principal components (market modes) from a covariance or correlation matrix.
+A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix.
+
+For financial data, the leading principal components often represent market-wide movements that can obscure asset-specific signals. The `Detone` estimator allows users to specify the number of these leading components to remove, thereby enhancing the focus on idiosyncratic relationships between market members [mlp1](@cite).
+
+Detoned matrices may not be suitable for non-clustering optimisations because it can make the matrix non-positive definite. However, they can be quite effective for clustering optimsations.
 
 # Fields
 
@@ -45,6 +49,10 @@ Detone
 
   - [`detone!`](@ref)
   - [`detone`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 struct Detone{T1} <: AbstractDetoneEstimator
     n::T1
@@ -117,6 +125,10 @@ julia> X
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 function detone!(::Nothing, args...)
     return nothing
@@ -156,6 +168,10 @@ Out-of-place version of [`detone!`](@ref).
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 function detone(::Nothing, args...)
     return nothing
