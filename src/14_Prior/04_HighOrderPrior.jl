@@ -365,7 +365,7 @@ HighOrderPriorEstimator
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
-      │           │   mp ┼ DefaultMatrixProcessing
+      │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │       pdm ┼ Posdef
       │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -378,7 +378,7 @@ HighOrderPriorEstimator
   kte ┼ Cokurtosis
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DefaultMatrixProcessing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │       pdm ┼ Posdef
       │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -389,7 +389,7 @@ HighOrderPriorEstimator
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DefaultMatrixProcessing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │       pdm ┼ Posdef
       │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()

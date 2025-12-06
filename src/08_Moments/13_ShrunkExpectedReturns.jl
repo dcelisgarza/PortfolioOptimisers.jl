@@ -248,7 +248,7 @@ ShrunkExpectedReturns
       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
-      │   mp ┼ DefaultMatrixProcessing
+      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │      │       pdm ┼ Posdef
       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()

@@ -22,7 +22,7 @@ Factor-based prior estimator for asset returns.
 # Constructor
 
     FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                 re::AbstractRegressionEstimator = StepwiseRegression(),
                 ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
 
@@ -42,7 +42,7 @@ FactorPrior
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
-      │           │   mp ┼ DefaultMatrixProcessing
+      │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │       pdm ┼ Posdef
       │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -52,7 +52,7 @@ FactorPrior
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing
-   mp ┼ DefaultMatrixProcessing
+   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       pdm ┼ Posdef
       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -100,7 +100,7 @@ struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
     end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                     mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                      re::AbstractRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
     return FactorPrior(pe, mp, re, ve, rsd)

@@ -3,7 +3,7 @@
 ## Public
 
 ```@docs
-DefaultMatrixProcessing
+DenoiseDetoneAlgMatrixProcessing
 matrix_processing!
 matrix_processing
 ```

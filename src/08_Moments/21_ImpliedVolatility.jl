@@ -32,7 +32,7 @@ struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     end
 end
 function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
-                           mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                           mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)
     return ImpliedVolatility(ce, mp, alg, af)

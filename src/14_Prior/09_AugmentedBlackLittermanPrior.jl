@@ -44,7 +44,7 @@ Augmented Black-Litterman prior estimator for asset returns.
 
     AugmentedBlackLittermanPrior(; a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                  f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                 mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                  re::AbstractRegressionEstimator = StepwiseRegression(),
                                  ve::AbstractVarianceEstimator = SimpleVariance(),
                                  a_views::Lc_BLV,
@@ -92,7 +92,7 @@ AugmentedBlackLittermanPrior
                │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
                │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
-               │           │   mp ┼ DefaultMatrixProcessing
+               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │       pdm ┼ Posdef
                │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -111,7 +111,7 @@ AugmentedBlackLittermanPrior
                │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
                │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
-               │           │   mp ┼ DefaultMatrixProcessing
+               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │       pdm ┼ Posdef
                │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -121,7 +121,7 @@ AugmentedBlackLittermanPrior
                │        me ┼ SimpleExpectedReturns
                │           │   w ┴ nothing
                │   horizon ┴ nothing
-            mp ┼ DefaultMatrixProcessing
+            mp ┼ DenoiseDetoneAlgMatrixProcessing
                │       pdm ┼ Posdef
                │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -223,7 +223,7 @@ end
 function AugmentedBlackLittermanPrior(;
                                       a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                       f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                      mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
                                       a_views::Lc_BLV, f_views::Lc_BLV,

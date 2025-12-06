@@ -31,7 +31,7 @@ Container type for cokurtosis estimators.
 # Constructor
 
     Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+               mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                alg::AbstractMomentAlgorithm = Full())
 
 Keyword arguments correspond to the fields above.
@@ -43,7 +43,7 @@ julia> Cokurtosis()
 Cokurtosis
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
-   mp ┼ DefaultMatrixProcessing
+   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       pdm ┼ Posdef
       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -70,7 +70,7 @@ struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
     end
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                    mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis(me, mp, alg)
 end

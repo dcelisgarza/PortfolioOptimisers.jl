@@ -16,7 +16,7 @@ Composite covariance estimator with post-processing.
 # Constructor
 
     PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                  mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+                                  mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
 
 Keyword arguments correspond to the fields above.
 
@@ -32,7 +32,7 @@ PortfolioOptimisersCovariance
      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │    w ┴ nothing
      │   alg ┴ Full()
-  mp ┼ DefaultMatrixProcessing
+  mp ┼ DenoiseDetoneAlgMatrixProcessing
      │       pdm ┼ Posdef
      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -55,7 +55,7 @@ struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
     end
 end
 function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+                                       mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
 function factory(ce::PortfolioOptimisersCovariance, w::Option{<:AbstractWeights} = nothing)
