@@ -39,7 +39,7 @@ FactorPrior
       │           │      │    me ┼ SimpleExpectedReturns
       │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -48,7 +48,8 @@ FactorPrior
       │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │   denoise ┼ nothing
       │           │      │    detone ┼ nothing
-      │           │      │       alg ┴ nothing
+      │           │      │       alg ┼ nothing
+      │           │      │     order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing
@@ -58,7 +59,8 @@ FactorPrior
       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │   denoise ┼ nothing
       │    detone ┼ nothing
-      │       alg ┴ nothing
+      │       alg ┼ nothing
+      │     order ┴ DenoiseDetoneAlg()
    re ┼ StepwiseRegression
       │     crit ┼ PValue
       │          │   threshold ┴ Float64: 0.05

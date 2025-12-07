@@ -420,11 +420,12 @@ EntropyPoolingPrior
               │           │      │   alg ┴ Full()
               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
               │           │      │       pdm ┼ Posdef
-              │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+              │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton      
               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
               │           │      │   denoise ┼ nothing
               │           │      │    detone ┼ nothing
-              │           │      │       alg ┴ nothing
+              │           │      │       alg ┼ nothing
+              │           │      │     order ┴ DenoiseDetoneAlg()
               │        me ┼ SimpleExpectedReturns
               │           │   w ┴ nothing
               │   horizon ┴ nothing

@@ -45,7 +45,7 @@ NormalUncertaintySet
         │           │      │    me ┼ SimpleExpectedReturns
         │           │      │       │   w ┴ nothing
         │           │      │    ce ┼ GeneralCovariance
-        │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true) 
         │           │      │       │    w ┴ nothing
         │           │      │   alg ┴ Full()
         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -54,7 +54,8 @@ NormalUncertaintySet
         │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
         │           │      │   denoise ┼ nothing
         │           │      │    detone ┼ nothing
-        │           │      │       alg ┴ nothing
+        │           │      │       alg ┼ nothing
+        │           │      │     order ┴ DenoiseDetoneAlg()
         │        me ┼ SimpleExpectedReturns
         │           │   w ┴ nothing
         │   horizon ┴ nothing

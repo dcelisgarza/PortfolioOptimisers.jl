@@ -60,11 +60,12 @@ BlackLittermanPrior
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
-             │           │      │       alg ┴ nothing
+             │           │      │       alg ┼ nothing
+             │           │      │     order ┴ DenoiseDetoneAlg()
              │        me ┼ EquilibriumExpectedReturns
              │           │   ce ┼ PortfolioOptimisersCovariance
              │           │      │   ce ┼ Covariance
@@ -80,7 +81,8 @@ BlackLittermanPrior
              │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │      │   denoise ┼ nothing
              │           │      │      │    detone ┼ nothing
-             │           │      │      │       alg ┴ nothing
+             │           │      │      │       alg ┼ nothing
+             │           │      │      │     order ┴ DenoiseDetoneAlg()
              │           │    w ┼ nothing
              │           │    l ┴ Int64: 1
              │   horizon ┴ nothing
@@ -90,7 +92,8 @@ BlackLittermanPrior
              │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
-             │       alg ┴ nothing
+             │       alg ┼ nothing
+             │     order ┴ DenoiseDetoneAlg()
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing

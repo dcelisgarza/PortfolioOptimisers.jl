@@ -362,7 +362,7 @@ HighOrderPriorEstimator
       │           │      │    me ┼ SimpleExpectedReturns
       │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -371,7 +371,8 @@ HighOrderPriorEstimator
       │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │   denoise ┼ nothing
       │           │      │    detone ┼ nothing
-      │           │      │       alg ┴ nothing
+      │           │      │       alg ┼ nothing
+      │           │      │     order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing
@@ -384,7 +385,8 @@ HighOrderPriorEstimator
       │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │   denoise ┼ nothing
       │       │    detone ┼ nothing
-      │       │       alg ┴ nothing
+      │       │       alg ┼ nothing
+      │       │     order ┴ DenoiseDetoneAlg()
       │   alg ┴ Full()
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
@@ -395,7 +397,8 @@ HighOrderPriorEstimator
       │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │   denoise ┼ nothing
       │       │    detone ┼ nothing
-      │       │       alg ┴ nothing
+      │       │       alg ┼ nothing
+      │       │     order ┴ DenoiseDetoneAlg()
       │   alg ┴ Full()
 ```
 

@@ -80,11 +80,12 @@ FactorBlackLittermanPrior
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
-             │           │      │       alg ┴ nothing
+             │           │      │       alg ┼ nothing
+             │           │      │     order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
              │           │   w ┴ nothing
              │   horizon ┴ nothing
@@ -94,14 +95,16 @@ FactorBlackLittermanPrior
              │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
-             │       alg ┴ nothing
+             │       alg ┼ nothing
+             │     order ┴ DenoiseDetoneAlg()
           mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       pdm ┼ Posdef
              │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
              │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │   denoise ┼ nothing
              │    detone ┼ nothing
-             │       alg ┴ nothing
+             │       alg ┼ nothing
+             │     order ┴ DenoiseDetoneAlg()
           re ┼ StepwiseRegression
              │     crit ┼ PValue
              │          │   threshold ┴ Float64: 0.05
