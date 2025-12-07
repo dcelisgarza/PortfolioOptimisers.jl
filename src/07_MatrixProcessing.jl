@@ -308,6 +308,48 @@ In-place processing of a covariance or correlation matrix.
 
   - `nothing`. The input matrix `sigma` is modified in-place.
 
+# Related
+
+  - [`matrix_processing`](@ref)
+  - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
+  - [`posdef!`](@ref)
+  - [`denoise!`](@ref)
+  - [`detone!`](@ref)
+  - [`matrix_processing_algorithm!`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatNum`](@ref)
+"""
+function matrix_processing!(::Nothing, args...; kwargs...)
+    return nothing
+end
+"""
+    matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any, <:DenoiseDetoneAlg},
+                      sigma::MatNum, X::MatNum, args...; kwargs...)
+
+In-place matrix processing pipeline using the `DenoiseDetoneAlg` order.
+
+This method applies a sequence of matrix processing steps to the input covariance or correlation matrix `sigma`, modifying it in-place. The steps are performed in the following order: positive definiteness enforcement, denoising, detoning, and an optional custom algorithm. The order is determined by the `DenoiseDetoneAlg` type.
+
+# Arguments
+
+  - `mp`: Matrix processing estimator specifying the pipeline and order.
+  - `sigma`: Covariance or correlation matrix to be processed (modified in-place).
+  - `X`: Data matrix (observations × assets) used for denoising and detoning.
+  - `args...`: Additional positional arguments passed to custom algorithms.
+  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+
+# Returns
+
+  - `nothing`. The input matrix `sigma` is modified in-place.
+
+# Details
+
+  - Applies positive definiteness enforcement using `mp.pdm`.
+  - Applies denoising using `mp.denoise` and the ratio `T / N` from `X`.
+  - Applies detoning using `mp.detone`.
+  - Applies an optional custom matrix processing algorithm using `mp.alg`.
+  - The order of operations depends on the specific type of `mp.order`.
+
 # Examples
 
 ```jldoctest
@@ -356,18 +398,20 @@ julia> sigma
 
 # Related
 
-  - [`matrix_processing`](@ref)
   - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
+  - [`matrix_processing`](@ref)
   - [`posdef!`](@ref)
   - [`denoise!`](@ref)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`MatNum`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function matrix_processing!(::Nothing, args...; kwargs...)
-    return nothing
-end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:DenoiseDetoneAlg},
                             sigma::MatNum, X::MatNum, args...; kwargs...)

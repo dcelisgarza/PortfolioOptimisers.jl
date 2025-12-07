@@ -1,7 +1,7 @@
 """
     abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 
-Abstract supertype for all Ordered Weights Array (OWA) estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all Ordered Weights Array (OWA) estimator types in `PortfolioOptimisers.jl`.
 
 All concrete types implementing OWA estimation algorithms should subtype `AbstractOrderedWeightsArrayEstimator`. This enables a consistent interface for OWA-based estimators throughout the package.
 
@@ -15,7 +15,7 @@ abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 """
     abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all Ordered Weights Array (OWA) algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all Ordered Weights Array (OWA) algorithm types in `PortfolioOptimisers.jl`.
 
 All concrete types implementing specific OWA algorithms should subtype `AbstractOrderedWeightsArrayAlgorithm`. This enables flexible extension and dispatch of OWA routines.
 
@@ -31,7 +31,7 @@ abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 
 Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
 
-The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resulting in the most "uninformative" or uniform distribution of weights subject to the imposed constraints. This is often used as a default or reference OWA weighting scheme.
+The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resulting in the most "uninformative" or uniform distribution of weights subject to the imposed constraints.
 
 # Related
 
@@ -44,7 +44,7 @@ struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
 
 Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
 
-The Minimum Squared Distance algorithm finds OWA weights that minimize the squared distance from a target or reference vector, subject to the OWA constraints. This approach is useful for regularizing OWA weights towards a desired profile.
+The Minimum Squared Distance algorithm finds OWA weights that minimize the squared distance between adjacent entries in the array, subject to the OWA constraints. This approach promotes smoothness in the resulting weights.
 
 # Related
 
@@ -57,7 +57,7 @@ struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
 
 Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
 
-The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, promoting sparsity or concentration in the resulting weights. This can be used to emphasize extreme order statistics in OWA-based risk measures.
+The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, subject to the OWA constraints. This promotes sparsity or concentration in the resulting weights. This can be used to emphasize extreme order statistics in OWA-based risk measures.
 
 # Related
 
