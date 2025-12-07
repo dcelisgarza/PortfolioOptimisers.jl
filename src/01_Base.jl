@@ -141,6 +141,8 @@ end
 
 Default method indicating whether a type has a custom pretty-printing `show` method.
 
+Overloading this method to return `true` indicates that type already has a custom pretty-printing method.
+
 # Arguments
 
   - `::Any`: Any type.

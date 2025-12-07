@@ -1,6 +1,9 @@
 # Ordered Weights Array
 
-## Public
+Certain risk measures can be expressed as ordered weights arrays [owa1,owa3](@cite). It is also possible to express higher Linear moments (l-moments) as linear combinations of ordered weights arrays [owa2](@cite).
+
+These types and functions implement the various existing formulations and risk measures representable by ordered weights arrays.
+
 
 ```@docs
 MaximumEntropy
@@ -19,11 +22,6 @@ owa_rg
 owa_cvarrg
 owa_wcvarrg
 owa_tgrg
-```
-
-## Private
-
-```@docs
 AbstractOrderedWeightsArrayEstimator
 AbstractOrderedWeightsArrayAlgorithm
 ncrra_weights

@@ -291,7 +291,7 @@ function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     return nothing
 end
 """
-    errPDF(x::Number, vals::VecNum, q::Number;
+    errPDF(x::Number, vals::VecNum, q::Number,
            kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
            n::Integer = 1000)
 
@@ -323,7 +323,7 @@ This function is used internally to fit the MP distribution to the observed spec
 
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function errPDF(x::Number, vals::VecNum, q::Number;
+function errPDF(x::Number, vals::VecNum, q::Number,
                 kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                 n::Integer = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
@@ -338,7 +338,7 @@ function errPDF(x::Number, vals::VecNum, q::Number;
     return sse
 end
 """
-    find_max_eval(vals::VecNum, q::Number;
+    find_max_eval(vals::VecNum, q::Number,
                   kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                   n::Integer = 1000, args::Tuple = (), kwargs::NamedTuple = (;))
 
@@ -371,12 +371,12 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function find_max_eval(vals::VecNum, q::Number;
+function find_max_eval(vals::VecNum, q::Number,
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
                        m::Integer = 10, n::Integer = 1000, args::Tuple = (),
                        kwargs::NamedTuple = (;))
-    res = Optim.optimize(x -> errPDF(x, vals, q; kernel = kernel, m = m, n = n), 0.0, 1.0,
-                         args...; kwargs...)
+    res = Optim.optimize(x -> errPDF(x, vals, q, kernel, m, n), 0.0, 1.0, args...;
+                         kwargs...)
     x = Optim.converged(res) ? Optim.minimizer(res) : 1.0
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
@@ -460,8 +460,7 @@ function denoise!(de::Denoise, X::MatNum, q::Number)
         StatsBase.cov2cor!(X, s)
     end
     vals, vecs = eigen(X)
-    max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
-                            kwargs = de.kwargs)[1]
+    max_val = find_max_eval(vals, q, de.kernel, de.m, de.n, de.args, de.kwargs)[1]
     num_factors = searchsortedlast(vals, max_val)
     _denoise!(de.alg, X, vals, vecs, num_factors)
     posdef!(de.pdm, X)

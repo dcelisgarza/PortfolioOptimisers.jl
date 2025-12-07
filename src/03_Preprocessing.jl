@@ -228,7 +228,7 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
-    prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
+    prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                       Rb::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
                       padding::Bool = false, missing_col_percent::Number = 1.0,

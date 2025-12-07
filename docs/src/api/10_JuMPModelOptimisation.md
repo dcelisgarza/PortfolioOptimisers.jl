@@ -2,7 +2,7 @@
 
 `PortfolioOptimisers.jl` is based on [`JuMP`](https://github.com/jump-dev/JuMP.jl), as such it tries to be as flexible as possible.
 
-Theese types and functions let us define solver and solution interfaces.
+These types and functions let us define solver and solution interfaces.
 
 ```@docs
 DictStrA_VecPairStrA
