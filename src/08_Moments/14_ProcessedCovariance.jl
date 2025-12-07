@@ -26,7 +26,7 @@ function Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
         sigma = Matrix(sigma)
     end
     posdef!(ce.pdm, sigma)
-    matrix_processing_algorithm!(ce.alg, ce.pdm, sigma, X; kwargs...)
+    matrix_processing_algorithm!(ce.alg, sigma, X; kwargs...)
     return sigma
 end
 function Statistics.cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
@@ -39,7 +39,7 @@ function Statistics.cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
         rho = Matrix(rho)
     end
     posdef!(ce.pdm, rho)
-    matrix_processing_algorithm!(ce.alg, ce.pdm, rho, X; kwargs...)
+    matrix_processing_algorithm!(ce.alg, rho, X; kwargs...)
     return rho
 end
 

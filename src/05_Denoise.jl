@@ -128,13 +128,14 @@ function ShrunkDenoise(; alpha::Number = 0.0)
     return ShrunkDenoise(alpha)
 end
 """
-    struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
+    struct Denoise{T1, T2, T3, T4, T5, T6, T7} <: AbstractDenoiseEstimator
         alg::T1
         args::T2
         kwargs::T3
         kernel::T4
         m::T5
         n::T6
+        pdm::T7
     end
 
 A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in `PortfolioOptimisers.jl`.
@@ -149,12 +150,13 @@ A flexible container type for configuring and applying denoising algorithms to c
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
+  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
 # Constructor
 
     Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
             n::Integer = 1000, kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
-            args::Tuple = (), kwargs::NamedTuple = (;))
+            args::Tuple = (), kwargs::NamedTuple = (;), pdm::Option{<:Posdef} = Posdef())
 
 Keyword arguments correspond to the fields above.
 
@@ -169,7 +171,10 @@ Denoise
   kwargs ┼ @NamedTuple{}: NamedTuple()
   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
        m ┼ Int64: 10
-       n ┴ Int64: 1000
+       n ┼ Int64: 1000
+     pdm ┼ Posdef
+         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │   kwargs ┴ @NamedTuple{}: NamedTuple()
 
 julia> Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
 Denoise
@@ -178,7 +183,10 @@ Denoise
   kwargs ┼ @NamedTuple{}: NamedTuple()
   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
        m ┼ Int64: 20
-       n ┴ Int64: 500
+       n ┼ Int64: 500
+     pdm ┼ Posdef
+         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -196,26 +204,27 @@ Denoise
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
+struct Denoise{T1, T2, T3, T4, T5, T6, T7} <: AbstractDenoiseEstimator
     alg::T1
     args::T2
     kwargs::T3
     kernel::T4
     m::T5
     n::T6
+    pdm::T7
     function Denoise(alg::AbstractDenoiseAlgorithm, args::Tuple, kwargs::NamedTuple, kernel,
-                     m::Integer, n::Integer)
+                     m::Integer, n::Integer, pdm::Option{<:Posdef} = Posdef())
         @argcheck(1 < m, DomainError)
         @argcheck(1 < n, DomainError)
         return new{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
-                   typeof(n)}(alg, args, kwargs, kernel, m, n)
+                   typeof(n), typeof(pdm)}(alg, args, kwargs, kernel, m, n, pdm)
     end
 end
 function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
                  kwargs::NamedTuple = (;),
                  kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
-                 n::Integer = 1000)
-    return Denoise(alg, args, kwargs, kernel, m, n)
+                 n::Integer = 1000, pdm::Option{<:Posdef} = Posdef())
+    return Denoise(alg, args, kwargs, kernel, m, n, pdm)
 end
 """
     _denoise!(de::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
@@ -227,16 +236,12 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 # Arguments
 
-  - `alg::AbstractDenoiseAlgorithm`: The denoising algorithm to apply.
-
-      + `alg::SpectralDenoise`: Sets the smallest `num_factors` eigenvalues to zero.
-      + `alg::FixedDenoise`: Replaces the smallest `num_factors` eigenvalues with their average.
-      + `alg::ShrunkDenoise`: Shrinks the smallest `num_factors` eigenvalues towards the diagonal, controlled by `alg.alpha`.
-
+  - `alg`: The denoising algorithm to apply.
   - `X`: The matrix to be denoised (modified in-place).
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
+  - `pdm`: Positive definite matrix estimator.
 
 # Returns
 
@@ -377,7 +382,7 @@ function find_max_eval(vals::VecNum, q::Number;
     return e_max, x
 end
 """
-    denoise!(de::Denoise, X::MatNum, q::Number; pdm::Option{<:Posdef} = Posdef())
+    denoise!(de::Denoise, X::MatNum, q::Number)
     denoise!(::Nothing, args...)
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
@@ -393,7 +398,6 @@ For covariance matrices, the function internally converts to a correlation matri
 
   - `X`: The covariance or correlation matrix to be denoised (modified in-place).
   - `q`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
-  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
 # Returns
 
@@ -447,7 +451,7 @@ julia> X
 function denoise!(::Nothing, args...)
     return nothing
 end
-function denoise!(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Posdef())
+function denoise!(de::Denoise, X::MatNum, q::Number)
     assert_matrix_issquare(X, :X)
     s = diag(X)
     iscov = any(!isone, s)
@@ -460,14 +464,14 @@ function denoise!(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Pos
                             kwargs = de.kwargs)[1]
     num_factors = searchsortedlast(vals, max_val)
     _denoise!(de.alg, X, vals, vecs, num_factors)
-    posdef!(pdm, X)
+    posdef!(de.pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
     return nothing
 end
 """
-    denoise(de::Denoise, X::MatNum, q::Number; pdm::Option{<:Posdef} = Posdef())
+    denoise(de::Denoise, X::MatNum, q::Number)
     denoise(::Nothing, args...)
 
 Out-of-place version of [`denoise!`](@ref).
@@ -492,9 +496,9 @@ Out-of-place version of [`denoise!`](@ref).
 function denoise(::Nothing, args...)
     return nothing
 end
-function denoise(de::Denoise, X::MatNum, q::Number, pdm::Option{<:Posdef} = Posdef())
+function denoise(de::Denoise, X::MatNum, q::Number)
     X = copy(X)
-    denoise!(de, X, q, pdm)
+    denoise!(de, X, q)
     return X
 end
 

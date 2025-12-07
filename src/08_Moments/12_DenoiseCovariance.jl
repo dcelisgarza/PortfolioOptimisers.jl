@@ -26,7 +26,7 @@ function Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     end
     T, N = size(X)
     posdef!(ce.pdm, sigma)
-    denoise!(ce.denoise, sigma, T / N, ce.pdm)
+    denoise!(ce.denoise, sigma, T / N)
     return sigma
 end
 function Statistics.cor(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
@@ -40,7 +40,7 @@ function Statistics.cor(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     end
     T, N = size(X)
     posdef!(ce.pdm, rho)
-    denoise!(ce.denoise, rho, T / N, ce.pdm)
+    denoise!(ce.denoise, rho, T / N)
     return rho
 end
 

@@ -1826,9 +1826,10 @@ Abstract supertype for all inverse matrix sparsification algorithms in Portfolio
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 """
-    struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
+    struct LoGo{T1, T2, T3} <: InverseMatrixSparsificationAlgorithm
         dist::T1
         sim::T2
+        pdm::T3
     end
 
 LoGo (Local-Global) sparse inverse covariance estimation algorithm.
@@ -1839,11 +1840,13 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
   - `dist`: Distance matrix estimator.
   - `sim`: Similarity matrix algorithm.
+  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
 # Constructor
 
     LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-         sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
+         sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+         pdm::Option{<:Posdef} = Posdef())
 
 Keyword arguments correspond to the fields above.
 
@@ -1855,7 +1858,10 @@ LoGo
   dist ┼ Distance
        │   power ┼ nothing
        │     alg ┴ CanonicalDistance()
-   sim ┴ MaximumDistanceSimilarity()
+   sim ┼ MaximumDistanceSimilarity()
+   pdm ┼ Posdef
+       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -1867,16 +1873,19 @@ LoGo
   - [`ExponentialSimilarity`](@ref)
   - [`GeneralExponentialSimilarity`](@ref)
 """
-struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
+struct LoGo{T1, T2, T3} <: InverseMatrixSparsificationAlgorithm
     dist::T1
     sim::T2
-    function LoGo(dist::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm)
-        return new{typeof(dist), typeof(sim)}(dist, sim)
+    pdm::T3
+    function LoGo(dist::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
+                  pdm::Option{<:Posdef} = Posdef())
+        return new{typeof(dist), typeof(sim), typeof(pdm)}(dist, sim, pdm)
     end
 end
 function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-              sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
-    return LoGo(dist, sim)
+              sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+              pdm::Option{<:Posdef} = Posdef())
+    return LoGo(dist, sim, pdm)
 end
 const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
                                  <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
@@ -1918,7 +1927,7 @@ function LoGo_dist_assert(args...)
     return nothing
 end
 """
-    logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::MatNum, X::MatNum;
+    logo!(je::LoGo, sigma::MatNum, X::MatNum;
           dims::Int = 1, kwargs...)
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
@@ -1928,7 +1937,6 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 # Arguments
 
   - `je`: LoGo algorithm instance.
-  - `pdm`: Optional positive definite matrix estimator.
   - `sigma`: Covariance matrix (`N×N`), updated in-place with the LoGo sparse inverse covariance.
   - `X`: Data matrix (`T×N`).
   - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
@@ -1962,8 +1970,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - [`dbht_similarity`](@ref)
   - [`Posdef`](@ref)
 """
-function logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::MatNum, X::MatNum; dims::Int = 1,
-               kwargs...)
+function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -1978,11 +1985,11 @@ function logo!(je::LoGo, pdm::Option{<:Posdef}, sigma::MatNum, X::MatNum; dims::
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ I
-    posdef!(pdm, sigma)
+    posdef!(je.pdm, sigma)
     return nothing
 end
 """
-    matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef}, sigma::MatNum,
+    matrix_processing_algorithm!(je::LoGo, sigma::MatNum,
                                  X::MatNum; dims::Int = 1, kwargs...)
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
@@ -2014,9 +2021,9 @@ This method provides a standard interface for applying the LoGo algorithm to a c
   - [`Posdef`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
 """
-function matrix_processing_algorithm!(je::LoGo, pdm::Option{<:Posdef}, sigma::MatNum,
-                                      X::MatNum; dims::Int = 1, kwargs...)
-    return logo!(je, pdm, sigma, X; dims = dims, kwargs...)
+function matrix_processing_algorithm!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1,
+                                      kwargs...)
+    return logo!(je, sigma, X; dims = dims, kwargs...)
 end
 
 export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,

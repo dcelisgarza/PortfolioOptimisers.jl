@@ -24,7 +24,7 @@ function Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
         sigma = Matrix(sigma)
     end
     posdef!(ce.pdm, sigma)
-    detone!(ce.detone, sigma, ce.pdm)
+    detone!(ce.detone, sigma)
     return sigma
 end
 function Statistics.cor(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
@@ -37,7 +37,7 @@ function Statistics.cor(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
         rho = Matrix(rho)
     end
     posdef!(ce.pdm, rho)
-    detone!(ce.detone, rho, ce.pdm)
+    detone!(ce.detone, rho)
     return rho
 end
 
