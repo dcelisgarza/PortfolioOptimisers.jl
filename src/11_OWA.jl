@@ -254,7 +254,6 @@ function ncrra_weights(weights::MatNum, g::Number = 0.5)
     N = size(weights, 2)
     phis = Vector{eltype(weights)}(undef, N)
     e = 1
-    #! https://juliafolds2.github.io/FLoops.jl/dev/howto/parallel/
     for i in eachindex(phis)
         e *= g + i - 1
         phis[i] = e / factorial(i + 1)

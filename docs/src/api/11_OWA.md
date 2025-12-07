@@ -4,8 +4,9 @@ Certain risk measures can be expressed as ordered weights arrays [owa1,owa3](@ci
 
 These types and functions implement the various existing formulations and risk measures representable by ordered weights arrays.
 
-
 ```@docs
+AbstractOrderedWeightsArrayEstimator
+AbstractOrderedWeightsArrayAlgorithm
 MaximumEntropy
 MinimumSquaredDistance
 MinimumSumSquares
@@ -22,8 +23,6 @@ owa_rg
 owa_cvarrg
 owa_wcvarrg
 owa_tgrg
-AbstractOrderedWeightsArrayEstimator
-AbstractOrderedWeightsArrayAlgorithm
 ncrra_weights
 owa_model_setup
 owa_model_solve

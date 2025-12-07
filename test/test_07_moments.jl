@@ -231,7 +231,7 @@
         @test ce.ce.c2 == ce0.ce.c2
         @test ce.ce.c3 == ce0.ce.c3
         @test ce.ce.n == ce0.ce.n
-        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.executor === ce0.ce.executor
         @test ce.ce.alg === ce0.ce.alg
         @test isapprox(cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
                        cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
@@ -251,7 +251,7 @@
         @test ce.ce.dist === ce0.ce.dist
         @test ce.ce.args === ce0.ce.args
         @test ce.ce.kwargs === ce0.ce.kwargs
-        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.executor === ce0.ce.executor
         @test ce.ce.w === ew
         @test isapprox(cov(DistanceCovariance(), rd.X),
                        cov(DistanceCovariance(), rd.X'; dims = 2))
@@ -265,7 +265,7 @@
         @test ce.ce.alpha == ce0.ce.alpha
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.executor === ce0.ce.executor
         @test isapprox(cov(LowerTailDependenceCovariance(), rd.X),
                        cov(LowerTailDependenceCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(LowerTailDependenceCovariance(), rd.X),

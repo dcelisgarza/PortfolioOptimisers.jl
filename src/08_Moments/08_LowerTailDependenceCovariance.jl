@@ -2,7 +2,7 @@
     struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
         ve::T1
         alpha::T2
-        threads::T3
+        executor::T3
     end
 
 Lower tail dependence covariance estimator.
@@ -13,12 +13,12 @@ Lower tail dependence covariance estimator.
 
   - `ve`: Variance estimator used to compute marginal standard deviations.
   - `alpha`: Quantile level for the 5% lower tail.
-  - `threads`: Parallel execution strategy.
+  - `executor`: Parallel execution strategy.
 
 # Constructor
 
     LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Number = 0.05,
-                  threads::FLoops.Transducers.Executor = ThreadedEx())
+                  executor::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
 
@@ -31,13 +31,13 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> LowerTailDependenceCovariance()
 LowerTailDependenceCovariance
-       ve ┼ SimpleVariance
-          │          me ┼ SimpleExpectedReturns
-          │             │   w ┴ nothing
-          │           w ┼ nothing
-          │   corrected ┴ Bool: true
-    alpha ┼ Float64: 0.05
-  threads ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+        ve ┼ SimpleVariance
+           │          me ┼ SimpleExpectedReturns
+           │             │   w ┴ nothing
+           │           w ┼ nothing
+           │   corrected ┴ Bool: true
+     alpha ┼ Float64: 0.05
+  executor ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -50,26 +50,26 @@ LowerTailDependenceCovariance
 struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     alpha::T2
-    threads::T3
+    executor::T3
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
-                                           threads::FLoops.Transducers.Executor)
+                                           executor::FLoops.Transducers.Executor)
         @argcheck(zero(alpha) < alpha < one(alpha),
                   DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
-        return new{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
+        return new{typeof(ve), typeof(alpha), typeof(executor)}(ve, alpha, executor)
     end
 end
 function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                        alpha::Number = 0.05,
-                                       threads::FLoops.Transducers.Executor = ThreadedEx())
-    return LowerTailDependenceCovariance(ve, alpha, threads)
+                                       executor::FLoops.Transducers.Executor = ThreadedEx())
+    return LowerTailDependenceCovariance(ve, alpha, executor)
 end
 function factory(ce::LowerTailDependenceCovariance, w::Option{<:AbstractWeights} = nothing)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
-                                         threads = ce.threads)
+                                         executor = ce.executor)
 end
 """
     lower_tail_dependence(X::MatNum; alpha::Number = 0.05,
-                          threads::FLoops.Transducers.Executor = SequentialEx())
+                          executor::FLoops.Transducers.Executor = SequentialEx())
 
 Compute the lower tail dependence matrix for a set of asset returns.
 
@@ -79,7 +79,7 @@ The lower tail dependence (LTD) between two assets quantifies the probability th
 
   - `X`: Data matrix of asset returns (observations × assets).
   - `alpha`: Quantile level for the lower tail.
-  - `threads`: Parallel execution strategy.
+  - `executor`: Parallel execution strategy.
 
 # Returns
 
@@ -97,13 +97,13 @@ The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
 function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
-                               threads::FLoops.Transducers.Executor = SequentialEx())
+                               executor::FLoops.Transducers.Executor = SequentialEx())
     T, N = size(X)
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
     if k > 0
         let mv = sqrt(eps(eltype(X)))
-            @floop threads for j in axes(X, 2)
+            @floop executor for j in axes(X, 2)
                 xj = view(X, :, j)
                 v = sort(xj)[k]
                 maskj = xj .<= v
@@ -151,7 +151,7 @@ function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
-    return lower_tail_dependence(X, ce.alpha, ce.threads)
+    return lower_tail_dependence(X, ce.alpha, ce.executor)
 end
 """
     cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
@@ -187,7 +187,7 @@ function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
         X = transpose(X)
     end
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
-    return lower_tail_dependence(X, ce.alpha, ce.threads) ⊙ (std_vec ⊗ std_vec)
+    return lower_tail_dependence(X, ce.alpha, ce.executor) ⊙ (std_vec ⊗ std_vec)
 end
 
 export LowerTailDependenceCovariance
