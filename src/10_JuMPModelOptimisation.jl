@@ -1,7 +1,7 @@
 """
     abstract type AbstractJuMPResult <: AbstractResult end
 
-Abstract supertype for all JuMP-based optimisation result types in PortfolioOptimisers.jl.
+Abstract supertype for all JuMP-based optimisation result types in `PortfolioOptimisers.jl`.
 
 All concrete types representing the result of a JuMP model optimisation should subtype `AbstractJuMPResult`. This enables a consistent interface for handling solver results throughout the package.
 

@@ -44,7 +44,7 @@ abstract type AbstractMatrixProcessingOrder <: AbstractAlgorithm end
 """
     struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
 
-Matrix processing order: Denoising → Detoning → Algorithm.
+Matrix processing order: Denoising → Detoning → Custom Algorithm.
 
 `DenoiseDetoneAlg` specifies that matrix processing should be performed in the order of denoising, then detoning, followed by any custom algorithm. This type is used to configure the sequence of operations in matrix processing pipelines.
 
@@ -61,7 +61,7 @@ struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
 """
     struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
 
-Matrix processing order: Denoising → Algorithm → Detoning.
+Matrix processing order: Denoising → Custom Algorithm → Detoning.
 
 `DenoiseAlgDetone` specifies that matrix processing should be performed in the order of denoising, then applying a custom algorithm, followed by detoning. This type is used to configure the sequence of operations in matrix processing pipelines.
 
@@ -78,7 +78,7 @@ struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
 """
     struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
 
-Matrix processing order: Detoning → Denoising → Algorithm.
+Matrix processing order: Detoning → Denoising → Custom Algorithm.
 
 `DetoneDenoiseAlg` specifies that matrix processing should be performed in the order of detoning, then denoising, followed by any custom algorithm. This type is used to configure the sequence of operations in matrix processing pipelines.
 
@@ -95,7 +95,7 @@ struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
 """
     struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
 
-Matrix processing order: Detoning → Algorithm → Denoising.
+Matrix processing order: Detoning → Custom Algorithm → Denoising.
 
 `DetoneAlgDenoise` specifies that matrix processing should be performed in the order of detoning, then applying a custom algorithm, followed by denoising. This type is used to configure the sequence of operations in matrix processing pipelines.
 
@@ -112,7 +112,7 @@ struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
 """
     struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
 
-Matrix processing order: Algorithm → Denoising → Detoning.
+Matrix processing order: Custom Algorithm → Denoising → Detoning.
 
 `AlgDenoiseDetone` specifies that matrix processing should be performed in the order of applying a custom algorithm, then denoising, followed by detoning. This type is used to configure the sequence of operations in matrix processing pipelines.
 
@@ -129,7 +129,7 @@ struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
 """
     struct AlgDetoneDenoise <: AbstractMatrixProcessingOrder end
 
-Matrix processing order: Algorithm → Detoning → Denoising.
+Matrix processing order: Custom Algorithm → Detoning → Denoising.
 
 `AlgDetoneDenoise` specifies that matrix processing should be performed in the order of applying a custom algorithm, then detoning, followed by denoising. This type is used to configure the sequence of operations in matrix processing pipelines.
 
@@ -196,11 +196,11 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Fields
 
-  - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)), or `nothing` to skip.
-  - `denoise`: Denoising estimator (see [`Denoise`](@ref)), or `nothing` to skip.
-  - `detone`: Detoning estimator (see [`Detone`](@ref)), or `nothing` to skip.
+  - `pdm`: Positive definite matrix estimator, or `nothing` to skip.
+  - `denoise`: Denoising estimator, or `nothing` to skip.
+  - `detone`: Detoning estimator, or `nothing` to skip.
   - `alg`: Optional custom matrix processing algorithm, or `nothing` to skip.
-  - `order`: Specifies the order in which denoising, detoning, and algorithmic steps are applied.
+  - `order`: Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
 
 # Constructor
 
