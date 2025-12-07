@@ -120,7 +120,8 @@ DenoiseDetoneAlgMatrixProcessing
           │   kwargs ┴ @NamedTuple{}: NamedTuple()
   denoise ┼ nothing
    detone ┼ nothing
-      alg ┴ nothing
+      alg ┼ nothing
+    order ┴ DenoiseDetoneAlg()
 
 julia> DenoiseDetoneAlgMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
 DenoiseDetoneAlgMatrixProcessing
@@ -137,7 +138,8 @@ DenoiseDetoneAlgMatrixProcessing
           │        n ┴ Int64: 1000
    detone ┼ Detone
           │   n ┴ Int64: 2
-      alg ┴ nothing
+      alg ┼ nothing
+    order ┴ DenoiseDetoneAlg()
 ```
 
 # Related

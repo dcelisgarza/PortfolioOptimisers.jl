@@ -154,12 +154,14 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
     return distance(Distance(; power = de.power, alg = SimpleDistance()), ce, X;
                     dims = dims, kwargs...)
 end
-const LTDCov_PLTDCov = Union{<:LowerTailDependenceCovariance,
-                             <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance,
-                                                             <:Any}}
+const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
+                                       <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance},
+                                       <:DenoiseCovariance{<:LowerTailDependenceCovariance},
+                                       <:DetoneCovariance{<:LowerTailDependenceCovariance},
+                                       <:ProcessedCovariance{<:LowerTailDependenceCovariance}}
 """
     distance(de::Distance{<:Any, <:LogDistance},
-             ce::LTDCov_PLTDCov,
+             ce::LTDCov_AllInternalLTDCov,
              X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance estimator and data matrix.
@@ -182,13 +184,13 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
   - [`LogDistance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
-                  dims::Int = 1, kwargs...)
+function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
+                  X::MatNum; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
-function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
-                  dims::Int = 1, kwargs...)
+function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
+                  X::MatNum; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return -log.(rho)
 end
@@ -443,13 +445,13 @@ function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
     rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return rho, -log.(rho)
 end
-function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
-                      dims::Int = 1, kwargs...)
+function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
+                      X::MatNum; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(rho)
 end
-function cor_and_dist(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_PLTDCov, X::MatNum;
-                      dims::Int = 1, kwargs...)
+function cor_and_dist(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
+                      X::MatNum; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return rho, -log.(rho)
 end
@@ -492,23 +494,29 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCo
                                                              normalise = ce.normalise)), ce,
                         X; dims = dims, kwargs...)
 end
+const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance},
+                                       <:DenoiseCovariance{<:MutualInfoCovariance},
+                                       <:DetoneCovariance{<:MutualInfoCovariance},
+                                       <:ProcessedCovariance{<:MutualInfoCovariance}}
 function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
-                      ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
-                      X::MatNum; dims::Int = 1, kwargs...)
+                      ce::AllInternalMutualInfoCov, X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power,
                                  alg = VariationInfoDistance(; bins = ce.ce.bins,
                                                              normalise = ce.ce.normalise)),
                         ce, X; dims = dims, kwargs...)
 end
-function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCov_PLTDCov,
-                      X::MatNum; dims::Int = 1, kwargs...)
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
+                      ce::LTDCov_AllInternalLTDCov, X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power, alg = LogDistance()), ce, X;
                         dims = dims, kwargs...)
 end
-const DistCov_PDistCov = Union{<:DistanceCovariance,
-                               <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}}
-function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_PDistCov,
-                      X::MatNum; dims::Int = 1, kwargs...)
+const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
+                                         <:PortfolioOptimisersCovariance{<:DistanceCovariance},
+                                         <:DenoiseCovariance{<:DistanceCovariance},
+                                         <:DetoneCovariance{<:DistanceCovariance},
+                                         <:ProcessedCovariance{<:DistanceCovariance}}
+function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
+                      ce::DistCov_AllInternalDistCov, X::MatNum; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
                         dims = dims, kwargs...)
 end
@@ -521,10 +529,9 @@ end
 """
     distance(de::Distance{<:Any, <:CanonicalDistance},
              ce::Union{<:MutualInfoCovariance,
-                       <:PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
-                       <:LowerTailDependenceCovariance, <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance, <:Any},
-                       <:DistanceCovariance,
-                       <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
+                       <:AllInternalMutualInfoCov,
+                       <:LTDCov_AllInternalLTDCov,
+                       <:DistCov_AllInternalDistCov},
              X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the canonical distance matrix using the covariance estimator and data matrix. The method selects the appropriate distance algorithm based on the type of covariance estimator provided (see [`CanonicalDistance`](@ref)).
@@ -556,21 +563,20 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovari
                                                          normalise = ce.normalise)), ce, X;
                     dims = dims, kwargs...)
 end
-function distance(de::Distance{<:Any, <:CanonicalDistance},
-                  ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
+function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::AllInternalMutualInfoCov,
                   X::MatNum; dims::Int = 1, kwargs...)
     return distance(Distance(; power = de.power,
                              alg = VariationInfoDistance(; bins = ce.ce.bins,
                                                          normalise = ce.ce.normalise)), ce,
                     X; dims = dims, kwargs...)
 end
-function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCov_PLTDCov, X::MatNum;
-                  dims::Int = 1, kwargs...)
+function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::LTDCov_AllInternalLTDCov,
+                  X::MatNum; dims::Int = 1, kwargs...)
     return distance(Distance(; power = de.power, alg = LogDistance()), ce, X; dims = dims,
                     kwargs...)
 end
-function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_PDistCov, X::MatNum;
-                  dims::Int = 1, kwargs...)
+function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_AllInternalDistCov,
+                  X::MatNum; dims::Int = 1, kwargs...)
     return distance(Distance(; power = de.power, alg = CorrelationDistance()), ce, X;
                     dims = dims, kwargs...)
 end
