@@ -1,7 +1,7 @@
 """
     abstract type AbstractDetoneEstimator <: AbstractEstimator end
 
-Abstract supertype for all detoning estimators in PortfolioOptimisers.jl.
+Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
 All concrete types representing detoning estimators (such as [`Detone`](@ref)) should subtype `AbstractDetoneEstimator`. This enables a consistent interface for detoning routines and downstream analysis.
 

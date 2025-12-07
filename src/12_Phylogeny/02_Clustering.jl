@@ -345,7 +345,8 @@ ClusteringEstimator
       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      │   denoise ┼ nothing
       │      │    detone ┼ nothing
-      │      │       alg ┴ nothing
+      │      │       alg ┼ nothing
+      │      │     order ┴ DenoiseDetoneAlg()
    de ┼ Distance
       │   power ┼ nothing
       │     alg ┴ CanonicalDistance()

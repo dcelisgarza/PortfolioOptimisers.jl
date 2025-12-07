@@ -38,7 +38,8 @@ PortfolioOptimisersCovariance
      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
      │   denoise ┼ nothing
      │    detone ┼ nothing
-     │       alg ┴ nothing
+     │       alg ┼ nothing
+     │     order ┴ DenoiseDetoneAlg()
 ```
 
 # Related

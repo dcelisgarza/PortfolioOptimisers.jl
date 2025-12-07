@@ -773,7 +773,8 @@ NetworkEstimator
       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      │   denoise ┼ nothing
       │      │    detone ┼ nothing
-      │      │       alg ┴ nothing
+      │      │       alg ┼ nothing
+      │      │     order ┴ DenoiseDetoneAlg()
    de ┼ Distance
       │   power ┼ nothing
       │     alg ┴ CanonicalDistance()
@@ -853,7 +854,7 @@ CentralityEstimator
        │       │      │    me ┼ SimpleExpectedReturns
        │       │      │       │   w ┴ nothing
        │       │      │    ce ┼ GeneralCovariance
-       │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)      
        │       │      │       │    w ┴ nothing
        │       │      │   alg ┴ Full()
        │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -862,7 +863,8 @@ CentralityEstimator
        │       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
        │       │      │   denoise ┼ nothing
        │       │      │    detone ┼ nothing
-       │       │      │       alg ┴ nothing
+       │       │      │       alg ┼ nothing
+       │       │      │     order ┴ DenoiseDetoneAlg()
        │    de ┼ Distance
        │       │   power ┼ nothing
        │       │     alg ┴ CanonicalDistance()

@@ -1,7 +1,7 @@
 """
     abstract type AbstractReturnsResult <: AbstractResult end
 
-Abstract supertype for all returns result types in PortfolioOptimisers.jl.
+Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
 
 All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
 
@@ -67,7 +67,7 @@ end
         ivpa::T7
     end
 
-A flexible container type for storing the results of asset and factor returns calculations in PortfolioOptimisers.jl.
+A flexible container type for storing the results of asset and factor returns calculations in `PortfolioOptimisers.jl`.
 
 `ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
 It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimization and analysis routines.

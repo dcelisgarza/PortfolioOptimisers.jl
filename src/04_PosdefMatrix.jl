@@ -1,7 +1,7 @@
 """
     abstract type AbstractPosdefEstimator <: AbstractEstimator end
 
-Abstract supertype for all positive definite matrix estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
 
 All concrete types that implement positive definite matrix projection or estimation (e.g., for covariance or correlation matrices) should subtype `AbstractPosdefEstimator`. This enables a consistent interface for positive definite matrix estimation routines throughout the package.
 
