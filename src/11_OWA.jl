@@ -90,6 +90,28 @@ Estimator type for normalised constant relative risk aversion (CRRA) OWA weights
 
 This struct represents an estimator for Ordered Weights Array (OWA) weights based on a normalised constant relative risk aversion parameter `g`. The CRRA approach generates OWA weights that interpolate between risk-neutral and risk-averse profiles, controlled by the parameter `g`.
 
+```math
+\\begin{algin}
+\\phi_{1} &\\coloneqq 1 \\\\
+\\bm{\\phi} &= \\dfrac{\\phi_{k-1}\\left(\\gamma \\left(k - 1\\right)\\right)}{k!} \\forall k = 2,\\ldots,\\K \\\\
+\\sum\\limits_{k=2}^K \\phi_{k} &= 1 \\\\
+\\bm{w}_{k} &= \\dfrac{1}{k \\binom{T}{k}} \\left(\\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{j} \\right) \\forall t = 1,\\ldots\\, T\\\\
+\\mathbf{w} &= \\left[(-1)^i\\bm{w}_{i} \\forall i = 2,\\ldots,\\,k\\right] \\\\
+\\bm{\\eta} &= \\mathbf{w} \\bm{\\phi} \\\\
+\\eta_{i+1} &= \\max \\left(\\eta_{j} \\forall j = 1, \\ldots, \\,i\\right)
+\\end{align}
+```
+
+Where:
+
+  - ``\\phi_{k}``: is the risk aversion coefficient for the k-th order moment.
+  - ``\\gamma``: is the risk aversion parameter `g`.
+  - ``T``: is the total number of observations.
+  - ``\\bm{w}_{k}``: is the OWA weights vector for the k-th order moment.
+  - ``\\mathbf{w}``: is the matrix of OWA weights for all order moments where each column ``k`` corresponds to weights of the k-th order moment.
+  - ``\\bm{\\eta}``: is the final OWA weights vector after enforcing non-decreasing monotonicity.
+    and risk aversion.
+
 # Fields
 
   - `g`: Risk aversion parameter.
@@ -223,7 +245,7 @@ function OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 """
-    ncrra_weights(weights::MatNum; g::Number = 0.5)
+    ncrra_weights(weights::MatNum, g::Number = 0.5)
 
 Compute normalised constant relative risk aversion (CRRA) Ordered Weights Array (OWA) weights.
 
@@ -291,7 +313,7 @@ function ncrra_weights(weights::MatNum, g::Number = 0.5)
     w = similar(a)
     w[1] = a[1]
     for i in 2:length(a)
-        w[i] = maximum(a[1:i])
+        w[i] = maximum(view(a, 1:i))
     end
     return w
 end
@@ -811,9 +833,8 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
     @argcheck(2 <= k, DomainError)
-    rg = 2:k
-    weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
-    for i in rg
+    weights = Matrix{typeof(inv(T * k))}(undef, T, length(2:k))
+    for i in 2:k
         wi = (-1)^i * owa_l_moment(T, i)
         weights[:, i - 1] = wi
     end
