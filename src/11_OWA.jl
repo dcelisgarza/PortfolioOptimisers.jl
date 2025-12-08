@@ -27,7 +27,7 @@ All concrete types implementing specific OWA algorithms should subtype `Abstract
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 """
@@ -44,7 +44,7 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
 """
@@ -61,7 +61,7 @@ The Minimum Squared Distance algorithm finds OWA weights that minimize the squar
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
 """
@@ -78,7 +78,7 @@ The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, s
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
 """
@@ -141,7 +141,7 @@ NormalisedConstantRelativeRiskAversion
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
     g::T1
@@ -215,7 +215,7 @@ OWAJuMP
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     slv::T1
@@ -298,7 +298,7 @@ julia> PortfolioOptimisers.ncrra_weights(w, 0.5)
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 function ncrra_weights(weights::MatNum, g::Number = 0.5)
     N = size(weights, 2)
@@ -348,7 +348,7 @@ This function sets up a JuMP optimization model for OWA weights, given an `OWAJu
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 function owa_model_setup(method::OWAJuMP, weights::MatNum)
     T, N = size(weights)
@@ -400,7 +400,7 @@ This function solves the provided JuMP model using the solver(s) specified in th
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     slv = method.slv
@@ -445,7 +445,7 @@ This function dispatches on the estimator `method` to compute OWA weights from a
 
 # References
 
-  - [owa2](@cite) D. Cajas. *Higher Order Moment Portfolio Optimization with L-Moments* (March 19, 2023). Available at SSRN 4393155.
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
     return ncrra_weights(weights, method.g)
