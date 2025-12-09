@@ -26,7 +26,7 @@ function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
     elseif sym in propertynames(r)
         getfield(r, sym)
     elseif sym in propertynames(r.pa)
-        getfield(r.pa, sym)
+        getproperty(r.pa, sym)
     end
 end
 struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:

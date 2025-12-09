@@ -72,7 +72,9 @@ function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
     elseif sym in propertynames(r)
         getfield(r, sym)
     elseif sym in propertynames(r.pa)
-        getfield(r.pa, sym)
+        getproperty(r.pa, sym)
+    else
+        getfield(r, sym)
     end
 end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
@@ -81,9 +83,11 @@ function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol
     elseif sym in propertynames(r)
         getfield(r, sym)
     elseif sym in propertynames(r.rr)
-        getfield(r.rr, sym)
+        getproperty(r.rr, sym)
     elseif sym in propertynames(r.pa)
-        getfield(r.pa, sym)
+        getproperty(r.pa, sym)
+    else
+        getfield(r, sym)
     end
 end
 function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
@@ -92,9 +96,11 @@ function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
     elseif sym in propertynames(r)
         getfield(r, sym)
     elseif sym in propertynames(r.prb)
-        getfield(r.prb, sym)
+        getproperty(r.prb, sym)
     elseif sym in propertynames(r.pa)
-        getfield(r.pa, sym)
+        getproperty(r.pa, sym)
+    else
+        getfield(r, sym)
     end
 end
 function assert_finite_nonnegative_real_or_vec(val::Number)

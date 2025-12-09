@@ -302,10 +302,12 @@ function prior_view(pr::HighOrderPrior, i)
                           sk = sk, V = V, skmp = skmp)
 end
 function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
-    return if sym in propertynames(obj.pr)
-        getfield(obj.pr, sym)
-    else
+    return if sym in propertynames(obj)
         getfield(obj, sym)
+    elseif sym in propertynames(obj.pr)
+        getproperty(obj.pr, sym)
+    else
+        getproperty(obj, sym)
     end
 end
 """
