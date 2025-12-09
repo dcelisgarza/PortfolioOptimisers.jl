@@ -73,18 +73,18 @@ function AKelly(; formulation::VarianceFormulation = SOC(),
                 a_rc::Union{<:MatNum, Nothing} = nothing,
                 b_rc::Union{<:AbstractVector, Nothing} = nothing)
     if !isnothing(a_rc) && !isnothing(b_rc) && !isempty(a_rc) && !isempty(b_rc)
-        @smart_assert(size(a_rc, 1) == length(b_rc))
+        @argcheck(size(a_rc, 1) == length(b_rc))
     end
     return AKelly(formulation, a_rc, b_rc)
 end
 function Base.setproperty!(obj::AKelly, sym::Symbol, val)
     if sym == :a_rc
         if !isnothing(val) && !isnothing(obj.b_rc) && !isempty(val) && !isempty(obj.b_rc)
-            @smart_assert(size(val, 1) == length(obj.b_rc))
+            @argcheck(size(val, 1) == length(obj.b_rc))
         end
     elseif sym == :b_rc
         if !isnothing(val) && !isnothing(obj.a_rc) && !isempty(val) && !isempty(obj.a_rc)
-            @smart_assert(size(obj.a_rc, 1) == length(val))
+            @argcheck(size(obj.a_rc, 1) == length(val))
         end
     end
     return setfield!(obj, sym, val)
