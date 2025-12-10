@@ -91,14 +91,14 @@ Estimator type for normalised constant relative risk aversion (CRRA) OWA weights
 This struct represents an estimator for Ordered Weights Array (OWA) weights based on a normalised constant relative risk aversion parameter `g`. The CRRA approach generates OWA weights that interpolate between risk-neutral and risk-averse profiles, controlled by the parameter `g`.
 
 ```math
-\\begin{algin}
+\\begin{align}
 \\phi_{1} &\\coloneqq 1 \\\\
-\\bm{\\phi} &= \\dfrac{\\phi_{k-1}\\left(\\gamma \\left(k - 1\\right)\\right)}{k!} \\forall k = 2,\\ldots,\\K \\\\
+\\boldsymbol{\\phi} &= \\dfrac{\\phi_{k-1}\\left(\\gamma \\left(k - 1\\right)\\right)}{k!} \\quad \forall k = 2,\\ldots,\\, K \\\\
 \\sum\\limits_{k=2}^K \\phi_{k} &= 1 \\\\
-\\bm{w}_{k} &= \\dfrac{1}{k \\binom{T}{k}} \\left(\\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{j} \\right) \\forall t = 1,\\ldots\\, T\\\\
-\\mathbf{w} &= \\left[(-1)^i\\bm{w}_{i} \\forall i = 2,\\ldots,\\,k\\right] \\\\
-\\bm{\\eta} &= \\mathbf{w} \\bm{\\phi} \\\\
-\\eta_{i+1} &= \\max \\left(\\eta_{j} \\forall j = 1, \\ldots, \\,i\\right)
+\\boldsymbol{w}_{k} &= \\dfrac{1}{k \\binom{T}{k}} \\left(\\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{j} \\right) \\forall t = 1,\\ldots\\, T\\\\
+\\mathbf{w} &= \\left[(-1)^i\\boldsymbol{w}_{i} \\quad \\forall i = 2,\\ldots,\\,k\\right] \\\\
+\\boldsymbol{\\theta} &= \\mathbf{w} \\boldsymbol{\\phi} \\\\
+\\theta_{i+1} &= \\max \\left(\\theta_{j} \\quad \\forall j = 1, \\ldots, \\,i\\right)
 \\end{align}
 ```
 
@@ -107,10 +107,9 @@ Where:
   - ``\\phi_{k}``: is the risk aversion coefficient for the k-th order moment.
   - ``\\gamma``: is the risk aversion parameter `g`.
   - ``T``: is the total number of observations.
-  - ``\\bm{w}_{k}``: is the OWA weights vector for the k-th order moment.
+  - ``\\boldsymbol{w}_{k}``: is the OWA weights vector for the k-th order moment.
   - ``\\mathbf{w}``: is the matrix of OWA weights for all order moments where each column ``k`` corresponds to weights of the k-th order moment.
-  - ``\\bm{\\eta}``: is the final OWA weights vector after enforcing non-decreasing monotonicity.
-    and risk aversion.
+  - ``\\boldsymbol{\\theta}``: is the final OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
 # Fields
 
