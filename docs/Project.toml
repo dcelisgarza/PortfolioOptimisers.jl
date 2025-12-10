@@ -24,5 +24,5 @@ YFinance = "e4b3b0a2-f9a3-42f3-aabb-32142cceaf77"
 [compat]
 Clarabel = "0.11"
 TimeSeries = "0.25, 0.24"
-YFinance = "0.1.10"
+# YFinance = "0.1.10"
 Documenter = "1"
