@@ -759,7 +759,7 @@ function owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05,
     return w
 end
 """
-    owa_l_moment(T::Integer; k::Integer = 2)
+    owa_l_moment(T::Integer, k::Integer = 2)
 
 Compute the linear moment weights for the linear moments convex risk measure (CRM).
 
@@ -796,8 +796,9 @@ function owa_l_moment(T::Integer, k::Integer = 2)
     return w
 end
 """
-    owa_l_moment_crm(T::Integer; k::Integer = 2,
-                     method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+    owa_l_moment_crm(T::Integer,
+                     method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion();
+                     k::Integer = 2)
 
 Compute the ordered weights array (OWA) linear moments convex risk measure (CRM) weights for a given number of observations and moment order.
 
@@ -829,8 +830,9 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
   - [`OWAJuMP`](@ref)
   - [`VecNum`](@ref)
 """
-function owa_l_moment_crm(T::Integer; k::Integer = 2,
-                          method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+function owa_l_moment_crm(T::Integer,
+                          method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion();
+                          k::Integer = 2)
     @argcheck(2 <= k, DomainError)
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(2:k))
     for i in 2:k
