@@ -39,17 +39,26 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 
 ```math
 \\begin{align}
-\\text{feasibility}\\
-\\text{Subject to} \\quad & phi_{1} + phi_{2} + phi_{3} = 1\\
- & phi_{1} \\leq 0.5\\
- & phi_{2} \\leq 0.5\\
- & phi_{3} \\leq 0.5\\
- & [theta_{1} - 5 phi_{1} - 2 phi_{2} - 3 phi_{3}, theta_{2} - 5 phi_{1} - phi_{2} - 3 phi_{3}, theta_{3} - 3 phi_{1} - 5 phi_{2} - phi_{3}, theta_{4} - 3 phi_{1} - 2 phi_{2} - 3 phi_{3}, theta_{5} - 4 phi_{1} - 3 phi_{2} - 3 phi_{3}] \\in \\text{Zeros()}\\
- & [phi_{1}, phi_{2}, phi_{3}] \\in \\text{Nonnegatives()}\\
- & [-theta_{1} + theta_{2}, -theta_{2} + theta_{3}, -theta_{3} + theta_{4}, -theta_{4} + theta_{5}] \\in \\text{Nonnegatives()}\\
- & [-phi_{1} + phi_{2}, -phi_{2} + phi_{3}] \\in \\text{Nonpositives()}
+\\text{feasibility}\\\\
+\\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
+ & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
+ & \\boldsymbol{\\phi} \\geq 0 \\\\
+ & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 1, \\ldots,\\, K-1 \\\\
+ & \\boldsymbol{w}_{k} = \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
+ & \\mathbf{w} = \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
+ & \\boldsymbol{\\theta} = \\mathbf{w} \\boldsymbol{\\phi} \\\\
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1, \\ldots,\\, T-1 \\\\
 \\end{align}
 ```
+
+Where:
+
+  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\phi_{\\text{max}}``: is the maximum risk aversion coefficient.
+  - ``T``: is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
 # Related
 
@@ -107,23 +116,24 @@ This struct represents an estimator for Ordered Weights Array (OWA) weights base
 ```math
 \\begin{align}
 \\phi_{1} &\\coloneqq 1 \\\\
-\\boldsymbol{\\phi} &= \\dfrac{\\phi_{k-1}\\left(\\gamma \\left(k - 1\\right)\\right)}{k!} \\quad \forall k = 2,\\ldots,\\, K \\\\
+\\boldsymbol{\\phi} &= \\phi_{k-1} \\dfrac{\\gamma + k - 2}{k!} (k-1)! \\quad \\forall k = 2,\\ldots,\\, K \\\\
 \\sum\\limits_{k=2}^K \\phi_{k} &= 1 \\\\
-\\boldsymbol{w}_{k} &= \\dfrac{1}{k \\binom{T}{k}} \\left(\\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{j} \\right) \\forall t = 1,\\ldots\\, T\\\\
-\\mathbf{w} &= \\left[(-1)^i\\boldsymbol{w}_{i} \\quad \\forall i = 2,\\ldots,\\,k\\right] \\\\
-\\boldsymbol{\\theta} &= \\mathbf{w} \\boldsymbol{\\phi} \\\\
-\\theta_{i+1} &= \\max \\left(\\theta_{j} \\quad \\forall j = 1, \\ldots, \\,i\\right)
+\\boldsymbol{w}_{k} &= \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
+\\mathbf{w} &= \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
+\\boldsymbol{\\vartheta} &= \\mathbf{w} \\boldsymbol{\\phi} \\\\
+\\theta_{i} &= \\max \\left(\\vartheta_{j} \\quad \\forall j = 1, \\ldots,\\, i\\right) \\quad \\forall i = 1,\\ldots,\\, T
 \\end{align}
 ```
 
 Where:
 
-  - ``\\phi_{k}``: is the risk aversion coefficient for the k-th order moment.
+  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
   - ``\\gamma``: is the risk aversion parameter `g`.
   - ``T``: is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: is the OWA weights vector for the k-th order moment.
-  - ``\\mathbf{w}``: is the matrix of OWA weights for all order moments where each column ``k`` corresponds to weights of the k-th order moment.
-  - ``\\boldsymbol{\\theta}``: is the final OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\vartheta}``: is the intermediate `T × 1` OWA weights vector incorporating the user-defined risk aversion before enforcing non-decreasing monotonicity.
+  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector incorporating the user-defined risk aversion after enforcing non-decreasing monotonicity.
 
 # Fields
 

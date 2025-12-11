@@ -1116,8 +1116,8 @@ This function assigns each vertex to a cluster based on the directed bubble hier
 
 # Returns
 
-  - `Adjv::SparseMatrixCSC{Int, Int}`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`'th non-discrete cluster.
-  - `Tc::Vector{Int}`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`'th discrete cluster.
+  - `Adjv::SparseMatrixCSC{Int, Int}`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster.
+  - `Tc::Vector{Int}`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
 
 # Related
 
@@ -1384,7 +1384,7 @@ This function builds a hierarchical clustering (dendrogram) by first constructin
 
   - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
   - `Dpm`: `N×N` shortest path lengths matrix of the PMFG.
-  - `Tc`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`'th discrete cluster.
+  - `Tc`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
   - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
 
 # Details

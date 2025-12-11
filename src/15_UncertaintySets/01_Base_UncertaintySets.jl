@@ -435,9 +435,9 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
 
   - Uses different algorithms to compute the scaling parameter:
 
-      + Normal: `1 - q`'th quantile of the Mahalanobis distances.
+      + Normal: `1 - q`-th quantile of the Mahalanobis distances.
       + General: formula `sqrt((1 - q) / q)`.
-      + Chi-squared: `1 - q`'th quantile of the chi-squared distribution.
+      + Chi-squared: `1 - q`-th quantile of the chi-squared distribution.
       + Number: returns the provided value directly.
 
   - Supports multiple dispatch for extensibility.
