@@ -37,6 +37,20 @@ Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimat
 
 The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resulting in the most "uninformative" or uniform distribution of weights subject to the imposed constraints.
 
+```math
+\\begin{align}
+\\text{feasibility}\\
+\\text{Subject to} \\quad & phi_{1} + phi_{2} + phi_{3} = 1\\
+ & phi_{1} \\leq 0.5\\
+ & phi_{2} \\leq 0.5\\
+ & phi_{3} \\leq 0.5\\
+ & [theta_{1} - 5 phi_{1} - 2 phi_{2} - 3 phi_{3}, theta_{2} - 5 phi_{1} - phi_{2} - 3 phi_{3}, theta_{3} - 3 phi_{1} - 5 phi_{2} - phi_{3}, theta_{4} - 3 phi_{1} - 2 phi_{2} - 3 phi_{3}, theta_{5} - 4 phi_{1} - 3 phi_{2} - 3 phi_{3}] \\in \\text{Zeros()}\\
+ & [phi_{1}, phi_{2}, phi_{3}] \\in \\text{Nonnegatives()}\\
+ & [-theta_{1} + theta_{2}, -theta_{2} + theta_{3}, -theta_{3} + theta_{4}, -theta_{4} + theta_{5}] \\in \\text{Nonnegatives()}\\
+ & [-phi_{1} + phi_{2}, -phi_{2} + phi_{3}] \\in \\text{Nonpositives()}
+\\end{align}
+```
+
 # Related
 
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
@@ -404,10 +418,7 @@ This function solves the provided JuMP model using the solver(s) specified in th
 function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     slv = method.slv
     return if optimise_JuMP_model!(model, slv).success
-        phi = model[:phi]
-        phis = value.(phi)
-        phis ./= sum(phis)
-        w = weights * phis
+        w = value.(model[:theta])
     else
         @warn("Type: $method\nReverting to ncrra_weights.")
         w = ncrra_weights(weights, 0.5)

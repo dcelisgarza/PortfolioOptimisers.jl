@@ -32,7 +32,7 @@ Direct quadratic risk expression optimisation formulation for variance-like risk
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
@@ -45,8 +45,8 @@ Where:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
-\\textrm{s.t.} &\\qquad \\boldsymbol{d} \\in \\mathcal{S}_{w}.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{d} \\cdot \\boldsymbol{d}.\\\\
+\\text{s.t.} \\quad & \\boldsymbol{d} \\in \\mathcal{S}_{w}.
 \\end{align}
 ```
 
@@ -148,7 +148,7 @@ Depending on the `alg` field, the variance risk measure is formulated using `JuM
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
@@ -161,8 +161,8 @@ Where:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\sigma^2\\nonumber\\\\
-\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\sigma^2\\nonumber\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
 \\end{align}
 ```
 
@@ -314,8 +314,8 @@ Keyword arguments correspond to the fields above.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\sigma\\nonumber\\\\
-\\textrm{s.t.} &\\qquad \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\sigma\\nonumber\\\\
+\\text{s.t.} \\quad & \\left\\lVert \\mathbf{G} \\boldsymbol{w} \\right\\rVert_{2} \\leq \\sigma\\,.
 \\end{align}
 ```
 
@@ -454,7 +454,7 @@ When using an uncertainty set on the variance, the optimisation problem becomes:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\mathrm{opt}} &\\qquad \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
+\\underset{\\boldsymbol{w}}{\\mathrm{opt}} \\quad & \\underset{\\mathbf{\\Sigma} \\in U_{\\mathbf{\\Sigma}}}{\\max} \\boldsymbol{w}^\\intercal \\, \\mathbf{\\Sigma}\\, \\boldsymbol{w}\\,.
 \\end{align}
 ```
 
@@ -471,7 +471,7 @@ This problem can be reformulated depending on the type of uncertainty set used.
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left(\\mathbf{A}_u \\mathbf{\\Sigma}_u\\right) - \\mathrm{Tr}\\left(\\mathbf{A}_l \\mathbf{\\Sigma}_l\\right)\\\\
-\\textrm{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
+\\text{s.t.} & \\quad \\mathbf{A}_u \\geq 0\\\\
                & \\quad \\mathbf{A}_l \\geq 0\\\\
                & \\quad \\begin{bmatrix}
                             \\mathbf{W} & \\boldsymbol{w}\\\\
@@ -499,7 +499,7 @@ Where:
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{w}}{\\mathrm{opt}} & \\quad \\mathrm{Tr}\\left( \\mathbf{\\Sigma} \\left( \\mathbf{W} + \\mathbf{E} \\right) \\right) + k_{\\mathbf{\\Sigma}} \\sigma \\\\
-\\textrm{s.t.} & \\quad \\begin{bmatrix}
+\\text{s.t.} & \\quad \\begin{bmatrix}
                             \\mathbf{W} & \\boldsymbol{w}\\\\
                             \\boldsymbol{w}^\\intercal & k
                         \\end{bmatrix} \\succeq 0 \\\\

@@ -330,9 +330,9 @@ As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\,.
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\mathbb{E}\\left[\\boldsymbol{d}\\right] \\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
 
@@ -362,9 +362,9 @@ As an optimisation problem, it can be formulated as:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\,.
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & 2 \\mathbb{E}\\left[\\boldsymbol{d}\\right]\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} \\geq \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] - \\mathrm{X} \\boldsymbol{w}\\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\,.
 \\end{align}
 ```
 
@@ -433,10 +433,10 @@ The variance is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
@@ -444,11 +444,11 @@ The semi-variance is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\sigma^2\\\\
-\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
@@ -472,10 +472,10 @@ The variance is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
 \\end{align}
 ```
 
@@ -483,11 +483,11 @@ The semi-variance is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot t\\\\
-\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
 \\end{align}
 ```
 
@@ -511,9 +511,9 @@ The variance is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
 \\end{align}
 ```
 
@@ -521,10 +521,10 @@ The semi-variance is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
-\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} 
 \\end{align}
 ```
 
@@ -547,10 +547,10 @@ The standard deviation is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} &\\qquad \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
@@ -558,11 +558,11 @@ The semi-standard deviation is formulated as.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} &\\qquad \\sqrt{f} \\cdot \\sigma\\\\
-\\mathrm{s.t.} &\\qquad \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
-               &\\qquad \\boldsymbol{d} \\geq 0 \\\\
-               &\\qquad \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               &\\qquad \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
+\\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
+               \\quad & \\boldsymbol{d} \\geq 0 \\\\
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
 \\end{align}
 ```
 
