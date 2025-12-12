@@ -14,7 +14,7 @@ using ArgCheck, AverageShiftedHistograms, Clustering, Distances, Distributions, 
 end PortfolioOptimisers
 
 src_files = String[]
-sizehint!(src_files, 140)
+sizehint!(src_files, 139)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files
         if file == "PortfolioOptimisers.jl"

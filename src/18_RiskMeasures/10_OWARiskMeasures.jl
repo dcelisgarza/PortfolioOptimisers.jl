@@ -30,8 +30,13 @@ All concrete types implementing specific OWA algorithms should subtype `Abstract
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+abstract type EntropyFormulation <: AbstractAlgorithm end
+struct ExponentialConeEntropy <: EntropyFormulation end
+struct RelativeEntropy <: EntropyFormulation end
 """
-    struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+    struct MaximumEntropy{T1} <: AbstractOrderedWeightsArrayAlgorithm
+        alg::T1
+    end
 
 Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -62,7 +67,27 @@ Where:
   - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
   - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
-The implementation uses `MOI.RelativeEntropyCone` to model the entropy. An alternative formulation using exponential cones is also possible.
+# Fields
+
+  - `alg`: Entropy formulation to use.
+
+# Constructors
+
+    MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
+
+Keyword arguments correspond to the fields above.
+
+# Details
+
+The `MaximumEntropy` algorithm can be configured to use different entropy formulations via the `alg` field. The default is `RelativeEntropy`, but other formulations such as `ExponentialConeEntropy` can also be used.
+
+# Examples
+
+```jldoctest
+julia> MaximumEntropy()
+MaximumEntropy
+  alg ┴ RelativeEntropy()
+```
 
 # Related
 
@@ -73,9 +98,32 @@ The implementation uses `MOI.RelativeEntropyCone` to model the entropy. An alter
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+struct MaximumEntropy{T1} <: AbstractOrderedWeightsArrayAlgorithm
+    alg::T1
+    function MaximumEntropy(alg::EntropyFormulation)
+        return new{typeof(alg)}(alg)
+    end
+end
+function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
+    return MaximumEntropy(alg)
+end
 """
-    struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
+"""
+abstract type SquaredOrderedWeightsArrayAlgorithm{T1} <:
+              AbstractOrderedWeightsArrayAlgorithm end
+"""
+"""
+const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
+"""
+"""
+const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
+"""
+"""
+const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
+"""
+    struct MinimumSquaredDistance{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
+        alg::T1
+    end
 
 Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -83,7 +131,7 @@ The Minimum Squared Distance algorithm finds OWA weights that minimize the squar
 
 ```math
 \\begin{align}
-\\text{feasibility}\\\\
+\\underset{\\boldsymbol{\\theta}}{\\min} \\sum\\limits_{t=1}^{T-1}\\left(\\boldsymbol{\\theta}_{t+1} - \\boldsymbol{\\theta}_{t} \\right)^2 \\\\
 \\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
  & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
  & \\boldsymbol{\\phi} \\geq 0 \\\\
@@ -104,6 +152,28 @@ Where:
   - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
   - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
+# Fields
+
+  - `alg`: Second-order cone risk expression to use.
+
+# Constructor
+
+    MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> MinimumSquaredDistance()
+MinimumSquaredDistance
+  alg ┴ SOCRiskExpr()
+```
+
+# Details
+
+The `MinimumSquaredDistance` algorithm can be configured to use different second-order cone risk expressions via the `alg` field. The default is `SOCRiskExpr`, but other formulations such as `SquaredSOCRiskExpr` or `RSOCRiskExpr` can also be used.
+
 # Related
 
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
@@ -113,9 +183,19 @@ Where:
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
+struct MinimumSquaredDistance{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
+    alg::T1
+    function MinimumSquaredDistance(alg::UnionAllSOCRiskExpr)
+        return new{typeof(alg)}(alg)
+    end
+end
+function MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+    return MinimumSquaredDistance(alg)
+end
 """
-    struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+    struct MinimumSumSquares{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
+        alg::T1
+    end
 
 Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -123,7 +203,7 @@ The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, s
 
 ```math
 \\begin{align}
-\\text{feasibility}\\\\
+\\underset{\\boldsymbol{\\theta}}{\\min} \\sum\\limits_{t=1}^{T} \\boldsymbol{\\theta}_{t}^2 \\\\
 \\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
  & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
  & \\boldsymbol{\\phi} \\geq 0 \\\\
@@ -144,16 +224,46 @@ Where:
   - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
   - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
+# Fields
+
+  - `alg`: Second-order cone risk expression to use.
+
+# Constructor
+
+    MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> MinimumSumSquares()
+MinimumSumSquares
+  alg ┴ SOCRiskExpr()
+```
+
+# Details
+
+The `MinimumSumSquares` algorithm can be configured to use different second-order cone risk expressions via the `alg` field. The default is `SOCRiskExpr`, but other formulations such as `SquaredSOCRiskExpr` or `RSOCRiskExpr` can also be used.
+
 # Related
 
-  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`SquaredOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
 
 # References
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+struct MinimumSumSquares{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
+    alg::T1
+    function MinimumSumSquares(alg::UnionAllSOCRiskExpr)
+        return new{typeof(alg)}(alg)
+    end
+end
+function MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+    return MinimumSumSquares(alg)
+end
 """
     struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
         g::T1
@@ -520,39 +630,86 @@ This function dispatches on the estimator `method` to compute OWA weights from a
 function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
     return ncrra_weights(weights, method.g)
 end
+function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                                  <:MaximumEntropy{<:RelativeEntropy}},
+                                  model::JuMP.Model)
+    sc = method.sc
+    so = method.so
+    x = model[:x]
+    T = length(x)
+    ovec = range(sc, sc; length = T)
+    @variable(model, t)
+    @constraint(model, [sc * t; ovec; sc * x] in MOI.RelativeEntropyCone(2 * T + 1))
+    @objective(model, Max, -so * t)
+    return nothing
+end
+function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                                  <:MaximumEntropy{<:ExponentialConeEntropy}},
+                                  model::JuMP.Model)
+    sc = method.sc
+    so = method.so
+    x = model[:x]
+    T = length(x)
+    @variable(model, t[1:T])
+    @constraint(model, [i = 1:T], [sc * t[i], sc * x[i], 1] in MOI.ExponentialCone())
+    @objective(model, Max, so * sum(t))
+    return nothing
+end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
                           weights::MatNum)
     T = size(weights, 1)
     sc = method.sc
-    so = method.so
-    ovec = range(sc, sc; length = T)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
-    @variables(model, begin
-                   t
-                   x[1:T]
-               end)
+    @variable(model, x[1:T])
     @constraints(model, begin
                      sc * (sum(x) - 1) == 0
-                     [sc * t; ovec; sc * x] in MOI.RelativeEntropyCone(2 * T + 1)
                      [i = 1:T], [sc * x[i]; sc * theta[i]] in MOI.NormOneCone(2)
                  end)
-    @objective(model, Max, -so * t)
+    owa_l_moment_crm_entropy(method, model)
     return owa_model_solve(model, method, weights)
 end
-function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
-                                          <:MinimumSquaredDistance}, weights::MatNum)
-    sc = method.sc
+function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                                    <:SquaredOrderedWeightsArrayAlgorithm{<:UnionRSOCSOCRiskExpr}},
+                                    model::JuMP.Model)
     so = method.so
+    t = model[:t]
+    @objective(model, Min, so * t)
+end
+function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                                    <:SquaredOrderedWeightsArrayAlgorithm{<:SquaredSOCRiskExpr}},
+                                    model::JuMP.Model)
+    so = method.so
+    t = model[:t]
+    @objective(model, Min, so * t^2)
+end
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                          <:MinimumSquaredDistance{<:UnionSOCRiskExpr}},
+                          weights::MatNum)
+    sc = method.sc
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variable(model, t)
     @constraint(model,
                 [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] in SecondOrderCone())
-    @objective(model, Min, so * t)
+    owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end
-function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares},
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                          <:MinimumSquaredDistance{<:RSOCRiskExpr}},
+                          weights::MatNum)
+    sc = method.sc
+    model = owa_model_setup(method, weights)
+    theta = model[:theta]
+    @variable(model, t)
+    @constraint(model,
+                [sc * t; 0.5; sc * (theta[2:end] - theta[1:(end - 1)])] in
+                RotatedSecondOrderCone())
+    owa_l_moment_crm_sumsq_obj(method, model)
+    return owa_model_solve(model, method, weights)
+end
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                          <:MinimumSumSquares{<:UnionSOCRiskExpr}},
                           weights::MatNum)
     sc = method.sc
     so = method.so
@@ -560,7 +717,18 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumS
     theta = model[:theta]
     @variable(model, t)
     @constraint(model, [sc * t; sc * theta] in SecondOrderCone())
-    @objective(model, Min, so * t)
+    owa_l_moment_crm_sumsq_obj(method, model)
+    return owa_model_solve(model, method, weights)
+end
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                          <:MinimumSumSquares{<:RSOCRiskExpr}},
+                          weights::MatNum)
+    sc = method.sc
+    model = owa_model_setup(method, weights)
+    theta = model[:theta]
+    @variable(model, t)
+    @constraint(model, [sc * t; 0.5; sc * theta] in RotatedSecondOrderCone())
+    owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end
 """
@@ -913,7 +1081,82 @@ function owa_l_moment_crm(T::Integer,
     return owa_l_moment_crm(method, weights)
 end
 
+abstract type OrderedWeightsArrayFormulation <: AbstractAlgorithm end
+struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
+struct ApproxOrderedWeightsArray{T1} <: OrderedWeightsArrayFormulation
+    p::T1
+    function ApproxOrderedWeightsArray(p::VecNum)
+        @argcheck(!isempty(p))
+        @argcheck(all(x -> x > one(x), p))
+        return new{typeof(p)}(p)
+    end
+end
+function ApproxOrderedWeightsArray(; p::VecNum = Float64[2, 3, 4, 10, 50])
+    return ApproxOrderedWeightsArray(p)
+end
+struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
+    settings::T1
+    w::T2
+    alg::T3
+    function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:VecNum},
+                                 alg::OrderedWeightsArrayFormulation)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(w), typeof(alg)}(settings, w, alg)
+    end
+end
+function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                             w::Option{<:VecNum} = nothing,
+                             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(settings, w, alg)
+end
+function (r::OrderedWeightsArray)(x::VecNum)
+    w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
+    return dot(w, sort!(x))
+end
+struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
+    settings::T1
+    w1::T2
+    w2::T3
+    alg::T4
+    function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::Option{<:VecNum},
+                                      w2::Option{<:VecNum},
+                                      alg::OrderedWeightsArrayFormulation, rev::Bool)
+        w1_flag = !isnothing(w1)
+        w2_flag = !isnothing(w2)
+        if w1_flag
+            @argcheck(!isempty(w1))
+        end
+        if w2_flag
+            @argcheck(!isempty(w2))
+            if !rev
+                w2 = reverse(w2)
+            end
+        end
+        if w1_flag && w2_flag
+            @argcheck(length(w1) == length(w2))
+        end
+        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg)}(settings, w1, w2,
+                                                                          alg)
+    end
+end
+function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                  w1::Option{<:VecNum} = nothing,
+                                  w2::Option{<:VecNum} = nothing,
+                                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
+                                  rev::Bool = false)
+    return OrderedWeightsArrayRange(settings, w1, w2, alg, rev)
+end
+function (r::OrderedWeightsArrayRange)(x::VecNum)
+    w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1
+    w2 = isnothing(r.w2) ? reverse(w1) : r.w2
+    w = w1 - w2
+    return dot(w, sort!(x))
+end
+
 export MaximumEntropy, MinimumSquaredDistance, MinimumSumSquares,
        NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd, owa_cvar, owa_wcvar,
        owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg, owa_l_moment,
-       owa_l_moment_crm
+       owa_l_moment_crm, ExactOrderedWeightsArray, ApproxOrderedWeightsArray,
+       OrderedWeightsArray, OrderedWeightsArrayRange
