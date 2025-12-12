@@ -157,7 +157,7 @@
                     println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
                     find_tol(owa_qsoc, owa_rsoc)
                 end
-                @tesr res
+                @test res
             end
             rtol = if i == 4
                 0.05
