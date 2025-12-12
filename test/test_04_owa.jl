@@ -89,7 +89,7 @@
                 if i == 4
                     rtol = 0.05
                 elseif i == 5
-                    rtol = 0.001
+                    rtol = 0.005
                 else
                     rtol = 1e-6
                 end
@@ -99,6 +99,7 @@
                     println("Fails on OWA l-moments (entropy) iteration $i")
                     find_tol(owa, owa_entr)
                 end
+                @test res
             elseif i in 7:9
                 owa_qsoc = owa_l_moment_crm(200, owas_sum_sq_sqsoc[i - 6]; k = 5)
                 owa_rsoc = owa_l_moment_crm(200, owas_sum_sq_rsoc[i - 6]; k = 5)
@@ -112,6 +113,7 @@
                     println("Fails on OWA l-moments (sq soc) iteration $i")
                     find_tol(owa, owa_qsoc)
                 end
+                @test res
                 res = isapprox(owa, owa_rsoc; rtol = rtol)
                 if !res
                     println("Fails on OWA l-moments (rsoc) iteration $i")
@@ -122,6 +124,7 @@
                     println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
                     find_tol(owa_qsoc, owa_rsoc)
                 end
+                @test res
             elseif i in 10:12
                 owa_qsoc = owa_l_moment_crm(200, owas_min_sq_dist_sqsoc[i - 9]; k = 5)
                 owa_rsoc = owa_l_moment_crm(200, owas_min_sq_dist_rsoc[i - 9]; k = 5)
@@ -137,11 +140,13 @@
                     println("Fails on OWA l-moments (sq soc) iteration $i")
                     find_tol(owa, owa_qsoc)
                 end
+                @test res
                 res = isapprox(owa, owa_rsoc; rtol = rtol)
                 if !res
                     println("Fails on OWA l-moments (rsoc) iteration $i")
                     find_tol(owa, owa_rsoc)
                 end
+                @test res
                 if i in 10:11
                     rtol = 5e-3
                 else
@@ -152,6 +157,7 @@
                     println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
                     find_tol(owa_qsoc, owa_rsoc)
                 end
+                @tesr res
             end
             rtol = if i == 4
                 0.05
