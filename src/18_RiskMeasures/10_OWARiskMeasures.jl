@@ -385,7 +385,8 @@ OWAJuMP
   max_phi ┼ Float64: 0.5
        sc ┼ Float64: 1.0
        so ┼ Float64: 1.0
-      alg ┴ MaximumEntropy()
+      alg ┼ MaximumEntropy
+          │   alg ┴ RelativeEntropy()
 ```
 
 # Related
@@ -1155,8 +1156,8 @@ function (r::OrderedWeightsArrayRange)(x::VecNum)
     return dot(w, sort!(x))
 end
 
-export MaximumEntropy, MinimumSquaredDistance, MinimumSumSquares,
-       NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd, owa_cvar, owa_wcvar,
-       owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg, owa_l_moment,
-       owa_l_moment_crm, ExactOrderedWeightsArray, ApproxOrderedWeightsArray,
+export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDistance,
+       MinimumSumSquares, NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd,
+       owa_cvar, owa_wcvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg,
+       owa_l_moment, owa_l_moment_crm, ExactOrderedWeightsArray, ApproxOrderedWeightsArray,
        OrderedWeightsArray, OrderedWeightsArrayRange
