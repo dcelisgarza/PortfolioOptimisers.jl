@@ -39,6 +39,50 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 
 ```math
 \\begin{align}
+\\underset{\\boldsymbol{\\phi},\\, \\boldsymbol{\\theta}}{\\max} -\\sum\\limits_{t=1}^{T}\\psi_{t} \\log\\left(\\psi_{t}\\right)\\\\
+\\text{s.t.} \\quad & \\left(\\psi_{i},\\,\\theta_{i}\\right) \\in \\mathcal{K}_{noc} \\quad \\forall i = 1, \\ldots,\\, T \\\\
+ & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
+ & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
+ & \\boldsymbol{\\phi} \\geq 0 \\\\
+ & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 1, \\ldots,\\, K-1 \\\\
+ & \\boldsymbol{w}_{k} = \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
+ & \\mathbf{w} = \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
+ & \\boldsymbol{\\theta} = \\mathbf{w} \\boldsymbol{\\phi} \\\\
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1, \\ldots,\\, T-1 \\\\
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{K}_{\\text{noc}} \\coloneqq \\left\\{\\left(t,\\,x\\right) \\in \\mathbb{R}^n : t \\geq \\lVert x \\rVert_{1}\\right = \\sum\\limits_{i} \\lvert x_{i} \\rvert\\}``: is the norm one cone, which enforces each entry of ``\\boldsymbol{\\psi}`` is the absolute value of each entry of ``\\boldsymbol{\\theta}``.
+  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\phi_{\\text{max}}``: is the maximum risk aversion coefficient.
+  - ``T``: is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+
+The implementation uses `MOI.RelativeEntropyCone` to model the entropy. An alternative formulation using exponential cones is also possible.
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`OWAJuMP`](@ref)
+
+# References
+
+  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
+"""
+struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+"""
+    struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
+
+Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
+
+The Minimum Squared Distance algorithm finds OWA weights that minimize the squared distance between adjacent entries in the array, subject to the OWA constraints. This approach promotes smoothness in the resulting weights.
+
+```math
+\\begin{align}
 \\text{feasibility}\\\\
 \\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
  & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
@@ -69,23 +113,6 @@ Where:
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
-"""
-    struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
-
-Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
-
-The Minimum Squared Distance algorithm finds OWA weights that minimize the squared distance between adjacent entries in the array, subject to the OWA constraints. This approach promotes smoothness in the resulting weights.
-
-# Related
-
-  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
-  - [`OWAJuMP`](@ref)
-
-# References
-
-  - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
-"""
 struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
 """
     struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
@@ -93,6 +120,29 @@ struct MinimumSquaredDistance <: AbstractOrderedWeightsArrayAlgorithm end
 Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
 
 The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, subject to the OWA constraints. This promotes sparsity or concentration in the resulting weights. This can be used to emphasize extreme order statistics in OWA-based risk measures.
+
+```math
+\\begin{align}
+\\text{feasibility}\\\\
+\\text{s.t.} \\quad & \\sum\\limits_{k=1}^K \\phi_{k} = 1 \\\\
+ & \\boldsymbol{\\phi} \\leq \\phi_{\\text{max}} \\\\
+ & \\boldsymbol{\\phi} \\geq 0 \\\\
+ & \\phi_{k+1} \\leq \\phi_{k} \\quad \\forall k = 1, \\ldots,\\, K-1 \\\\
+ & \\boldsymbol{w}_{k} = \\dfrac{1}{k} \\binom{T}{k}^{-1} \\sum\\limits_{i=0}^{k-1} (-1)^{i} \\binom{k-1}{i} \\binom{t-1}{k-1-i} \\binom{T-t}{i}  \\quad \\forall t = 1,\\ldots,\\, T \\\\
+ & \\mathbf{w} = \\left[(-1)^k\\boldsymbol{w}_{k} \\quad \\forall k = 2,\\ldots,\\, K\\right] \\\\
+ & \\boldsymbol{\\theta} = \\mathbf{w} \\boldsymbol{\\phi} \\\\
+ & \\theta_{t+1} \\geq \\theta_{t} \\quad \\forall t = 1, \\ldots,\\, T-1 \\\\
+\\end{align}
+```
+
+Where:
+
+  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\phi_{\\text{max}}``: is the maximum risk aversion coefficient.
+  - ``T``: is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
 # Related
 
