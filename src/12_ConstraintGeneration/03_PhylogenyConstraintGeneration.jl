@@ -179,7 +179,7 @@ This function is used internally to ensure that the number of groups or allocati
   - `alg`:
 
       + `Nothing`: No validation is performed.
-      + `Integer`: specifying the maximum allowed length for `B`.
+      + `Integer`: Specifying the maximum allowed length for `B`.
 
   - `B`: Vector of integers representing group sizes or allocations.
 
@@ -280,7 +280,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 
   - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
-      + `AbstractVector`: it is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
+      + `AbstractVector`: It is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
 
 # Examples
 
@@ -433,8 +433,8 @@ Generate phylogeny-based portfolio constraints from an estimator or result.
 
   - `est`:
 
-      + `AbstractPhylogenyConstraintEstimator`: computes the phylogeny matrix using the estimator.
-      + `Option{<:AbstractPhylogenyConstraintResult}`: returns it unchanged.
+      + `AbstractPhylogenyConstraintEstimator`: Computes the phylogeny matrix using the estimator.
+      + `Option{<:AbstractPhylogenyConstraintResult}`: Returns it unchanged.
 
 # Related
 
@@ -587,7 +587,7 @@ Reduce a vector of real values to a single real value using a specified measure.
 
 # Returns
 
-  - `score::Number`: computed value according to `measure`.
+  - `score::Number`: Computed value according to `measure`.
 
 # Examples
 

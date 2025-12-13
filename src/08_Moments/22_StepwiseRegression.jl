@@ -615,7 +615,7 @@ This method fits a stepwise regression model (as specified by `re`) to each colu
 
 # Returns
 
-  - `Regression`: A regression result object containing:
+  - `reg::Regression`: A regression result object containing:
 
       + `b`: Vector of intercepts for each asset.
       + `M`: Matrix of coefficients for each asset and feature (zeros for excluded features).

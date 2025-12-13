@@ -1640,7 +1640,7 @@ This internal function updates the `jlogo` matrix in-place by iterating over a l
 
 # Returns
 
-  - `nothing`, updates `jlogo` in-place.
+  - `nothing`. Updates `jlogo` in-place.
 
 # Related
 
@@ -1903,7 +1903,11 @@ Validate compatibility of the distance estimator and covariance matrix for LoGo 
 
 # Returns
 
-  - `nothing`. Throws an error if validation fails.
+  - `nothing`.
+
+# Validation
+
+  - `size(sigma, 1) == size(X, 2)`.
 
 # Related
 

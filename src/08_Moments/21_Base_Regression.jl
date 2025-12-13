@@ -154,7 +154,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 
 # Returns
 
-  - `GLM.LinearModel`: A fitted linear model object from the GLM.jl package.
+  - `model::GLM.LinearModel`: A fitted linear model object from the GLM.jl package.
 
 # Related
 
@@ -238,7 +238,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
 
 # Returns
 
-  - `GLM.GeneralizedLinearModel`: A fitted generalised linear model object from the GLM.jl package.
+  - `model::GLM.GeneralizedLinearModel`: A fitted generalised linear model object from the GLM.jl package.
 
 # Related
 
@@ -504,7 +504,7 @@ This function constructs a new `Regression` result, where the coefficient matrix
 
 # Returns
 
-  - `Regression`: A new regression result object with fields restricted to the selected rows.
+  - `reg::Regression`: A new regression result object with fields restricted to the selected rows.
 
 # Examples
 
@@ -590,7 +590,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 
 # Returns
 
-  - `Regression`: The computed or extracted regression result.
+  - `reg::Regression`: The computed or extracted regression result.
 
 # Related
 

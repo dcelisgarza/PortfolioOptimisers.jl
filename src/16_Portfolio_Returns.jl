@@ -125,7 +125,7 @@ Returns a new `FeesEstimator` with all fee fields restricted to the indices or a
 
 # Arguments
 
-  - `fees`: instance of `FeesEstimator`.
+  - `fees`: Instance of `FeesEstimator`.
   - `i`: Index or indices specifying the subset of assets.
 
 # Returns
@@ -293,7 +293,7 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 
 # Returns
 
-  - `Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
+  - `fe::Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
 
 # Details
 
@@ -403,7 +403,7 @@ This method is used as a fallback for missing fee estimators or constraints, ens
 
 # Returns
 
-  - `nothing`: Always returns `nothing`.
+  - `nothing`.
 
 # Related
 
@@ -428,7 +428,7 @@ Returns a new `Fees` object with all fee fields restricted to the indices or ass
 
 # Returns
 
-  - `Fees`: New constraint object with fields restricted to the specified subset.
+  - `fe::Fees`: New constraint object with fields restricted to the specified subset.
 
 # Details
 
@@ -591,8 +591,8 @@ Compute the actual turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::VecNum`: vector of turnover fees per asset.
+      + `tn.val::Number`: Single turnover fee applied to all assets.
+      + `tn.val::VecNum`: Vector of turnover fees per asset.
 
 # Returns
 
@@ -730,8 +730,8 @@ Compute the turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::VecNum`: vector of turnover fees per asset.
+      + `tn.val::Number`: Single turnover fee applied to all assets.
+      + `tn.val::VecNum`: Vector of turnover fees per asset.
 
 # Returns
 
@@ -927,8 +927,8 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::VecNum`: vector of turnover fees per asset.
+      + `tn.val::Number`: Single turnover fee applied to all assets.
+      + `tn.val::VecNum`: Vector of turnover fees per asset.
 
 # Returns
 
@@ -1073,8 +1073,8 @@ Compute the per asset turnover fees for portfolio weights and prices.
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
-      + `tn.val::Number`: single turnover fee applied to all assets.
-      + `tn.val::VecNum`: vector of turnover fees per asset.
+      + `tn.val::Number`: Single turnover fee applied to all assets.
+      + `tn.val::VecNum`: Vector of turnover fees per asset.
 
 # Returns
 
@@ -1226,7 +1226,7 @@ Returns the portfolio returns as the product of the asset return matrix `X` and 
 
 # Returns
 
-  - `VecNum`: Portfolio net returns.
+  - `val::VecNum`: Portfolio net returns.
 
 # Examples
 
@@ -1267,7 +1267,7 @@ Returns the portfolio returns as the product of the asset return matrix `X` and 
 
 # Returns
 
-  - `Matrix{<:Number}`: Per asset portfolio net returns.
+  - `ret::Matrix{<:Number}`: Per asset portfolio net returns.
 
 # Examples
 

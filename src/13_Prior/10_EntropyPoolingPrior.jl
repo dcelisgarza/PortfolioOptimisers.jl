@@ -1009,8 +1009,8 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `opt: Optim.jl-based entropy pooling optimiser with exponential objective.
 
-      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: use the exponential formulation.
-      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: use the logarithmic formulation.
+      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
+      + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Use the logarithmic formulation.
 
 # Returns
 
@@ -1146,8 +1146,8 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `opt`: JuMP.jl-based entropy pooling optimiser with exponential objective.
 
-      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: use the exponential formulation.
-      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: use the logarithmic formulation.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
+      + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Use the logarithmic formulation.
 
 # Returns
 

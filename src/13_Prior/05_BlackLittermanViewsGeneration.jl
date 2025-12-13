@@ -145,7 +145,7 @@ Unified interface for constructing or passing through Black-Litterman investor v
   - `views`:
 
       + `nothing` or [`BlackLittermanViews`](@ref): it is returned unchanged.
-      + `EqnType`: the view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
+      + `EqnType`: The view(s) are parsed, groups are replaced by their constituent assets using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
       + [`LinearConstraintEstimator`](@ref): calls the method described above using the `val` field of the estimator.
 
   - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.

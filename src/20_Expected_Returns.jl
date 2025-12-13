@@ -319,7 +319,7 @@ This function provides a consistent interface for updating or copying return-bas
 
 # Returns
 
-  - `ReturnRiskMeasure`: The input risk measure object.
+  - `r::ReturnRiskMeasure`: The input risk measure object.
 
 # Details
 
@@ -442,7 +442,7 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Returns
 
-  - `RatioRiskMeasure`: New risk measure object with updated return estimator and risk measure.
+  - `r::RatioRiskMeasure`: New risk measure object with updated return estimator and risk measure.
 
 # Details
 
@@ -475,7 +475,7 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Returns
 
-  - `RatioRiskMeasure`: New risk measure object with updated uncertainty set risk measure.
+  - `r::RatioRiskMeasure`: New risk measure object with updated uncertainty set risk measure.
 
 # Details
 
@@ -508,7 +508,7 @@ Creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk 
 
 # Returns
 
-  - `RatioRiskMeasure`: New risk measure object with updated solver-based risk measure.
+  - `r::RatioRiskMeasure`: New risk measure object with updated solver-based risk measure.
 
 # Details
 

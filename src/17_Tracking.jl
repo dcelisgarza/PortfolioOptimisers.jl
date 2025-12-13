@@ -315,7 +315,7 @@ Used as a fallback method for missing tracking constraints or estimators, ensuri
 
 # Returns
 
-  - `nothing`: Returns `nothing`.
+  - `nothing`.
 
 # Details
 
@@ -588,7 +588,7 @@ This function returns the input [`ReturnsTracking`](@ref) object unchanged. It i
 
 # Returns
 
-  - `ReturnsTracking`: The input tracking algorithm object.
+  - `tr::ReturnsTracking`: The input tracking algorithm object.
 
 # Details
 
@@ -617,7 +617,7 @@ Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 # Returns
 
-  - `VecNum`: Benchmark portfolio returns.
+  - `b::VecNum`: Benchmark portfolio returns.
 
 # Examples
 
@@ -654,7 +654,7 @@ This function provides a consistent interface for updating or copying returns-ba
 
 # Returns
 
-  - `ReturnsTracking`: The input tracking algorithm object.
+  - `tr::ReturnsTracking`: The input tracking algorithm object.
 
 # Details
 

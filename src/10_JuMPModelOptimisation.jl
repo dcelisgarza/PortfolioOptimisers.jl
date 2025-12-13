@@ -201,7 +201,7 @@ This is a generic fallback that does nothing if no model or settings are provide
 
 # Returns
 
-  - `nothing`
+  - `nothing`.
 """
 function set_solver_attributes(args...)
     return nothing
@@ -220,7 +220,7 @@ Iterates over the provided settings and applies each as a solver attribute.
 
 # Returns
 
-  - `nothing`
+  - `nothing`.
 
 # Related
 
@@ -246,7 +246,7 @@ Set a single solver attribute on a JuMP model.
 
 # Returns
 
-  - `nothing`
+  - `nothing`.
 
 # Related
 
@@ -271,7 +271,7 @@ Tries each solver in order, applying settings and checking for solution feasibil
 
 # Returns
 
-  - `JuMPResult`: Result object containing trial errors and success flag.
+  - `res::JuMPResult`: Result object containing trial errors and success flag.
 
 # Details
 

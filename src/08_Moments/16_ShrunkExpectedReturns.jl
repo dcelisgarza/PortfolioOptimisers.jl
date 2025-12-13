@@ -360,9 +360,9 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - Computes the shrinkage target using `target_mean`.
   - Computes the shrinkage intensity `alpha` with:
 
-      + `JamesStein`: the centered mean and eigenvalues of the covariance matrix.
-      + `BayesStein`: a Bayesian formula involving the centered mean and inverse covariance.
-      + `BodnarOkhrinParolya`: a Bayesian formula involving the target mean, mean and inverse covariance.
+      + `JamesStein`: The centered mean and eigenvalues of the covariance matrix.
+      + `BayesStein`: A Bayesian formula involving the centered mean and inverse covariance.
+      + `BodnarOkhrinParolya`: A Bayesian formula involving the target mean, mean and inverse covariance.
   - ReturnsResult the shrunk mean vector.
 
 # Related

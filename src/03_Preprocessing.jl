@@ -26,7 +26,7 @@ Validate that asset or factor names and their corresponding returns matrix are p
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Details
 
@@ -179,7 +179,7 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `i`
 
 # Returns
 
-  - `ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
+  - `rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
 
 # Details
 

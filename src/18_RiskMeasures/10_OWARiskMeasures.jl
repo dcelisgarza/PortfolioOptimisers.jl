@@ -59,13 +59,13 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 
 Where:
 
-  - ``\\mathcal{K}_{\\text{noc}} \\coloneqq \\left\\{\\left(t,\\,x\\right) \\in \\mathbb{R}^n : t \\geq \\lVert x \\rVert_{1}\\right = \\sum\\limits_{i} \\lvert x_{i} \\rvert\\}``: is the norm one cone, which enforces each entry of ``\\boldsymbol{\\psi}`` is the absolute value of each entry of ``\\boldsymbol{\\theta}``.
-  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\phi_{\\text{max}}``: is the maximum risk aversion coefficient.
-  - ``T``: is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - ``\\mathcal{K}_{\\text{noc}} \\coloneqq \\left\\{\\left(t,\\,x\\right) \\in \\mathbb{R}^n : t \\geq \\lVert x \\rVert_{1}\\right = \\sum\\limits_{i} \\lvert x_{i} \\rvert\\}``: Is the norm one cone, which enforces each entry of ``\\boldsymbol{\\psi}`` is the absolute value of each entry of ``\\boldsymbol{\\theta}``.
+  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
+  - ``T``: Is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
 # Fields
 
@@ -145,12 +145,12 @@ The Minimum Squared Distance algorithm finds OWA weights that minimize the squar
 
 Where:
 
-  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\phi_{\\text{max}}``: is the maximum risk aversion coefficient.
-  - ``T``: is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
+  - ``T``: Is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
 # Fields
 
@@ -217,12 +217,12 @@ The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, s
 
 Where:
 
-  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\phi_{\\text{max}}``: is the maximum risk aversion coefficient.
-  - ``T``: is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
+  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
+  - ``T``: Is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector after enforcing non-decreasing monotonicity and incorporating the user-defined risk aversion.
 
 # Fields
 
@@ -287,13 +287,13 @@ This struct represents an estimator for Ordered Weights Array (OWA) weights base
 
 Where:
 
-  - ``\\phi_{k}``: is the risk aversion coefficient for the `k`-th order moment.
-  - ``\\gamma``: is the risk aversion parameter `g`.
-  - ``T``: is the total number of observations.
-  - ``\\boldsymbol{w}_{k}``: is the `T × 1` OWA weights vector for the `k`-th order moment.
-  - ``\\mathbf{w}``: is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
-  - ``\\boldsymbol{\\vartheta}``: is the intermediate `T × 1` OWA weights vector incorporating the user-defined risk aversion before enforcing non-decreasing monotonicity.
-  - ``\\boldsymbol{\\theta}``: is the final `T × 1` OWA weights vector incorporating the user-defined risk aversion after enforcing non-decreasing monotonicity.
+  - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
+  - ``\\gamma``: Is the risk aversion parameter `g`.
+  - ``T``: Is the total number of observations.
+  - ``\\boldsymbol{w}_{k}``: Is the `T × 1` OWA weights vector for the `k`-th order moment.
+  - ``\\mathbf{w}``: Is the `T × K` matrix of OWA weights for all order moments where each column `k` corresponds to weights of the `k`-th order moment, each row corresponds to the weights for the `t`-th observation.
+  - ``\\boldsymbol{\\vartheta}``: Is the intermediate `T × 1` OWA weights vector incorporating the user-defined risk aversion before enforcing non-decreasing monotonicity.
+  - ``\\boldsymbol{\\theta}``: Is the final `T × 1` OWA weights vector incorporating the user-defined risk aversion after enforcing non-decreasing monotonicity.
 
 # Fields
 

@@ -367,7 +367,7 @@ Set values in a vector for all assets belonging to a specified group.
 
 # Returns
 
-  - `nothing`: The operation is performed in-place on `arr`.
+  - `nothing`. The operation is performed in-place on `arr`.
 
 # Related
 
@@ -541,9 +541,9 @@ Recursively evaluate numeric functions and constants in a Julia expression.
 
   - `expr`:
 
-      + `Number`: it is returned as-is.
-      + `:Inf`: returns `Inf`.
-      + `Expr`: representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
+      + `Number`: It is returned as-is.
+      + `:Inf`: Returns `Inf`.
+      + `Expr`: Representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
       + Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
 
 # Returns
@@ -624,9 +624,9 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
   - `expr`:
 
-      + `Number`: appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
+      + `Number`: Appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
 
-      + `Symbol`: appends `(coeff, string(expr))` to `terms`.
+      + `Symbol`: Appends `(coeff, string(expr))` to `terms`.
       + `Expr`:
 
           * For multiplication (`*`), distributes the coefficient to the numeric part.
@@ -637,7 +637,7 @@ Recursively collect and expand terms from a Julia expression for linear constrai
 
 # Returns
 
-  - `nothing`: The function modifies `terms` in-place.
+  - `nothing`. The function modifies `terms` in-place.
 
 # Related
 
@@ -746,7 +746,7 @@ Internal utility for error handling during equation parsing.
 
 # Returns
 
-  - `nothing`: if the expression is valid or handled.
+  - `nothing`. If the expression is valid or handled.
 
 # Related
 

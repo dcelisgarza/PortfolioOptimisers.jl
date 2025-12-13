@@ -155,7 +155,7 @@ Returns a vector of node properties (by default, node IDs) in preorder (root, le
 
 # Returns
 
-  - `Vector{Int}`: Vector of node properties in preorder.
+  - `res::Vector{Int}`: Vector of node properties in preorder.
 
 # Related
 
@@ -374,7 +374,7 @@ This function applies the specified optimal number of clusters estimator (`onc`)
 
 # Returns
 
-  - `Integer`: Selected optimal number of clusters.
+  - `onc::Integer`: Selected optimal number of clusters.
 
 # Related
 

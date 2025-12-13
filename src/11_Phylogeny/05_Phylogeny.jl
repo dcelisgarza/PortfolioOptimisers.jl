@@ -488,7 +488,7 @@ This function dispatches to the appropriate centrality computation from [`Graphs
 
 # Returns
 
-  - `VecNum`: Centrality scores for each node in the graph.
+  - `cent::VecNum`: Centrality scores for each node in the graph.
 
 # Related
 

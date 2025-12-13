@@ -15,18 +15,18 @@ Validate that the input value is non-empty, non-negative and finite.
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Details
 
-  - `val`: input value to validate.
+  - `val`: Input value to validate.
 
       + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
       + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
       + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
       + `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
       + `::Number`: `isfinite(val)` and `val >= 0`.
-      + `args...`: always passes.
+      + `args...`: Always passes.
 
 # Related
 
@@ -93,18 +93,18 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Details
 
-  - `val`: input value to validate.
+  - `val`: Input value to validate.
 
       + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
       + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
       + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
       + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
       + `::Number`: `isfinite(val)` and `val > 0`.
-      + `args...`: always passes.
+      + `args...`: Always passes.
 
 # Related
 
@@ -171,18 +171,18 @@ Validate that the input value is non-empty and finite.
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Details
 
-  - `val`: input value to validate.
+  - `val`: Input value to validate.
 
       + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
       + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
       + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
       + `::Pair`: `isfinite(val[2])`.
       + `::Number`: `isfinite(val).
-      + `args...`: always passes.
+      + `args...`: Always passes.
 
 # Related
 
@@ -235,7 +235,7 @@ Assert that the input matrix is square.
 
 # Returns
 
-  - Returns `nothing` if validation passes.
+  - `nothing`.
 
 # Validation
 
@@ -406,7 +406,7 @@ Efficient scalar and vector dot product utility.
 
 # Returns
 
-  - `Number`: The resulting scalar.
+  - `res::Number`: The resulting scalar.
 
 # Examples
 
@@ -453,11 +453,11 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: returns `x` unchanged.
-      + `::AbstractVector`: returns `view(x, i)`.
-      + `::VecScalar`: returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: returns `view(x, i, i)`.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `view(x, i)`.
+      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: Returns a vector of views for each element in `x`.
+      + `::AbstractMatrix`: Returns `view(x, i, i)`.
 
 # Examples
 
@@ -546,11 +546,11 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: returns `x` unchanged.
-      + `::AbstractVector`: returns `view(x, i)`.
-      + `::VecScalar`: returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: returns `view(x, i, i)`.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `view(x, i)`.
+      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: Returns a vector of views for each element in `x`.
+      + `::AbstractMatrix`: Returns `view(x, i, i)`.
 
 # Examples
 
@@ -740,7 +740,7 @@ Defining methods which dispatch on the first argument allows for a consistent fa
 
 # Returns
 
-  - `nothing`: Always returns `nothing`.
+  - `nothing`.
 
 # Related
 

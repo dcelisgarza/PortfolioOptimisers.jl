@@ -12,7 +12,7 @@ Used as a fallback method for missing turnover constraints or estimators, ensuri
 
 # Returns
 
-  - `nothing`: Always returns `nothing`.
+  - `nothing`.
 
 # Related
 
@@ -253,7 +253,7 @@ Where:
 
   - ``\\boldsymbol{w}``: `N × 1` vector of current portfolio weights.
   - ``\\boldsymbol{w}_b``: `N × 1` vector of benchmark portfolio weights.
-  - ``\\lvert \\cdot \\rvert``: element-wise absolute value.
+  - ``\\lvert \\cdot \\rvert``: Element-wise absolute value.
 
 # Fields
 

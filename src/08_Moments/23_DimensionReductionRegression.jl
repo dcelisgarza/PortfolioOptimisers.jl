@@ -74,7 +74,7 @@ This method applies PCA as a dimension reduction technique for regression-based 
 
 # Returns
 
-  - `model`: A fitted PCA model object from `MultivariateStats.jl`.
+  - `model::PCA`: A fitted PCA model object from `MultivariateStats.jl`.
 
 # Related
 
@@ -141,7 +141,7 @@ This method applies PPCA as a dimension reduction technique for regression-based
 
 # Returns
 
-  - `model`: A fitted PPCA model object from `MultivariateStats.jl`.
+  - `model::PPCA`: A fitted PPCA model object from `MultivariateStats.jl`.
 
 # Related
 
@@ -329,7 +329,7 @@ This method fits a regression model with dimension reduction (e.g., PCA or PPCA)
 
 # Returns
 
-  - `Regression`: A regression result object containing:
+  - `reg::Regression`: A regression result object containing:
 
       + `b`: Vector of intercepts for each response.
       + `M`: Matrix of coefficients for each response and feature (in the original feature space).

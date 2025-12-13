@@ -302,10 +302,10 @@ Scalariser that combines multiple risk measures using a weighted sum.
 
 Where:
 
-  - ``N``: number of risk measures.
-  - ``i``: subscript denoting the `i`-th risk measure.
+  - ``N``: Number of risk measures.
+  - ``i``: Subscript denoting the `i`-th risk measure.
   - ``r_i``: `i`-th risk measure value.
-  - ``w_i``: weight of the `i`-th risk measure.
+  - ``w_i``: Weight of the `i`-th risk measure.
 
 # Related
 
@@ -331,10 +331,10 @@ Scalariser that selects the risk expression whose scaled value is the largest.
 
 Where:
 
-  - ``N``: number of risk measures.
-  - ``i``: subscript denoting the `i`-th risk measure.
+  - ``N``: Number of risk measures.
+  - ``i``: Subscript denoting the `i`-th risk measure.
   - ``r_i``: `i`-th risk measure value.
-  - ``w_i``: weight of the `i`-th risk measure.
+  - ``w_i``: Weight of the `i`-th risk measure.
 
 # Related
 
@@ -364,11 +364,11 @@ The parameter `gamma` controls the approximation accuracy to the maximum functio
 
 Where:
 
-  - ``N``: number of risk measures.
-  - ``i``: subscript denoting the `i`-th risk measure.
+  - ``N``: Number of risk measures.
+  - ``i``: Subscript denoting the `i`-th risk measure.
   - ``r_i``: `i`-th risk measure value.
-  - ``w_i``: weight of the `i`-th risk measure.
-  - ``\\gamma``: positive parameter controlling the interpolation between the weighted sum and the maximum functions.
+  - ``w_i``: Weight of the `i`-th risk measure.
+  - ``\\gamma``: Positive parameter controlling the interpolation between the weighted sum and the maximum functions.
 
 # Fields
 
