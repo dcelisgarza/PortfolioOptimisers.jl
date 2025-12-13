@@ -1,7 +1,7 @@
 """
     abstract type AbstractDetoneEstimator <: AbstractEstimator end
 
-Abstract supertype for all detoning estimators in PortfolioOptimisers.jl.
+Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
 All concrete types representing detoning estimators (such as [`Detone`](@ref)) should subtype `AbstractDetoneEstimator`. This enables a consistent interface for detoning routines and downstream analysis.
 
@@ -13,19 +13,25 @@ All concrete types representing detoning estimators (such as [`Detone`](@ref)) s
 """
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
-    struct Detone{T1} <: AbstractDetoneEstimator
+    struct Detone{T1, T2} <: AbstractDetoneEstimator
         n::T1
+        pdm::T2
     end
 
-A concrete detoning estimator for removing the top `n` principal components (market modes) from a covariance or correlation matrix.
+A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix.
+
+For financial data, the leading principal components often represent market-wide movements that can obscure asset-specific signals. The `Detone` estimator allows users to specify the number of these leading components to remove, thereby enhancing the focus on idiosyncratic relationships between market members [mlp1](@cite).
+
+Detoned matrices may not be suitable for non-clustering optimisations because it can make the matrix non-positive definite. However, they can be quite effective for clustering optimsations.
 
 # Fields
 
   - `n`: Number of leading principal components to remove.
+  - `pdm`:  Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
 # Constructor
 
-    Detone(; n::Integer = 1)
+    Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
 
 Keyword arguments correspond to the fields above.
 
@@ -38,26 +44,34 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Detone(; n = 2)
 Detone
-  n ┴ Int64: 2
+    n ┼ Int64: 2
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
 
   - [`detone!`](@ref)
   - [`detone`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
-struct Detone{T1} <: AbstractDetoneEstimator
+struct Detone{T1, T2} <: AbstractDetoneEstimator
     n::T1
-    function Detone(n::Integer)
+    pdm::T2
+    function Detone(n::Integer, pdm::Option{<:Posdef} = Posdef())
         @argcheck(zero(n) < n, DomainError)
-        return new{typeof(n)}(n)
+        return new{typeof(n), typeof(pdm)}(n, pdm)
     end
 end
-function Detone(; n::Integer = 1)
-    return Detone(n)
+function Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
+    return Detone(n, pdm)
 end
 """
-    detone!(dt::Detone, X::MatNum; pdm::Option{<:Posdef} = Posdef())
+    detone!(dt::Detone, X::MatNum)
     detone!(::Nothing, args...)
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
@@ -72,7 +86,6 @@ For covariance matrices, the function internally converts to a correlation matri
       + `dt::Nothing`: No-op and returns `nothing`.
 
   - `X`: The covariance or correlation matrix to be detoned (modified in-place).
-  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
 # Returns
 
@@ -117,12 +130,16 @@ julia> X
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 function detone!(::Nothing, args...)
     return nothing
 end
-function detone!(ce::Detone, X::MatNum, pdm::Option{<:Posdef} = Posdef())
-    n = ce.n
+function detone!(de::Detone, X::MatNum)
+    n = de.n
     @argcheck(zero(n) < n <= size(X, 2),
               DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
@@ -137,14 +154,14 @@ function detone!(ce::Detone, X::MatNum, pdm::Option{<:Posdef} = Posdef())
     vecs = vecs[:, (end - n):end]
     X .-= vecs * vals * transpose(vecs)
     X .= cov2cor(X)
-    posdef!(pdm, X)
+    posdef!(de.pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
     return nothing
 end
 """
-    detone(dt::Detone, X::MatNum; pdm::Option{<:Posdef} = Posdef())
+    detone(dt::Detone, X::MatNum)
     detone(::Nothing, args...)
 
 Out-of-place version of [`detone!`](@ref).
@@ -156,13 +173,17 @@ Out-of-place version of [`detone!`](@ref).
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
+
+# References
+
+  - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 function detone(::Nothing, args...)
     return nothing
 end
-function detone(ce::Detone, X::MatNum, pdm::Option{<:Posdef} = Posdef())
+function detone(de::Detone, X::MatNum)
     X = copy(X)
-    detone!(ce, X, pdm)
+    detone!(de, X)
     return X
 end
 

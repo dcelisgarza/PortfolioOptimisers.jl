@@ -1,7 +1,7 @@
 """
     abstract type AbstractReturnsResult <: AbstractResult end
 
-Abstract supertype for all returns result types in PortfolioOptimisers.jl.
+Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
 
 All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
 
@@ -26,7 +26,7 @@ Validate that asset or factor names and their corresponding returns matrix are p
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Details
 
@@ -67,7 +67,7 @@ end
         ivpa::T7
     end
 
-A flexible container type for storing the results of asset and factor returns calculations in PortfolioOptimisers.jl.
+A flexible container type for storing the results of asset and factor returns calculations in `PortfolioOptimisers.jl`.
 
 `ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
 It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimization and analysis routines.
@@ -179,7 +179,7 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `i`
 
 # Returns
 
-  - `ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
+  - `rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
 
 # Details
 
@@ -228,7 +228,7 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
-    prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
+    prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                       Rb::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
                       padding::Bool = false, missing_col_percent::Number = 1.0,
@@ -401,7 +401,7 @@ This function scans the specified dimension of the input matrix and returns the 
 
 # Validation
 
-  - `dims` must be either `1` (columns) or `2` (rows).
+  - `dims in (1, 2)`.
 
 # Details
 

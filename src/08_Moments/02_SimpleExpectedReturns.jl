@@ -106,7 +106,7 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionall
 
 # Returns
 
-  - `SimpleExpectedReturns`: New estimator with updated weights.
+  - `me::SimpleExpectedReturns`: New estimator with updated weights.
 
 # Details
 

@@ -67,7 +67,9 @@
         end
 
         @test iszero(calc_fees(res.w, Fees()))
-        @test all(x -> iszero(x), calc_asset_fees(res.w, Fees()))
+        @test all(iszero, calc_asset_fees(res.w, Fees()))
+        @test iszero(calc_fees(res.w, vec(values(X[end])), Fees()))
+        @test all(iszero, calc_asset_fees(res.w, vec(values(X[end])), Fees()))
     end
     @testset "Expected Returns" begin
         r = factory(Variance(), pr, slv)

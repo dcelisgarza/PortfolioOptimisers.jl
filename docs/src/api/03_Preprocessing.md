@@ -1,4 +1,4 @@
-# Preprocessing
+# Pre-processing
 
 ## Prices to returns
 

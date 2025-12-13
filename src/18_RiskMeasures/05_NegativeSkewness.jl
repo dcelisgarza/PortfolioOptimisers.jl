@@ -1,0 +1,60 @@
+const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
+struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
+    settings::T1
+    mp::T2
+    sk::T3
+    V::T4
+    alg::T5
+    function NegativeSkewness(settings::RiskMeasureSettings,
+                              mp::AbstractMatrixProcessingEstimator, sk::Option{<:MatNum},
+                              V::Option{<:MatNum}, alg::NSkeFormulations)
+        sk_flag = isnothing(sk)
+        V_flag = isnothing(V)
+        if sk_flag || V_flag
+            @argcheck(sk_flag)
+            @argcheck(V_flag)
+        else
+            @argcheck(!isempty(sk))
+            @argcheck(!isempty(V))
+            @argcheck(size(sk, 1)^2 == size(sk, 2))
+            assert_matrix_issquare(V, :V)
+        end
+        return new{typeof(settings), typeof(mp), typeof(sk), typeof(V), typeof(alg)}(settings,
+                                                                                     mp, sk,
+                                                                                     V, alg)
+    end
+end
+function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                          mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                          sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
+                          alg::NSkeFormulations = SOCRiskExpr())
+    return NegativeSkewness(settings, mp, sk, V, alg)
+end
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::VecNum)
+    return sqrt(dot(w, r.V, w))
+end
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
+    return dot(w, r.V, w)
+end
+function factory(r::NegativeSkewness, pr::HighOrderPrior, args...; kwargs...)
+    sk = nothing_scalar_array_selector(r.sk, pr.sk)
+    V = nothing_scalar_array_selector(r.V, pr.V)
+    return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg)
+end
+function factory(r::NegativeSkewness, ::LowOrderPrior, args...; kwargs...)
+    return r
+end
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any}, ::Any,
+                           args...)
+    return r
+end
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum, <:Any}, i,
+                           X::MatNum)
+    sk = r.sk
+    idx = fourth_moment_index_generator(size(sk, 1), i)
+    sk = view(r.sk, i, idx)
+    V = __coskewness(sk, view(X, :, i), r.mp)
+    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
+end
+
+export NegativeSkewness
