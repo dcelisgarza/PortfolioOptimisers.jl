@@ -252,7 +252,7 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 
 # Arguments
 
-  - `W`: `N×N` matrix of non-negative weights (e.g., similarity or correlation matrix).
+  - `W`: `N × N` matrix of non-negative weights (e.g., similarity or correlation matrix).
   - `nargout`: Number of output arguments. All outputs are always computed, but if `nargout <= 3`, `cliques` and `cliqueTree` are returned as `nothing`.
 
 # Validation
@@ -469,7 +469,7 @@ This function identifies all 3-cliques (triangles) in the adjacency matrix `A` o
 
 # Inputs
 
-  - `A`: `N×N` adjacency matrix of a Maximal Planar Graph (MPG).
+  - `A`: `N × N` adjacency matrix of a Maximal Planar Graph (MPG).
 
 # Details
 
@@ -617,7 +617,7 @@ This function identifies nodes that are not adjacent to a given 3-clique in the 
 
 # Arguments
 
-  - `Adj`: `N×N` adjacency matrix.
+  - `Adj`: `N × N` adjacency matrix.
   - `Cliq`: `3×1` vector of node indices forming a 3-clique.
 
 # Details
@@ -628,13 +628,13 @@ This function identifies nodes that are not adjacent to a given 3-clique in the 
 
 # Returns
 
-  - `T::Vector{Int}`: `N×1` vector containing the adjacency number of each node:
+  - `T::Vector{Int}`: `N × 1` vector containing the adjacency number of each node:
 
       + `0` for nodes in the clique,
       + `1` for nodes in a disjoint component,
       + `2` for nodes in the same component as the clique.
 
-  - `IndxNot::Vector{Int}`: `N×1` vector of nodes with no adjacencies to the clique.
+  - `IndxNot::Vector{Int}`: `N × 1` vector of nodes with no adjacencies to the clique.
 
 # Related
 
@@ -720,7 +720,7 @@ This function computes the adjacency matrix among root candidate 3-cliques, iden
 
 # Arguments
 
-  - `A`: `N×N` adjacency matrix of the MPG.
+  - `A`: `N × N` adjacency matrix of the MPG.
   - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
   - `CliqRoot`: Vector of indices of root candidate cliques.
 
@@ -892,7 +892,7 @@ This method creates a root from the adjacency tree of all root candidate cliques
   - `Root`: Vector of indices of root candidate cliques.
   - `Pred`: Vector of predicted parent indices for each clique.
   - `Nc`: Number of 3-cliques.
-  - `A`: `N×N` adjacency matrix of the MPG.
+  - `A`: `N × N` adjacency matrix of the MPG.
   - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
 
 # Details
@@ -1018,7 +1018,7 @@ This function assigns directions to each separating 3-clique in the undirected b
 
 # Arguments
 
-  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
+  - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
   - `Hb`: Undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)).
   - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
   - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
@@ -1099,8 +1099,8 @@ This function assigns each vertex to a cluster based on the directed bubble hier
 
 # Arguments
 
-  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
-  - `Dpm`: `N×N` shortest path lengths matrix of the PMFG.
+  - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
+  - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
   - `Hb`: Undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
   - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
   - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
@@ -1117,7 +1117,7 @@ This function assigns each vertex to a cluster based on the directed bubble hier
 # Returns
 
   - `Adjv::SparseMatrixCSC{Int, Int}`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster.
-  - `Tc::Vector{Int}`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
+  - `Tc::Vector{Int}`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
 
 # Related
 
@@ -1189,7 +1189,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 
 # Arguments
 
-  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
+  - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
   - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Mc`: Matrix indicating bubbles that coincide with clusters.
 
@@ -1382,9 +1382,9 @@ This function builds a hierarchical clustering (dendrogram) by first constructin
 
 # Inputs
 
-  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
-  - `Dpm`: `N×N` shortest path lengths matrix of the PMFG.
-  - `Tc`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
+  - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
+  - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
+  - `Tc`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
   - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
 
 # Details
@@ -1533,8 +1533,8 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
 
 # Arguments
 
-  - `D`: `N×N` dissimilarity matrix (e.g., a distance matrix). Must be symmetric and non-empty.
-  - `S`: `N×N` non-negative similarity matrix. Must be symmetric and non-empty.
+  - `D`: `N × N` dissimilarity matrix (e.g., a distance matrix). Must be symmetric and non-empty.
+  - `S`: `N × N` non-negative similarity matrix. Must be symmetric and non-empty.
   - `branchorder`: Ordering method for the dendrogram branches. Accepts `:optimal`, `:barjoseph`, or `:r`.
   - `root`: Root selection method for the clique hierarchy.
 
@@ -1556,10 +1556,10 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
 
 # Returns
 
-  - `T8::Vector{Int}`: `N×1` cluster membership vector.
-  - `Rpm::SparseMatrixCSC{<:Number, Int}`: `N×N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
+  - `T8::Vector{Int}`: `N × 1` cluster membership vector.
+  - `Rpm::SparseMatrixCSC{<:Number, Int}`: `N × N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
   - `Adjv::SparseMatrixCSC{Int, Int}`: Bubble cluster membership matrix from [`BubbleCluster8s`](@ref).
-  - `Dpm::Matrix{<:Number}`: `N×N` shortest path length matrix of the PMFG.
+  - `Dpm::Matrix{<:Number}`: `N × N` shortest path length matrix of the PMFG.
   - `Mv::SparseMatrixCSC{Int, Int}`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Z::Matrix{<:Number}`: `(N-1)×3` linkage matrix in Matlab format.
   - `Z_hclust::Clustering.Hclust`: Dendrogram in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
@@ -1686,7 +1686,7 @@ This function implements the LoGo sparse inverse covariance estimation by combin
 
 # Arguments
 
-  - `sigma`: The covariance matrix (`N×N`).
+  - `sigma`: The covariance matrix (`N × N`).
   - `separators`: Each row contains indices of a separator (typically 3-cliques).
   - `cliques`: Each row contains indices of a clique (typically 4-cliques).
 
@@ -1898,8 +1898,8 @@ Validate compatibility of the distance estimator and covariance matrix for LoGo 
 # Arguments
 
   - `dist`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
-  - `sigma`: Covariance matrix (`N×N`).
-  - `X`: Data matrix (`T×N` or `N×T`).
+  - `sigma`: Covariance matrix (`N × N`).
+  - `X`: Data matrix (`T × N` or `N × T`).
 
 # Returns
 
@@ -1937,8 +1937,8 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 # Arguments
 
   - `je`: LoGo algorithm instance.
-  - `sigma`: Covariance matrix (`N×N`), updated in-place with the LoGo sparse inverse covariance.
-  - `X`: Data matrix (`T×N`).
+  - `sigma`: Covariance matrix (`N × N`), updated in-place with the LoGo sparse inverse covariance.
+  - `X`: Data matrix (`T × N`).
   - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
   - `kwargs...`: Additional keyword arguments passed to distance and similarity estimators.
 
@@ -2000,8 +2000,8 @@ This method provides a standard interface for applying the LoGo algorithm to a c
 
   - `je`: LoGo algorithm instance (`LoGo`).
   - `pdm`: Optional positive definite matrix estimator (e.g., `Posdef()`), or `nothing`.
-  - `sigma`: Covariance matrix (`N×N`), updated in-place.
-  - `X`: Data matrix (`T×N` or `N×T`).
+  - `sigma`: Covariance matrix (`N × N`), updated in-place.
+  - `X`: Data matrix (`T × N` or `N × T`).
   - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
   - `kwargs...`: Additional keyword arguments passed to distance and similarity estimators.
 

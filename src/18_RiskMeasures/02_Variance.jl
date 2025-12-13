@@ -38,8 +38,8 @@ Direct quadratic risk expression optimisation formulation for variance-like risk
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N×N` co-moment matrix.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N × N` co-moment matrix.
 
 # Scenario-based
 
@@ -52,9 +52,9 @@ Where:
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\boldsymbol{d}``: `T×1` deviations vector.
-  - ``\\mathcal{S}_{w}``: Scenario set for portfolio `x`.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` deviations vector.
+  - ``\\mathcal{S}_{w}``: scenario set for portfolio `x`.
 
 # Related Types
 
@@ -154,8 +154,8 @@ Depending on the `alg` field, the variance risk measure is formulated using `JuM
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
 
 ## `SquaredSOCRiskExpr`
 
@@ -168,9 +168,9 @@ Where:
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
-  - ``\\mathbf{G}``: Suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\sigma``: variable representing the optimised portfolio's standard deviation.
+  - ``\\mathbf{G}``: suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
@@ -187,8 +187,8 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
 
 ## Arguments
 
@@ -321,9 +321,9 @@ Keyword arguments correspond to the fields above.
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
-  - ``\\mathbf{G}``: Suitable factorisation of the `N×N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\sigma``: variable representing the optimised portfolio's standard deviation.
+  - ``\\mathbf{G}``: suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
@@ -340,8 +340,8 @@ Computes the standard deviation risk of a portfolio with weights `w` using the c
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
 
 ## Arguments
 
@@ -460,9 +460,9 @@ When using an uncertainty set on the variance, the optimisation problem becomes:
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
-  - ``U_{\\mathbf{\\Sigma}}``: Uncertainty set for the covariance matrix.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - ``U_{\\mathbf{\\Sigma}}``: uncertainty set for the covariance matrix.
 
 This problem can be reformulated depending on the type of uncertainty set used.
 
@@ -483,16 +483,16 @@ This problem can be reformulated depending on the type of uncertainty set used.
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
 
-  - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{W}``: `N×N` auxiliary symmetric matrices.
-  - ``\\mathbf{\\Sigma}_l``: `N×N` lower bound of the covariance matrix.
-  - ``\\mathbf{\\Sigma}_u``: `N×N` upper bound of the covariance matrix.
-  - ``k``: Scalar variable/constant.
+  - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{W}``: `N × N` auxiliary symmetric matrices.
+  - ``\\mathbf{\\Sigma}_l``: `N × N` lower bound of the covariance matrix.
+  - ``\\mathbf{\\Sigma}_u``: `N × N` upper bound of the covariance matrix.
+  - ``k``: scalar variable/constant.
 
       + If the objective risk-adjusted return, it is a non-negative variable.
       + Else it is equal to 1.
-  - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
+  - ``\\mathrm{Tr}(\\cdot)``: trace operator.
 
 ## Ellipse uncertainty set
 
@@ -510,19 +510,19 @@ Where:
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
 
-  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
-  - ``\\mathbf{W}``, ``\\mathbf{E}``: `N×N` auxiliary symmetric matrices.
-  - ``k_{\\mathbf{\\Sigma}}``: Scalar constant defining the size of the uncertainty set.
-  - ``\\sigma``: Variable representing the portfolio's variance of the variance.
-  - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
-  - ``k``: Scalar variable/constant.
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+  - ``\\mathbf{W}``, ``\\mathbf{E}``: `N × N` auxiliary symmetric matrices.
+  - ``k_{\\mathbf{\\Sigma}}``: scalar constant defining the size of the uncertainty set.
+  - ``\\sigma``: variable representing the portfolio's variance of the variance.
+  - ``\\mathbf{G}``: suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
+  - ``k``: scalar variable/constant.
 
       + If the objective risk-adjusted return, it is a non-negative variable.
       + Else it is equal to 1.
-  - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
-  - ``\\mathrm{vec}(\\cdot)``: Vectorisation operator, which unrolls a matrix as a column vector in column-major order.
+  - ``\\mathrm{Tr}(\\cdot)``: trace operator.
+  - ``\\mathrm{vec}(\\cdot)``: vectorisation operator, which unrolls a matrix as a column vector in column-major order.
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
@@ -539,8 +539,8 @@ Computes the variance risk of a portfolio with weights `w` using the covariance 
 
 Where:
 
-  - ``\\boldsymbol{w}``: `N×1` asset weights vector.
-  - ``\\mathbf{\\Sigma}``: `N×N` covariance matrix.
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
 
 ## Arguments
 
