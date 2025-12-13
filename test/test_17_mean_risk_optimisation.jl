@@ -146,7 +146,22 @@
                                                  3, 3, 3, 3, 3, 3],
                                  "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
                                                  3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
-                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
+                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end],
+                                 "nx_industries" => ["Technology", "Technology",
+                                                     "Financials", "Consumer_Discretionary",
+                                                     "Energy", "Industrials",
+                                                     "Consumer_Discretionary", "Healthcare",
+                                                     "Financials", "Consumer_Staples",
+                                                     "Healthcare", "Healthcare",
+                                                     "Technology", "Consumer_Staples",
+                                                     "Healthcare", "Consumer_Staples",
+                                                     "Energy", "Healthcare",
+                                                     "Consumer_Staples", "Energy"],
+                                 "ux_industries" => ["Technology", "Financials",
+                                                     "Consumer_Discretionary", "Energy",
+                                                     "Industrials", "Healthcare",
+                                                     "Consumer_Staples"]))
+
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -1022,14 +1037,6 @@
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         @test isapprox(res.w, optimise(mre, rd).w)
 
-        sets.dict["nx_industries"] = ["Technology", "Technology", "Financials",
-                                      "Consumer_Discretionary", "Energy", "Industrials",
-                                      "Consumer_Discretionary", "Healthcare", "Financials",
-                                      "Consumer_Staples", "Healthcare", "Healthcare",
-                                      "Technology", "Consumer_Staples", "Healthcare",
-                                      "Consumer_Staples", "Energy", "Healthcare",
-                                      "Consumer_Staples", "Energy"]
-        sets.dict["ux_industries"] = unique(sets.dict["nx_industries"])
         idx = [sets.dict["nx_industries"] .== i for i in sets.dict["ux_industries"]]
         for (i, ui) in zip(idx, sets.dict["ux_industries"])
             sets.dict[ui] = sets.dict["nx"][i]

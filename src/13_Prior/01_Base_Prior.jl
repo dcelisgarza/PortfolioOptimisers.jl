@@ -375,7 +375,7 @@ Compute the weighted average centrality for a centrality estimator.
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
                             kwargs...)
-    return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
+    return average_centrality(cte, w, pr.X; kwargs...)
 end
 """
     asset_phylogeny(cle::PhE_Cl,
