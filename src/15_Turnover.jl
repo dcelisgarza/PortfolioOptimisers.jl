@@ -48,6 +48,7 @@ Estimator for turnover portfolio constraints.
 
   - `w` is validated with [`assert_nonempty_finite_val`](@ref).
   - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - `dval`, if not `nothing`, `dval >= 0`.
 
 # Examples
 
@@ -93,7 +94,7 @@ Create a view of a `TurnoverEstimator` for a subset of assets.
 
 # Arguments
 
-  - `tn`: A `TurnoverEstimator` containing portfolio weights, turnover values, and default value.
+  - `tn`: An instance of `TurnoverEstimator`.
   - `i`: Index or indices specifying the subset of assets.
 
 # Returns
@@ -105,7 +106,6 @@ Create a view of a `TurnoverEstimator` for a subset of assets.
   - Uses `view` to create a subset of the weights.
   - Uses [`nothing_scalar_array_view`](@ref) to subset turnover values.
   - Propagates the default turnover value.
-  - Enables composable processing of asset subsets.
 
 # Examples
 
@@ -201,7 +201,7 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 
 # Returns
 
-  - `Turnover`: Object containing portfolio weights and turnover values aligned with `sets`.
+  - `tn::Turnover`: Object containing portfolio weights and turnover values aligned with `sets`.
 
 # Details
 
@@ -332,7 +332,7 @@ Returns a new `Turnover` object with portfolio weights and turnover values restr
 
 # Returns
 
-  - `Turnover`: A new turnover constraint object with fields restricted to the specified subset.
+  - `tn::Turnover`: A new turnover constraint object with fields restricted to the specified subset.
 
 # Details
 
@@ -421,7 +421,7 @@ Propagate or pass through turnover portfolio constraints.
 
 # Returns
 
-  - `tn::Option{ <:Turnover}`: The input constraint object, unchanged.
+  - `tn::Option{<:Turnover}`: The input constraint object, unchanged.
 
 # Examples
 
@@ -524,6 +524,10 @@ Provides a uniform interface for processing multiple constraint estimators simul
   - `sets`: [`AssetSets`](@ref) containing asset names or indices.
   - `datatype`: Data type for default turnover values when `dval` is `nothing`.
   - `strict`: If `true`, enforces strict matching between assets and turnover values (throws error on mismatch); if `false`, issues a warning.
+
+# Returns
+
+  - `res::VecTn`: Vector of constructed turnover constraints.
 
 # Related
 
