@@ -182,6 +182,36 @@
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    detone = Detone())),
                                rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = DenoiseAlgDetone(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = DetoneDenoiseAlg(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = DetoneAlgDenoise(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = AlgDenoiseDetone(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = AlgDetoneDenoise(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
         @test isapprox(df[!, 42],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
