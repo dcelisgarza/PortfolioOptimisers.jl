@@ -409,32 +409,29 @@ function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
     return IntegerPhylogeny(A, B, scale)
 end
 """
-    phylogeny_constraints(est::Option{<:PhCE_PhC}, X::MatNum;
-                          dims::Int = 1, kwargs...)
+    phylogeny_constraints(plc::Option{<:PhCE_PhC}, X::MatNum; dims::Int = 1, kwargs...)
+    phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
 
-`phylogeny_constraints` constructs constraint objects based on phylogenetic, clustering, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `est` is `nothing`, returns `nothing`.
+`phylogeny_constraints` constructs constraint objects based on phylogenetic, clustering, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
+
+If a vector broadcasts the function over each element, returning a vector of constraint results.
 
 # Arguments
 
-  - `est`: A phylogeny constraint estimator, result, or `nothing`.
-  - `X`: Data matrix of asset features or returns (ignored when `est` is not an estimator).
-  - `dims`: Dimension along which to compute the phylogeny (ignored when `est` is not an estimator).
+  - `plc`: A phylogeny constraint estimator, result, or `nothing`.
+  - `X`: Data matrix of asset features or returns (ignored when `plc` is not an estimator).
+  - `dims`: Dimension along which to compute the phylogeny (ignored when `plc` is not an estimator).
   - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny matrix routine (ignored when `est` is not an estimator).
 
 # Returns
 
-  - `SemiDefinitePhylogeny`: For semi-definite constraint estimators/results.
-  - `IntegerPhylogeny`: For integer constraint estimators/results.
-  - `nothing`: If `est` is `nothing`.
+  - `res`: Constraint result.
 
-# Details
-
-  - `est`:
-
-      + `AbstractPhylogenyConstraintEstimator`: Computes the phylogeny matrix using the estimator.
-      + `Option{<:AbstractPhylogenyConstraintResult}`: Returns it unchanged.
+      + `SemiDefinitePhylogeny`: For semi-definite constraint estimators/results.
+      + `IntegerPhylogeny`: For integer constraint estimators/results.
+      + `nothing`: If `est` is `nothing`.
 
 # Related
 
@@ -802,7 +799,7 @@ This method returns the input [`LinearConstraint`](@ref) object or `nothing` unc
 
 # Returns
 
-  - `ccs`: The input constraint object or `nothing`, unchanged.
+  - `ccs::Option{<:LinearConstraint}`: The input constraint object or `nothing`, unchanged.
 
 # Related
 

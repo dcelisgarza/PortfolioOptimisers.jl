@@ -147,6 +147,8 @@ Function for selecting uncertainty sets from risk measure or prior result instan
 
 # Returns
 
+Based on the argument types, returns one of the following:
+
   - `nothing`: If both `risk_ucs` and `prior_ucs` are `nothing`.
   - `risk_ucs::UcSE_UcS`: If `risk_ucs` is not `nothing`.
   - `prior_ucs::UcSE_UcS`: If `risk_ucs` is `nothing` but `prior_ucs` is not `nothing`.

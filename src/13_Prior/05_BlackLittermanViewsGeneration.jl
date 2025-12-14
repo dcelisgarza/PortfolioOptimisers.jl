@@ -76,7 +76,7 @@ Convert parsed Black-Litterman view equations into a `BlackLittermanViews` objec
 
 # Returns
 
-  - `BlackLittermanViews`: An object containing the assembled views matrix `P` and expected returns vector `Q`, or `nothing` if no views are present.
+  - `blv::BlackLittermanViews`: An object containing the assembled views matrix `P` and expected returns vector `Q`, or `nothing` if no views are present.
 
 # Examples
 
@@ -211,7 +211,7 @@ Validate Black-Litterman view confidence specification.
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes; throws an error otherwise.
+  - `nothing`.
 
 # Validation
 

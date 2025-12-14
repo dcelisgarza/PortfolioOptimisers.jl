@@ -769,7 +769,7 @@ No-op pass-through for mean view constraints when none are specified.
 
 # Returns
 
-  - `nothing`: No operation is performed.
+  - `nothing`.
 
 # Related
 
@@ -910,7 +910,7 @@ No-op pass-through for variance view constraints when none are specified.
 
 # Returns
 
-  - `nothing`: No operation is performed.
+  - `nothing`.
 
 # Related
 

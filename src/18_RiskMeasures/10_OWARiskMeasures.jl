@@ -446,7 +446,7 @@ This function generates OWA weights using a normalised CRRA scheme, parameterise
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights, normalised to sum to one.
+  - `w::VecNum`: Vector of OWA weights, normalised to sum to one.
 
 # Details
 
@@ -568,7 +568,7 @@ This function solves the provided JuMP model using the solver(s) specified in th
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights, normalised to sum to one.
+  - `w::VecNum`: Vector of OWA weights, normalised to sum to one.
 
 # Details
 
@@ -612,7 +612,7 @@ This function dispatches on the estimator `method` to compute OWA weights from a
 
 # Returns
 
-  - `w::Vector`: Vector of OWA weights, normalised to sum to one.
+  - `w::VecNum`: Vector of OWA weights, normalised to sum to one.
 
 # Related
 
