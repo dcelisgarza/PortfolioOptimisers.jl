@@ -746,7 +746,7 @@ Internal utility for error handling during equation parsing.
 
 # Returns
 
-  - `nothing`. If the expression is valid or handled.
+  - `nothing`.
 
 # Related
 
@@ -1293,7 +1293,7 @@ This method is used to pass through an already constructed [`LinearConstraint`](
 
 # Returns
 
-  - `lcs`: The input, unchanged.
+  - `lcs::Option{<:LinearConstraint}`: The input, unchanged.
 
 # Related
 
@@ -1529,7 +1529,7 @@ This method returns a uniform risk budget allocation when no explicit risk budge
 
 # Returns
 
-  - `RiskBudgetResult`: A result object containing a uniform risk budget vector of length `N`, with each entry equal to `1/N`.
+  - `rb::RiskBudgetResult`: A result object containing a uniform risk budget vector of length `N`, with each entry equal to `1/N`.
 
 # Examples
 
@@ -1563,7 +1563,7 @@ This method returns the input [`RiskBudgetResult`](@ref) object unchanged. It is
 
 # Returns
 
-  - `rb`: The input `RiskBudgetResult` object, unchanged.
+  - `rb::RiskBudgetResult`: The input `RiskBudgetResult` object, unchanged.
 
 # Examples
 
@@ -1605,7 +1605,7 @@ This method constructs a [`RiskBudgetResult`](@ref) from a mapping of asset or g
 
 # Returns
 
-  - `RiskBudgetResult`: A result object containing the normalised risk budget vector.
+  - `rb::RiskBudgetResult`: A result object containing the normalised risk budget vector.
 
 # Examples
 
@@ -1786,7 +1786,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 
 # Returns
 
-  - `smtx`: The input matrix or `nothing`, unchanged.
+  - `smtx::Option{<:MatNum}`: The input matrix or `nothing`, unchanged.
 
 # Related
 

@@ -358,7 +358,8 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
 # Returns
 
-  - `(e_max::Number, x::Number)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
+  - `e_max::Number`: Estimated upper edge of the noise eigenvalue spectrum.
+  - `x::Number`: Fitted scale parameter.
 
 # Related
 

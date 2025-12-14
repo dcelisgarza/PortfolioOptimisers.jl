@@ -170,7 +170,8 @@ Constructs box uncertainty sets for mean and covariance statistics under the ass
 
 # Returns
 
-  - `(mu_ucs::BoxUncertaintySet, sigma_ucs::BoxUncertaintySet)`: Expected returns and covariance uncertainty sets.
+  - `mu_ucs::BoxUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 
@@ -341,7 +342,8 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `(mu_ucs::EllipseUncertaintySet, sigma_ucs::EllipseUncertaintySet)`: Expected returns and covariance uncertainty sets.
+  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 
@@ -413,7 +415,8 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `(mu_ucs::EllipseUncertaintySet, sigma_ucs::EllipseUncertaintySet)`: Expected returns and covariance uncertainty sets.
+  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 
@@ -474,7 +477,8 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `(mu_ucs::EllipseUncertaintySet, sigma_ucs::EllipseUncertaintySet)`: Expected returns and covariance uncertainty sets.
+  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 

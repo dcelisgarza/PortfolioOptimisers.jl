@@ -396,7 +396,8 @@ Compute and return the correlation and distance matrices. The distance matrix de
 
 # Returns
 
-  - `(rho::Matrix{<:Number}, dist::Matrix{<:Number})`: Tuple of correlation matrix and distance matrix.
+  - `rho::Matrix{<:Number}`: Correlation matrix.
+  - `dist::Matrix{<:Number}`: Distance matrix.
 
 # Related
 

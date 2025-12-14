@@ -90,7 +90,8 @@ Constructs box uncertainty sets for mean and covariance statistics using delta b
 
 # Returns
 
-  - `(mu_ucs::BoxUncertaintySet, sigma_ucs::BoxUncertaintySet)`: Expected returns and covariance uncertainty sets.
+  - `mu_ucs::BoxUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 

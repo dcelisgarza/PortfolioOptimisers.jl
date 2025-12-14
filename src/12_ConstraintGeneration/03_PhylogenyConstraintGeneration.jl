@@ -185,7 +185,7 @@ This function is used internally to ensure that the number of groups or allocati
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Validation
 
@@ -223,7 +223,7 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
 
 # Returns
 
-  - `nothing`: Returns nothing if validation passes.
+  - `nothing`.
 
 # Validation
 

@@ -219,7 +219,8 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 
 # Returns
 
-  - `(mus::Matrix{<:Number}, sigmas::Array{<:Number, 3})`: Tuple containing the matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`), array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
+  - `mus::Matrix{<:Number}`: Matrix of bootstrapped expected return vectors (`size(X, 2) × ue.n_sim`).
+  - `sigmas::Array{<:Number, 3})`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
 
 # Details
 
@@ -336,7 +337,8 @@ Constructs box uncertainty sets for expected returns and covariance statistics u
 
 # Returns
 
-  - `(mu_ucs::BoxUncertaintySet, sigma_ucs::BoxUncertaintySet)`: Expected returns and covariance uncertainty sets.
+  - `mu_ucs::BoxUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::BoxUncertaintySet`: Covariance uncertainty set.
 
 # Details
 
@@ -496,7 +498,8 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `(mu_ucs::EllipseUncertaintySet, sigma_ucs::EllipseUncertaintySet)`: Tuple containing ellipse uncertainty sets for expected returns and covariance.
+  - `mu_ucs::EllipseUncertaintySet`: Ellipse uncertainty set for expected returns.
+  - `sigma_ucs::EllipseUncertaintySet`: Ellipse uncertainty set for covariance.
 
 # Details
 

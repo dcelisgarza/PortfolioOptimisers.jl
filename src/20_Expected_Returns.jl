@@ -121,7 +121,9 @@ Compute expected risk, expected return, and risk-adjusted return ratio for a por
 
 # Returns
 
-  - `(risk::Number, return::Number, ratio::Number)`: Tuple of expected risk, expected return, and risk-adjusted return ratio.
+  - `risk::Number`: Expected portfolio risk.
+  - `return::Number`: Expected portfolio return.
+  - `ratio::Number`: Risk-adjusted return ratio.
 
 # Related
 
@@ -205,7 +207,9 @@ Compute expected risk, expected return, and SRIC for a portfolio.
 
 # Returns
 
-  - `(risk::Number, return::Number, sric::Number)`: Tuple of expected risk, expected return, and SRIC.
+  - `risk::Number`: Expected portfolio risk.
+  - `return::Number`: Expected portfolio return.
+  - `sric::Number`: Sharpe Ratio Information Criterion.
 
 # Related
 
