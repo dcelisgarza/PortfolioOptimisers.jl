@@ -323,8 +323,8 @@ function matrix_processing!(::Nothing, args...; kwargs...)
     return nothing
 end
 """
-    matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any, <:DenoiseDetoneAlg},
-                      sigma::MatNum, X::MatNum, args...; kwargs...)
+    matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing, sigma::MatNum, X::MatNum, args...;
+                       kwargs...)
 
 In-place matrix processing pipeline using the `DenoiseDetoneAlg` order.
 
@@ -398,13 +398,14 @@ julia> sigma
 
 # Related
 
+  - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
+  - [`AbstractMatrixProcessingOrder`](@ref)
   - [`matrix_processing`](@ref)
   - [`posdef!`](@ref)
   - [`denoise!`](@ref)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`MatNum`](@ref)
 
 # References
