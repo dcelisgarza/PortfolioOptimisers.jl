@@ -1,7 +1,7 @@
 """
     abstract type AbstractEstimator end
 
-Abstract supertype for all estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
 
 All custom estimators (e.g., for moments, risk, or priors) should subtype `AbstractEstimator`.
 
@@ -140,6 +140,8 @@ end
     has_pretty_show_method(::Any)
 
 Default method indicating whether a type has a custom pretty-printing `show` method.
+
+Overloading this method to return `true` indicates that type already has a custom pretty-printing method.
 
 # Arguments
 
@@ -599,7 +601,7 @@ const Str_Vec = Union{<:AbstractString, <:AbstractVector}
         s::T2
     end
 
-Represents a composite result containing a vector and a scalar in PortfolioOptimisers.jl.
+Represents a composite result containing a vector and a scalar in `PortfolioOptimisers.jl`.
 
 Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
 

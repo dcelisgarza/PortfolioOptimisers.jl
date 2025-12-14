@@ -187,7 +187,6 @@
         df1 = CSV.read(joinpath(@__DIR__, "./assets/Centrality1.csv.gz"), DataFrame)
         df2 = CSV.read(joinpath(@__DIR__, "./assets/AverageCentrality1.csv.gz"), DataFrame)
         w = fill(inv(20), 20)
-        wak = Float64[]
         for (i, ce) in enumerate(ces)
             v1 = centrality_vector(CentralityEstimator(; cent = ce), pr)
             @test v1 === centrality_vector(v1)
@@ -199,7 +198,9 @@
             end
             @test res
 
-            c = average_centrality(CentralityEstimator(; cent = ce), w, pr)
+            cte = CentralityEstimator(; cent = ce)
+            c = average_centrality(cte, w, pr)
+            @test isapprox(c, average_centrality(cte.ne, cte.cent, w, pr))
             res = isapprox(c, df2[i, 1])
             if !res
                 println("Average default centrality iteration: $i")
@@ -613,10 +614,10 @@
             sigma2 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
-                                                             Posdef(), sigma1, X)
+                                                             sigma1, X)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = desg[i]),
-                                                             Posdef(), sigma2, X)
+                                                             sigma2, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -664,11 +665,11 @@
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
                                                                                       sim = ExponentialSimilarity()),
-                                                             Posdef(), sigma1, X)
+                                                             sigma1, X)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = desg[i],
                                                                                       sim = ExponentialSimilarity()),
-                                                             Posdef(), sigma2, X)
+                                                             sigma2, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1

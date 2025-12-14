@@ -251,6 +251,9 @@ Many of these can be used in conjunction. For example, some covariance estimator
       + Mutual information.
         
           * Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
+      + Denoised.
+      + Detoned.
+      + Custom algorithm.
       + Coskewness.
         
           * Full.

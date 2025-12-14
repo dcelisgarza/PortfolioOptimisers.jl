@@ -68,7 +68,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv.gz"), DataFrame)
         for (i, de) in pairs(des)
             sigma1 = copy(pr.sigma)
-            denoise!(de, sigma1, q, Posdef())
+            denoise!(de, sigma1, q)
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")
@@ -78,8 +78,8 @@
         end
         @test isnothing(denoise(nothing))
         sigma1 = copy(pr.sigma)
-        sigma2 = denoise(des[2], sigma1, q, Posdef())
-        denoise!(des[2], sigma1, q, Posdef())
+        sigma2 = denoise(des[2], sigma1, q)
+        denoise!(des[2], sigma1, q)
         @test sigma1 == sigma2
     end
     @testset "Detone" begin
@@ -87,7 +87,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv.gz"), DataFrame)
         for (i, de) in pairs(des)
             sigma1 = copy(pr.sigma)
-            detone!(des[i], sigma1, Posdef())
+            detone!(des[i], sigma1)
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")
@@ -97,8 +97,8 @@
         end
         @test isnothing(detone(nothing))
         sigma1 = copy(pr.sigma)
-        sigma2 = detone(des[2], sigma1, Posdef())
-        detone!(des[2], sigma1, Posdef())
+        sigma2 = detone(des[2], sigma1)
+        detone!(des[2], sigma1)
         @test sigma1 == sigma2
     end
     @testset "Matrix processing" begin
@@ -108,9 +108,9 @@
         sigma1 = copy(pr.sigma)
         sigma2 = copy(pr.sigma)
         sigma3 = copy(pr.sigma)
-        sigma4 = matrix_processing(DefaultMatrixProcessing(), sigma1, pr.X)
+        sigma4 = matrix_processing(DenoiseDetoneAlgMatrixProcessing(), sigma1, pr.X)
         sigma5 = matrix_processing(nothing, sigma1, pr.X)
-        sigma4 == matrix_processing!(DefaultMatrixProcessing(), sigma2, pr.X)
+        sigma4 == matrix_processing!(DenoiseDetoneAlgMatrixProcessing(), sigma2, pr.X)
         sigma5 == matrix_processing!(nothing, sigma3, pr.X)
     end
 end

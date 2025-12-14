@@ -4,7 +4,6 @@
 [![Development documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://dcelisgarza.github.io/PortfolioOptimisers.jl/dev)
 [![Test workflow status](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Test.yml/badge.svg?branch=main)](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Test.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/dcelisgarza/PortfolioOptimisers.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/dcelisgarza/PortfolioOptimisers.jl)
-[![Lint workflow Status](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Lint.yml/badge.svg?branch=main)](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Lint.yml?query=branch%3Amain)
 [![Docs workflow Status](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Docs.yml/badge.svg?branch=main)](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Docs.yml?query=branch%3Amain)
 [![Build Status](https://api.cirrus-ci.com/github/dcelisgarza/PortfolioOptimisers.jl.svg)](https://cirrus-ci.com/github/dcelisgarza/PortfolioOptimisers.jl)
 [![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME)
@@ -261,6 +260,9 @@ Many of these can be used in conjunction. For example, some covariance estimator
       + Mutual information.
         
           * Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
+      + Denoised.
+      + Detoned.
+      + Custom algorithm.
       + Coskewness.
         
           * Full.

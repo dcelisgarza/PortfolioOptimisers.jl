@@ -155,7 +155,9 @@
                SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
                SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber1()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber2())]
+               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber2()),
+               DenoiseCovariance(; denoise = Denoise(; alg = SpectralDenoise())),
+               DetoneCovariance(), ProcessedCovariance(; alg = LoGo())]
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
@@ -169,11 +171,53 @@
             end
             @test success
         end
-        @test isapprox(df[!, "40"],
+        @test isapprox(df[!, 40],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DefaultMatrixProcessing(;
-                                                                                          alg = LoGo())),
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   denoise = Denoise(;
+                                                                                                                     alg = SpectralDenoise()))),
                                rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   order = DenoiseAlgDetone(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   order = DetoneDenoiseAlg(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   order = DetoneAlgDenoise(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   order = AlgDenoiseDetone(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 41],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   order = AlgDetoneDenoise(),
+                                                                                                   detone = Detone())),
+                               rd.X)))
+        @test isapprox(df[!, 42],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                   alg = LoGo())),
+                               rd.X)))
+
         @test isapprox(var(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1),
                        std(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1) .^
                        2)
@@ -231,7 +275,7 @@
         @test ce.ce.c2 == ce0.ce.c2
         @test ce.ce.c3 == ce0.ce.c3
         @test ce.ce.n == ce0.ce.n
-        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.executor === ce0.ce.executor
         @test ce.ce.alg === ce0.ce.alg
         @test isapprox(cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
                        cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
@@ -251,7 +295,7 @@
         @test ce.ce.dist === ce0.ce.dist
         @test ce.ce.args === ce0.ce.args
         @test ce.ce.kwargs === ce0.ce.kwargs
-        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.executor === ce0.ce.executor
         @test ce.ce.w === ew
         @test isapprox(cov(DistanceCovariance(), rd.X),
                        cov(DistanceCovariance(), rd.X'; dims = 2))
@@ -265,7 +309,7 @@
         @test ce.ce.alpha == ce0.ce.alpha
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.threads === ce0.ce.threads
+        @test ce.ce.executor === ce0.ce.executor
         @test isapprox(cov(LowerTailDependenceCovariance(), rd.X),
                        cov(LowerTailDependenceCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(LowerTailDependenceCovariance(), rd.X),
@@ -304,6 +348,39 @@
                        cov(MutualInfoCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(MutualInfoCovariance(), rd.X),
                        cor(MutualInfoCovariance(), rd.X'; dims = 2))
+
+        ce0 = PortfolioOptimisersCovariance(; ce = DenoiseCovariance())
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.ce.ce.w === ew
+        @test ce.ce.ce.me.w === ew
+        @test ce.ce.denoise == ce0.ce.denoise
+        @test ce.ce.pdm == ce0.ce.pdm
+        @test isapprox(cov(DenoiseCovariance(), rd.X),
+                       cov(DenoiseCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(DenoiseCovariance(), rd.X),
+                       cor(DenoiseCovariance(), rd.X'; dims = 2))
+
+        ce0 = PortfolioOptimisersCovariance(; ce = DetoneCovariance())
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.ce.ce.w === ew
+        @test ce.ce.ce.me.w === ew
+        @test ce.ce.detone == ce0.ce.detone
+        @test ce.ce.pdm == ce0.ce.pdm
+        @test isapprox(cov(DetoneCovariance(), rd.X),
+                       cov(DetoneCovariance(), rd.X'; dims = 2))
+        @test isapprox(cor(DetoneCovariance(), rd.X),
+                       cor(DetoneCovariance(), rd.X'; dims = 2))
+
+        ce0 = PortfolioOptimisersCovariance(; ce = ProcessedCovariance(; alg = LoGo()))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.ce.ce.w === ew
+        @test ce.ce.ce.me.w === ew
+        @test ce.ce.alg == ce0.ce.alg
+        @test ce.ce.pdm == ce0.ce.pdm
+        @test isapprox(cov(ProcessedCovariance(; alg = LoGo()), rd.X),
+                       cov(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
+        @test isapprox(cor(ProcessedCovariance(; alg = LoGo()), rd.X),
+                       cor(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
