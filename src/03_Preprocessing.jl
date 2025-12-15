@@ -179,7 +179,7 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `i`
 
 # Returns
 
-  - `rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
+  - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
 
 # Details
 
@@ -237,8 +237,6 @@ end
                       impute_method::Option{<:Impute.Imputor} = nothing)
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
-
-ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, time series, and optional implied volatility data, suitable for downstream portfolio optimization.
 
 # Arguments
 

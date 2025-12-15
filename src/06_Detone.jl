@@ -18,7 +18,7 @@ abstract type AbstractDetoneEstimator <: AbstractEstimator end
         pdm::T2
     end
 
-A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix.
+A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix in [`detone!`](@ref) and [`detone`](@ref).
 
 For financial data, the leading principal components often represent market-wide movements that can obscure asset-specific signals. The `Detone` estimator allows users to specify the number of these leading components to remove, thereby enhancing the focus on idiosyncratic relationships between market members [mlp1](@cite).
 
@@ -76,7 +76,7 @@ end
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
-For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
+For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
 # Arguments
 

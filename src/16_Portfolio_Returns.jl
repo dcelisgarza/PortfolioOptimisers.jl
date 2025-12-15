@@ -14,7 +14,7 @@
 
 Estimator for portfolio transaction fees constraints.
 
-`FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Asset-specific fees can be provided via dictionaries, pairs, or vectors of pairs. Input validation ensures all fee inputs are non-empty and non-negative where applicable.
+`FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Supports asset-specific fees via dictionaries, pairs, or vectors of pairs, and validates all inputs for non-emptiness, non-negativity, and finiteness.
 
 # Fields
 
