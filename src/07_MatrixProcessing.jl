@@ -192,7 +192,7 @@ end
 
 A flexible container type for configuring and applying matrix processing routines in `PortfolioOptimisers.jl`.
 
-`DenoiseDetoneAlgMatrixProcessing` encapsulates all steps required for processing covariance or correlation matrices, including positive definiteness enforcement, denoising, detoning, and optional custom matrix processing algorithms via [`matrix_processing_algorithm!`](@ref). This estimator allows users to build complex matrix processing pipelines tailored to their specific needs.
+`DenoiseDetoneAlgMatrixProcessing` encapsulates all steps required for processing covariance or correlation matrices, including positive definiteness enforcement, denoising, detoning, and optional custom matrix processing algorithms via [`matrix_processing!`](@ref) and [`matrix_processing`](@ref). This estimator allows users to build complex matrix processing pipelines tailored to their specific needs.
 
 # Fields
 

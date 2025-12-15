@@ -14,7 +14,9 @@
 
 Estimator for portfolio transaction fees constraints.
 
-`FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Supports asset-specific fees via dictionaries, pairs, or vectors of pairs, and validates all inputs for non-emptiness, non-negativity, and finiteness.
+`FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Supports asset-specific fees via dictionaries, pairs, or vectors of pairs.
+
+This estimator can be converted into a concrete [`Fees`](@ref) constraint using the [`fees_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`AssetSets`](@ref) object.
 
 # Fields
 
@@ -192,7 +194,29 @@ end
 
 Container for portfolio transaction fee constraints.
 
-`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values. Input validation ensures all fee values are non-negative and, if vectors, non-empty.
+`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values.
+
+For non-finite optimisations, the total transaction fees are computed as:
+
+```math
+\\begin{align}
+F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
+F_{\\text{Tn}} &= \\boltsymbol{Tn} \\cdot \\boldsymbol{f_{Tn}}\\\\
+\\end{align}
+F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}^{-}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}} &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+}) + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
+```
+
+Where:
+
+  - ``F``: Portfolio fee.
+
+  - ``\\textsymbol{f}``: Per asset fee vector.
+  - ``\\boltsymbol{Tn}``: Turnover vector from the [`Turnover`](@ref) constraint.
+  - ``\\boldsymbol{f_{Tn}}``: Turnover fees per asset.
+  - ``^+``,\\, ``^-``: Long and short asset selections respectively, i.e. long assets are where \\boldsymbol{w} > 0 and short assets are where \\boldsymbol{w} < 0.
+  - ``_{\\text{Tn}},\\, _{\\text{p}},\\, _{\\text{f}}``: Subscripts for turnover, proportional, and fixed fees respectively.
+  - ``1\\left\\{\\cdot\\right\\}``: Indicator function returning 1 when the condition is true, 0 otherwise.
 
 # Fields
 

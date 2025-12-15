@@ -32,7 +32,9 @@ end
 
 Estimator for turnover portfolio constraints.
 
-`TurnoverEstimator` specifies turnover constraints for each asset in a portfolio, based on current portfolio weights `w`, asset-specific turnover values `val`, and a default value for assets not explicitly specified. Supports asset-specific turnover via dictionaries, pairs, or vectors of pairs, and validates all inputs for non-emptiness, non-negativity, and finiteness.
+`TurnoverEstimator` specifies turnover constraints for each asset in a portfolio, based on current portfolio weights `w`, asset-specific turnover values `val`, and a default value for assets not explicitly specified. Supports asset-specific turnover via dictionaries, pairs, or vectors of pairs.
+
+This estimator can be converted into a concrete [`Turnover`](@ref) constraint using the [`turnover_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`AssetSets`](@ref) object.
 
 # Fields
 
