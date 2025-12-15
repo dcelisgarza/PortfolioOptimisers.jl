@@ -1,4 +1,6 @@
-# Portfolio Returns
+# Portfolio returns
+
+One of the measures of portfolio performance are the returns. In active, and small quantity investing, fees can be a non-negligible factor that affects portfolio returns. `PortfolioOptimisers.jl` has the capability of including a variety of fees. Here we define the functionality to used to compute portfolio fees and returns.
 
 ```@docs
 FeesEstimator
