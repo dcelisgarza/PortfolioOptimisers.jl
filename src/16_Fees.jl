@@ -228,7 +228,9 @@ Where:
   - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
   - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
 
-The finite optimisations use fees somewhat differently because they use a finite amount of capital as well as asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred. However, this method lets us automatically adjust the available cash amount during the optimisation so that fees are discounted from the available cash.
+The finite optimisations use fees somewhat differently because they use a finite amount of capital as well as asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred.
+
+This method lets us automatically adjust the available cash amount during the optimisation so that fees are discounted from the available cash. It also lets us account for the budget constraints properly when fees are involved.
 
 ```math
 \\begin{align}
@@ -278,7 +280,7 @@ The finite optimisation uses fees somewhat differently because it uses a finite 
 ```math
 \\begin{align}
 F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}} &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{Tn}} &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}} \\\\
 F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
 F_{\\text{f}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
