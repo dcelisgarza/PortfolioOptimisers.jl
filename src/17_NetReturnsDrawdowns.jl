@@ -2,14 +2,28 @@
     calc_net_returns(w::VecNum, X::MatNum, args...)
     calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
 
-Compute the net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
+Compute the net portfolio returns. If `fees` is provided, it deducts the computed fees from the gross returns.
 
 Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+
+```math
+\\begin{align}
+\\boldsymbol{R}(\\mathbf{X},\\, \\boldsymbol{w}) &= \\mathbf{X} \\boldsymbol{w} \\ominus F_{\\text{t}}(\\boldsymbol{w})
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{R}(\\mathbf{X},\\, \\boldsymbol{w})``: `T × 1` vector of portfolio net returns.
+  - ``\\mathbf{X}``: `T × N` matrix of asset returns (observations × assets).
+  - ``\\boldsymbol{w}``: `N × 1` vector of portfolio weights.
+  - ``F_{\\text{t}}(\\boldsymbol{w})``: Total fees computed using [`calc_fees`](@ref).
+  - ``\\ominus``: Elementwise (Hadamard) subtraction.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `X`: Asset return matrix (assets × periods).
+  - `X`: Asset return matrix (observations × assets).
   - `fees`: [`Fees`](@ref) structure.
   - `args...`: Additional arguments (ignored).
 
@@ -43,9 +57,24 @@ end
     calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
 
-Compute the per asset net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
+Compute the per asset net portfolio returns. If `fees` is provided, it deducts the computed fees from the gross returns.
 
-Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+Returns the per asset portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+
+```math
+\\begin{align}
+\\mathbf{R}(\\mathbf{X},\\, \\boldsymbol{w}) &= \\mathbf{X} \\odot \\boldsymbol{w}^{\\intercal} \\ominus \\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w})^{\\intercal}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{R}(\\mathbf{X},\\, \\boldsymbol{w})``: `T × N` matrix of per asset portfolio net returns.
+  - ``\\mathbf{X}``: `T × N` matrix of asset returns (observations × assets).
+  - ``\\boldsymbol{w}``: `N × 1` vector of portfolio weights.
+  - ``\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w})``: `N × 1` per asset vector of total portfolio fees computed using [`calc_fees`](@ref).
+  - ``\\odot``: Elementwise (Hadamard) multiplication.
+  - ``\\ominus``: Elementwise (Hadamard) subtraction.
 
 # Arguments
 
@@ -56,7 +85,7 @@ Returns the portfolio returns as the product of the asset return matrix `X` and 
 
 # Returns
 
-  - `ret::Matrix{<:Number}`: Per asset portfolio net returns.
+  - `ret::MatNum`: Per asset portfolio net returns.
 
 # Examples
 
@@ -86,6 +115,34 @@ end
 Compute simple or compounded cumulative returns along a specified dimension.
 
 `cumulative_returns` calculates the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
+
+## Portfolio cumulative returns
+
+```math
+\\begin{align}
+\\boldsymbol{CR}_{a,\\, j}(\\boldsymbol{w}) &= \\sum\\limits_{i=1}^{j} \\boldsymbol{X}_{i} \\boldsymbol{w} \\\\
+\\boldsymbol{CR}_{r,\\, j}(\\boldsymbol{w}) &= \\prod\\limits_{i=1}^{j} (1 \\oplus \\boldsymbol{X}_{i}) \\boldsymbol{w}
+\\end{align}
+```
+
+## Per asset portfolio cumulative returns
+
+```math
+\\begin{align}
+\\mathbf{CR}_{a,\\, j}(\\boldsymbol{w}) &= \\sum\\limits_{i=1}^{j} \\boldsymbol{X}_{i} \\odot \\boldsymbol{w}^{\\intercal} \\\\
+\\mathbf{CR}_{r,\\, j}(\\boldsymbol{w}) &= \\prod\\limits_{i=1}^{j} (1 \\oplus \\boldsymbol{X}_{i}) \\odot \\boldsymbol{w}^{\\intercal}
+\\end{align}
+```
+
+Where:
+
+  - ``(a,\\,j), \\, (r,\\,j)``: Subscripts are the simple and compound cumulative returns up to period `j` respectively.
+  - ``\\boldsymbol{CR}``: `T × 1` vector of portfolio simple cumulative returns.
+  - ``\\mathbf{CR}``: `T × N` matrix of per asset portfolio simple cumulative returns.
+  - ``\\boldsymbol{X}_{i}``: `1 × N` vector of asset returns at period `i`.
+  - ``\\boldsymbol{w}``: Portfolio weights.
+  - ``\\oplus``: Elementwise (Hadamard) addition.
+  - ``\\otimes``: Elementwise (Hadamard) multiplication.
 
 # Arguments
 

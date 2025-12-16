@@ -247,12 +247,13 @@ Container for turnover portfolio constraints.
 
 ```math
 \\begin{align}
-    \\text{Turnover} &\\coloneqq \\lvert \\boldsymbol{w} - \\boldsymbol{w}_b \\rvert
+    \\boldsymbol{Tn}(\\boldsymbol{w}) &\\coloneqq \\lvert \\boldsymbol{w} - \\boldsymbol{w}_b \\rvert
 \\end{align}
 ```
 
 Where:
 
+  - ``\\boldsymbol{Tn}(\\boldsymbol{w})``: `N × 1` turnover vector.
   - ``\\boldsymbol{w}``: `N × 1` vector of current portfolio weights.
   - ``\\boldsymbol{w}_b``: `N × 1` vector of benchmark portfolio weights.
   - ``\\lvert \\cdot \\rvert``: Element-wise absolute value.

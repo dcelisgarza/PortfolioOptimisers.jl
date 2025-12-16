@@ -20,7 +20,7 @@ This estimator can be converted into a concrete [`Fees`](@ref) constraint using 
 
 !!! warning
 
-    The value of the fees must match the periodicity and units of the returns used in the portfolio optimisation. For example, if using daily returns, the fees should be specified as daily fees.
+    The turnover and proportional fees must match the periodicity of the returns series, and the fixed fees must be divided by the portfolio's holding period. The units of the fees and returns must also be consistent.
 
 # Fields
 
@@ -204,7 +204,7 @@ Fee values can be specified as scalars (applied to all assets) or as vectors of 
 
 !!! warning
 
-    The value of the fees must match the periodicity and units of the returns used in the portfolio optimisation. For example, if using daily returns, the fees should be specified as daily fees.
+    The turnover and proportional fees must match the periodicity of the returns series, and the fixed fees must be divided by the portfolio's holding period. The units of the fees and returns must also be consistent.
 
 ## Portfolio fees
 
@@ -212,21 +212,12 @@ For non-finite optimisations, the total portfolio transaction fees are computed 
 
 ```math
 \\begin{align}
-F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}} &= \\boldsymbol{Tn} \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
-F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}} &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
+F_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
+F_{\\text{Tn}}(\\boldsymbol{w}) &= \\boldsymbol{Tn} \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
-
-Where:
-
-  - ``F``: Portfolio fee.
-  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
-  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
-  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
-  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
-  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
 
 The finite optimisations use fees somewhat differently because they use a finite amount of capital as well as asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred.
 
@@ -234,23 +225,12 @@ This method lets us automatically adjust the available cash amount during the op
 
 ```math
 \\begin{align}
-F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}} &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
-F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{-}
+F_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
+F_{\\text{Tn}}(\\boldsymbol{w}) &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
-
-Where:
-
-  - ``F``: Portfolio fee.
-  - ``\\boldsymbol{X}``: Asset price vector.
-  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
-  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
-  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
-  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
-  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
-  - ``\\odot``: Elementwise (Hadamard) product.
 
 ## Per-asset fees
 
@@ -258,42 +238,33 @@ It is also possible to compute per-asset fees incurred using the same definition
 
 ```math
 \\begin{align}
-F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}} &= \\boldsymbol{Tn} \\odot \\boldsymbol{f}_{\\text{Tn}}\\\\
-F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}} &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot\\boldsymbol{f}_{\\text{f}}^{-}
+\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq \\boldsymbol{F}_{\\text{Tn}} + \\boldsymbol{F}_{\\text{p}} + \\boldsymbol{F}_{\\text{f}} \\\\
+\\boldsymbol{F}_{\\text{Tn}}(\\boldsymbol{w}) &= \\boldsymbol{Tn} \\odot \\boldsymbol{f}_{\\text{Tn}}\\\\
+\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot\\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
-
-Where:
-
-  - ``F``: Portfolio fee.
-  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
-  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
-  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
-  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
-  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
-  - ``\\odot``: Elementwise (Hadamard) product.
 
 The finite optimisation uses fees somewhat differently because it uses a finite amount of capital and utilises the asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred.
 
 ```math
 \\begin{align}
-F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}} &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}} \\\\
-F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{-}
+\\boldsymbol{F}_{\\text{t}}(\\boldsymbol{w}) &\\coloneqq \\boldsymbol{F}_{\\text{Tn}} + \\boldsymbol{F}_{\\text{p}} + \\boldsymbol{F}_{\\text{f}} \\\\
+\\boldsymbol{F}_{\\text{Tn}}(\\boldsymbol{w}) &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}} \\\\
+\\boldsymbol{F}_{\\text{p}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+\\boldsymbol{F}_{\\text{f}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
 ```
 
 Where:
 
   - ``F``: Portfolio fee.
-  - ``\\boldsymbol{X}``: Asset price vector.
-  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
-  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
+  - ``\\boldsymbol{F}``: `N × 1` per asset vector of portfolio fees.
+  - ``\\boldsymbol{X}``: `N × 1` asset price vector.
+  - ``\\boldsymbol{f}``: `N × 1` per asset fee vector. If it is a scalar, it is broadcasted to all assets.
+  - ``\\boldsymbol{Tn}``: `N × 1` turnover vector as defined in [`Turnover`](@ref). The benchmark weight vector is encoded in the `w` field of the turnover object and the new weight vector is the portfolio weight vector.
   - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
-  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
+  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is encoded an instance of [`Turnover`](@ref), where `val` is the per asset fee.
   - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
   - ``\\odot``: Elementwise (Hadamard) product.
 
@@ -488,6 +459,7 @@ julia> fees_constraints(nothing)
 
   - [`FeesEstimator`](@ref)
   - [`Fees`](@ref)
+  - [`Option`](@ref)
 """
 function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
     return fees
