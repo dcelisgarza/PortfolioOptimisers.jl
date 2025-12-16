@@ -177,8 +177,8 @@ Constructs box uncertainty sets for mean and covariance statistics under the ass
 
   - Computes prior statistics using the provided prior estimator.
   - Simulates covariance matrices using the Wishart distribution.
-  - Calculates lower and upper bounds for covariance using quantiles of simulated values.
-  - Calculates upper bound for mean using the normal quantile and simulated covariance.
+  - Computes lower and upper bounds for covariance using quantiles of simulated values.
+  - Computes upper bound for mean using the normal quantile and simulated covariance.
   - Returns both sets as a tuple.
 
 # Related
@@ -240,7 +240,7 @@ Constructs a box uncertainty set for expected returns under the assumption of no
 # Details
 
   - Computes prior statistics using the provided prior estimator.
-  - Calculates the upper bound for mean using the normal quantile and simulated covariance.
+  - Computes the upper bound for mean using the normal quantile and simulated covariance.
   - Sets the lower bound for mean to zero.
   - Ignores additional arguments and keyword arguments except those passed to the prior estimator.
 
@@ -285,7 +285,7 @@ Constructs a box uncertainty set for covariance under the assumption of normally
 
   - Computes prior statistics using the provided prior estimator.
   - Simulates covariance matrices using the Wishart distribution.
-  - Calculates lower and upper bounds for covariance using quantiles of simulated values.
+  - Computes lower and upper bounds for covariance using quantiles of simulated values.
   - Ensures positive definiteness of the bounds.
   - Ignores additional arguments and keyword arguments except those passed to the prior estimator.
 
@@ -350,7 +350,7 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
   - Computes prior statistics using the provided prior estimator.
   - Simulates mean and covariance using multivariate normal and Wishart distributions.
   - Constructs commutation matrix for covariance vectorization.
-  - Calculates scaling parameters for mean and covariance using the specified ellipse algorithm.
+  - Computes scaling parameters for mean and covariance using the specified ellipse algorithm.
   - Returns both sets as a tuple.
 
 # Related
@@ -422,7 +422,7 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
   - Computes prior statistics using the provided prior estimator.
   - Constructs commutation matrix for covariance vectorization.
-  - Calculates scaling parameters for mean and covariance using the chi-squared scaling algorithm.
+  - Computes scaling parameters for mean and covariance using the chi-squared scaling algorithm.
   - Applies diagonal processing if specified in the algorithm.
   - Returns both sets as a tuple.
 
@@ -484,7 +484,7 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
   - Computes prior statistics using the provided prior estimator.
   - Constructs commutation matrix for covariance vectorization.
-  - Calculates scaling parameters for mean and covariance using the provided ellipse algorithm.
+  - Computes scaling parameters for mean and covariance using the provided ellipse algorithm.
   - Applies diagonal processing if specified in the algorithm.
   - Returns both sets as a tuple.
 
@@ -545,7 +545,7 @@ Constructs an ellipse uncertainty set for expected returns under the assumption 
   - Computes prior statistics using the provided prior estimator.
   - Simulates mean vectors using the multivariate normal distribution.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Calculates the scaling parameter for the ellipse using the normal scaling algorithm.
+  - Computes the scaling parameter for the ellipse using the normal scaling algorithm.
   - Returns an ellipse uncertainty set for the mean.
 
 # Related
@@ -603,7 +603,7 @@ Constructs an ellipse uncertainty set for expected returns under the assumption 
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Calculates the scaling parameter for the ellipse using the chi-squared scaling algorithm.
+  - Computes the scaling parameter for the ellipse using the chi-squared scaling algorithm.
   - Returns an ellipse uncertainty set for the mean.
 
 # Related
@@ -658,7 +658,7 @@ Constructs an ellipse uncertainty set for expected returns under the assumption 
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Calculates the scaling parameter for the ellipse using the chi-squared scaling algorithm.
+  - Computes the scaling parameter for the ellipse using the chi-squared scaling algorithm.
   - Returns an ellipse uncertainty set for the mean.
 
 # Related
@@ -712,7 +712,7 @@ Constructs an ellipse uncertainty set for covariance under the assumption of nor
   - Computes prior statistics using the provided prior estimator.
   - Simulates covariance matrices using the Wishart distribution.
   - Constructs commutation matrix for covariance vectorization.
-  - Calculates the scaling parameter for the ellipse using the normal scaling algorithm.
+  - Computes the scaling parameter for the ellipse using the normal scaling algorithm.
   - Applies diagonal processing to the covariance if specified in the algorithm.
   - Returns an ellipse uncertainty set for covariance.
 
@@ -779,7 +779,7 @@ Constructs an ellipse uncertainty set for covariance under the assumption of nor
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Constructs commutation matrix for covariance vectorization.
-  - Calculates the scaling parameter for the ellipse using the chi-squared scaling algorithm.
+  - Computes the scaling parameter for the ellipse using the chi-squared scaling algorithm.
   - Applies diagonal processing to the covariance if specified in the algorithm.
   - Returns an ellipse uncertainty set for covariance.
 
@@ -837,7 +837,7 @@ Constructs an ellipse uncertainty set for covariance under the assumption of nor
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Constructs commutation matrix for covariance vectorization.
-  - Calculates the scaling parameter for the ellipse using the provided ellipse algorithm.
+  - Computes the scaling parameter for the ellipse using the provided ellipse algorithm.
   - Applies diagonal processing to the covariance if specified in the algorithm.
   - Returns an ellipse uncertainty set for covariance.
 

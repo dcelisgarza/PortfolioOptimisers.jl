@@ -8,7 +8,7 @@
 
 Compute the expected portfolio return using the specified return estimator.
 
-`expected_return` calculates the expected return for a portfolio given its weights, a prior result, and optional transaction fees. Supports arithmetic, Kelly, and JuMP-based return estimators. For Kelly returns, computes the mean log-growth rate. For JuMP-based estimators, returns a vector of expected returns for each portfolio.
+`expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. Supports arithmetic, Kelly, and JuMP-based return estimators. For Kelly returns, computes the mean log-growth rate. For JuMP-based estimators, returns a vector of expected returns for each portfolio.
 
 # Arguments
 
@@ -65,7 +65,7 @@ end
 
 Compute the expected risk-adjusted return ratio for a portfolio.
 
-`expected_ratio` calculates the ratio of expected portfolio return (net of fees and risk-free rate) to expected portfolio risk, using the specified risk measure and return estimator.
+`expected_ratio` computes the ratio of expected portfolio return (net of fees and risk-free rate) to expected portfolio risk, using the specified risk measure and return estimator.
 
 # Arguments
 
@@ -151,7 +151,7 @@ end
 
 Compute the risk-adjusted ratio information criterion (SRIC) for a portfolio.
 
-`expected_sric` calculates the SRIC, which adjusts the risk-adjusted return ratio for estimation error, penalizing overfitting in portfolio optimization. The SRIC is computed as the risk-adjusted return ratio minus a penalty term based on the number of assets and sample size.
+`expected_sric` computes the SRIC, which adjusts the risk-adjusted return ratio for estimation error, penalizing overfitting in portfolio optimization. The SRIC is computed as the risk-adjusted return ratio minus a penalty term based on the number of assets and sample size.
 
 # Arguments
 

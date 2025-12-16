@@ -344,7 +344,7 @@ Constructs box uncertainty sets for expected returns and covariance statistics u
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of expected returns and covariance using the specified bootstrap algorithm.
-  - Calculates lower and upper bounds for expected returns and covariance using quantiles of bootstrapped samples.
+  - Computes lower and upper bounds for expected returns and covariance using quantiles of bootstrapped samples.
   - Returns both sets as a tuple.
 
 # Related
@@ -402,7 +402,7 @@ Constructs a box uncertainty set for expected returns using bootstrap resampling
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of expected returns using the specified bootstrap algorithm.
-  - Calculates lower and upper bounds for expected returns using quantiles of bootstrapped samples.
+  - Computes lower and upper bounds for expected returns using quantiles of bootstrapped samples.
   - Returns the expected returns box uncertainty set.
 
 # Related
@@ -452,7 +452,7 @@ Constructs a box uncertainty set for covariance using bootstrap resampling for t
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of covariance using the specified bootstrap algorithm.
-  - Calculates lower and upper bounds for covariance using quantiles of bootstrapped samples.
+  - Computes lower and upper bounds for covariance using quantiles of bootstrapped samples.
   - Returns the covariance box uncertainty set.
 
 # Related
@@ -505,7 +505,7 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of expected returns and covariance using the specified bootstrap algorithm.
-  - Calculates deviations from prior statistics for each bootstrap sample.
+  - Computes deviations from prior statistics for each bootstrap sample.
   - Computes covariance matrices of deviations and constructs ellipse uncertainty sets using the specified method and quantile.
   - Returns both sets as a tuple.
 
@@ -567,7 +567,7 @@ Constructs an ellipse uncertainty set for expected returns using bootstrap resam
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of expected returns using the specified bootstrap algorithm.
-  - Calculates deviations from prior expected returns for each bootstrap sample.
+  - Computes deviations from prior expected returns for each bootstrap sample.
   - Computes the covariance matrix of deviations and constructs an ellipse uncertainty set using the specified method and quantile.
   - Returns the expected returns ellipse uncertainty set.
 
@@ -621,7 +621,7 @@ Constructs an ellipse uncertainty set for covariance using bootstrap resampling 
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of covariance using the specified bootstrap algorithm.
-  - Calculates deviations from prior covariance for each bootstrap sample.
+  - Computes deviations from prior covariance for each bootstrap sample.
   - Computes the covariance matrix of deviations and constructs an ellipse uncertainty set using the specified method and quantile.
   - Returns the covariance ellipse uncertainty set.
 

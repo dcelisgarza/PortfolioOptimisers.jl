@@ -289,7 +289,7 @@ end
 
 Compute the shrinkage target vector for expected returns estimation.
 
-`target_mean` calculates the target vector toward which expected returns are shrunk, based on the specified shrinkage target type. This function is used internally by shrinkage estimators such as James-Stein, Bayes-Stein, and Bodnar-Okhrin-Parolya.
+`target_mean` computes the target vector toward which expected returns are shrunk, based on the specified shrinkage target type. This function is used internally by shrinkage estimators such as James-Stein, Bayes-Stein, and Bodnar-Okhrin-Parolya.
 
 # Arguments
 

@@ -114,13 +114,15 @@ end
 
 Compute simple or compounded cumulative returns along a specified dimension.
 
-`cumulative_returns` calculates the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
+`cumulative_returns` computes the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
 
 ## Portfolio cumulative returns
 
 ```math
 \\begin{align}
+\\boldsymbol{CR}_{a}(\\boldsymbol{w}) &= \\boldsymbol{CR}_{a,\\, j}(\\boldsymbol{w}) \\quad \\forall j = 1,\\, \\ldots, \\, T \\\\
 \\boldsymbol{CR}_{a,\\, j}(\\boldsymbol{w}) &= \\sum\\limits_{i=1}^{j} \\boldsymbol{X}_{i} \\boldsymbol{w} \\\\
+\\boldsymbol{CR}_{r}(\\boldsymbol{w}) &= \\boldsymbol{CR}_{r,\\, j}(\\boldsymbol{w}) \\quad \\forall j = 1,\\, \\ldots, \\, T \\\\
 \\boldsymbol{CR}_{r,\\, j}(\\boldsymbol{w}) &= \\prod\\limits_{i=1}^{j} (1 \\oplus \\boldsymbol{X}_{i}) \\boldsymbol{w}
 \\end{align}
 ```
@@ -129,24 +131,26 @@ Compute simple or compounded cumulative returns along a specified dimension.
 
 ```math
 \\begin{align}
+\\mathbf{CR}_{a}(\\boldsymbol{w}) &= \\mathbf{CR}_{a,\\, j}(\\boldsymbol{w}) \\quad \\forall j = 1,\\, \\ldots, \\, T \\\\
 \\mathbf{CR}_{a,\\, j}(\\boldsymbol{w}) &= \\sum\\limits_{i=1}^{j} \\boldsymbol{X}_{i} \\odot \\boldsymbol{w}^{\\intercal} \\\\
+\\mathbf{CR}_{r}(\\boldsymbol{w}) &= \\mathbf{CR}_{r,\\, j}(\\boldsymbol{w}) \\quad \\forall j = 1,\\, \\ldots, \\, T \\\\
 \\mathbf{CR}_{r,\\, j}(\\boldsymbol{w}) &= \\prod\\limits_{i=1}^{j} (1 \\oplus \\boldsymbol{X}_{i}) \\odot \\boldsymbol{w}^{\\intercal}
 \\end{align}
 ```
 
 Where:
 
-  - ``(a,\\,j), \\, (r,\\,j)``: Subscripts are the simple and compound cumulative returns up to period `j` respectively.
   - ``\\boldsymbol{CR}``: `T × 1` vector of portfolio simple cumulative returns.
   - ``\\mathbf{CR}``: `T × N` matrix of per asset portfolio simple cumulative returns.
   - ``\\boldsymbol{X}_{i}``: `1 × N` vector of asset returns at period `i`.
   - ``\\boldsymbol{w}``: Portfolio weights.
+  - ``(a,\\,j), \\, (r,\\,j)``: Subscripts are the simple and compound cumulative returns up to period `j` respectively.
   - ``\\oplus``: Elementwise (Hadamard) addition.
-  - ``\\otimes``: Elementwise (Hadamard) multiplication.
+  - ``\\odot``: Elementwise (Hadamard) multiplication.
 
 # Arguments
 
-  - `X`: Array of asset or portfolio returns (vector, matrix, or higher-dimensional).
+  - `X`: Array of asset or portfolio returns (vector or matrix).
   - `compound`: If `true`, computes compounded cumulative returns; otherwise, computes simple cumulative returns.
   - `dims`: Dimension along which to compute cumulative returns.
 
@@ -187,7 +191,21 @@ end
 
 Compute simple or compounded drawdowns along a specified dimension.
 
-`drawdowns` calculates the drawdowns for an array of asset or portfolio returns. By default, it computes drawdowns from cumulative returns using `cumulative_returns`. If `compound` is `true`, it computes compounded drawdowns. If `cX` is `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
+```math
+\\begin{align}
+\\text{DD}_{a}(\\bm{X}) &= \\left\\{j \\in (1,\\,T) \\, | \\, \\text{DD}_{a}(\\bm{X},\\, j)\\right\\} \\\\
+\\text{DD}_{a}(\\bm{X},\\, j) &= \\underset{t \\in (1,\\, j)}{\\max}\\left( \\sum\\limits_{i=1}^{t} X_{i} \\right) - \\sum\\limits_{i=1}^{j} X_{i}
+\\end{align}
+```
+
+Where:
+
+  - ``\\text{DaR}_{a}(\\bm{X},\\, \\alpha)``: Drawdown at risk at confidence level `α`.
+  - ``\\text{DD}_{a}(\\bm{X},\\, j)``: Simple drawdown at period `j`.
+  - ``\\bm{X}``: `T × N` matrix of asset returns (observations × assets).
+  - ``F_{\\text{DD}}``: Cumulative distribution function of drawdowns.
+  - ``T``: Total number of periods.
+  - ``\\sum``: Summation operator.
 
 # Arguments
 
@@ -199,6 +217,10 @@ Compute simple or compounded drawdowns along a specified dimension.
 # Returns
 
   - `dd::ArrNum`: Array of drawdowns, same shape as `X`.
+
+# Details
+
+`drawdowns` computes the drawdowns for an array of asset or portfolio returns. By default, it computes drawdowns from cumulative returns using `cumulative_returns`. If `compound` is `true`, it computes compounded drawdowns. If `cX` is `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
 
 # Examples
 
