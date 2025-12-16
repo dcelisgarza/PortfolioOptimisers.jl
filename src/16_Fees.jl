@@ -18,6 +18,10 @@ Estimator for portfolio transaction fees constraints.
 
 This estimator can be converted into a concrete [`Fees`](@ref) constraint using the [`fees_constraints`](@ref) function, which maps the estimator's specifications to the assets in a given [`AssetSets`](@ref) object.
 
+!!! warning
+
+    The value of the fees must match the periodicity and units of the returns used in the portfolio optimisation. For example, if using daily returns, the fees should be specified as daily fees.
+
 # Fields
 
   - `tn`: Turnover estimator or result.
@@ -29,7 +33,7 @@ This estimator can be converted into a concrete [`Fees`](@ref) constraint using 
   - `ds`: Default short proportional fees.
   - `dfl`: Default long fixed fees.
   - `dfs`: Default short fixed fees.
-  - `kwargs`: Named tuple of keyword arguments for rounding fixed fees calculation.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
 
 # Constructor
 
@@ -194,29 +198,102 @@ end
 
 Container for portfolio transaction fee constraints.
 
-`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values.
+`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fixed fees do not depend on the value of the asset weights, only whether it weight is positive or negative---up to a tolerance defined by how close the asset weight is to zero defined by `isapprox` and the `kwargs` field.
 
-For non-finite optimisations, the total transaction fees are computed as:
+Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values. The portfolio fees are computed with [`calc_fees`](@ref) and asset fees by [`calc_asset_fees`](@ref).
+
+!!! warning
+
+    The value of the fees must match the periodicity and units of the returns used in the portfolio optimisation. For example, if using daily returns, the fees should be specified as daily fees.
+
+## Portfolio fees
+
+For non-finite optimisations, the total portfolio transaction fees are computed as:
 
 ```math
 \\begin{align}
 F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
-F_{\\text{Tn}} &= \\boltsymbol{Tn} \\cdot \\boldsymbol{f_{Tn}}\\\\
+F_{\\text{Tn}} &= \\boldsymbol{Tn} \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}} &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
 \\end{align}
-F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}^{-}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
-F_{\\text{f}} &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\cdot \\boldsymbol{f}_{\\text{f}}^{+}) + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\cdot\\boldsymbol{f}_{\\text{f}}^{-}
 ```
 
 Where:
 
   - ``F``: Portfolio fee.
+  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
+  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
+  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
+  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
 
-  - ``\\textsymbol{f}``: Per asset fee vector.
-  - ``\\boltsymbol{Tn}``: Turnover vector from the [`Turnover`](@ref) constraint.
-  - ``\\boldsymbol{f_{Tn}}``: Turnover fees per asset.
-  - ``^+``,\\, ``^-``: Long and short asset selections respectively, i.e. long assets are where \\boldsymbol{w} > 0 and short assets are where \\boldsymbol{w} < 0.
-  - ``_{\\text{Tn}},\\, _{\\text{p}},\\, _{\\text{f}}``: Subscripts for turnover, proportional, and fixed fees respectively.
-  - ``1\\left\\{\\cdot\\right\\}``: Indicator function returning 1 when the condition is true, 0 otherwise.
+The finite optimisations use fees somewhat differently because they use a finite amount of capital as well as asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred. However, this method lets us automatically adjust the available cash amount during the optimisation so that fees are discounted from the available cash.
+
+```math
+\\begin{align}
+F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
+F_{\\text{Tn}} &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\cdot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\cdot \\boldsymbol{f}_{\\text{f}}^{-}
+\\end{align}
+```
+
+Where:
+
+  - ``F``: Portfolio fee.
+  - ``\\boldsymbol{X}``: Asset price vector.
+  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
+  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
+  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
+  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
+  - ``\\odot``: Elementwise (Hadamard) product.
+
+## Per-asset fees
+
+It is also possible to compute per-asset fees incurred using the same definitions as above, but replacing the dot products with elementwise (Hadamard) products.
+
+```math
+\\begin{align}
+F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
+F_{\\text{Tn}} &= \\boldsymbol{Tn} \\odot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}} &= 1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{f}_{\\text{f}}^{+} + 1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot\\boldsymbol{f}_{\\text{f}}^{-}
+\\end{align}
+```
+
+Where:
+
+  - ``F``: Portfolio fee.
+  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
+  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
+  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
+  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
+  - ``\\odot``: Elementwise (Hadamard) product.
+
+The finite optimisation uses fees somewhat differently because it uses a finite amount of capital and utilises the asset prices to compute the actual fees incurred when buying or selling assets. As such, these fees require a vector of asset prices to compute the actual fees incurred.
+
+```math
+\\begin{align}
+F_{\\text{t}} &\\coloneqq F_{\\text{Tn}} + F_{\\text{p}} + F_{\\text{f}} \\\\
+F_{\\text{Tn}} &= \\left(\\boldsymbol{Tn} \\odot \\boldsymbol{X} \\right) \\odot \\boldsymbol{f}_{\\text{Tn}}\\\\
+F_{\\text{p}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{w} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{p}}^{-} \\\\
+F_{\\text{f}} &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{+} + \\left(1\\left\\{\\boldsymbol{w} \\lt 0\\right\\} \\odot \\boldsymbol{X}\\right) \\odot \\boldsymbol{f}_{\\text{f}}^{-}
+\\end{align}
+```
+
+Where:
+
+  - ``F``: Portfolio fee.
+  - ``\\boldsymbol{X}``: Asset price vector.
+  - ``\\boldsymbol{f}``: Per asset fee vector. If it is a scalar, it is broadcasted to all assets.
+  - ``\\boldsymbol{Tn}``: Turnover vector as defined in [`Turnover`](@ref).
+  - ``+,\\, -``: Superscripts denote long and short fees respectively. This is because brokers sometimes charge different fees for long and short positions.
+  - ``\\text{t},\\, \\text{Tn},\\, \\text{p},\\, \\text{f}``: Subscripts for total, turnover, proportional, and fixed fees respectively. The turnover fee is an instance of [`Turnover`](@ref), where `val` is the per asset fee.
+  - ``1\\left\\{\\cdot\\right\\}``: Elementwise (Hadamard) indicator function returning `1` when the condition is true, `0` otherwise. This activates long or short fees based on whether the asset weight is non-negative or otherwise.
+  - ``\\odot``: Elementwise (Hadamard) product.
 
 # Fields
 
@@ -225,7 +302,7 @@ Where:
   - `s`: Short proportional fees.
   - `fl`: Long fixed fees.
   - `fs`: Short fixed fees.
-  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
 
 # Constructor
 
@@ -595,7 +672,7 @@ function calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
 end
 function calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return dot_scalar(fees * w[idx], p[idx])
+    return fees * dot(w[idx], p[idx])
 end
 function calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
@@ -643,7 +720,7 @@ function calc_fees(w::VecNum, p::VecNum, ::Nothing)
     return zero(promote_type(eltype(w), eltype(p)))
 end
 function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:Number})
-    return dot_scalar(tn.val * abs.(w - tn.w), p)
+    return tn.val * dot(abs.(w - tn.w), p)
 end
 function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
     return dot(tn.val, abs.(w - tn.w) .* p)
@@ -782,7 +859,7 @@ function calc_fees(w::VecNum, ::Nothing)
     return zero(eltype(w))
 end
 function calc_fees(w::VecNum, tn::Turnover{<:Any, <:Number})
-    return sum(tn.val * abs.(w - tn.w))
+    return tn.val * sum(abs.(w - tn.w))
 end
 function calc_fees(w::VecNum, tn::Turnover{<:Any, <:VecNum})
     return dot(tn.val, abs.(w - tn.w))
@@ -803,7 +880,7 @@ Compute the fixed portfolio fees for assets that have been allocated.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
-  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -1147,7 +1224,7 @@ Compute the per asset fixed portfolio fees for assets that have been allocated.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
-  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -1233,182 +1310,6 @@ function calc_asset_fees(w::VecNum, fees::Fees)
     fees_turnover = calc_asset_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
-"""
-    calc_net_returns(w::VecNum, X::MatNum, args...)
-    calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
-
-Compute the net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
-
-Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-  - `X`: Asset return matrix (assets × periods).
-  - `fees`: [`Fees`](@ref) structure.
-  - `args...`: Additional arguments (ignored).
-
-# Returns
-
-  - `val::VecNum`: Portfolio net returns.
-
-# Examples
-
-```jldoctest
-julia> calc_net_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
-2-element Vector{Float64}:
- 0.015
- 0.035
-```
-
-# Related
-
-  - [`VecNum`](@ref)
-  - [`MatNum`](@ref)
-  - [`calc_net_asset_returns`](@ref)
-  - [`calc_fees`](@ref)
-"""
-function calc_net_returns(w::VecNum, X::MatNum, args...)
-    return X * w
-end
-function calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
-    return X * w .- calc_fees(w, fees)
-end
-"""
-    calc_net_asset_returns(w::VecNum, X::MatNum, args...)
-    calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
-
-Compute the per asset net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
-
-Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
-
-# Arguments
-
-  - `w`: Portfolio weights.
-  - `X`: Asset return matrix (assets × periods).
-  - `fees`: [`Fees`](@ref) structure.
-  - `args...`: Additional arguments (ignored).
-
-# Returns
-
-  - `ret::Matrix{<:Number}`: Per asset portfolio net returns.
-
-# Examples
-
-```jldoctest
-julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
-2×2 Matrix{Float64}:
- 0.005  0.01
- 0.015  0.02
-```
-
-# Related
-
-  - [`VecNum`](@ref)
-  - [`MatNum`](@ref)
-  - [`calc_net_returns`](@ref)
-  - [`calc_fees`](@ref)
-"""
-function calc_net_asset_returns(w::VecNum, X::MatNum, args...)
-    return X ⊙ transpose(w)
-end
-function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
-    return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
-end
-"""
-    cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
-
-Compute simple or compounded cumulative returns along a specified dimension.
-
-`cumulative_returns` calculates the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
-
-# Arguments
-
-  - `X`: Array of asset or portfolio returns (vector, matrix, or higher-dimensional).
-  - `compound`: If `true`, computes compounded cumulative returns; otherwise, computes simple cumulative returns.
-  - `dims`: Dimension along which to compute cumulative returns.
-
-# Returns
-
-  - `ret::ArrNum`: Array of cumulative returns, same shape as `X`.
-
-# Examples
-
-```jldoctest
-julia> cumulative_returns([0.01, 0.02, -0.01])
-3-element Vector{Float64}:
- 0.01
- 0.03
- 0.02
-
-julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
-3-element Vector{Float64}:
- 1.01
- 1.0302
- 1.019898
-```
-
-# Related
-
-  - [`ArrNum`](@ref)
-  - [`drawdowns`](@ref)
-"""
-function cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
-    return if compound
-        cumprod(one(eltype(X)) .+ X; dims = dims)
-    else
-        cumsum(X; dims = dims)
-    end
-end
-"""
-    drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)
-
-Compute simple or compounded drawdowns along a specified dimension.
-
-`drawdowns` calculates the drawdowns for an array of asset or portfolio returns. By default, it computes drawdowns from cumulative returns using `cumulative_returns`. If `compound` is `true`, it computes compounded drawdowns. If `cX` is `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
-
-# Arguments
-
-  - `X`: Array of asset or portfolio returns (vector, matrix, or higher-dimensional).
-  - `cX`: If `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns from `X`.
-  - `compound`: If `true`, computes compounded drawdowns; otherwise, computes simple drawdowns.
-  - `dims`: Dimension along which to compute drawdowns.
-
-# Returns
-
-  - `dd::ArrNum`: Array of drawdowns, same shape as `X`.
-
-# Examples
-
-```jldoctest
-julia> drawdowns([0.01, 0.02, -0.01])
-3-element Vector{Float64}:
-  0.0
-  0.0
- -0.009999999999999998
-
-julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
-3-element Vector{Float64}:
-  0.0
-  0.0
- -0.010000000000000009
-```
-
-# Related
-
-  - [`ArrNum`](@ref)
-  - [`cumulative_returns`](@ref)
-"""
-function drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)
-    cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
-    if compound
-        return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
-    else
-        return cX - accumulate(max, cX; dims = dims)
-    end
-    return nothing
-end
 
 export FeesEstimator, Fees, fees_constraints, calc_fees, calc_fixed_fees, calc_asset_fees,
-       calc_asset_fixed_fees, calc_net_returns, calc_net_asset_returns, cumulative_returns,
-       drawdowns
+       calc_asset_fixed_fees
