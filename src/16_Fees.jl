@@ -841,8 +841,8 @@ Compute the turnover fees for portfolio weights and prices.
 # Examples
 
 ```jldoctest
-julia> calc_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
-0.003
+julia> calc_fees([0.8, 0.2], Turnover([0.0, 0.0], 0.02))
+0.02
 ```
 
 # Related
