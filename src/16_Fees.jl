@@ -198,7 +198,7 @@ end
 
 Container for portfolio transaction fee constraints.
 
-`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fixed fees do not depend on the value of the asset weights, only whether it weight is positive or negative---up to a tolerance defined by how close the asset weight is to zero defined by `isapprox` and the `kwargs` field.
+`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fixed fees do not depend on the value of the asset weights, only whether it is positive or negative---up to a tolerance defined by how close the asset weight is to zero defined by `isapprox` and the `kwargs` field.
 
 Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values. The portfolio fees are computed with [`calc_fees`](@ref) and asset fees by [`calc_asset_fees`](@ref).
 
