@@ -10,7 +10,7 @@ function plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                      legend_kwargs::NamedTuple = (; position = :lt,
                                                                   merge = true))
     ax = Axis(f[fpos...]; ax_kwargs...)
-    ret = cumulative_returns(calc_net_returns(w, X, fees); compound = compound)
+    ret = cumulative_returns(calc_net_returns(w, X, fees), compound)
     lines!(ax, ts, ret; line_kwargs...)
     axislegend(; legend_kwargs...)
     return f
@@ -42,7 +42,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::MatNum,
                                        legend_kwargs::NamedTuple = (; position = :lt,
                                                                     merge = true))
     ax = Axis(f[fpos...]; ax_kwargs...)
-    ret = cumulative_returns(calc_net_asset_returns(w, X, fees); compound = compound)
+    ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
     N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
     ret = view(ret, :, idx)
@@ -56,8 +56,8 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::MatNum,
     if M > N
         idx = view(idx, (N + 1):M)
         ret = cumulative_returns(calc_net_returns(view(w, idx), view(X, :, idx),
-                                                  fees_view(fees, idx));
-                                 compound = compound)
+                                                  fees_view(fees, idx)),
+                                 compound)
         lines!(ax, ts, ret; line_kwargs...)
     end
     axislegend(; legend_kwargs...)

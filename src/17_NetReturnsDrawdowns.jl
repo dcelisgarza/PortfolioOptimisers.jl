@@ -110,7 +110,7 @@ function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 """
-    cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
+    cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
 
 Compute simple or compounded cumulative returns along a specified dimension.
 
@@ -121,17 +121,17 @@ Compute simple or compounded cumulative returns along a specified dimension.
 ```math
 \\begin{align}
 \\boldsymbol{CR}_{a}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T]\\, |\\, \\boldsymbol{CR}_{a,\\, j}\\right\\} \\\\
-\\boldsymbol{CR}_{a,\\, j}(\\boldsymbol{X}) &= \\sum\\limits_{i=1}^{j} X_{i} \\\\
+CR_{a,\\, j}(\\boldsymbol{X}) &= \\sum\\limits_{i=1}^{j} X_{i} \\\\
 \\boldsymbol{CR}_{r}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T]\\, |\\, \\boldsymbol{CR}_{r,\\, j}\\right\\} \\\\
-\\boldsymbol{CR}_{r,\\, j}(\\boldsymbol{X}) &= \\prod\\limits_{i=1}^{j} (1 + X_{i})
+CR_{r,\\, j}(\\boldsymbol{X}) &= \\prod\\limits_{i=1}^{j} (1 + X_{i})
 \\end{align}
 ```
 
 Where:
 
   - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
-  - ``\\boldsymbol{CR}_{a,\\, j}(\\boldsymbol{X})``: Simple cumulative portfolio returns at period `j`.
-  - ``\\boldsymbol{CR}_{r,\\, j}(\\boldsymbol{X})``: Compound cumulative portfolio returns at period `j`.
+  - ``CR_{a,\\, j}(\\boldsymbol{X})``: Simple cumulative portfolio returns at period `j`.
+  - ``CR_{r,\\, j}(\\boldsymbol{X})``: Compound cumulative portfolio returns at period `j`.
   - ``\\boldsymbol{CR}_{a}``: `T × 1` vector of simple cumulative portfolio returns.
   - ``\\boldsymbol{CR}_{r}``: `T × 1` vector of compound cumulative portfolio returns.
 
@@ -158,7 +158,7 @@ julia> cumulative_returns([0.01, 0.02, -0.01])
  0.03
  0.02
 
-julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
+julia> cumulative_returns([0.01, 0.02, -0.01], true)
 3-element Vector{Float64}:
  1.01
  1.0302
@@ -170,7 +170,7 @@ julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
   - [`ArrNum`](@ref)
   - [`drawdowns`](@ref)
 """
-function cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
+function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
     return if compound
         cumprod(one(eltype(X)) .+ X; dims = dims)
     else
@@ -178,7 +178,7 @@ function cumulative_returns(X::ArrNum; compound::Bool = false, dims::Int = 1)
     end
 end
 """
-    drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)
+    drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
 
 Compute simple or compounded drawdowns along a specified dimension.
 
@@ -187,18 +187,18 @@ Compute simple or compounded drawdowns along a specified dimension.
 ```math
 \\begin{align}
 \\boldsymbol{DD}_{a}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{a}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
-\\DD_{a}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\sum\\limits_{i=1}^{t} X_{i} \\right) - \\sum\\limits_{i=1}^{j} X_{i}\\\\
+DD_{a}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\sum\\limits_{i=1}^{t} X_{i} \\right) - \\sum\\limits_{i=1}^{j} X_{i}\\\\
 \\boldsymbol{DD}_{r}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{r}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
-\\DD_{r}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\prod\\limits_{i=1}^{t}\\left(1 + X_{i}\\right) \\right) - \\prod\\limits_{i=1}^{j}\\left(1 + X_{i}\\right)
+DD_{r}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\prod\\limits_{i=1}^{t}\\left(1 + X_{i}\\right) \\right) - \\prod\\limits_{i=1}^{j}\\left(1 + X_{i}\\right)
 \\end{align}
 ```
 
 Where:
 
   - ``\\boldsymbol{DD}_{a}(\\boldsymbol{X})``: `T × 1` vector of simple drawdowns.
-  - ``\\DD_{a}(\\boldsymbol{X},\\, j)``: Simple drawdown at period `j`.
+  - ``DD_{a}(\\boldsymbol{X},\\, j)``: Simple drawdown at period `j`.
   - ``\\boldsymbol{DD}_{r}(\\boldsymbol{X})``: `T × 1` vector of compound drawdowns.
-  - ``\\DD_{r}(\\boldsymbol{X},\\, j)``: Compound drawdown at period `j`.
+  - ``DD_{r}(\\boldsymbol{X},\\, j)``: Compound drawdown at period `j`.
   - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
 
 ## Per asset portfolio drawdowns
@@ -222,7 +222,7 @@ julia> drawdowns([0.01, 0.02, -0.01])
   0.0
  -0.009999999999999998
 
-julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
+julia> drawdowns([0.01, 0.02, -0.01], true)
 3-element Vector{Float64}:
   0.0
   0.0
@@ -234,8 +234,8 @@ julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
   - [`ArrNum`](@ref)
   - [`cumulative_returns`](@ref)
 """
-function drawdowns(X::ArrNum; cX::Bool = false, compound::Bool = false, dims::Int = 1)
-    cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
+function drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
+    cX = cX ? X : cumulative_returns(X, compound; dims = dims)
     if compound
         return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
     else

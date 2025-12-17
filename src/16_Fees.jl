@@ -232,7 +232,7 @@ F_{\\text{f}}(\\boldsymbol{w}) &= \\left(1\\left\\{\\boldsymbol{w} \\geq 0\\righ
 \\end{align}
 ```
 
-## Per-asset fees
+## Per asset fees
 
 It is also possible to compute per-asset fees incurred using the same definitions as above, but replacing the dot products with elementwise (Hadamard) products.
 
