@@ -170,11 +170,17 @@ julia> cumulative_returns([0.01, 0.02, -0.01], true)
   - [`ArrNum`](@ref)
   - [`drawdowns`](@ref)
 """
+function _relative_cumulative_returns(X::ArrNum; dims::Int = 1)
+    return cumprod(one(eltype(X)) .+ X; dims = dims)
+end
+function _absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
+    return cumsum(X; dims = dims)
+end
 function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
     return if compound
-        cumprod(one(eltype(X)) .+ X; dims = dims)
+        _relative_cumulative_returns(X; dims = dims)
     else
-        cumsum(X; dims = dims)
+        _absolute_cumulative_returns(X; dims = dims)
     end
 end
 """
@@ -235,7 +241,7 @@ julia> drawdowns([0.01, 0.02, -0.01], true)
   - [`cumulative_returns`](@ref)
 """
 function drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
-    cX = cX ? X : cumulative_returns(X, compound; dims = dims)
+    cX = !cX ? cumulative_returns(X, compound; dims = dims) : X
     if compound
         return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
     else

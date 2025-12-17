@@ -144,8 +144,8 @@ function DrawdownatRisk(;
                         alpha::Number = 0.05)
     return DrawdownatRisk(settings, alpha)
 end
-function (r::DrawdownatRisk)(x::VecNum)
-    pushfirst!(x, 1)
+function _absolute_drawdown(x::VecNum)
+    pushfirst!(x, zero(eltype(x)))
     cs = cumsum(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
@@ -157,6 +157,10 @@ function (r::DrawdownatRisk)(x::VecNum)
     end
     popfirst!(x)
     popfirst!(dd)
+    return dd
+end
+function (r::DrawdownatRisk)(x::VecNum)
+    dd = _absolute_drawdown(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 struct RelativeDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
@@ -173,9 +177,9 @@ function RelativeDrawdownatRisk(;
                                 alpha::Number = 0.05)
     return RelativeDrawdownatRisk(settings, alpha)
 end
-function (r::RelativeDrawdownatRisk)(x::VecNum)
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
+function _relative_drawdown(x::VecNum)
+    pushfirst!(x, zero(eltype(x)))
+    cs = cumprod(x .+ one(eltype(x)))
     peak = typemin(eltype(x))
     dd = similar(cs)
     for (idx, i) in pairs(cs)
@@ -186,6 +190,10 @@ function (r::RelativeDrawdownatRisk)(x::VecNum)
     end
     popfirst!(x)
     popfirst!(dd)
+    return dd
+end
+function (r::RelativeDrawdownatRisk)(x::VecNum)
+    dd = _relative_drawdown(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 

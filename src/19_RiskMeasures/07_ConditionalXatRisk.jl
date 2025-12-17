@@ -229,18 +229,7 @@ end
 function (r::ConditionalDrawdownatRisk)(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i - peak
-    end
-    popfirst!(x)
-    popfirst!(dd)
+    dd = _absolute_drawdown(x)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)
@@ -264,19 +253,8 @@ function RelativeConditionalDrawdownatRisk(;
 end
 function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     aT = r.alpha * length(x)
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i / peak - 1
-    end
-    popfirst!(x)
-    popfirst!(dd)
     idx = ceil(Int, aT)
+    dd = _relative_drawdown(x)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)

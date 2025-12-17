@@ -122,18 +122,7 @@ function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
     return EntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::EntropicDrawdownatRisk)(x::VecNum)
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = -(peak - i)
-    end
-    popfirst!(x)
-    popfirst!(dd)
+    dd = _absolute_drawdown(x)
     return ERM(dd, r.slv, r.alpha)
 end
 struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
@@ -156,18 +145,7 @@ function RelativeEntropicDrawdownatRisk(;
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i / peak - one(eltype(dd))
-    end
-    popfirst!(x)
-    popfirst!(dd)
+    dd = _relative_drawdown(x)
     return ERM(dd, r.slv, r.alpha)
 end
 for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)

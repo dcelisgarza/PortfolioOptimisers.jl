@@ -183,18 +183,7 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i - peak
-    end
-    popfirst!(x)
-    popfirst!(dd)
+    dd = _absolute_drawdown(x)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end
 struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
@@ -222,18 +211,7 @@ function RelativeRelativisticDrawdownatRisk(;
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i / peak - 1
-    end
-    popfirst!(x)
-    popfirst!(dd)
+    dd = _relative_drawdown(x)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end
 for r in (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
