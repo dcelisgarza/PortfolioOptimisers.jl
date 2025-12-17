@@ -135,27 +135,9 @@ Where:
   - ``\\boldsymbol{CR}_{a}``: `T × 1` vector of simple cumulative portfolio returns.
   - ``\\boldsymbol{CR}_{r}``: `T × 1` vector of compound cumulative portfolio returns.
 
-## Per asset portfolio cumulative returns
+## Per asset cumulative returns
 
-```math
-\\begin{align}
-\\mathbf{CR}_{a}(\\mathbf{X}) &= \\left\\{j \\in [1,\\,T]\\, |\\, \\mathbf{CR}_{a,\\, j}\\right\\} \\\\
-\\mathbf{CR}_{a,\\, j}(\\mathbf{X}) &= \\sum\\limits_{i=1}^{j} \\boldsymbol{X}_{i} \\\\
-\\mathbf{CR}_{r}(\\mathbf{X}) &= \\left\\{j \\in [1,\\,T]\\, |\\, \\mathbf{CR}_{r,\\, j}\\right\\} \\\\
-\\mathbf{CR}_{r,\\, j}(\\mathbf{X}) &= \\prod\\limits_{i=1}^{j} (1 \\oplus \\boldsymbol{X}_{i}) \\odot \\boldsymbol{w}^{\\intercal}
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathbf{X}``: `T × N` matrix of asset returns (observations × assets).
-  - ``\\boldsymbol{X}_{i}``: `1 × N` vector of asset returns at period `i`.
-  - ``\\mathbf{CR}_{a,\\, j}(\\mathbf{X})``: `1 × N` vector of simple cumulative per asset portfolio returns at period `j`.
-  - ``\\mathbf{CR}_{r,\\, j}(\\mathbf{X})``: `1 × N` vector of compound cumulative per asset portfolio returns at period `j`.
-  - ``\\mathbf{CR}_{a}``: `T × N` (observations × assets) matrix of simple cumulative per asset portfolio returns.
-  - ``\\mathbf{CR}_{r}``: `T × N` (observations × assets) matrix of compound cumulative per asset portfolio returns.
-  - ``\\oplus``: Elementwise (Hadamard) addition.
-  - ``\\odot``: Elementwise (Hadamard) multiplication.
+The same definitions apply as above, but for each individual asset in the returns matrix ``\\mathbf{X}`` instead of the portfolio return ``\\mathbf{X} \\boldsymbol{w}``.
 
 # Arguments
 
@@ -200,22 +182,28 @@ end
 
 Compute simple or compounded drawdowns along a specified dimension.
 
+## Portfolio drawdowns
+
 ```math
 \\begin{align}
-\\boldsymbol{DD_{a}}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{a}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
+\\boldsymbol{DD}_{a}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{a}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
 \\DD_{a}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\sum\\limits_{i=1}^{t} X_{i} \\right) - \\sum\\limits_{i=1}^{j} X_{i}\\\\
-\\boldsymbol{DD_{r}}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{r}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
+\\boldsymbol{DD}_{r}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{r}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
 \\DD_{r}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\prod\\limits_{i=1}^{t}\\left(1 + X_{i}\\right) \\right) - \\prod\\limits_{i=1}^{j}\\left(1 + X_{i}\\right)
 \\end{align}
 ```
 
 Where:
 
-  - ``\\boldsymbol{DD_{a}}(\\boldsymbol{X})``: `T × 1` vector of simple drawdowns.
+  - ``\\boldsymbol{DD}_{a}(\\boldsymbol{X})``: `T × 1` vector of simple drawdowns.
   - ``\\DD_{a}(\\boldsymbol{X},\\, j)``: Simple drawdown at period `j`.
-  - ``\\boldsymbol{DD_{r}}(\\boldsymbol{X})``: `T × 1` vector of compound drawdowns.
+  - ``\\boldsymbol{DD}_{r}(\\boldsymbol{X})``: `T × 1` vector of compound drawdowns.
   - ``\\DD_{r}(\\boldsymbol{X},\\, j)``: Compound drawdown at period `j`.
   - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
+
+## Per asset portfolio drawdowns
+
+The same definitions apply as above, but for each individual asset in the returns matrix ``\\mathbf{X}`` instead of the portfolio return ``\\mathbf{X} \\boldsymbol{w}``.
 
 # Returns
 
