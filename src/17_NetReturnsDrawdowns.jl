@@ -109,6 +109,12 @@ end
 function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
+function _relative_cumulative_returns(X::ArrNum; dims::Int = 1)
+    return cumprod(one(eltype(X)) .+ X; dims = dims)
+end
+function _absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
+    return cumsum(X; dims = dims)
+end
 """
     cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
 
@@ -170,12 +176,6 @@ julia> cumulative_returns([0.01, 0.02, -0.01], true)
   - [`ArrNum`](@ref)
   - [`drawdowns`](@ref)
 """
-function _relative_cumulative_returns(X::ArrNum; dims::Int = 1)
-    return cumprod(one(eltype(X)) .+ X; dims = dims)
-end
-function _absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
-    return cumsum(X; dims = dims)
-end
 function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
     return if compound
         _relative_cumulative_returns(X; dims = dims)
