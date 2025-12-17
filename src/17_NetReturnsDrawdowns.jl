@@ -187,9 +187,9 @@ Compute simple or compounded drawdowns along a specified dimension.
 ```math
 \\begin{align}
 \\boldsymbol{DD}_{a}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{a}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
-DD_{a}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\sum\\limits_{i=1}^{t} X_{i} \\right) - \\sum\\limits_{i=1}^{j} X_{i}\\\\
+DD_{a}(\\boldsymbol{X},\\, j) &= \\sum\\limits_{i=1}^{j} X_{i} - \\underset{t \\in [1,\\, j]}{\\max}\\left( \\sum\\limits_{i=1}^{t} X_{i} \\right)\\\\
 \\boldsymbol{DD}_{r}(\\boldsymbol{X}) &= \\left\\{j \\in [1,\\,T] \\, |\\, \\mathrm{DD_{r}}(\\boldsymbol{X},\\, j)\\right\\}\\\\
-DD_{r}(\\boldsymbol{X},\\, j) &= \\underset{t \\in [1,\\, j]}{\\max}\\left( \\prod\\limits_{i=1}^{t}\\left(1 + X_{i}\\right) \\right) - \\prod\\limits_{i=1}^{j}\\left(1 + X_{i}\\right)
+DD_{r}(\\boldsymbol{X},\\, j) &= \\dfrac{\\prod\\limits_{i=1}^{j}\\left(1 + X_{i}\\right)}{\\underset{t \\in [1,\\, j]}{\\max}\\left( \\prod\\limits_{i=1}^{t}\\left(1 + X_{i}\\right) \\right)} - 1
 \\end{align}
 ```
 
