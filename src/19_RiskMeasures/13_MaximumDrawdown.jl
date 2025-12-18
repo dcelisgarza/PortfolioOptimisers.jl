@@ -8,6 +8,7 @@ function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return MaximumDrawdown(settings)
 end
 function (::MaximumDrawdown)(x::VecNum)
+    #=
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
@@ -23,6 +24,9 @@ function (::MaximumDrawdown)(x::VecNum)
     end
     popfirst!(x)
     return val
+    =#
+    dd = _absolute_drawdown(x)
+    return -minimum(dd)
 end
 struct RelativeMaximumDrawdown{T1} <: HierarchicalRiskMeasure
     settings::T1
@@ -35,6 +39,7 @@ function RelativeMaximumDrawdown(;
     return RelativeMaximumDrawdown(settings)
 end
 function (::RelativeMaximumDrawdown)(x::VecNum)
+    #=
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))
@@ -48,7 +53,11 @@ function (::RelativeMaximumDrawdown)(x::VecNum)
             val = dd
         end
     end
+    popfirst!(x)
     return val
+    =#
+    dd = _relative_drawdown(x)
+    return -minimum(dd)
 end
 
 export MaximumDrawdown, RelativeMaximumDrawdown

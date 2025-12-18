@@ -12,6 +12,11 @@ function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          w::Option{<:AbstractWeights} = nothing)
     return AverageDrawdown(settings, w)
 end
+function (r::AverageDrawdown)(x::VecNum)
+    dd = _absolute_drawdown(x)
+    return -(isnothing(r.w) ? mean(dd) : mean(dd, r.w))
+end
+#=
 function (::AverageDrawdown{<:Any, Nothing})(x::VecNum)
     pushfirst!(x, 1)
     cs = cumsum(x)
@@ -48,6 +53,7 @@ function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::VecNum)
     popfirst!(x)
     return val / sum(r.w)
 end
+=#
 struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
@@ -64,6 +70,11 @@ function RelativeAverageDrawdown(;
                                  w::Option{<:AbstractWeights} = nothing)
     return RelativeAverageDrawdown(settings, w)
 end
+function (r::RelativeAverageDrawdown)(x::VecNum)
+    dd = _relative_drawdown(x)
+    return -(isnothing(r.w) ? mean(dd) : mean(dd, r.w))
+end
+#=
 function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::VecNum)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
@@ -100,6 +111,7 @@ function (r::RelativeAverageDrawdown{<:Any, <:AbstractWeights})(x::VecNum)
     popfirst!(x)
     return val / sum(r.w)
 end
+=#
 for r in (AverageDrawdown, RelativeAverageDrawdown)
     eval(quote
              function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)

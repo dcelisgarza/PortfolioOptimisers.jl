@@ -161,6 +161,7 @@ function _absolute_drawdown(x::VecNum)
 end
 function (r::DrawdownatRisk)(x::VecNum)
     dd = _absolute_drawdown(x)
+    # partioalsortperm instead
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 struct RelativeDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
