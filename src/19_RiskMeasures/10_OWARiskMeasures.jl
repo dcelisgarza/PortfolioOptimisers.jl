@@ -1132,7 +1132,11 @@ struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
         if w2_flag
             @argcheck(!isempty(w2))
             if !rev
-                reverse!(w2)
+                if w1 === w2
+                    w2 = reverse(w2)
+                else
+                    reverse!(w2)
+                end
             end
         end
         if w1_flag && w2_flag
