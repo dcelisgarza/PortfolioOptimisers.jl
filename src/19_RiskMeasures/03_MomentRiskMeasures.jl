@@ -798,25 +798,37 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return HighOrderMoment(settings, w, mu, alg)
 end
 abstract type StandardisedArbitraryOrderMomentAlgorithm <: MomentMeasureAlgorithm end
-struct StandardisedArbitraryOrderMoment{T1, T2, T3} <:
+struct StandardisedArbitraryOrderMoment{T1, T2, T3, T4} <:
        StandardisedArbitraryOrderMomentAlgorithm
     p::T1
     alpha::T2
-    alg::T3
+    w::T3
+    alg::T4
     function StandardisedArbitraryOrderMoment(p::Integer, alpha::Number,
+                                              w::Option{<:AbstractWeights},
                                               alg::AbstractMomentAlgorithm)
-        return new{typeof(p), typeof(alpha), typeof(alg)}(p, alpha, alg)
+        return new{typeof(p), typeof(alpha), typeof(w), typeof(alg)}(p, alpha, w, alg)
     end
 end
 function StandardisedArbitraryOrderMoment(; p::Integer = 3, alpha::Number = 0.05,
+                                          w::Option{<:AbstractWeights} = nothing,
                                           alg::AbstractMomentAlgorithm = ThirdLowerMoment())
     @argcheck(isfinite(p))
     @argcheck(p > one(p))
     @argcheck(isfinite(alpha))
     @argcheck(zero(alpha) < alpha < one(alpha))
-    return StandardisedArbitraryOrderMoment(p, alpha, alg)
+    if !isnothing(w)
+        @argcheck(!isempty(w))
+    end
+    return StandardisedArbitraryOrderMoment(p, alpha, w, alg)
 end
-struct ArbitraryOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
+function factory(alg::StandardisedArbitraryOrderMoment,
+                 w::Option{<:AbstractWeights} = nothing)
+    return StandardisedArbitraryOrderMoment(; p = alg.p, alpha = alg.alpha,
+                                            w = nothing_scalar_array_selector(alg.w, w),
+                                            alg = alg.alg)
+end
+struct ArbitraryOrderMoment{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -843,6 +855,30 @@ function ArbitraryOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSetti
                               mu::Option{<:Num_VecNum_VecScalar} = nothing,
                               alg::StandardisedArbitraryOrderMomentAlgorithm = StandardisedArbitraryOrderMoment())
     return ArbitraryOrderMoment(settings, w, mu, alg)
+end
+function (r::ArbitraryOrderMoment{<:Any, <:Any, <:Any,
+                                  <:StandardisedArbitraryOrderMoment{<:Any, <:Any, <:Any,
+                                                                     <:Semi}})(w::VecNum,
+                                                                               X::MatNum,
+                                                                               fees::Option{<:Fees} = nothing)
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+    return if isnothing(r.w)
+        StatsBase.moment(val, r.alg.p; mean = zero(eltype(val)))
+    else
+        StatsBase.moment(val, r.alg.p, r.w; mean = zero(eltype(val)))
+    end
+end
+function (r::ArbitraryOrderMoment{<:Any, <:Any, <:Any,
+                                  <:StandardisedArbitraryOrderMoment{<:Any, <:Any, <:Any,
+                                                                     <:Full}})(w::VecNum,
+                                                                               X::MatNum,
+                                                                               fees::Option{<:Fees} = nothing)
+    val = calc_deviations_vec(r, w, X, fees)
+    return if isnothing(r.w)
+        StatsBase.moment(val, r.alg.p; mean = zero(eltype(val)))
+    else
+        StatsBase.moment(val, r.alg.p, r.w; mean = zero(eltype(val)))
+    end
 end
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
                                               <:HighOrderMoment{T1, T2, T3, T4},
@@ -1102,7 +1138,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^2
 end
-for rt in (LowOrderMoment, HighOrderMoment)
+for rt in (LowOrderMoment, HighOrderMoment, ArbitraryOrderMoment)
     eval(quote
              function factory(r::$(rt), pr::AbstractPriorResult, args...; kwargs...)
                  w = nothing_scalar_array_selector(r.w, pr.w)
@@ -1118,4 +1154,5 @@ for rt in (LowOrderMoment, HighOrderMoment)
 end
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
-       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment
+       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment,
+       ArbitraryOrderMoment, StandardisedArbitraryOrderMoment
