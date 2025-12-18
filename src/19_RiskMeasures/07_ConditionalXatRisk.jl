@@ -60,7 +60,7 @@ const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
 function (r::RMCVaR{Nothing})(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
-    var = -partialsort!(x, idx)
+    var = -partialsort(x, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)
         sum_var += x[i] + var
@@ -166,7 +166,7 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     alpha = r.alpha
     aT = alpha * length(x)
     idx1 = ceil(Int, aT)
-    var1 = -partialsort!(x, idx1)
+    var1 = -partialsort(x, idx1)
     sum_var1 = zero(eltype(x))
     for i in 1:(idx1 - 1)
         sum_var1 += x[i] + var1
@@ -176,7 +176,7 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     beta = r.beta
     bT = beta * length(x)
     idx2 = ceil(Int, bT)
-    var2 = -partialsort!(x, idx2; rev = true)
+    var2 = -partialsort(x, idx2; rev = true)
     sum_var2 = zero(eltype(x))
     for i in 1:(idx2 - 1)
         sum_var2 += x[i] + var2

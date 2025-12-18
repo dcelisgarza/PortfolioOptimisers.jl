@@ -65,7 +65,7 @@ function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
-    return -partialsort!(x, ceil(Int, r.alpha * length(x)))
+    return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
 function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     w = r.w
@@ -109,8 +109,8 @@ function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs..
                             alg = r.alg)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
-    loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
-    gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
+    loss = -partialsort(x, ceil(Int, r.alpha * length(x)))
+    gain = -partialsort(x, ceil(Int, r.beta * length(x)); rev = true)
     return loss - gain
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum)
@@ -161,7 +161,6 @@ function _absolute_drawdown(x::VecNum)
 end
 function (r::DrawdownatRisk)(x::VecNum)
     dd = _absolute_drawdown(x)
-    # partioalsortperm instead
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 struct RelativeDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
