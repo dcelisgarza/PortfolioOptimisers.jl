@@ -109,8 +109,9 @@ function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs..
                             alg = r.alg)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
-    loss = -partialsort(x, ceil(Int, r.alpha * length(x)))
-    gain = -partialsort(x, ceil(Int, r.beta * length(x)); rev = true)
+    x = copy(x)
+    loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
+    gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
     return loss - gain
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum)
