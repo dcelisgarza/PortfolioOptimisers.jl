@@ -8,23 +8,21 @@ function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return UlcerIndex(settings)
 end
 function (::UlcerIndex)(x::VecNum)
-    #=
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for i in cs
-        if i > peak
-            peak = i
-        end
-        dd = peak - i
-        if dd > zero(dd)
-            val += dd^2
-        end
-    end
-    popfirst!(x)
-    return sqrt(val / length(x))
-    =#
+    # pushfirst!(x, 1)
+    # cs = cumsum(x)
+    # val = zero(eltype(x))
+    # peak = typemin(eltype(x))
+    # for i in cs
+    #     if i > peak
+    #         peak = i
+    #     end
+    #     dd = peak - i
+    #     if dd > zero(dd)
+    #         val += dd^2
+    #     end
+    # end
+    # popfirst!(x)
+    # return sqrt(val / length(x))
     dd = _absolute_drawdown(x)
     return norm(dd, 2) / sqrt(length(x))
 end
@@ -53,6 +51,7 @@ function (::RelativeUlcerIndex)(x::VecNum)
             val += dd^2
         end
     end
+    popfirst!(x)
     return sqrt(val / length(x))
     =#
     dd = _relative_drawdown(x)

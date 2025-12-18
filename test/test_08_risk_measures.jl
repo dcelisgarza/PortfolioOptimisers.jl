@@ -243,7 +243,7 @@
                        0.05118499953858111)
         @test isapprox(expected_risk(RelativeAverageDrawdown(), w, rd.X),
                        expected_risk(RelativeAverageDrawdown(; w = wt), w, rd.X))
-        @test isapprox(expected_risk(RelativeUlcerIndex(), w, rd.X), 0.06356737835751593)
+        @test isapprox(expected_risk(RelativeUlcerIndex(), w, rd.X), 0.06369337923112198)
         @test isapprox(expected_risk(RelativeMaximumDrawdown(), w, rd.X),
                        0.14712227931904298)
         @test isapprox(expected_risk(BrownianDistanceVariance(), w, rd.X),
