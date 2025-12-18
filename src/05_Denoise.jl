@@ -379,7 +379,7 @@ function find_max_eval(vals::VecNum, q::Number,
     res = Optim.optimize(x -> errPDF(x, vals, q, kernel, m, n), 0.0, 1.0, args...;
                          kwargs...)
     x = Optim.converged(res) ? Optim.minimizer(res) : 1.0
-    e_max = x * (1.0 + sqrt(1.0 / q))^2
+    e_max = x * (one(q) + sqrt(one(q) / q))^2
     return e_max, x
 end
 """

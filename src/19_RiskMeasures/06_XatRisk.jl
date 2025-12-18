@@ -124,8 +124,8 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum
     idx = ifelse(idx > length(x), idx - 1, idx)
     loss = -sorted_x[idx]
 
-    sorted_x = reverse(sorted_x)
-    sorted_w = reverse(sorted_w)
+    sorted_x = reverse!(sorted_x)
+    sorted_w = reverse!(sorted_w)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.beta)
     idx = ifelse(idx > length(x), idx - 1, idx)

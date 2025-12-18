@@ -202,8 +202,8 @@ function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 
-    sorted_x = reverse(sorted_x)
-    sorted_w = reverse(sorted_w)
+    sorted_x = reverse!(sorted_x)
+    sorted_w = reverse!(sorted_w)
     cum_w = cumsum(sorted_w)
     beta = sw * r.beta
     idx = searchsortedfirst(cum_w, beta)
