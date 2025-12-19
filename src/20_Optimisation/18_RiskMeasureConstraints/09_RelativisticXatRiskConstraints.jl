@@ -31,7 +31,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     else
         iat = inv(alpha * sum(wi))
         lnk = (iat^kappa - iat^(-kappa)) * ik2
-        # Try scaling psi and theta by wi instead
         @expression(model, t_rlvar + lnk * z_rlvar + dot(wi, psi_rlvar + theta_rlvar))
     end
     model[Symbol(:crlvar_pcone_a_, i)], model[Symbol(:crlvar_pcone_b_, i)], model[Symbol(:crlvar_, i)] = @constraints(model,

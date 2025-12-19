@@ -3,6 +3,12 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv))
     end
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    ik = inv(kappa)
+    iopk = inv(opk)
+    iomk = inv(omk)
+    ik2 = inv(2 * kappa)
     T = length(x)
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
@@ -16,27 +22,20 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                end)
     if isnothing(w)
         invat = inv(alpha * T)
-        invk2 = inv(2 * kappa)
-        ln_k = (invat^kappa - invat^(-kappa)) * invk2
+        ln_k = (invat^kappa - invat^(-kappa)) * ik2
         @expression(model, risk, t + ln_k * z + sum(psi + theta))
     else
-        invat = inv(alpha * sum(w))
-        invk2 = inv(2 * kappa)
-        ln_k = (invat^kappa - invat^(-kappa)) * invk2
+        sw = sum(w)
+        invat = inv(alpha * sw)
+        ln_k = (invat^kappa - invat^(-kappa)) * ik2
         @expression(model, risk, t + ln_k * z + dot(w, psi + theta))
     end
-    opk = one(kappa) + kappa
-    omk = one(kappa) - kappa
-    invk = inv(kappa)
-    invopk = inv(opk)
-    invomk = inv(omk)
     @constraints(model,
                  begin
                      [i = 1:T],
-                     [z * opk * invk2, psi[i] * opk * invk, epsilon[i]] in
-                     MOI.PowerCone(invopk)
+                     [z * opk * ik2, psi[i] * opk * ik, epsilon[i]] in MOI.PowerCone(iopk)
                      [i = 1:T],
-                     [omega[i] * invomk, theta[i] * invk, -z * invk2] in MOI.PowerCone(omk)
+                     [omega[i] * iomk, theta[i] * ik, -z * ik2] in MOI.PowerCone(omk)
                      (epsilon + omega - x) .- t <= 0
                  end)
     @objective(model, Min, risk)
@@ -53,18 +52,18 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
         if isnothing(w)
             @constraints(model, begin
                              sum(z) - 1 == 0
-                             sum(nu - tau) * invk2 - ln_k <= 0
+                             sum(nu - tau) * ik2 - ln_k <= 0
                          end)
             @expression(model, risk, -dot(z, x))
         else
             @constraints(model, begin
                              dot(w, z) - 1 == 0
-                             dot(w, nu - tau) * invk2 - ln_k <= 0
+                             dot(w, nu - tau) * ik2 - ln_k <= 0
                          end)
-            @expression(model, risk, -dot(z, w .* x))
+            @expression(model, risk, -dot(w .* z, x))
         end
         @constraints(model, begin
-                         [i = 1:T], [nu[i], 1, z[i]] in MOI.PowerCone(invopk)
+                         [i = 1:T], [nu[i], 1, z[i]] in MOI.PowerCone(iopk)
                          [i = 1:T], [z[i], 1, tau[i]] in MOI.PowerCone(omk)
                      end)
         @objective(model, Max, risk)
