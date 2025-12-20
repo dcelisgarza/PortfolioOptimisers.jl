@@ -12,18 +12,13 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
                    u[1:T]
                end)
     aT = if isnothing(w)
-        @constraints(model, begin
-                         sum(u) - z <= 0
-                         [i = 1:T], [-x[i] - t, z, u[i]] in MOI.ExponentialCone()
-                     end)
+        @constraint(model, sum(u) - z <= 0)
         alpha * T
     else
-        @constraints(model, begin
-                         dot(w, u) - z <= 0
-                         [i = 1:T], [-x[i] - t, z, u[i]] in MOI.ExponentialCone()
-                     end)
+        @constraint(model, dot(w, u) - z <= 0)
         alpha * sum(w)
     end
+    @constraint(model, [i = 1:T], [-x[i] - t, z, u[i]] in MOI.ExponentialCone())
     @expression(model, risk, t - z * log(aT))
     @objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
