@@ -8,24 +8,24 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
     set_string_names_on_creation(model, false)
     T = length(x)
     ip = inv(p)
+    @variables(model, begin
+                   pvar_eta
+                   pvar_t
+                   pvar_w[1:T] >= 0
+                   pvar_v[1:T]
+               end)
     iaT = if isnothing(w)
-        @constraint(model, sum(a) - b == 0)
+        @constraint(model, sum(pvar_v) - pvar_t == 0)
         inv(alpha * T^ip)
     else
-        @constraint(model, dot(w, a) - b == 0)
+        @constraint(model, dot(w, pvar_v) - pvar_t == 0)
         inv(alpha * sum(w)^ip)
     end
-    @variables(model, begin
-                   eta
-                   b
-                   c[1:T] >= 0
-                   a[1:T]
-               end)
     @constraints(model, begin
-                     (x + c) .+ eta >= 0
-                     [i = 1:T], [a[i], b, c[i]] in MOI.PowerCone(ip)
+                     (x + pvar_w) .+ pvar_eta >= 0
+                     [i = 1:T], [pvar_v[i], pvar_t, pvar_w[i]] in MOI.PowerCone(ip)
                  end)
-    @objective(model, Min, eta + iaT * b)
+    @objective(model, Min, pvar_eta + iaT * pvar_t)
     return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
     else
@@ -85,7 +85,8 @@ struct PowerValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        @argcheck(p > one(p))
+        @argcheck(pa > one(pa))
+        @argcheck(pb > one(pb))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -109,8 +110,71 @@ function factory(r::PowerValueatRiskRange, pr::AbstractPriorResult,
     return PowerValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                  beta = r.beta, pa = r.pa, pb = r.pb, w = w)
 end
-struct PowerDrawdownatRisk <: RiskMeasure end
-struct RelativePowerDrawdownatRisk <: HierarchicalRiskMeasure end
-
+struct PowerDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
+    settings::T1
+    slv::T2
+    alpha::T3
+    p::T4
+    function PowerDrawdownatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
+                                 alpha::Number, p::Number)
+        if isa(slv, VecSlv)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(p > one(p))
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p)}(settings, slv,
+                                                                            alpha, p)
+    end
+end
+function PowerDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                             slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                             p::Number = 2.0)
+    return PowerDrawdownatRisk(settings, slv, alpha, p)
+end
+function (r::PowerDrawdownatRisk)(x::VecNum)
+    dd = _absolute_drawdown(x)
+    return PRM(dd, r.slv, r.alpha, r.p)
+end
+struct RelativePowerDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
+    settings::T1
+    slv::T2
+    alpha::T3
+    p::T4
+    function RelativePowerDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
+                                         slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                         p::Number)
+        if isa(slv, VecSlv)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(p > one(p))
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p)}(settings, slv,
+                                                                            alpha, p)
+    end
+end
+function RelativePowerDrawdownatRisk(;
+                                     settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
+                                     slv::Option{<:Slv_VecSlv} = nothing,
+                                     alpha::Number = 0.05, p::Number = 2.0)
+    return RelativePowerDrawdownatRisk(settings, slv, alpha, p)
+end
+function (r::RelativePowerDrawdownatRisk)(x::VecNum)
+    rdd = _relative_drawdown(x)
+    return PRM(rdd, r.slv, r.alpha, r.p)
+end
+for r in (PowerDrawdownatRisk, RelativePowerDrawdownatRisk)
+    eval(quote
+             function factory(r::$(r), ::Any, slv::Option{<:Slv_VecSlv}, args...;
+                              kwargs...)
+                 slv = solver_selector(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, p = r.p, slv = slv)
+             end
+             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
+                 slv = solver_selector(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
+                             p = r.p, slv = slv)
+             end
+         end)
+end
 export PowerValueatRisk, PowerValueatRiskRange, PowerDrawdownatRisk,
        RelativePowerDrawdownatRisk

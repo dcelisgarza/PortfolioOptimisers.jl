@@ -14,7 +14,8 @@ const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                         <:RelativeRelativisticDrawdownatRisk, <:Range,
                         <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                         <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
-                        <:MeanReturn}
+                        <:MeanReturn, <:PowerValueatRisk, <:PowerValueatRiskRange,
+                        <:PowerDrawdownatRisk, <:RelativePowerDrawdownatRisk}
 const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                         <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
                         <:Skewness, <:MedianAbsoluteDeviation}
