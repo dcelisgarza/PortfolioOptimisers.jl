@@ -31,6 +31,8 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
                                                           r::Number,
                                                           w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(l > zero(l))
+        @argcheck(r > zero(r))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -84,7 +86,6 @@ function (r::RMCVaR{<:AbstractWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
-#! Make the drawdown equivalent.
 struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2
@@ -130,6 +131,10 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
                                                                w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
+        @argcheck(l_a > zero(l_a))
+        @argcheck(r_a > zero(r_a))
+        @argcheck(l_b > zero(l_b))
+        @argcheck(r_b > zero(r_b))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -229,7 +234,31 @@ function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasure
                                    alpha::Number = 0.05)
     return ConditionalDrawdownatRisk(settings, alpha)
 end
-function (r::ConditionalDrawdownatRisk)(x::VecNum)
+#==#
+struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
+    settings::T1
+    alpha::T2
+    l::T3
+    r::T4
+    function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
+                                                             alpha::Number, l::Number,
+                                                             r::Number)
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(l > zero(l))
+        @argcheck(r > zero(r))
+        return new{typeof(settings), typeof(alpha), typeof(l), typeof(r)}(settings, alpha,
+                                                                          l, r)
+    end
+end
+function DistributionallyRobustConditionalDrawdownatRisk(;
+                                                         settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                                         alpha::Number = 0.05,
+                                                         l::Number = 1.0, r::Number = 0.02)
+    return DistributionallyRobustConditionalDrawdownatRisk(settings, alpha, l, r)
+end
+const RMCDaR = Union{<:ConditionalDrawdownatRisk,
+                     <:DistributionallyRobustConditionalDrawdownatRisk}
+function (r::RMCDaR)(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     dd = _absolute_drawdown(x)
@@ -268,4 +297,5 @@ end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
        ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
-       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk
+       ConditionalDrawdownatRisk, DistributionallyRobustConditionalDrawdownatRisk,
+       RelativeConditionalDrawdownatRisk
