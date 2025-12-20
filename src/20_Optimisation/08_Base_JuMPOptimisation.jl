@@ -143,6 +143,17 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
     @expression(model, Xap1, one(eltype(X)) .+ X)
     return Xap1
 end
+function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
+    if haskey(model, :ddap1)
+        return model[:ddap1]
+    end
+    _ddap1 = similar(X)
+    for i in axes(X, 2)
+        _ddap1[:, i] = _absolute_drawdown(X[:, i]) .+ one(eltype(X))
+    end
+    @expression(model, ddap1, _ddap1)
+    return ddap1
+end
 function scalarise_risk_expression! end
 function set_risk_constraints! end
 
