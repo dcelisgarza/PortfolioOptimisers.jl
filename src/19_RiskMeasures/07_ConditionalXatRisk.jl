@@ -84,6 +84,7 @@ function (r::RMCVaR{<:AbstractWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
+#! Make the drawdown equivalent.
 struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2

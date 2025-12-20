@@ -15,10 +15,10 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
                    pvar_v[1:T]
                end)
     iaT = if isnothing(w)
-        @constraint(model, sum(pvar_v) - pvar_t == 0)
+        @constraint(model, sum(pvar_v) - pvar_t <= 0)
         inv(alpha * T^ip)
     else
-        @constraint(model, dot(w, pvar_v) - pvar_t == 0)
+        @constraint(model, dot(w, pvar_v) - pvar_t <= 0)
         inv(alpha * sum(w)^ip)
     end
     @constraints(model, begin
