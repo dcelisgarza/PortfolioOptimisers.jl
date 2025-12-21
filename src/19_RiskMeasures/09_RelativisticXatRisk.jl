@@ -104,13 +104,6 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
                                  w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
-function factory(r::RelativisticValueatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
-                                   kappa = r.kappa, slv = slv, w = w)
-end
 function (r::RelativisticValueatRisk)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
@@ -159,67 +152,83 @@ function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
 end
-struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
+struct RelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
     kappa::T4
+    w::T5
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                        kappa::Number)
+                                        kappa::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
-        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa)}(settings,
-                                                                                slv, alpha,
-                                                                                kappa)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
+                                                                                           slv,
+                                                                                           alpha,
+                                                                                           kappa,
+                                                                                           w)
     end
 end
 function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
-                                    alpha::Number = 0.05, kappa::Number = 0.3)
-    return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
+                                    alpha::Number = 0.05, kappa::Number = 0.3,
+                                    w::Option{<:AbstractWeights} = nothing)
+    return RelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
-    return RRM(dd, r.slv, r.alpha, r.kappa)
+    return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
 end
-struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
+struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
     kappa::T4
+    w::T5
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                                kappa::Number)
+                                                kappa::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
-        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa)}(settings,
-                                                                                slv, alpha,
-                                                                                kappa)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
+                                                                                           slv,
+                                                                                           alpha,
+                                                                                           kappa,
+                                                                                           w)
     end
 end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Option{<:Slv_VecSlv} = nothing,
-                                            alpha::Number = 0.05, kappa::Number = 0.3)
-    return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
+                                            alpha::Number = 0.05, kappa::Number = 0.3,
+                                            w::Option{<:AbstractWeights} = nothing)
+    return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
-    return RRM(dd, r.slv, r.alpha, r.kappa)
+    return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
 end
-for r in (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
+for r in (RelativisticValueatRisk, RelativisticDrawdownatRisk,
+          RelativeRelativisticDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), ::Any, slv::Option{<:Slv_VecSlv}, args...;
-                              kwargs...)
+             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
+                              args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             slv = slv)
+                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha,
+                             kappa = r.kappa, w = w)
              end
              function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
                  slv = solver_selector(r.slv, slv)

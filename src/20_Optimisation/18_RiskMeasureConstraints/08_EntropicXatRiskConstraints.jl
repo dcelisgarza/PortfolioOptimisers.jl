@@ -127,23 +127,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatR
                                                                                                                                  (lower_bound = 0)
                                                                                                                                  [1:T]
                                                                                                                              end)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    at = if isnothing(wi)
+        model[Symbol(:cedar_, i)] = @constraint(model, sc * (sum(u_edar) - z_edar) <= 0)
+        r.alpha * T
+    else
+        model[Symbol(:cedar_, i)] = @constraint(model, sc * (dot(wi, u_edar) - z_edar) <= 0)
+        r.alpha * sum(wi)
+    end
+    model[Symbol(:cedar_exp_cone_, i)] = @constraint(model, [i = 1:T],
+                                                     [sc * (dd[i + 1] - t_edar),
+                                                      sc * z_edar, sc * u_edar[i]] in
+                                                     MOI.ExponentialCone())
     edar_risk = model[key] = @expression(model, t_edar - z_edar * log(at))
-    model[Symbol(:cedar_, i)], model[Symbol(:cedar_exp_cone_, i)] = @constraints(model,
-                                                                                 begin
-                                                                                     sc *
-                                                                                     (sum(u_edar) -
-                                                                                      z_edar) <=
-                                                                                     0
-                                                                                     [i = 1:T],
-                                                                                     [sc *
-                                                                                      (dd[i + 1] -
-                                                                                       t_edar),
-                                                                                      sc *
-                                                                                      z_edar,
-                                                                                      sc *
-                                                                                      u_edar[i]] in
-                                                                                     MOI.ExponentialCone()
-                                                                                 end)
     set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, key)
     return edar_risk
 end

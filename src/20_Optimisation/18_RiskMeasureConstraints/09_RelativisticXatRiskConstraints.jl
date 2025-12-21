@@ -229,10 +229,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
                                                                                                                                                                                                                                                                                          [1:T]
                                                                                                                                                                                                                                                                                          [1:T]
                                                                                                                                                                                                                                                                                      end)
-    rldar_risk = model[key] = @expression(model,
-                                          t_rldar +
-                                          lnk * z_rldar +
-                                          sum(psi_rldar + theta_rldar))
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    rldar_risk = model[key] = if isnothing(wi)
+        iat = inv(alpha * T)
+        lnk = (iat^kappa - iat^(-kappa)) * ik2
+        @expression(model, t_rldar + lnk * z_rldar + sum(psi_rldar + theta_rldar))
+    else
+        iat = inv(alpha * sum(wi))
+        lnk = (iat^kappa - iat^(-kappa)) * ik2
+        @expression(model, t_rldar + lnk * z_rldar + dot(wi, psi_rldar + theta_rldar))
+    end
     model[Symbol(:crldar_pcone_a_, i)], model[Symbol(:crldar_pcone_b_, i)], model[Symbol(:crldar_, i)] = @constraints(model,
                                                                                                                       begin
                                                                                                                           [i = 1:T],

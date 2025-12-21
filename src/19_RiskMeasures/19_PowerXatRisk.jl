@@ -62,13 +62,6 @@ end
 function (r::PowerValueatRisk)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.p, r.w)
 end
-function factory(r::PowerValueatRisk, pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                 args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return PowerValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, p = r.p,
-                            w = w)
-end
 struct PowerValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     settings::T1
     slv::T2
@@ -135,39 +128,48 @@ function (r::PowerDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p)
 end
-struct RelativePowerDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
+struct RelativePowerDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
     p::T4
+    w::T5
     function RelativePowerDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                          slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                         p::Number)
+                                         p::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p > one(p))
-        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p)}(settings, slv,
-                                                                            alpha, p)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
+                                                                                       slv,
+                                                                                       alpha,
+                                                                                       p, w)
     end
 end
 function RelativePowerDrawdownatRisk(;
                                      settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                      slv::Option{<:Slv_VecSlv} = nothing,
-                                     alpha::Number = 0.05, p::Number = 2.0)
-    return RelativePowerDrawdownatRisk(settings, slv, alpha, p)
+                                     alpha::Number = 0.05, p::Number = 2.0,
+                                     w::Option{<:AbstractWeights} = nothing)
+    return RelativePowerDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::RelativePowerDrawdownatRisk)(x::VecNum)
     rdd = relative_drawdown_vec(x)
-    return PRM(rdd, r.slv, r.alpha, r.p)
+    return PRM(rdd, r.slv, r.alpha, r.p, r.w)
 end
-for r in (PowerDrawdownatRisk, RelativePowerDrawdownatRisk)
+for r in (PowerValueatRisk, PowerDrawdownatRisk, RelativePowerDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), ::Any, slv::Option{<:Slv_VecSlv}, args...;
-                              kwargs...)
+             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
+                              args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, p = r.p, slv = slv)
+                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, p = r.p,
+                             w = w)
              end
              function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
                  slv = solver_selector(r.slv, slv)
@@ -176,5 +178,6 @@ for r in (PowerDrawdownatRisk, RelativePowerDrawdownatRisk)
              end
          end)
 end
+
 export PowerValueatRisk, PowerValueatRiskRange, PowerDrawdownatRisk,
        RelativePowerDrawdownatRisk

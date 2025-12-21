@@ -60,10 +60,6 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
-function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
-end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
@@ -132,23 +128,33 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum
     return loss - gain
 end
 #! Turn into a normal risk measure and implement it as value at risk.
-struct DrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
+struct DrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
-    function DrawdownatRisk(settings::HierarchicalRiskMeasureSettings, alpha::Number,
-                            w::Option{<:AbstractWeights})
+    alg::T4
+    function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
+                            w::Option{<:AbstractWeights}, alg::MIPValueatRisk)
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
+        return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
+                                                                            w, alg)
     end
 end
-function DrawdownatRisk(;
-                        settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                        alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing)
-    return DrawdownatRisk(settings, alpha, w)
+function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                        alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing,
+                        alg::MIPValueatRisk = MIPValueatRisk())
+    return DrawdownatRisk(settings, alpha, w, alg)
+end
+for r in (ValueatRisk, DrawdownatRisk)
+    eval(quote
+             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
+             end
+         end)
 end
 function absolute_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))
@@ -223,13 +229,9 @@ function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
 end
-for r in (DrawdownatRisk, RelativeDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w)
-             end
-         end)
+function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 
 export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,

@@ -155,8 +155,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerDrawdownatRisk
                                                                                                                                                                          (lower_bound = 0)
                                                                                                                                                                          [1:T]
                                                                                                                                                                      end)
-    iaT = inv(r.alpha * T^ip)
-    model[Symbol(:cpdar_eq_, i)] = @constraint(model, sc * (sum(pdar_v) - pdar_t) <= 0)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    iaT = if isnothing(wi)
+        model[Symbol(:cpdar_eq_, i)] = @constraint(model, sc * (sum(pdar_v) - pdar_t) <= 0)
+        inv(r.alpha * T^ip)
+    else
+        model[Symbol(:cpdar_eq_, i)] = @constraint(model,
+                                                   sc * (dot(wi, pdar_v) - pdar_t) <= 0)
+        inv(r.alpha * sum(wi)^ip)
+    end
     model[Symbol(:cpdar_, i)], model[Symbol(:cpdar_pcone_, i)] = @constraints(model,
                                                                               begin
                                                                                   sc *

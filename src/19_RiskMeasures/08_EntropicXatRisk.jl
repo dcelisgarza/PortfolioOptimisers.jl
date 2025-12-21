@@ -53,12 +53,6 @@ end
 function (r::EntropicValueatRisk)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w)
 end
-function factory(r::EntropicValueatRisk, pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                 args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
-end
 struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     slv::T2
@@ -99,61 +93,75 @@ function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                     beta = r.beta, w = w)
 end
-struct EntropicDrawdownatRisk{T1, T2, T3} <: RiskMeasure
+struct EntropicDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
+    w::T4
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
-                                    slv::Option{<:Slv_VecSlv}, alpha::Number)
+                                    slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                    w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        return new{typeof(settings), typeof(slv), typeof(alpha)}(settings, slv, alpha)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
+                                                                            alpha, w)
     end
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05)
-    return EntropicDrawdownatRisk(settings, slv, alpha)
+                                slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
+                                w::Option{<:AbstractWeights} = nothing)
+    return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
-    return ERM(dd, r.slv, r.alpha)
+    return ERM(dd, r.slv, r.alpha, r.w)
 end
-struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
+struct RelativeEntropicDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
+    w::T4
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                            slv::Option{<:Slv_VecSlv}, alpha::Number)
+                                            slv::Option{<:Slv_VecSlv}, alpha::Number,
+                                            w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        return new{typeof(settings), typeof(slv), typeof(alpha)}(settings, slv, alpha)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
+                                                                            alpha, w)
     end
 end
 function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
-                                        alpha::Number = 0.05)
-    return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
+                                        alpha::Number = 0.05,
+                                        w::Option{<:AbstractWeights} = nothing)
+    return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
-    return ERM(dd, r.slv, r.alpha)
+    return ERM(dd, r.slv, r.alpha, r.w)
 end
-for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
+for r in (EntropicValueatRisk, EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), ::Any, slv::Option{<:Slv_VecSlv}, args...;
-                              kwargs...)
+             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
+                              args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
+                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
              end
              function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
                  slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             slv = slv)
+                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = r.w)
              end
          end)
 end
