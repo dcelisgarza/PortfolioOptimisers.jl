@@ -371,7 +371,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
     return cdar_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::DistributionallyRobustConditionalValueatRisk,
+                               r::DistributionallyRobustConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:drcvar_risk_, i)
@@ -388,7 +388,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     a1 = -one(alpha)
     a2 = -one(alpha) - b1 * inv(alpha)
     b2 = b1 * (one(alpha) - inv(alpha))
-    lb, tau, s, tu_drdvar, tv_drdvar, u, v = model[Symbol(:lb_drdvar_, i)], model[Symbol(:tau_drdvar_, i)], model[Symbol(:s_drdvar_, i)], model[Symbol(:tu_drdvar_, i)], model[Symbol(:tv_drdvar_, i)], model[Symbol(:u_drdvar_, i)], model[Symbol(:v_drdvar_, i)] = @variables(model,
+    lb, tau, s, tu_drcdar, tv_drcdar, u, v = model[Symbol(:lb_drcdar_, i)], model[Symbol(:tau_drcdar_, i)], model[Symbol(:s_drcdar_, i)], model[Symbol(:tu_drcdar_, i)], model[Symbol(:tv_drcdar_, i)], model[Symbol(:u_drcdar_, i)], model[Symbol(:v_drcdar_, i)] = @variables(model,
                                                                                                                                                                                                                                                                                 begin
                                                                                                                                                                                                                                                                                     ()
                                                                                                                                                                                                                                                                                     ()
@@ -402,7 +402,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                      1:N],
                                                                                                                                                                                                                                                                                     (lower_bound = 0)
                                                                                                                                                                                                                                                                                 end)
-    model[Symbol(:cu_drdvar_, i)], model[Symbol(:cv_drdvar_, i)], model[Symbol(:cu_drdvar_infnorm_, i)], model[Symbol(:cv_drdvar_infnorm_, i)], model[Symbol(:cu_drdvar_lb_, i)], model[Symbol(:cv_drdvar_lb_, i)] = @constraints(model,
+    model[Symbol(:cu_drcdar_, i)], model[Symbol(:cv_drcdar_, i)], model[Symbol(:cu_drcdar_infnorm_, i)], model[Symbol(:cv_drcdar_infnorm_, i)], model[Symbol(:cu_drcdar_lb_, i)], model[Symbol(:cv_drcdar_lb_, i)] = @constraints(model,
                                                                                                                                                                                                                                   begin
                                                                                                                                                                                                                                       sc *
                                                                                                                                                                                                                                       (b1 *
@@ -428,7 +428,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                       0
                                                                                                                                                                                                                                       [i = 1:T],
                                                                                                                                                                                                                                       [sc *
-                                                                                                                                                                                                                                       tu_drdvar[i]
+                                                                                                                                                                                                                                       tu_drcdar[i]
                                                                                                                                                                                                                                        sc *
                                                                                                                                                                                                                                        (-view(u,
                                                                                                                                                                                                                                               i,
@@ -439,7 +439,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                            N)
                                                                                                                                                                                                                                       [i = 1:T],
                                                                                                                                                                                                                                       [sc *
-                                                                                                                                                                                                                                       tv_drdvar[i]
+                                                                                                                                                                                                                                       tv_drcdar[i]
                                                                                                                                                                                                                                        sc *
                                                                                                                                                                                                                                        (-view(v,
                                                                                                                                                                                                                                               i,
@@ -449,15 +449,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                       MOI.NormInfinityCone(1 +
                                                                                                                                                                                                                                                            N)
                                                                                                                                                                                                                                       sc *
-                                                                                                                                                                                                                                      (tu_drdvar .-
+                                                                                                                                                                                                                                      (tu_drcdar .-
                                                                                                                                                                                                                                        lb) <=
                                                                                                                                                                                                                                       0
                                                                                                                                                                                                                                       sc *
-                                                                                                                                                                                                                                      (tv_drdvar .-
+                                                                                                                                                                                                                                      (tv_drcdar .-
                                                                                                                                                                                                                                        lb) <=
                                                                                                                                                                                                                                       0
                                                                                                                                                                                                                                   end)
-    drdvar_risk = model[key] = @expression(model, radius * lb + mean(s))
-    set_risk_bounds_and_expression!(model, opt, drdvar_risk, r.settings, key)
-    return drdvar_risk
+    drcdar_risk = model[key] = @expression(model, radius * lb + mean(s))
+    set_risk_bounds_and_expression!(model, opt, drcdar_risk, r.settings, key)
+    return drcdar_risk
 end

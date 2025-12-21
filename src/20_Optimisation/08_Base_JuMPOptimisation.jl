@@ -140,17 +140,14 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
     if haskey(model, :Xap1)
         return model[:Xap1]
     end
-    @expression(model, Xap1, one(eltype(X)) .+ X)
+    @expression(model, Xap1, X .+ one(eltype(X)))
     return Xap1
 end
 function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
     if haskey(model, :ddap1)
         return model[:ddap1]
     end
-    _ddap1 = similar(X)
-    for i in axes(X, 2)
-        _ddap1[:, i] = _absolute_drawdown(X[:, i]) .+ one(eltype(X))
-    end
+    _ddap1 = absolute_drawdown_arr(X) .+ one(eltype(X))
     @expression(model, ddap1, _ddap1)
     return ddap1
 end

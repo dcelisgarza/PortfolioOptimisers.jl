@@ -132,7 +132,7 @@ function PowerDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettin
     return PowerDrawdownatRisk(settings, slv, alpha, p)
 end
 function (r::PowerDrawdownatRisk)(x::VecNum)
-    dd = _absolute_drawdown(x)
+    dd = absolute_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p)
 end
 struct RelativePowerDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
@@ -159,7 +159,7 @@ function RelativePowerDrawdownatRisk(;
     return RelativePowerDrawdownatRisk(settings, slv, alpha, p)
 end
 function (r::RelativePowerDrawdownatRisk)(x::VecNum)
-    rdd = _relative_drawdown(x)
+    rdd = relative_drawdown_vec(x)
     return PRM(rdd, r.slv, r.alpha, r.p)
 end
 for r in (PowerDrawdownatRisk, RelativePowerDrawdownatRisk)

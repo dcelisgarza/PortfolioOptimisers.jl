@@ -233,8 +233,8 @@ end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    alpha::Number = 0.05)
     return ConditionalDrawdownatRisk(settings, alpha)
-end
-#==#
+end #==#
+
 struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2
@@ -261,7 +261,7 @@ const RMCDaR = Union{<:ConditionalDrawdownatRisk,
 function (r::RMCDaR)(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
-    dd = _absolute_drawdown(x)
+    dd = absolute_drawdown_vec(x)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)
@@ -286,7 +286,7 @@ end
 function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
-    dd = _relative_drawdown(x)
+    dd = relative_drawdown_vec(x)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)

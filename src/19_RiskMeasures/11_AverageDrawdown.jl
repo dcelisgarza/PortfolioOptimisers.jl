@@ -13,7 +13,7 @@ function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return AverageDrawdown(settings, w)
 end
 function (r::AverageDrawdown)(x::VecNum)
-    dd = _absolute_drawdown(x)
+    dd = absolute_drawdown_vec(x)
     return -(isnothing(r.w) ? mean(dd) : mean(dd, r.w))
 end
 #=
@@ -71,7 +71,7 @@ function RelativeAverageDrawdown(;
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown)(x::VecNum)
-    dd = _relative_drawdown(x)
+    dd = relative_drawdown_vec(x)
     return -(isnothing(r.w) ? mean(dd) : mean(dd, r.w))
 end
 #=

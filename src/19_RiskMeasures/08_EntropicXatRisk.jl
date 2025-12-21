@@ -117,7 +117,7 @@ function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
     return EntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::EntropicDrawdownatRisk)(x::VecNum)
-    dd = _absolute_drawdown(x)
+    dd = absolute_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha)
 end
 struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
@@ -140,7 +140,7 @@ function RelativeEntropicDrawdownatRisk(;
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
-    dd = _relative_drawdown(x)
+    dd = relative_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha)
 end
 for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)

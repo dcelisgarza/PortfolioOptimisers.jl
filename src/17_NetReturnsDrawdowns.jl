@@ -177,11 +177,19 @@ julia> cumulative_returns([0.01, 0.02, -0.01], true)
   - [`drawdowns`](@ref)
 """
 function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
-    return if compound
-        _relative_cumulative_returns(X; dims = dims)
-    else
+    return if !compound
         _absolute_cumulative_returns(X; dims = dims)
+    else
+        _relative_cumulative_returns(X; dims = dims)
     end
+end
+function absolute_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
+    cX = !cX ? _absolute_cumulative_returns(X; dims = dims) : X
+    return cX - accumulate(max, cX; dims = dims, init = zero(eltype(X)))
+end
+function relative_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
+    cX = !cX ? _relative_cumulative_returns(X; dims = dims) : X
+    return cX ./ accumulate(max, cX; dims = dims, init = one(eltype(X))) .- one(eltype(X))
 end
 """
     drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
@@ -242,12 +250,11 @@ julia> drawdowns([0.01, 0.02, -0.01], true)
 """
 function drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
     cX = !cX ? cumulative_returns(X, compound; dims = dims) : X
-    if compound
-        return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
+    if !compound
+        cX - accumulate(max, cX; dims = dims)
     else
-        return cX - accumulate(max, cX; dims = dims)
+        cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
     end
-    return nothing
 end
 
 export calc_net_returns, calc_net_asset_returns, cumulative_returns, drawdowns

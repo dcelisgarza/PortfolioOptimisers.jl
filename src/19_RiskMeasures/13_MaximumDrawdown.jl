@@ -25,7 +25,7 @@ function (::MaximumDrawdown)(x::VecNum)
     popfirst!(x)
     return val
     =#
-    dd = _absolute_drawdown(x)
+    dd = absolute_drawdown_vec(x)
     return -minimum(dd)
 end
 struct RelativeMaximumDrawdown{T1} <: HierarchicalRiskMeasure
@@ -56,7 +56,7 @@ function (::RelativeMaximumDrawdown)(x::VecNum)
     popfirst!(x)
     return val
     =#
-    dd = _relative_drawdown(x)
+    dd = relative_drawdown_vec(x)
     return -minimum(dd)
 end
 
