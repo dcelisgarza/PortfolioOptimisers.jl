@@ -101,8 +101,52 @@
                RelativisticValueatRiskRange(; w = wt, slv = slv)),
               (RelativisticValueatRiskRange(; alpha = 1 - 1e-6, beta = 1 - 1e-6, slv = slv),
                RelativisticValueatRiskRange(; alpha = 1 - 1e-6, beta = 1 - 1e-6, w = wt,
-                                            slv = slv))]
-        df = CSV.read(joinpath(@__DIR__, "./assets/XValueatRisk.csv.gz"), DataFrame)
+                                            slv = slv)),
+              (DrawdownatRisk(; alpha = 1e-6), DrawdownatRisk(; alpha = 1e-6, w = wt)),
+              (DrawdownatRisk(;), DrawdownatRisk(; w = wt)),
+              (DrawdownatRisk(; alpha = 1 - 1e-6),
+               DrawdownatRisk(; alpha = 1 - 1e-6, w = wt)),
+              (ConditionalDrawdownatRisk(; alpha = 1e-6),
+               ConditionalDrawdownatRisk(; alpha = 1e-6, w = wt)),
+              (ConditionalDrawdownatRisk(;), ConditionalDrawdownatRisk(; w = wt)),
+              (ConditionalDrawdownatRisk(; alpha = 1 - 1e-6),
+               ConditionalDrawdownatRisk(; alpha = 1 - 1e-6, w = wt)),
+              (EntropicDrawdownatRisk(; alpha = 1e-6, slv = slv),
+               EntropicDrawdownatRisk(; alpha = 1e-6, w = wt, slv = slv)),
+              (EntropicDrawdownatRisk(; slv = slv),
+               EntropicDrawdownatRisk(; w = wt, slv = slv)),
+              (EntropicDrawdownatRisk(; alpha = 1 - 1e-6, slv = slv),
+               EntropicDrawdownatRisk(; alpha = 1 - 1e-6, w = wt, slv = slv)),
+              (RelativisticDrawdownatRisk(; alpha = 1e-6, slv = slv),
+               RelativisticDrawdownatRisk(; alpha = 1e-6, w = wt, slv = slv)),
+              (RelativisticDrawdownatRisk(; slv = slv),
+               RelativisticDrawdownatRisk(; w = wt, slv = slv)),
+              (RelativisticDrawdownatRisk(; alpha = 1 - 1e-6, slv = slv),
+               RelativisticDrawdownatRisk(; alpha = 1 - 1e-6, w = wt, slv = slv)),
+              (RelativeDrawdownatRisk(; alpha = 1e-6),
+               RelativeDrawdownatRisk(; alpha = 1e-6, w = wt)),
+              (RelativeDrawdownatRisk(;), RelativeDrawdownatRisk(; w = wt)),
+              (RelativeDrawdownatRisk(; alpha = 1 - 1e-6),
+               RelativeDrawdownatRisk(; alpha = 1 - 1e-6, w = wt)),
+              (RelativeConditionalDrawdownatRisk(; alpha = 1e-6),
+               RelativeConditionalDrawdownatRisk(; alpha = 1e-6, w = wt)),
+              (RelativeConditionalDrawdownatRisk(;),
+               RelativeConditionalDrawdownatRisk(; w = wt)),
+              (RelativeConditionalDrawdownatRisk(; alpha = 1 - 1e-6),
+               RelativeConditionalDrawdownatRisk(; alpha = 1 - 1e-6, w = wt)),
+              (RelativeEntropicDrawdownatRisk(; alpha = 1e-6, slv = slv),
+               RelativeEntropicDrawdownatRisk(; alpha = 1e-6, w = wt, slv = slv)),
+              (RelativeEntropicDrawdownatRisk(; slv = slv),
+               RelativeEntropicDrawdownatRisk(; w = wt, slv = slv)),
+              (RelativeEntropicDrawdownatRisk(; alpha = 1 - 1e-6, slv = slv),
+               RelativeEntropicDrawdownatRisk(; alpha = 1 - 1e-6, w = wt, slv = slv)),
+              (RelativeRelativisticDrawdownatRisk(; alpha = 1e-6, slv = slv),
+               RelativeRelativisticDrawdownatRisk(; alpha = 1e-6, w = wt, slv = slv)),
+              (RelativeRelativisticDrawdownatRisk(; slv = slv),
+               RelativeRelativisticDrawdownatRisk(; w = wt, slv = slv)),
+              (RelativeRelativisticDrawdownatRisk(; alpha = 1 - 1e-6, slv = slv),
+               RelativeRelativisticDrawdownatRisk(; alpha = 1 - 1e-6, w = wt, slv = slv))]
+        df = CSV.read(joinpath(@__DIR__, "./assets/XatRisk.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
             r1 = expected_risk(r[1], w, rd.X)
             r2 = expected_risk(r[2], w, rd.X)
@@ -110,10 +154,16 @@
                 5e-2
             elseif i in (18, 21)
                 1e-1
-            elseif i == 16
+            elseif i in (16, 35, 47)
                 5e-2
             elseif i in (20, 23, 24)
                 0.25
+            elseif i in (33, 45)
+                5e-5
+            elseif i == 36
+                5e-3
+            elseif i == 48
+                5e-4
             else
                 1e-6
             end
