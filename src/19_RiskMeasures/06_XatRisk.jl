@@ -68,10 +68,9 @@ function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
 function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
-    w = r.w
     order = sortperm(x)
     sorted_x = view(x, order)
-    sorted_w = view(w, order)
+    sorted_w = view(r.w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
     idx = ifelse(idx > length(x), idx - 1, idx)
@@ -132,18 +131,24 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum
     gain = -sorted_x[idx]
     return loss - gain
 end
-struct DrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
+#! Turn into a normal risk measure and implement it as value at risk.
+struct DrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
-    function DrawdownatRisk(settings::HierarchicalRiskMeasureSettings, alpha::Number)
+    w::T3
+    function DrawdownatRisk(settings::HierarchicalRiskMeasureSettings, alpha::Number,
+                            w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        return new{typeof(settings), typeof(alpha)}(settings, alpha)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function DrawdownatRisk(;
                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                        alpha::Number = 0.05)
-    return DrawdownatRisk(settings, alpha)
+                        alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing)
+    return DrawdownatRisk(settings, alpha, w)
 end
 function absolute_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))
@@ -158,23 +163,38 @@ function absolute_drawdown_vec(x::VecNum)
     popfirst!(dd)
     return dd
 end
-function (r::DrawdownatRisk)(x::VecNum)
+function (r::DrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
-struct RelativeDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
+function (r::DrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
+    dd = absolute_drawdown_vec(x)
+    order = sortperm(dd)
+    sorted_dd = view(dd, order)
+    sorted_w = view(r.w, order)
+    cum_w = cumsum(sorted_w)
+    idx = searchsortedfirst(cum_w, r.alpha)
+    idx = ifelse(idx > length(dd), idx - 1, idx)
+    return -sorted_dd[idx]
+end
+struct RelativeDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
+    w::T3
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                    alpha::Number)
+                                    alpha::Number, w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        return new{typeof(settings), typeof(alpha)}(settings, alpha)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                alpha::Number = 0.05)
-    return RelativeDrawdownatRisk(settings, alpha)
+                                alpha::Number = 0.05,
+                                w::Option{<:AbstractWeights} = nothing)
+    return RelativeDrawdownatRisk(settings, alpha, w)
 end
 function relative_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))
@@ -189,9 +209,27 @@ function relative_drawdown_vec(x::VecNum)
     popfirst!(dd)
     return dd
 end
-function (r::RelativeDrawdownatRisk)(x::VecNum)
+function (r::RelativeDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     dd = relative_drawdown_vec(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
+end
+function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
+    dd = relative_drawdown_vec(x)
+    order = sortperm(dd)
+    sorted_dd = view(dd, order)
+    sorted_w = view(r.w, order)
+    cum_w = cumsum(sorted_w)
+    idx = searchsortedfirst(cum_w, r.alpha)
+    idx = ifelse(idx > length(dd), idx - 1, idx)
+    return -sorted_dd[idx]
+end
+for r in (DrawdownatRisk, RelativeDrawdownatRisk)
+    eval(quote
+             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w)
+             end
+         end)
 end
 
 export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,

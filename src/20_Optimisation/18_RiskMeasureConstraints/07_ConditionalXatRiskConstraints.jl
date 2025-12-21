@@ -363,7 +363,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
                                                                                        [1:T],
                                                                                        (lower_bound = 0)
                                                                                    end)
-    cdar_risk = model[key] = @expression(model, dar + sum(z_cdar) * iat)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    cdar_risk = model[key] = if isnothing(wi)
+        iat = inv(r.alpha * T)
+        @expression(model, dar + sum(z_cdar) * iat)
+    else
+        iat = inv(r.alpha * sum(wi))
+        @expression(model, dar + dot(wi, z_cdar) * iat)
+    end
     model[Symbol(:ccdar_, i)] = @constraint(model,
                                             sc * ((z_cdar - view(dd, 2:(T + 1))) .+ dar) >=
                                             0)
@@ -457,7 +464,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                        lb) <=
                                                                                                                                                                                                                                       0
                                                                                                                                                                                                                                   end)
-    drcdar_risk = model[key] = @expression(model, radius * lb + mean(s))
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    drcdar_risk = model[key] = if isnothing(wi)
+        @expression(model, radius * lb + mean(s))
+    else
+        @expression(model, radius * lb + mean(s, wi))
+    end
     set_risk_bounds_and_expression!(model, opt, drcdar_risk, r.settings, key)
     return drcdar_risk
 end
