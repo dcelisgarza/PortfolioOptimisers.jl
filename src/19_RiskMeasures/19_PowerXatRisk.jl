@@ -165,8 +165,8 @@ function RelativePowerDrawdownatRisk(;
     return RelativePowerDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::RelativePowerDrawdownatRisk)(x::VecNum)
-    rdd = relative_drawdown_vec(x)
-    return PRM(rdd, r.slv, r.alpha, r.p, r.w)
+    dd = relative_drawdown_vec(x)
+    return PRM(dd, r.slv, r.alpha, r.p, r.w)
 end
 for r in (PowerValueatRisk, PowerDrawdownatRisk, RelativePowerDrawdownatRisk)
     eval(quote
