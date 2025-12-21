@@ -233,8 +233,7 @@ end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    alpha::Number = 0.05)
     return ConditionalDrawdownatRisk(settings, alpha)
-end #==#
-
+end
 struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2
