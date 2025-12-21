@@ -145,25 +145,52 @@
               (RelativeRelativisticDrawdownatRisk(; slv = slv),
                RelativeRelativisticDrawdownatRisk(; w = wt, slv = slv)),
               (RelativeRelativisticDrawdownatRisk(; alpha = 1 - 1e-6, slv = slv),
-               RelativeRelativisticDrawdownatRisk(; alpha = 1 - 1e-6, w = wt, slv = slv))]
+               RelativeRelativisticDrawdownatRisk(; alpha = 1 - 1e-6, w = wt, slv = slv)),
+              (PowerValueatRisk(; slv = slv, alpha = 1e-6),
+               PowerValueatRisk(; slv = slv, alpha = 1e-6, w = wt)),
+              (PowerValueatRisk(; slv = slv), PowerValueatRisk(; slv = slv, w = wt)),
+              (PowerValueatRisk(; slv = slv, alpha = 1 - 1e-6),
+               PowerValueatRisk(; slv = slv, alpha = 1 - 1e-6, w = wt)),
+              (PowerValueatRiskRange(; slv = slv, alpha = 1e-6, beta = 1e-6),
+               PowerValueatRiskRange(; slv = slv, alpha = 1e-6, beta = 1e-6, w = wt)),
+              (PowerValueatRiskRange(; slv = slv),
+               PowerValueatRiskRange(; slv = slv, w = wt)),
+              (PowerValueatRiskRange(; slv = slv, alpha = 1 - 1e-6, beta = 1 - 1e-6),
+               PowerValueatRiskRange(; slv = slv, alpha = 1 - 1e-6, beta = 1 - 1e-6,
+                                     w = wt)),
+              (PowerDrawdownatRisk(; slv = slv, alpha = 1e-6),
+               PowerDrawdownatRisk(; slv = slv, alpha = 1e-6, w = wt)),
+              (PowerDrawdownatRisk(; slv = slv), PowerDrawdownatRisk(; slv = slv, w = wt)),
+              (PowerDrawdownatRisk(; slv = slv, alpha = 1 - 1e-6),
+               PowerDrawdownatRisk(; slv = slv, alpha = 1 - 1e-6, w = wt)),
+              (RelativePowerDrawdownatRisk(; slv = slv, alpha = 1e-6),
+               RelativePowerDrawdownatRisk(; slv = slv, alpha = 1e-6, w = wt)),
+              (RelativePowerDrawdownatRisk(; slv = slv),
+               RelativePowerDrawdownatRisk(; slv = slv, w = wt)),
+              (RelativePowerDrawdownatRisk(; slv = slv, alpha = 1 - 1e-6),
+               RelativePowerDrawdownatRisk(; slv = slv, alpha = 1 - 1e-6, w = wt))]
         df = CSV.read(joinpath(@__DIR__, "./assets/XatRisk.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
             r1 = expected_risk(r[1], w, rd.X)
             r2 = expected_risk(r[2], w, rd.X)
             rtol = if i == 15
                 5e-2
-            elseif i in (18, 21)
+            elseif i in (18, 21, 54)
                 1e-1
             elseif i in (16, 35, 47)
                 5e-2
             elseif i in (20, 23, 24)
                 0.25
-            elseif i in (33, 45)
+            elseif i in (33, 45, 57, 60)
                 5e-5
             elseif i == 36
                 5e-3
             elseif i == 48
                 5e-4
+            elseif i in (49, 55, 58)
+                5e-6
+            elseif i == 51
+                1e-2
             else
                 1e-6
             end

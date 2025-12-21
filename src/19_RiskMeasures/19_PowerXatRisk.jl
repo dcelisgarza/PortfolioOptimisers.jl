@@ -103,30 +103,36 @@ function factory(r::PowerValueatRiskRange, pr::AbstractPriorResult,
     return PowerValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                  beta = r.beta, pa = r.pa, pb = r.pb, w = w)
 end
-struct PowerDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
+struct PowerDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     slv::T2
     alpha::T3
     p::T4
+    w::T5
     function PowerDrawdownatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                 alpha::Number, p::Number)
+                                 alpha::Number, p::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p > one(p))
-        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p)}(settings, slv,
-                                                                            alpha, p)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
+                                                                                       slv,
+                                                                                       alpha,
+                                                                                       p, w)
     end
 end
 function PowerDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                             p::Number = 2.0)
-    return PowerDrawdownatRisk(settings, slv, alpha, p)
+                             p::Number = 2.0, w::Option{<:AbstractWeights} = nothing)
+    return PowerDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
-    return PRM(dd, r.slv, r.alpha, r.p)
+    return PRM(dd, r.slv, r.alpha, r.p, r.w)
 end
 struct RelativePowerDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRiskMeasure
     settings::T1
