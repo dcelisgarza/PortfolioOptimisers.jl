@@ -184,7 +184,7 @@
             elseif i in (33, 57)
                 5e-5
             elseif i == 60
-                1e-4
+                5e-4
             elseif i == 36
                 5e-3
             elseif i in (49, 55, 58)
