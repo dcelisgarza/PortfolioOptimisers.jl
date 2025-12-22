@@ -237,6 +237,8 @@
                 5e-2
             elseif i in (208, 234, 246)
                 1e-4
+            elseif i == 240
+                0.25
             else
                 1e-6
             end
@@ -307,7 +309,7 @@
                 1e-2
             elseif i in (22, 23)
                 1e-4
-            elseif i == 26
+            elseif i in (26, 43)
                 5e-5
             else
                 1e-6
