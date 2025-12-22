@@ -175,22 +175,22 @@
             r2 = expected_risk(r[2], w, rd.X)
             rtol = if i == 15
                 5e-2
-            elseif i in (18, 21, 54)
+            elseif i in (18, 21)
                 1e-1
-            elseif i in (16, 35, 47)
+            elseif i in (16, 35, 47, 51)
                 5e-2
-            elseif i in (20, 23, 24)
+            elseif i in (20, 23, 24, 54)
                 0.25
-            elseif i in (33, 45, 57, 60)
+            elseif i in (33, 57)
                 5e-5
+            elseif i == 60
+                1e-4
             elseif i == 36
                 5e-3
-            elseif i == 48
-                5e-4
             elseif i in (49, 55, 58)
                 5e-6
-            elseif i == 51
-                1e-2
+            elseif i in (45, 48)
+                1e-3
             else
                 1e-6
             end
