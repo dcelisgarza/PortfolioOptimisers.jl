@@ -205,8 +205,8 @@
               TurnoverRiskMeasure(; w = w0),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
-              DistributionallyRobustConditionalDrawdownatRisk(), PowerValueatRisk(),
-              PowerValueatRiskRange(), PowerDrawdownatRisk()]
+              DistributionallyRobustConditionalDrawdownatRisk(), PowerNormValueatRisk(),
+              PowerNormValueatRiskRange(), PowerNormDrawdownatRisk()]
 
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
