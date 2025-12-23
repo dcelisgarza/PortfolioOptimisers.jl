@@ -42,25 +42,54 @@ CurrentModule = PortfolioOptimisers
     
     Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
-Portfolio optimisation is the science of reducing investment risk by being clever about how you distribute your money. Ironically, some of the most robust ways to ensure risk is minimised is to distribute your money equally among a portfolio of proven assets. There exist however, a rather large number of methods, risk measures, constraints, prior statistics estimators, etc. Which give a huge number of combinations.
+Portfolio optimisation is the science of either:
 
-`PortfolioOptimisers.jl` is an attempt at providing as many as possible, and to make it possible to add more by leveraging Julia's type system.
+- Minimising risk whilst keeping returns to acceptable levels.
+- Maximising returns whilst keeping risk to acceptable levels.
 
-The feature list is *quite large* and under *active development*. New features will be added over time. Check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) documentation for details.
+To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
 
-Please feel free to file issues and/or start discussions if you have any issues using the library, or if I haven't got to writing docs/examples for something you need. That way I know what to prioritise.
+There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore a vast landscape of "optimal" portfolios.
+
+`PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
+
+For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) docs.
+
+## Caveat emptor
+
+- `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
+- The documentation is still under construction.
+- Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
+- Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
+
+## Installation
+
+`PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
+
+```julia
+julia> ]add PortfolioOptimisers
+```
 
 ## Quickstart
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) contains toy examples of the many, many features.
+The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) docs contain toy examples of the many, many features.
 
-````@example 0_index
+First we import the packages we will need for the example.
+
+- `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
+- `Clarabel` and `HiGHS` are the optimisers we will use.
+- `YFinance` and `TimeSeries` for downloading and preprocessing price data.
+- `PrettyTables` and `DataFrames` for displaying the results.
+
+```@example 0_index
 # Import module and plotting extension.
 using PortfolioOptimisers, StatsPlots, GraphRecipes
 # Import optimisers.
 using Clarabel, HiGHS
-# Download data and pretty printing
-using YFinance, PrettyTables, TimeSeries, DataFrames
+# Download data.
+using YFinance, TimeSeries
+# Pretty printing.
+using PrettyTables, DataFrames
 
 # Format for pretty tables.
 fmt1 = (v, i, j) -> begin
@@ -78,11 +107,11 @@ fmt2 = (v, i, j) -> begin
     end
 end;
 nothing # hide
-````
+```
 
-We will now download the prices.
+For illustration purposes, we will use a set of popular meme stocks. We need to download and set the price data in a format `PortfolioOptimisers.jl` can consume.
 
-````@example 0_index
+```@example 0_index
 # Function to convert prices to time array.
 function stock_price_to_time_array(x)
     # Only get the keys that are not ticker or datetime.
@@ -109,29 +138,49 @@ cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
 prices = prices[cidx]
 TimeSeries.rename!(prices, Symbol.(assets))
 pretty_table(prices[(end - 5):end]; formatters = [fmt1])
-````
+```
 
-We now have all we need to perform a basic optimisation.
+Now we can compute our returns by calling [`prices_to_returns`](@ref).
 
-````@example 0_index
+```@example 0_index
 # Compute the returns.
 rd = prices_to_returns(prices)
+```
 
+`PortfolioOptimisers.jl` uses `JuMP` for its solver backend, which means it is solver agnostic and therefore does not ship with any pre-installed solver. [`Solver`](@ref) lets us define the optimiser factory, its parameters, and solution acceptance criteria.
+
+```@example 0_index
 # Define the continuous solver.
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false, "max_step_fraction" => 0.9),
-             check_sol = (; allow_local = true, allow_almost = true))
+             check_sol = (; allow_local = true, allow_almost = true));
+nothing # hide
+```
 
+`PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`](@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
+
+```@example 0_index
+opt = JuMPOptimiser(; slv = slv);
+nothing # hide
+```
+
+Here we will use the traditional Mean-Risk [`MeanRisk`](@ref) optimsation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
+
+```@example 0_index
 # Vanilla (Markowitz) mean risk optimisation.
-mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+mr = MeanRisk(; opt = opt)
+```
 
+We can now perform the optimisation via [`optimise`](@ref). The solution can be accessed via the `w` property.
+
+```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
 res = optimise(mr, rd)
-````
+```
 
-`PortfolioOptimisers.jl` also has the capability to perform finite allocations for those of us without infinite money.
+`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money.
 
-````@example 0_index
+```@example 0_index
 # Define the MIP solver for finite discrete allocation.
 mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false),
@@ -139,7 +188,9 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 
 # Discrete finite allocation.
 da = DiscreteAllocation(; slv = mip_slv)
+```
 
+```@example 0_index
 # Perform the finite discrete allocation, uses the final asset 
 # prices, and an available cash amount. This is for us mortals 
 # without infinite wealth.
@@ -149,30 +200,30 @@ mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                :opt_weights => res.w, :mip_weights => mip_res.w)
 pretty_table(df; formatters = [fmt2])
-````
+```
 
 Finally, let's plot some results.
 
-````@example 0_index
+```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
-````
+```
 
-````@example 0_index
+```@example 0_index
 # Plot the risk contribution per asset.
 plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
-````
+```
 
-````@example 0_index
+```@example 0_index
 # Plot histogram of returns.
 plot_histogram(mip_res.w, rd.X, slv)
-````
+```
 
-````@example 0_index
+```@example 0_index
 # Plot compounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
-````
+```
 
 ## Caveats
 
