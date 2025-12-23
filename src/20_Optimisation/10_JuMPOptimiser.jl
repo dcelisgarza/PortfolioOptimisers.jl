@@ -114,48 +114,8 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)
     @argcheck(all(x -> zero(x) <= x, val))
     return nothing
 end
-#=
-opt: JuMPOptimiser
-    pe: prior estimator.
-        ce: covariance estimator.
-            ce: covariance estimator.
-                me: mean estimator.
-                    w: weights vector for mean estimation.
-                ce: covariance estimator.
-                    w: weights vector for covariance estimation.
-                alg: full or downside (semi) covariance estimator.
-            mp: matrix processing.
-                pdm: nearest correlation matrix projection.
-                denoise: covariance denoising.
-                detone: covariance detoning.
-                alg: matrix processing algorithm.
-        me: mean estimator.
-            w: weights vector for mean estimation.
-        horizon: investment horizon.
-    slv: solver (explained above).
-    wb: weight bounds.
-        lb: lower bounds for all assets.
-        ub: upper bounds for all assets.
-    bgt: budget constraint (sum of weights).
-    sbgt: short budget constraint (absolute value sum of negative weights).
-    lt: long weight buy in threshold(s) result(s) or estimators.
-    st: absolute value of the short weight buy in threshold.
-    lcs: linear constraint estimator(s) and/or result(s).
-    cent: centrality constraint result(s) and/or estimator(s).
-    gcard: group cardinality constraint result(s) and/or estimator(s).
-    sgcard: set group cardinality constraint result(s) and/or estimator(s).
-    smtx: set matrix estimator(s) and/or result(s).
-    sgmtx: group set matrix estimator(s) and/or result(s).
-    slt: set long buy in threshold.
-    sst: set short buy in threshold.
-    sglt: set group long buy in threshold.
-    sgst: set group short buy in threshold.
-    sets: asset sets.
-    plg: phylogeny constraint estimator(s) and/or result(s).
-    tn:
-    te:
-    fees:
-=#
+"""
+"""
 struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16,
                      T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30,
                      T31, T32, T33, T34, T35} <: BaseJuMPOptimisationEstimator

@@ -1,0 +1,5 @@
+# Mean Risk
+
+```@docs
+MeanRisk
+```
