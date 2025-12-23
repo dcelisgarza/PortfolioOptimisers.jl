@@ -140,11 +140,11 @@ end
 
 A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in `PortfolioOptimisers.jl`.
 
-`Denoise` encapsulates all parameters required for matrix denoising, including the kernel and its arguments for spectral density estimation, the denoising algorithm, and matrix dimensions. It is the standard estimator type for denoising routines and supports a variety of algorithms ([`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
+`Denoise` encapsulates all parameters required for matrix denoising in [`denoise!`](@ref) and [`denoise`](@ref), allowing users to specify the denoising algorithm, optimization parameters, kernel settings for density estimation, and optional positive definite matrix projection.
 
 # Fields
 
-  - `alg`: Denoising algorithm ([`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
+  - `alg`: Denoising algorithm.
   - `args`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
   - `kwargs`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
@@ -379,7 +379,7 @@ function find_max_eval(vals::VecNum, q::Number,
     res = Optim.optimize(x -> errPDF(x, vals, q, kernel, m, n), 0.0, 1.0, args...;
                          kwargs...)
     x = Optim.converged(res) ? Optim.minimizer(res) : 1.0
-    e_max = x * (1.0 + sqrt(1.0 / q))^2
+    e_max = x * (one(q) + sqrt(one(q) / q))^2
     return e_max, x
 end
 """
@@ -388,7 +388,7 @@ end
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
-For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
+For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
 # Arguments
 

@@ -797,6 +797,7 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
+
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
                                               <:HighOrderMoment{T1, T2, T3, T4}}
 """

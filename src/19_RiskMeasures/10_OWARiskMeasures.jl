@@ -928,7 +928,7 @@ This function returns a vector of OWA weights corresponding to the difference be
   - [`VecNum`](@ref)
 """
 function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
-    return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
+    return owa_cvar(T, alpha) - reverse!(owa_cvar(T, beta))
 end
 """
     owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum;
@@ -959,7 +959,7 @@ This function returns a vector of OWA weights corresponding to the difference be
 """
 function owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum, betas::VecNum = alphas,
                      weights_b::VecNum = weights_a)
-    w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
+    w = owa_wcvar(T, alphas, weights_a) - reverse!(owa_wcvar(T, betas, weights_b))
     return w
 end
 """
@@ -994,7 +994,7 @@ function owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05,
                   a_sim::Integer = 100, beta_i::Number = alpha_i, beta::Number = alpha,
                   b_sim::Integer = a_sim)
     w = owa_tg(T; alpha_i = alpha_i, alpha = alpha, a_sim = a_sim) -
-        reverse(owa_tg(T; alpha_i = beta_i, alpha = beta, a_sim = b_sim))
+        reverse!(owa_tg(T; alpha_i = beta_i, alpha = beta, a_sim = b_sim))
 
     return w
 end
@@ -1132,7 +1132,11 @@ struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
         if w2_flag
             @argcheck(!isempty(w2))
             if !rev
-                w2 = reverse(w2)
+                if w1 === w2
+                    w2 = reverse(w2)
+                else
+                    reverse!(w2)
+                end
             end
         end
         if w1_flag && w2_flag

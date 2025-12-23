@@ -295,7 +295,7 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 # Details
 
   - If `p` is `nothing`, i.e. the method with `args...`, returns the original opinion probabilities.
-  - If `p` is provided, computes the consensus distribution, calculates the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
+  - If `p` is provided, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
   - Used internally by [`OpinionPoolingPrior`](@ref) to ensure robust aggregation of opinions.
 
 # Related

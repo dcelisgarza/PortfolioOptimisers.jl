@@ -8,21 +8,23 @@ function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return UlcerIndex(settings)
 end
 function (::UlcerIndex)(x::VecNum)
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for i in cs
-        if i > peak
-            peak = i
-        end
-        dd = peak - i
-        if dd > zero(dd)
-            val += dd^2
-        end
-    end
-    popfirst!(x)
-    return sqrt(val / length(x))
+    # pushfirst!(x, 1)
+    # cs = cumsum(x)
+    # val = zero(eltype(x))
+    # peak = typemin(eltype(x))
+    # for i in cs
+    #     if i > peak
+    #         peak = i
+    #     end
+    #     dd = peak - i
+    #     if dd > zero(dd)
+    #         val += dd^2
+    #     end
+    # end
+    # popfirst!(x)
+    # return sqrt(val / length(x))
+    dd = absolute_drawdown_vec(x)
+    return norm(dd, 2) / sqrt(length(x))
 end
 struct RelativeUlcerIndex{T1} <: HierarchicalRiskMeasure
     settings::T1
@@ -35,6 +37,7 @@ function RelativeUlcerIndex(;
     return RelativeUlcerIndex(settings)
 end
 function (::RelativeUlcerIndex)(x::VecNum)
+    #=
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))
@@ -48,7 +51,11 @@ function (::RelativeUlcerIndex)(x::VecNum)
             val += dd^2
         end
     end
+    popfirst!(x)
     return sqrt(val / length(x))
+    =#
+    dd = relative_drawdown_vec(x)
+    return norm(dd, 2) / sqrt(length(x))
 end
 
 export UlcerIndex, RelativeUlcerIndex

@@ -16,7 +16,7 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                                                                ylabel = "$(compound ? "Compound" : "Simple") Portfolio Cumulative Returns",
                                                                                legend = false),
                                                          ekwargs...)
-    ret = cumulative_returns(calc_net_returns(w, X, fees); compound = compound)
+    ret = cumulative_returns(calc_net_returns(w, X, fees), compound)
     return plot(ts, ret; kwargs..., ekwargs...)
 end
 function compute_relevant_assets(w::VecNum, M::Number, N::Number)
@@ -47,7 +47,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            legend_kwargs::NamedTuple = (;
                                                                                         position = :auto),
                                                            ekwargs...)
-    ret = cumulative_returns(calc_net_asset_returns(w, X, fees); compound = compound)
+    ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
     N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
     ret = view(ret, :, idx)
@@ -62,8 +62,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
     if M > N
         idx = view(idx, (N + 1):M)
         ret = cumulative_returns(calc_net_returns(view(w, idx), view(X, :, idx),
-                                                  PortfolioOptimisers.fees_view(fees, idx));
-                                 compound = compound)
+                                                  PortfolioOptimisers.fees_view(fees, idx)),
+                                 compound)
         plot!(f, ts, ret; summary_kwargs...)
     end
     plot!(f; legend_kwargs..., ekwargs...)
@@ -265,8 +265,8 @@ function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum, slv::Slv_VecSl
                                                                                  1.618))),
                                             ekwargs...)
     ret = calc_net_returns(w, X, fees)
-    cret = cumulative_returns(ret; compound = compound)
-    dd = drawdowns(cret; cX = true, compound = compound)
+    cret = cumulative_returns(ret, compound)
+    dd = drawdowns(cret, compound; cX = true)
     dd .*= 100
     risks = 100 * if !compound
                   [-AverageDrawdown(; w = rw)(copy(ret)), -UlcerIndex()(copy(ret)),

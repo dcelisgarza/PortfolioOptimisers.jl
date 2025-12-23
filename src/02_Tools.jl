@@ -273,7 +273,7 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 """
     ⊙(A, B)
 
-Elementwise multiplication.
+Elementwise (Hadamard) multiplication.
 
 # Examples
 
@@ -304,7 +304,7 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 """
     ⊘(A, B)
 
-Elementwise division.
+Elementwise (Hadamard) division.
 
 # Examples
 
@@ -335,7 +335,7 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 """
     ⊕(A, B)
 
-Elementwise addition.
+Elementwise (Hadamard) addition.
 
 # Examples
 
@@ -366,7 +366,7 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 """
     ⊖(A, B)
 
-Elementwise subtraction.
+Elementwise (Hadamard) subtraction.
 
 # Examples
 

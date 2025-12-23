@@ -226,7 +226,7 @@ struct NOCTracking <: NormTracking end
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
-`norm_tracking` calculates the tracking error using either the Euclidean (L2) norm for [`SOCTracking`](@ref), squared Euclidean (L2) norm for [`SquaredSOCTracking`](@ref), or the L1 (norm-one) distance for [`NOCTracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+`norm_tracking` computes the tracking error using either the Euclidean (L2) norm for [`SOCTracking`](@ref), squared Euclidean (L2) norm for [`SquaredSOCTracking`](@ref), or the L1 (norm-one) distance for [`NOCTracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
 
 # Arguments
 
@@ -489,7 +489,7 @@ end
 
 Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
-`tracking_benchmark` calculates the net portfolio returns for the benchmark weights stored in a [`WeightsTracking`](@ref) object, optionally adjusting for transaction fees if specified. The asset return matrix `X` is multiplied by the benchmark weights, and fees are deducted if present.
+`tracking_benchmark` computes the net portfolio returns for the benchmark weights stored in a [`WeightsTracking`](@ref) object, optionally adjusting for transaction fees if specified. The asset return matrix `X` is multiplied by the benchmark weights, and fees are deducted if present.
 
 # Arguments
 

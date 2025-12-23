@@ -1,16 +1,16 @@
-function calc_risk_constraint_target(::LowOrderMoment{<:Any, <:Any, Nothing, <:Any},
+function calc_risk_constraint_target(::LoHiOrderMoment{<:Any, <:Any, Nothing, <:Any},
                                      w::VecNum, mu::VecNum, args...)
     return dot(w, mu)
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
+function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
                                      w::VecNum, args...)
     return dot(w, r.mu)
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      w::VecNum, ::Any, k)
     return dot(w, r.mu.v) + r.mu.s * k
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Number, <:Any},
+function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
                                      ::Any, ::Any, k)
     return r.mu * k
 end

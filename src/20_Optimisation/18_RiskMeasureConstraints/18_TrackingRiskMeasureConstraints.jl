@@ -88,6 +88,7 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
     X = haskey(model, :X)
     net_X = haskey(model, :net_X)
     Xap1 = haskey(model, :Xap1)
+    ddap1 = haskey(model, :ddap1)
     wr_risk = haskey(model, :wr_risk)
     range_risk = haskey(model, :range_risk)
     dd = haskey(model, :dd)
@@ -138,6 +139,10 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
     if Xap1
         model[:oldXap1] = model[:Xap1]
         unregister(model, :Xap1)
+    end
+    if ddap1
+        model[:oldddap1] = model[:ddap1]
+        unregister(model, :ddap1)
     end
     if wr_risk
         model[:oldwr_risk] = model[:wr_risk]
@@ -289,6 +294,15 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         if haskey(model, :oldXap1)
             model[:Xap1] = model[:oldXap1]
             unregister(model, :oldXap1)
+        end
+    end
+    if (!ddap1 && haskey(model, :ddap1)) || haskey(model, :oldddap1)
+        model[Symbol(:triv_, i, :_ddap1)] = model[:ddap1]
+        unregister(model, :ddap1)
+
+        if haskey(model, :oldddap1)
+            model[:ddap1] = model[:oldddap1]
+            unregister(model, :oldddap1)
         end
     end
     if (!wr_risk && haskey(model, :wr_risk)) || haskey(model, :oldwr_risk)

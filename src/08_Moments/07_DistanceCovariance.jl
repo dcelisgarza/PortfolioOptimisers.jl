@@ -77,7 +77,7 @@ end
 
 Compute the distance correlation between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
-This function calculates the distance correlation between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance correlation procedure, centering the pairwise distance matrices and normalizing the result.
+This function computes the distance correlation between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance correlation procedure, centering the pairwise distance matrices and normalizing the result.
 
 # Arguments
 
@@ -93,7 +93,7 @@ This function calculates the distance correlation between `v1` and `v2` using th
 
  1. Computes pairwise distance matrices for `v1` and `v2` using the estimator's metric and configuration.
  2. Centers the distance matrices by subtracting row and column means and adding the grand mean.
- 3. Calculates the squared distance covariance and normalizes to obtain the distance correlation.
+ 3. Computes the squared distance covariance and normalizes to obtain the distance correlation.
 
 # Validation
 
@@ -132,7 +132,7 @@ end
 
 Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
-This function calculates the distance correlation between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance correlation between two assets.
+This function computes the distance correlation between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance correlation between two assets.
 
 # Arguments
 
@@ -221,7 +221,7 @@ end
 
 Compute the distance covariance between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
-This function calculates the distance covariance between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance covariance procedure, centering the pairwise distance matrices and aggregating the result.
+This function computes the distance covariance between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance covariance procedure, centering the pairwise distance matrices and aggregating the result.
 
 # Arguments
 
@@ -237,7 +237,7 @@ This function calculates the distance covariance between `v1` and `v2` using the
 
  1. Computes pairwise distance matrices for `v1` and `v2` using the estimator's metric and configuration.
  2. Centers the distance matrices by subtracting row and column means and adding the grand mean.
- 3. Calculates the squared distance covariance and returns its square root.
+ 3. Computes the squared distance covariance and returns its square root.
 
 # Validation
 
@@ -274,7 +274,7 @@ end
 
 Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
 
-This function calculates the distance covariance between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance covariance between two assets.
+This function computes the distance covariance between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance covariance between two assets.
 
 # Arguments
 

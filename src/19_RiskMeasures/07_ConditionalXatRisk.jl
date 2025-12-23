@@ -16,10 +16,6 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
-function factory(r::ConditionalValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
-end
 struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     alpha::T2
@@ -31,6 +27,8 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
                                                           r::Number,
                                                           w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(l > zero(l))
+        @argcheck(r > zero(r))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -47,17 +45,11 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
-function factory(r::DistributionallyRobustConditionalValueatRisk, pr::AbstractPriorResult,
-                 args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
-                                                        alpha = r.alpha, l = r.l, r = r.r,
-                                                        w = w)
-end
 const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
                         <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
                                                                        <:Any, T}}
 function (r::RMCVaR{Nothing})(x::VecNum)
+    x = copy(x)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
@@ -70,8 +62,8 @@ end
 function (r::RMCVaR{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
-    sorted_x = x[order]
-    sorted_w = r.w[order]
+    sorted_x = view(x, order)
+    sorted_w = view(r.w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
@@ -128,6 +120,10 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
                                                                w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
+        @argcheck(l_a > zero(l_a))
+        @argcheck(r_a > zero(r_a))
+        @argcheck(l_b > zero(l_b))
+        @argcheck(r_b > zero(r_b))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -163,6 +159,7 @@ const RMCVaRRg{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
                                                                               <:Any, <:Any,
                                                                               <:Any, T}}
 function (r::RMCVaRRg{Nothing})(x::VecNum)
+    x = copy(x)
     alpha = r.alpha
     aT = alpha * length(x)
     idx1 = ceil(Int, aT)
@@ -187,8 +184,8 @@ end
 function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
-    sorted_x = x[order]
-    sorted_w = r.w[order]
+    sorted_x = view(x, order)
+    sorted_w = view(r.w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
@@ -200,8 +197,8 @@ function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 
-    sorted_x = reverse(sorted_x)
-    sorted_w = reverse(sorted_w)
+    sorted_x = reverse!(sorted_x)
+    sorted_w = reverse!(sorted_w)
     cum_w = cumsum(sorted_w)
     beta = sw * r.beta
     idx = searchsortedfirst(cum_w, beta)
@@ -214,33 +211,61 @@ function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
     end
     return loss - gain
 end
-struct ConditionalDrawdownatRisk{T1, T2} <: RiskMeasure
+struct ConditionalDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     settings::T1
     alpha::T2
-    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number)
+    w::T3
+    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
+                                       w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        return new{typeof(settings), typeof(alpha)}(settings, alpha)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                   alpha::Number = 0.05)
-    return ConditionalDrawdownatRisk(settings, alpha)
+                                   alpha::Number = 0.05,
+                                   w::Option{<:AbstractWeights} = nothing)
+    return ConditionalDrawdownatRisk(settings, alpha, w)
 end
-function (r::ConditionalDrawdownatRisk)(x::VecNum)
+struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
+    settings::T1
+    alpha::T2
+    l::T3
+    r::T4
+    w::T5
+    function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
+                                                             alpha::Number, l::Number,
+                                                             r::Number,
+                                                             w::Option{<:AbstractWeights})
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(l > zero(l))
+        @argcheck(r > zero(r))
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
+                                                                                     alpha,
+                                                                                     l, r,
+                                                                                     w)
+    end
+end
+function DistributionallyRobustConditionalDrawdownatRisk(;
+                                                         settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                                         alpha::Number = 0.05,
+                                                         l::Number = 1.0, r::Number = 0.02,
+                                                         w::Option{<:AbstractWeights} = nothing)
+    return DistributionallyRobustConditionalDrawdownatRisk(settings, alpha, l, r, w)
+end
+const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
+                        <:DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any,
+                                                                          <:Any, <:Any,
+                                                                          <:T}}
+function (r::RMCDaR{Nothing})(x::VecNum)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i - peak
-    end
-    popfirst!(x)
-    popfirst!(dd)
+    dd = absolute_drawdown_vec(x)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)
@@ -248,35 +273,46 @@ function (r::ConditionalDrawdownatRisk)(x::VecNum)
     end
     return var - sum_var / aT
 end
-struct RelativeConditionalDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
+function (r::RMCDaR{<:AbstractWeights})(x::VecNum)
+    sw = sum(r.w)
+    dd = absolute_drawdown_vec(x)
+    order = sortperm(dd)
+    sorted_dd = view(dd, order)
+    sorted_w = view(r.w, order)
+    cum_w = cumsum(sorted_w)
+    alpha = sw * r.alpha
+    idx = searchsortedfirst(cum_w, alpha)
+    return if idx == 1
+        -sorted_dd[1]
+    else
+        idx = ifelse(idx > length(dd), idx - 1, idx)
+        -(dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+          sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
+    end
+end
+struct RelativeConditionalDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
+    w::T3
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                               alpha::Number)
+                                               alpha::Number, w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        return new{typeof(settings), typeof(alpha)}(settings, alpha)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                           alpha::Number = 0.05)
-    return RelativeConditionalDrawdownatRisk(settings, alpha)
+                                           alpha::Number = 0.05,
+                                           w::Option{<:AbstractWeights} = nothing)
+    return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end
-function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
+function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     aT = r.alpha * length(x)
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd[idx] = i / peak - 1
-    end
-    popfirst!(x)
-    popfirst!(dd)
     idx = ceil(Int, aT)
+    dd = relative_drawdown_vec(x)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
     for i in 1:(idx - 1)
@@ -284,7 +320,43 @@ function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     end
     return var - sum_var / aT
 end
+function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
+    sw = sum(r.w)
+    dd = relative_drawdown_vec(x)
+    order = sortperm(dd)
+    sorted_dd = view(dd, order)
+    sorted_w = view(r.w, order)
+    cum_w = cumsum(sorted_w)
+    alpha = sw * r.alpha
+    idx = searchsortedfirst(cum_w, alpha)
+    return if idx == 1
+        -sorted_dd[1]
+    else
+        idx = ifelse(idx > length(dd), idx - 1, idx)
+        -(dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+          sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
+    end
+end
+for r in (ConditionalValueatRisk, ConditionalDrawdownatRisk)
+    eval(quote
+             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w)
+             end
+         end)
+end
+for r in (DistributionallyRobustConditionalValueatRisk,
+          DistributionallyRobustConditionalDrawdownatRisk)
+    eval(quote
+             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_selector(r.w, pr.w)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, l = r.l, r = r.r,
+                             w = w)
+             end
+         end)
+end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
        ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
-       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk
+       ConditionalDrawdownatRisk, DistributionallyRobustConditionalDrawdownatRisk,
+       RelativeConditionalDrawdownatRisk

@@ -21,6 +21,8 @@ abstract type AbstractPosdefEstimator <: AbstractEstimator end
 
 A concrete estimator type for projecting a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
 
+`Posdef` encapsulates all parameters required for positive definite matrix projection in [`posdef!`](@ref) and [`posdef`](@ref) to perform the nearest positive definite projection according to the estimator.
+
 # Fields
 
   - `alg`: The algorithm used for the nearest correlation matrix projection.
@@ -64,7 +66,7 @@ end
 
 In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
 
-For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
+For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
 # Arguments
 

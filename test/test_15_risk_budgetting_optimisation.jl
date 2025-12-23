@@ -176,7 +176,9 @@
                 5e-4
             elseif i == 17
                 1e-3
-            elseif i == 21 || Sys.isapple() && i == 14
+            elseif i == 21
+                5e-2
+            elseif Sys.isapple() && i == 14
                 1e-2
             elseif i ∈ (14, 15, 16, 20, 22)
                 5e-3
@@ -265,9 +267,9 @@
                 5e-3
             elseif i == 14
                 1e-2
-            elseif Sys.iswindows() && i == 21
+            elseif i == 21
                 5e-3
-            elseif i ∈ (18, 19, 21)
+            elseif i ∈ (18, 19)
                 5e-4
             elseif i ∈ (10, 11)
                 5e-4

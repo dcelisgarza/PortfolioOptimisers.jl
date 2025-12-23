@@ -158,7 +158,7 @@ Compute the number of histogram bins for a pair of variables using a specified b
 
 This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type and uses the appropriate method for each:
 
-  - For `AstroPyBins`, it computes the bin width using the provided `bin_width_func` and calculates the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
+  - For `AstroPyBins`, it computes the bin width using the provided `bin_width_func` and computes the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
   - For `HacineGharbiRavier`, it uses the Hacine-Gharbi–Ravier rule, which adapts the bin count based on the correlation and sample size.
   - For an integer, it returns the specified number of bins directly.
 
@@ -269,7 +269,7 @@ end
 
 Compute the intrinsic mutual information from a joint histogram.
 
-This function calculates the mutual information between two variables given their joint histogram matrix `X`. It is used as a core step in information-theoretic measures such as mutual information and variation of information.
+This function computes the mutual information between two variables given their joint histogram matrix `X`. It is used as a core step in information-theoretic measures such as mutual information and variation of information.
 
 # Arguments
 
@@ -321,7 +321,7 @@ end
 
 Compute the variation of information (VI) matrix for a set of variables.
 
-This function calculates the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions.
+This function computes the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions.
 
 # Arguments
 
@@ -418,7 +418,7 @@ end
 
 Compute the mutual information (MI) matrix for a set of variables.
 
-This function calculates the pairwise mutual information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. MI quantifies the amount of shared information between pairs of variables, and is widely used in information-theoretic analysis of dependencies.
+This function computes the pairwise mutual information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. MI quantifies the amount of shared information between pairs of variables, and is widely used in information-theoretic analysis of dependencies.
 
 # Arguments
 

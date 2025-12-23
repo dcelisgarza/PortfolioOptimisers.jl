@@ -178,3 +178,37 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
+function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               args...; kwargs...)
+    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
+    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
+    @argcheck(b > s)
+    key = Symbol(:dar_risk_, i)
+    sc = model[:sc]
+    dd = set_drawdown_constraints!(model, pr.X)
+    T = length(dd) - 1
+    dar_risk, z_dar = model[key], model[Symbol(:z_dar_, i)] = @variables(model,
+                                                                         begin
+                                                                             ()
+                                                                             [1:T],
+                                                                             (binary = true)
+                                                                         end)
+    alpha = r.alpha
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    if isnothing(wi)
+        model[Symbol(:csdar_, i)] = @constraint(model,
+                                                sc * (sum(z_dar) - alpha * T + s * T) <= 0)
+    else
+        sw = sum(wi)
+        model[Symbol(:csdar_, i)] = @constraint(model,
+                                                sc *
+                                                (dot(wi, z_dar) - alpha * sw + s * sw) <= 0)
+    end
+    model[Symbol(:cdar_, i)] = @constraint(model,
+                                           sc *
+                                           ((-view(dd, 2:(T + 1)) + b * z_dar) .+ dar_risk) >=
+                                           0)
+    set_risk_bounds_and_expression!(model, opt, dar_risk, r.settings, key)
+    return dar_risk
+end
