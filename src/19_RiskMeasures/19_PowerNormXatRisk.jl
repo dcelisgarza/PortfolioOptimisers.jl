@@ -44,7 +44,7 @@ struct PowerNormValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(p > one(p))
+        @argcheck(p >= one(p))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -118,7 +118,7 @@ struct PowerNormDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(p > one(p))
+        @argcheck(p >= one(p))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -150,7 +150,7 @@ struct RelativePowerNormDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRiskMe
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(p > one(p))
+        @argcheck(p >= one(p))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
