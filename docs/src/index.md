@@ -53,7 +53,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) docs.
+For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs.
 
 ## Caveat emptor
 
@@ -72,7 +72,7 @@ julia> ]add PortfolioOptimisers
 
 ## Quickstart
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) docs contain toy examples of the many, many features.
+The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs contain toy examples of the many, many features.
 
 First we import the packages we will need for the example.
 
@@ -147,7 +147,7 @@ Now we can compute our returns by calling [`prices_to_returns`](@ref).
 rd = prices_to_returns(prices)
 ```
 
-`PortfolioOptimisers.jl` uses `JuMP` for its solver backend, which means it is solver agnostic and therefore does not ship with any pre-installed solver. [`Solver`](@ref) lets us define the optimiser factory, its parameters, and solution acceptance criteria.
+`PortfolioOptimisers.jl` uses `JuMP` for handling the optimisation problems, which means it is solver agnostic and therefore does not ship with any pre-installed solver. [`Solver`](@ref) lets us define the optimiser factory, its solver-specific settings, and `JuMP`'s solution acceptance criteria.
 
 ```@example 0_index
 # Define the continuous solver.
@@ -171,14 +171,16 @@ Here we will use the traditional Mean-Risk [`MeanRisk`](@ref) optimsation estima
 mr = MeanRisk(; opt = opt)
 ```
 
-We can now perform the optimisation via [`optimise`](@ref). The solution can be accessed via the `w` property.
+As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction). For now, we will perform the optimisation via [`optimise`](@ref).
 
 ```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
 res = optimise(mr, rd)
 ```
 
-`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do this, a greedy algorithm [`GreedyAllocation`](@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`](@ref) which uses mixed-integer programming (MIP) which requires a capable solver.
+The solution lives in the `sol` field, but the weights can be accessed via the `w` property.
+
+`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do so, a greedy algorithm [`GreedyAllocation`](@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`](@ref) which uses mixed-integer programming (MIP) and requires a capable solver.
 
 Here we will use the latter.
 
@@ -192,7 +194,7 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 da = DiscreteAllocation(; slv = mip_slv)
 ```
 
-The discrete allocation minimises the difference between the ideal allocation to the one you can afford plus the leftover cash. As such it needs to know a few extra things, namely the optimal weights `res.w`, a vector of latest prices `vec(values(prices[end]))`, and available cash `4206.90`.
+The discrete allocation minimises the absolute or relative L1- or L2-norm (configurable) between the ideal allocation to the one you can afford plus the leftover cash. As such, it needs to know a few extra things, namely the optimal weights `res.w`, a vector of latest prices `vec(values(prices[end]))`, and available cash which we define to be `4206.90`.
 
 ```@example 0_index
 # Perform the finite discrete allocation, uses the final asset 
@@ -210,24 +212,28 @@ df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cos
 pretty_table(df; formatters = [fmt2])
 ```
 
-We can also visualise the portfolio using various plotting functions.
+We can also visualise the portfolio using various plotting functions. For example we can plot the portfolio's cumulative returns, in this case compound returns.
 
 ```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
+We can plot the histogram of portfolio returns.
+
 ```@example 0_index
 # Plot histogram of returns.
 plot_histogram(mip_res.w, rd.X, slv)
 ```
+
+We can plot the portfolio drawdowns, in this case compound drawdowns.
 
 ```@example 0_index
 # Plot compounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
-`PortfolioOptimisers.jl` has the capability of using multiple risk measures to create the risk expression to be optimised, and/or as risk constraints. As such, the risk measures have to be instantiated, and any quantities relating to them belong to the instance of the risk measure itself rather than an optimisation estimator or result. This decision allows for much greater flexibility in the types of problems one can construct with the library, but reduces the ergonomics. We can illustrate this by plotting the asset risk contribution, where we either need to use the [`factory`](@ref) function (used when this must be done programatically), or directly declare the risk with the appropriate covariance matrix.
+We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics included. We can do this by using the [`factory`](@ref) function (recommended when doing so programatically), or manually set the quantities ourselves.
 
 ```@example 0_index
 # Plot the risk contribution per asset.
@@ -235,52 +241,11 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
 ```
 
-For example, one can minimise the linear combination of two measures of variance both of which using different covariance estimators. Here we will use a Gerber Covariance, and a Semi covariance whose inverse has been sparsified according to the relationships between assets.
-
-```@example 0_index
-ce1 = PortfolioOptimisersCovariance(; ce = GerberCovariance())
-```
-
-```@example 0_index
-ce2 = PortfolioOptimisersCovariance(;
-                                    ce = ProcessedCovariance(;
-                                                             ce = Covariance(;
-                                                                             alg = Semi()),
-                                                             alg = LoGo()))
-```
-
-```@example 0_index
-r1 = Variance(; sigma = cov(GerberCovariance(), rd.X))
-r2 = Variance(; sigma = cov(Covariance(; alg = Semi()), rd.X))
-```
-
-However, this increase in flexibility comes at the cost of ergonomics.
-
-
-
-
-
-## Caveats
-
-### Documentation
-
-  - Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
-  - Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
-  - Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
-
-### API
-
-  - Unstable: there will likely be breaking changes as I figure out better, more general ways to do things, or better naming conventions.
-
-### Internals
-
-  - Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
+This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
 ## Features
 
-The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There are also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
-
-Without further ado, here is a summary of the features in this package.
+The feature list is rather large, so we will summarise them here.
 
 ### Price data
 

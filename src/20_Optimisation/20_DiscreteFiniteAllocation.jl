@@ -19,24 +19,77 @@ function factory(res::DiscreteAllocationOptimisation, fb)
 end
 """
 """
-struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
+struct DiscreteAllocation{T1, T2, T3, T4, T5} <: FiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
     so::T3
-    fb::T4
+    wf::T4
+    fb::T5
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
+                                wf::JuMPWeightFinaliserFormulation,
                                 fb::Option{<:FiniteAllocationOptimisationEstimator})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(sc > zero(sc))
         @argcheck(so > zero(so))
-        return new{typeof(slv), typeof(sc), typeof(so), typeof(fb)}(slv, sc, so, fb)
+        return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(fb)}(slv, sc, so,
+                                                                                wf, fb)
     end
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
+                            wf::JuMPWeightFinaliserFormulation = AbsoluteErrorWeightFinaliser(),
                             fb::Option{<:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
-    return DiscreteAllocation(slv, sc, so, fb)
+    return DiscreteAllocation(slv, sc, so, wf, fb)
+end
+function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
+                             ::RelativeErrorWeightFinaliser)
+    mask = iszero.(w)
+    if any(mask)
+        w = copy(w)
+        w[mask] .= eps(eltype(w))
+    end
+    x = model[:x]
+    u = model[:u]
+    sc = model[:sc]
+    @constraint(model,
+                [sc * u
+                 sc * ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
+                MOI.NormOneCone(length(x) + 1))
+    return nothing
+end
+function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
+                             ::SquareRelativeErrorWeightFinaliser)
+    mask = iszero.(w)
+    if any(mask)
+        w = copy(w)
+        w[mask] .= eps(eltype(w))
+    end
+    x = model[:x]
+    u = model[:u]
+    sc = model[:sc]
+    @constraint(model,
+                [sc * u;
+                 sc * ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
+                SecondOrderCone())
+    return nothing
+end
+function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
+                             ::AbsoluteErrorWeightFinaliser)
+    x = model[:x]
+    u = model[:u]
+    sc = model[:sc]
+    @constraint(model, [sc * u; sc * (w * cash - x .* p)] in MOI.NormOneCone(length(x) + 1))
+    return nothing
+end
+function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
+                             ::SquareAbsoluteErrorWeightFinaliser)
+    x = model[:x]
+    u = model[:u]
+    sc = model[:sc]
+    @constraint(model, [sc * u;
+                        sc * (w * cash - x .* p)] in SecondOrderCone())
+    return nothing
 end
 function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                da::DiscreteAllocation, str_names::Bool = false)
@@ -44,10 +97,10 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
                Vector{eltype(w)}(undef, 0), cash, nothing, nothing
     end
-    sc = da.sc
-    so = da.so
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
+    @expression(model, sc, da.sc)
+    @expression(model, so, da.so)
     N = length(w)
     # Integer allocation
     # x := number of shares
@@ -58,14 +111,9 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                end)
     # r := remaining money
     # eta := ideal_investment - discrete_investment
-    @expressions(model, begin
-                     r, cash - dot(x, p)
-                     eta, w * cash - x .* p
-                 end)
-    @constraints(model, begin
-                     sc * r >= 0
-                     [sc * u; sc * eta] in MOI.NormOneCone(N + 1)
-                 end)
+    @expression(model, r, cash - dot(x, p))
+    @constraint(model, sc * r >= 0)
+    set_discrete_error!(model, w, p, cash, da.wf)
     @objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)
     res = if res.success

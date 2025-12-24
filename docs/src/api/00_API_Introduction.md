@@ -1,4 +1,4 @@
-# Introduction
+# Introduction to the API
 
 This section explains `PortfolioOptimisers.jl` API in detail. The pages are organised in exactly the same way as the `src` folder itself. This means there should be a 1 to 1 correspondence between documentation and source files[^1].
 

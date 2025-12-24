@@ -1,7 +1,7 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
 
 ```@meta
-EditURL = "../../../examples/5_Budget_Constraints.jl"
+EditURL = "../../../examples/05_Budget_Constraints.jl"
 ```
 
 # Example 5: Budget constraints
@@ -10,7 +10,7 @@ This example shows how to use basic budget constraints.
 
 Before starting it is worth mentioning that portfolio budget constraints are implemented on the actual weights, while the short budget constraints are implemented on a relaxation variable stand-in for the short weights. This means that in some cases, it may appear the short budget constraints are not satisfied when they actually are. This is because the relaxation variables that stand in for the short weights can take on a range of values as long as they are greater than or equal to the absolute value of the actual negative weights, and still satisfy the budget constraint placed on them.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 using PortfolioOptimisers, PrettyTables
 # Format for pretty tables.
 tsfmt = (v, i, j) -> begin
@@ -41,7 +41,7 @@ nothing #hide
 
 We will use the same data as the previous example.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -57,7 +57,7 @@ We'll provide a vector of continuous solvers because the optimisation type we'll
 
 For the mixed integer solvers, we can use a single one.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 using Clarabel, HiGHS
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false),
@@ -79,7 +79,7 @@ nothing #hide
 
 This time we will use the `EntropicValueatRisk` measure and we will once again precompute prior.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 r = EntropicValueatRisk()
 pr = prior(EmpiricalPrior(), rd)
 ````
@@ -96,7 +96,7 @@ Here we will showcase various budget constraints. We will start simple, with a s
 
 First the default case, where the budget is equal to 1, `bgt = 1`. This means the portfolio will be fully invested.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 opt1 = JuMPOptimiser(; pe = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)
 ````
@@ -105,7 +105,7 @@ You can see that `wb` is of type `WeightBounds`, `lb = 0.0` (asset weights lower
 
 We can check that the constraints were satisfied.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 res1 = optimise(mr1)
 println("budget: $(sum(res1.w))")
 println("long budget: $(sum(res1.w[res1.w .>= zero(eltype(res1.w))]))")
@@ -115,7 +115,7 @@ println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res1.w))")
 
 Now let's allocate a finite amount of capital, `4206.9`, to this portfolio.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 da = DiscreteAllocation(; slv = mip_slv)
 mip_res1 = optimise(da, res1.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res1.shares, :cost => mip_res1.cost,
@@ -136,7 +136,7 @@ The short budget is given as an absolute value (simplifies implementation detail
 
 Minimising the risk under without additional constraints often yields all zeros. So we will maximise the risk-return ratio.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 rf = 4.2 / 100 / 252
 opt2 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget and short budget absolute values.
@@ -155,7 +155,7 @@ Let's allocate a finite amount of capital. Since we set the long and short budge
 
 The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 mip_res2 = optimise(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
@@ -171,7 +171,7 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip
 
 We will now create and discretely allocate a short-only portfolio. This is in general an anti-pattern but one can use various combinations of budget, weight bounds and short budget constraints to create hedging portfolios.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 opt3 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget and short budget absolute values.
                      bgt = -1, sbgt = 1,
@@ -187,7 +187,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= zero(x), res3.w))")
 
 We can confirm that the finite allocation behaves as expected.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 mip_res3 = optimise(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
@@ -203,7 +203,7 @@ println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.
 
 Let's try a leveraged long-only portfolio.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
 mr4 = MeanRisk(; r = r, opt = opt4)
 res4 = optimise(mr4)
@@ -215,7 +215,7 @@ println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res4.w))")
 
 Again, the finite allocation respects the budget constraints.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 mip_res4 = optimise(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
@@ -233,7 +233,7 @@ Note that the short budget is not satisfied, this is because it is implemented a
 
 It is also possible to set budget bounds for the short and portfolio budgets. They are implemented in the same way as the equality constraints. We will explore them in the next section.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 opt5 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget and short budget absolute values.
                      bgt = 0.5, sbgt = 1,
@@ -249,7 +249,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 
 For this portfolio, the sum of the long and short cost will be approximately equal to half the allocated value of `4206.9`. Any discrepancies are due to the fact we are allocating a finite amount.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 mip_res5 = optimise(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
@@ -267,7 +267,7 @@ The other type of budget constraint we will explore in this example is the budge
 
 We mentioned at the start of this example that the interaction between budget and short budget constraints might be unintuitive due to how the constraints are implemented. The following example will illustrate this.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 opt6 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget range.
                      bgt = BudgetRange(; lb = 0.3, ub = 0.8),
@@ -287,7 +287,7 @@ As you can see, the budget and weight constraints are satisfied, but not the sho
 
 In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value is greater than or equal to the short budget constraint.
 
-````@example 5_Budget_Constraints
+````@example 05_Budget_Constraints
 opt7 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget range.
                      bgt = BudgetRange(; lb = 0.3, ub = 0.8),

@@ -1,0 +1,5 @@
+# Base optimisation
+
+```@docs
+optimise
+```
