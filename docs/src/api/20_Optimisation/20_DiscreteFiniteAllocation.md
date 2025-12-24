@@ -1,0 +1,5 @@
+# Discrete allocation
+
+```@docs
+DiscreteAllocation
+```

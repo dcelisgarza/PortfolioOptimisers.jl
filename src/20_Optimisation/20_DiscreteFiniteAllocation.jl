@@ -17,6 +17,8 @@ function factory(res::DiscreteAllocationOptimisation, fb)
                                           res.s_retcode, res.l_retcode, res.s_model,
                                           res.l_model, res.cash, fb)
 end
+"""
+"""
 struct DiscreteAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2

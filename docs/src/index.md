@@ -178,7 +178,9 @@ We can now perform the optimisation via [`optimise`](@ref). The solution can be 
 res = optimise(mr, rd)
 ```
 
-`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money.
+`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do this, a greedy algorithm [`GreedyAllocation`](@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`](@ref) which uses mixed-integer programming (MIP) which requires a capable solver.
+
+Here we will use the latter.
 
 ```@example 0_index
 # Define the MIP solver for finite discrete allocation.
@@ -190,29 +192,29 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 da = DiscreteAllocation(; slv = mip_slv)
 ```
 
+The discrete allocation minimises the difference between the ideal allocation to the one you can afford plus the leftover cash. As such it needs to know a few extra things, namely the optimal weights `res.w`, a vector of latest prices `vec(values(prices[end]))`, and available cash `4206.90`.
+
 ```@example 0_index
 # Perform the finite discrete allocation, uses the final asset 
 # prices, and an available cash amount. This is for us mortals 
 # without infinite wealth.
 mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
+```
 
+We can display the results in a table.
+
+```@example 0_index
 # View the results.
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                :opt_weights => res.w, :mip_weights => mip_res.w)
 pretty_table(df; formatters = [fmt2])
 ```
 
-Finally, let's plot some results.
+We can also visualise the portfolio using various plotting functions.
 
 ```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
-```
-
-```@example 0_index
-# Plot the risk contribution per asset.
-plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
-                       percentage = true)
 ```
 
 ```@example 0_index
@@ -224,6 +226,39 @@ plot_histogram(mip_res.w, rd.X, slv)
 # Plot compounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
+
+`PortfolioOptimisers.jl` has the capability of using multiple risk measures to create the risk expression to be optimised, and/or as risk constraints. As such, the risk measures have to be instantiated, and any quantities relating to them belong to the instance of the risk measure itself rather than an optimisation estimator or result. This decision allows for much greater flexibility in the types of problems one can construct with the library, but reduces the ergonomics. We can illustrate this by plotting the asset risk contribution, where we either need to use the [`factory`](@ref) function (used when this must be done programatically), or directly declare the risk with the appropriate covariance matrix.
+
+```@example 0_index
+# Plot the risk contribution per asset.
+plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
+                       percentage = true)
+```
+
+For example, one can minimise the linear combination of two measures of variance both of which using different covariance estimators. Here we will use a Gerber Covariance, and a Semi covariance whose inverse has been sparsified according to the relationships between assets.
+
+```@example 0_index
+ce1 = PortfolioOptimisersCovariance(; ce = GerberCovariance())
+```
+
+```@example 0_index
+ce2 = PortfolioOptimisersCovariance(;
+                                    ce = ProcessedCovariance(;
+                                                             ce = Covariance(;
+                                                                             alg = Semi()),
+                                                             alg = LoGo()))
+```
+
+```@example 0_index
+r1 = Variance(; sigma = cov(GerberCovariance(), rd.X))
+r2 = Variance(; sigma = cov(Covariance(; alg = Semi()), rd.X))
+```
+
+However, this increase in flexibility comes at the cost of ergonomics.
+
+
+
+
 
 ## Caveats
 
