@@ -228,8 +228,8 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
-    prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                      Rb::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
+    prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
+                      B::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
                       padding::Bool = false, missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
@@ -242,7 +242,7 @@ Convert price data (and optionally factor data) in `TimeArray` format to returns
 
   - `X`: Asset price data (timestamps × assets).
   - `F`: Optional Factor price data (timestamps × factors).
-  - `Rb`: Optional Benchmark price data (timestamps × assets) or (timestamps × 1).
+  - `B`: Optional Benchmark price data (timestamps × assets) or (timestamps × 1).
   - `iv`: Optional Implied volatility data.
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
@@ -297,7 +297,7 @@ ReturnsResult
   - [`Impute`](https://github.com/invenia/Impute.jl)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                           Rb::Option{<:TimeArray} = nothing,
+                           B::Option{<:TimeArray} = nothing,
                            iv::Option{<:TimeArray} = nothing,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
@@ -314,13 +314,16 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                   missing_row_percent <=
                   one(missing_row_percent), DomainError)
     end
+    asset_names = string.(colnames(X))
+    factor_names = String[]
+    benchmark_names = String[]
     if !isempty(F)
-        asset_names = string.(colnames(X))
         factor_names = string.(colnames(F))
         X = merge(X, F; method = join_method)
-    else
-        asset_names = string.(colnames(X))
-        factor_names = String[]
+    end
+    if !isempty(B)
+        benchmark_names = string.(colnames(B))
+        X = merge(X, B; method = join_method)
     end
     if !isnothing(map_func)
         X = map(map_func, X)
@@ -350,18 +353,12 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     select!(X, Not(names(X, Missing)))
     dropmissing!(X)
     X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
-    if !isnothing(Rb)
-        @argcheck(timestamp(X) == timestamp(Rb))
-        Rb_v = values(Rb)
-        X_v = values(X)
-        X = TimeArray(timestamp(X), isa(Rb_v, AbstractMatrix) ? X_v - Rb_v : X_v .- Rb_v;
-                      colnames = colnames(X))
-    end
     X = DataFrame(X)
     col_names = names(X)
     nx = intersect(col_names, asset_names)
     nf = intersect(col_names, factor_names)
-    oc = setdiff(col_names, union(nx, nf))
+    nb = intersect(col_names, benchmark_names)
+    oc = setdiff(col_names, union(nx, nf, nb))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
         iv = iv[ts]
@@ -376,7 +373,13 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
         nx = nothing
         X = nothing
     else
-        X = Matrix(X[!, nx])
+        X = if isempty(nb)
+            Matrix(X[!, nx])
+        elseif length(nb) == 1
+            Matrix(X[!, nx]) .- Matrix(X[!, nb])
+        else
+            Matrix(X[!, nx]) - Matrix(X[!, nb])
+        end
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
                          ivpa = ivpa)

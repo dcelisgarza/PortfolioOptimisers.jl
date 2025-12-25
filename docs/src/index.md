@@ -233,7 +233,7 @@ We can plot the portfolio drawdowns, in this case compound drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
-We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics included. We can do this by using the [`factory`](@ref) function (recommended when doing so programatically), or manually set the quantities ourselves.
+We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.
 
 ```@example 0_index
 # Plot the risk contribution per asset.
@@ -245,7 +245,67 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ## Features
 
-The feature list is rather large, so we will summarise them here.
+### Preprocessing
+
+- Prices to returns.
+
+### Portfolio Optimisation
+
+#### Naïve
+
+- Equal Weighted
+- Inverse Volatility
+- Random (Dirichlet)
+
+#### Traditional
+
+- Mean-Risk
+- Factor Risk Contribution
+- Near Optimal Centering
+- Risk Budgeting
+  - Asset Risk Budgeting
+  - Factor Risk Budgeting
+- Relaxed Risk Budgeting
+  - Asset Relaxed Risk Budgeting
+  - Factor Relaxed Risk Budgeting
+
+##### Traditional Optimisation Features
+
+- Objective Functions
+  - Minimum Risk
+  - Maximum Utility
+  - Maximum Return Over Risk Ratio
+  - Maximum Return
+  - Custom
+- Fees
+  - Proportional
+    - Long
+    - Short
+  - Fixed
+    - Long
+    - Short
+  - Turnover
+- Regularisation
+  - L1
+  - L2
+- Weight Constraints
+- Budget Constraints
+
+#### Clustering
+
+- Hierarchical Risk Parity
+- Hierarchical Equal Risk Parity
+- Schur Complementary Hierarchical Risk Parity
+- Nested Clustered
+
+#### Ensemble
+
+- Stacking
+
+#### Finite Allocation
+
+- Discrete
+- Greedy
 
 ### Price data
 
