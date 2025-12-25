@@ -57,7 +57,7 @@ Keyword arguments correspond to the fields above.
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
-  - If `w` is provided, `length(w) == size(X, 2)`.
+  - If `w` is not `nothing`, `length(w) == size(X, 2)`.
 
 # Examples
 
@@ -232,7 +232,7 @@ Compute factor Black-Litterman prior moments for asset returns.
 
   - `dims in (1, 2)`.
   - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
-  - If `pe.w` is provided, `length(pe.w) == size(X, 2)`.
+  - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
 

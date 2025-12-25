@@ -59,7 +59,7 @@ const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
-Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is provided.
+Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is not `nothing`.
 
 # Arguments
 
@@ -86,7 +86,7 @@ end
 """
     mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is provided.
+Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is not `nothing`.
 
 # Arguments
 
@@ -111,7 +111,7 @@ end
 """
     sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is provided.
+Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is not `nothing`.
 
 # Arguments
 

@@ -2,7 +2,7 @@
     calc_net_returns(w::VecNum, X::MatNum, args...)
     calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
 
-Compute the net portfolio returns. If `fees` is provided, it deducts the computed fees from the gross returns.
+Compute the net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
 Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
 
@@ -57,7 +57,7 @@ end
     calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
 
-Compute the per asset net portfolio returns. If `fees` is provided, it deducts the computed fees from the gross returns.
+Compute the per asset net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
 Returns the per asset portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
 

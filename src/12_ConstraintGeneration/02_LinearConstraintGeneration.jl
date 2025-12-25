@@ -1517,11 +1517,11 @@ end
 
 No-op fallback for risk budget constraint generation.
 
-This method returns a uniform risk budget allocation when no explicit risk budget is provided. It creates a [`RiskBudgetResult`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
+This method returns a uniform risk budget allocation when no explicit risk budget is not `nothing`. It creates a [`RiskBudgetResult`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
 
 # Arguments
 
-  - `::Nothing`: Indicates that no risk budget is provided.
+  - `::Nothing`: Indicates that no risk budget is not `nothing`.
   - `args...`: Additional positional arguments (ignored).
   - `N::Number`: Number of assets (required).
   - `datatype::DataType`: Numeric type for the risk budget vector.

@@ -134,7 +134,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
 # `JuMP` Formulations
 
@@ -308,7 +308,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
 ## `JuMP` Formulation
 
@@ -446,7 +446,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `sigma` is provided, `!isempty(sigma)`.
+  - If `sigma` is not `nothing`, `!isempty(sigma)`.
 
 # `JuMP` Formulations
 

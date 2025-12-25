@@ -472,13 +472,13 @@ Keyword arguments correspond to the fields above.
   - `X`, `mu`, and `sigma` must be non-empty.
   - `size(sigma, 1) == size(sigma, 2)`.
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
-  - If `w` is provided, `!isempty(w)` and `length(w) == size(X, 1)`.
+  - If `w` is not `nothing`, `!isempty(w)` and `length(w) == size(X, 1)`.
   - If `kld` is an `AbstractVector`, `!isempty(kld)`.
-  - If `ow` is provided, `!isempty(ow)`.
+  - If `ow` is not `nothing`, `!isempty(ow)`.
   - If any of `rr`, `f_mu`, or `f_sigma` are provided, all must be provided and non-empty, `size(rr.M, 2) == length(f_mu) == size(f_sigma, 1)`, and `size(rr.M, 1) == length(mu)`.
-  - If `f_sigma` is provided, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
-  - If `chol` is provided, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
-  - If `f_w` is provided, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
+  - If `f_sigma` is not `nothing`, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
+  - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
+  - If `f_w` is not `nothing`, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
 
 # Examples
 

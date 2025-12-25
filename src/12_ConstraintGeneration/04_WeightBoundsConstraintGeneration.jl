@@ -169,8 +169,8 @@ Estimator for portfolio weight bounds constraints.
 
   - `lb`: Lower bound(s) for portfolio weights.
   - `ub`: Upper bound(s) for portfolio weights.
-  - `dlb`: Default lower bound applied when no specific bound is provided.
-  - `dub`: Default upper bound applied when no specific bound is provided.
+  - `dlb`: Default lower bound applied when no specific bound is not `nothing`.
+  - `dub`: Default upper bound applied when no specific bound is not `nothing`.
 
 # Constructor
 

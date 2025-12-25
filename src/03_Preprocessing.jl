@@ -47,9 +47,9 @@ function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:
                                          names_sym::Symbol, mat_sym::Symbol)
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
-                  IsNothingError("$names_sym cannot be nothing if $mat_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+                  IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
         @argcheck(!isnothing(mat),
-                  IsNothingError("$mat_sym cannot be nothing if $names_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+                  IsNothingError("$mat_sym cannot be nothing if $names_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
         @argcheck(!isempty(names), IsEmptyError("$names_sym cannot be empty."))
         @argcheck(!isempty(mat), IsEmptyError("$mat_sym cannot be empty."))
         @argcheck(length(names) == size(mat, 2),
@@ -93,11 +93,11 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `nx` or `X` is provided, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
-  - If `nf` or `F` is provided, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
-  - If `ts` is provided, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
-  - If `iv` is provided, `!isempty(iv)`, `all(x -> x >= 0, iv)`, and `size(iv) == size(X)`.
-  - If `ivpa` is provided, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+  - If `nx` or `X` is not `nothing`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
+  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `ts` is not `nothing`, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
+  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`, `!isnothing(ivpa)`.
+  - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
 # Examples
 
@@ -150,6 +150,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
             end
         end
         if !isnothing(iv)
+            @argcheck(!isnothing(ivpa), IsNothingError)
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
@@ -260,6 +261,22 @@ Convert price data (and optionally factor data) in `TimeArray` format to returns
 
 # Validation
 
+  - `!isempty(X)`.
+  - `0 < missing_col_percent <= 1`
+  - `0 < missing_row_percent <= 1`.
+  - If `F` is not `nothing`, `!isempty(F)`.
+  - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
+  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`, and `!isnothing(ivpa)`.
+  - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+
+# Details
+
+  - Joins asset, factor, and benchmark data as specified.
+  - Optionally applies a mapping function and/or collapses the time series.
+  - Handles missing values by filtering, imputation, and dropping as configured.
+  - Computes returns using the specified method.
+  - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
+
 # Examples
 
 ```jldoctest
@@ -309,7 +326,7 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
                            map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer,
                            impute_method::Option{<:Impute.Imputor} = nothing)
-    @argcheck(!isempty(X))
+    @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
     if !isnothing(missing_row_percent)
@@ -321,13 +338,14 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
     factor_names = String[]
     benchmark_names = String[]
     if !isnothing(F)
-        @argcheck(!isempty(F))
+        @argcheck(!isempty(F), IsEmptyError)
         factor_names = string.(colnames(F))
         X = merge(X, F; method = join_method)
     end
     if !isnothing(B)
-        @argcheck(!isempty(B))
+        @argcheck(!isempty(B), IsEmptyError)
         benchmark_names = string.(colnames(B))
+        @argcheck(length(benchmark_names) in (1, length(asset_names)), DimensionMismatch)
         X = merge(X, B; method = join_method)
     end
     if !isnothing(map_func)
@@ -366,7 +384,18 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
     oc = setdiff(col_names, union(nx, nf, nb))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
+        @argcheck(issubset(ts, timestamp(iv)), ValueError)
         iv = iv[ts]
+    end
+    if !isnothing(iv)
+        iv = values(iv)
+        @argcheck(!isnothing(ivpa), IsNothingError)
+        assert_nonempty_nonneg_finite_val(iv, :iv)
+        assert_nonempty_gt0_finite_val(ivpa, :ivpa)
+        @argcheck(size(iv) == length(nx), DimensionMismatch)
+        if isa(ivpa, VecNum)
+            @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
+        end
     end
     if isempty(nf)
         nf = nothing
@@ -386,8 +415,7 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
             Matrix(X[!, nx]) - Matrix(X[!, nb])
         end
     end
-    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
-                         ivpa = ivpa)
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = iv, ivpa = ivpa)
 end
 """
     find_complete_indices(X::AbstractMatrix; dims::Int = 1)

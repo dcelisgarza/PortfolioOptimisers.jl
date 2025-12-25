@@ -467,7 +467,7 @@ end
 """
     fees_view(::Nothing, ::Any)
 
-Return `nothing` when no fee estimator or constraint is provided.
+Return `nothing` when no fee estimator or constraint is not `nothing`.
 
 This method is used as a fallback for missing fee estimators or constraints, ensuring composability and uniform interface handling in fee constraint processing workflows.
 

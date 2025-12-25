@@ -1936,7 +1936,7 @@ end
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
 
-This method implements the LoGo algorithm for sparse inverse covariance estimation using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the PMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is provided.
+This method implements the LoGo algorithm for sparse inverse covariance estimation using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the PMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is not `nothing`.
 
 # Arguments
 
@@ -1954,7 +1954,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - Constructs the PMFG and extracts cliques and separators.
   - Computes the LoGo sparse inverse covariance matrix via [`J_LoGo`](@ref).
   - Updates `sigma` in-place with the inverse of the LoGo estimate.
-  - Projects the result to the nearest positive definite matrix if `pdm` is provided.
+  - Projects the result to the nearest positive definite matrix if `pdm` is not `nothing`.
 
 # Validation
 
@@ -1998,7 +1998,7 @@ end
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
 
-This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of PortfolioOptimisers.jl. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is provided, the result is projected to the nearest positive definite matrix.
+This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of PortfolioOptimisers.jl. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is not `nothing`, the result is projected to the nearest positive definite matrix.
 
 # Arguments
 

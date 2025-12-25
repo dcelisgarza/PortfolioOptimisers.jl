@@ -25,7 +25,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, `!isempty(w)`.
+  - If `w` is not `nothing`, `!isempty(w)`.
 
 # Examples
 
@@ -134,7 +134,7 @@ end
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
 
-This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is provided, it is used for centering; otherwise, the default mean is used.
+This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is not `nothing`, it is used for centering; otherwise, the default mean is used.
 
 # Arguments
 
@@ -249,7 +249,7 @@ end
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 
-This method computes the variance of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is provided, it is used for centering; otherwise, the default mean is used.
+This method computes the variance of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is not `nothing`, it is used for centering; otherwise, the default mean is used.
 
 # Arguments
 

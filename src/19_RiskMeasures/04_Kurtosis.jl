@@ -51,7 +51,7 @@ Keyword arguments correspond to the fields above.
 
           * `::VecNum`: `length(mu)^2 == size(kt, 1)`.
           * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
-  - If `N` is provided: must be positive.
+  - If `N` is not `nothing`: must be positive.
 
 # `JuMP` Formulations
 

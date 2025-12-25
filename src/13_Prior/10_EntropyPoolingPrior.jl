@@ -390,16 +390,16 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If any view constraint is provided, `sets` must not be `nothing`.
+  - If any view constraint is not `nothing`, `sets` must not be `nothing`.
   - If not `nothing`, `0 < var_alpha < 1`.
   - If not `nothing`, `0 < cvar_alpha < 1`.
-  - If `w` is provided, it must be non-empty and match the number of observations.
+  - If `w` is not `nothing`, it must be non-empty and match the number of observations.
 
 # Details
 
-  - If `w` is provided, it is normalised to sum to 1; otherwise, uniform weights are used when `prior` is called.
-  - If `var_views` is provided without `var_alpha`, defaults to `0.05`.
-  - If `cvar_views` is provided without `cvar_alpha`, defaults to `0.05`.
+  - If `w` is not `nothing`, it is normalised to sum to 1; otherwise, uniform weights are used when `prior` is called.
+  - If `var_views` is not `nothing` without `var_alpha`, defaults to `0.05`.
+  - If `cvar_views` is not `nothing` without `cvar_alpha`, defaults to `0.05`.
 
 # Examples
 
@@ -1979,7 +1979,7 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
 # Validation
 
   - `dims in (1, 2)`.
-  - If any view constraint is provided, `!isnothing(sets)`.
+  - If any view constraint is not `nothing`, `!isnothing(sets)`.
   - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations.
 
 # Details
@@ -2110,7 +2110,7 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
 # Validation
 
   - `dims in (1, 2)`.
-  - If any view constraint is provided, `!isnothing(pe.sets)`.
+  - If any view constraint is not `nothing`, `!isnothing(pe.sets)`.
   - If prior weights `pe.w` are provided, `length(pe.w) == T`, where `T` is the number of observations
 
 # Details

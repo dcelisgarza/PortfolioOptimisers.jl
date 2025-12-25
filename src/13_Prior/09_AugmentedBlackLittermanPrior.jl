@@ -61,7 +61,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, `!isempty(w)`.
+  - If `w` is not `nothing`, `!isempty(w)`.
   - If `a_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(a_sets)`.
   - If `f_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(f_sets)`.
   - If `a_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
@@ -289,7 +289,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - `dims in (1, 2)`.
   - `length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2)`.
   - `length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2)`.
-  - If `pe.w` is provided, `length(pe.w) == size(X, 2)`.
+  - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
 

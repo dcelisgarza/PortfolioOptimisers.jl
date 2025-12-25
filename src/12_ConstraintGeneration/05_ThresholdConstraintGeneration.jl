@@ -23,8 +23,8 @@ Estimator for buy-in threshold portfolio constraints.
 ## Validation
 
   - If `val` is a `AbstractDict` or `AbstractVector`, `!isempty(val)`.
-  - If `dval` is provided, it is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
-  - If `key` is provided, it is a non-empty string.
+  - If `dval` is not `nothing`, it is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - If `key` is not `nothing`, it is a non-empty string.
 
 # Examples
 

@@ -241,9 +241,9 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Details
 
-  - For `SOCTracking`, computes `norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is provided, else unscaled.
-  - For `SquaredSOCTracking`, computes `norm(a - b, 2)^2 / (N - f.ddof)` if `N` is provided, else unscaled.
-  - For `NOCTracking`, computes `norm(a - b, 1) / N` if `N` is provided, else unscaled.
+  - For `SOCTracking`, computes `norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is not `nothing`, else unscaled.
+  - For `SquaredSOCTracking`, computes `norm(a - b, 2)^2 / (N - f.ddof)` if `N` is not `nothing`, else unscaled.
+  - For `NOCTracking`, computes `norm(a - b, 1) / N` if `N` is not `nothing`, else unscaled.
 
 # Examples
 
@@ -502,7 +502,7 @@ Compute the benchmark portfolio returns for a weights-based tracking algorithm.
 
 # Details
 
-  - If `tr.fees` is provided, net returns are computed using `calc_net_returns`.
+  - If `tr.fees` is not `nothing`, net returns are computed using `calc_net_returns`.
   - Otherwise, returns are computed as `X * tr.w`.
 
 # Examples

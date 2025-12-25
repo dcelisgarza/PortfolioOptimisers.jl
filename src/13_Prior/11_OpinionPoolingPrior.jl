@@ -88,12 +88,12 @@ Keyword arguments correspond to the fields above. All arguments are validated fo
 ## Validation
 
   - `pes` must be a non-empty vector of prior estimators.
-  - If `w` is provided, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
-  - If `p` is provided, `p > 0`.
+  - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
+  - If `p` is not `nothing`, `p > 0`.
 
 # Details
 
-  - If `w` is provided, and `sum(w) < 1`, the remaining weight is assigned to the uniform prior. Otherwise, all opinions are assumed to be equally weighted.
+  - If `w` is not `nothing`, and `sum(w) < 1`, the remaining weight is assigned to the uniform prior. Otherwise, all opinions are assumed to be equally weighted.
   - If `p` is `nothing`, the the opinion probabilities are used as given. Else they are adjusted according to their Kullback-Leibler divergence from the consensus.
 
 # Examples
@@ -280,7 +280,7 @@ end
 
 Compute robust opinion probabilities for consensus formation in opinion pooling.
 
-`robust_probabilities` adjusts the vector of opinion probabilities (`ow`) used in opinion pooling algorithms to account for robustness against outlier or extreme opinions. If a penalty parameter `p` is provided, the method penalises opinions that diverge from the consensus by down-weighting them according to their Kullback-Leibler divergence from the pooled distribution. If no penalty parameter is set, the original opinion probabilities are returned unchanged.
+`robust_probabilities` adjusts the vector of opinion probabilities (`ow`) used in opinion pooling algorithms to account for robustness against outlier or extreme opinions. If a penalty parameter `p` is not `nothing`, the method penalises opinions that diverge from the consensus by down-weighting them according to their Kullback-Leibler divergence from the pooled distribution. If no penalty parameter is set, the original opinion probabilities are returned unchanged.
 
 # Arguments
 
@@ -295,7 +295,7 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 # Details
 
   - If `p` is `nothing`, i.e. the method with `args...`, returns the original opinion probabilities.
-  - If `p` is provided, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
+  - If `p` is not `nothing`, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
   - Used internally by [`OpinionPoolingPrior`](@ref) to ensure robust aggregation of opinions.
 
 # Related
@@ -381,7 +381,7 @@ Compute opinion pooling prior moments for asset returns.
   - Optional pre-processing estimator `pe.pe1` is applied to asset returns before pooling, else the original returns are used.
   - Each prior estimator in `pe.pes` is applied to the asset returns, producing individual prior weights.
   - Opinion probabilities `ow` are initialised from `pe.w` or set uniformly if it is `nothing`; if their sum is less than 1, the remainder is assigned to a uniform prior.
-  - Robust opinion probabilities are computed using [`robust_probabilities`](@ref) if a penalty parameter `pe.p` is provided.
+  - Robust opinion probabilities are computed using [`robust_probabilities`](@ref) if a penalty parameter `pe.p` is not `nothing`.
   - Consensus posterior weights are computed using [`compute_pooling`](@ref) according to the specified pooling algorithm `pe.alg`.
   - Post-processing estimator `pe.pe2` is applied using the consensus weights.
   - The result includes the effective number of scenarios, Kullback-Leibler divergence to each opinion, robust opinion probabilities, and optional factor moments.
