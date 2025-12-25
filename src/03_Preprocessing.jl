@@ -228,7 +228,7 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
-    prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
+    prices_to_returns(X::TimeArray; F::Option{TimeArray} = nothing;
                       B::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
                       padding::Bool = false, missing_col_percent::Number = 1.0,
@@ -257,6 +257,8 @@ Convert price data (and optionally factor data) in `TimeArray` format to returns
 # Returns
 
   - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
+
+# Validation
 
 # Examples
 
@@ -296,7 +298,7 @@ ReturnsResult
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
   - [`Impute`](https://github.com/invenia/Impute.jl)
 """
-function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
+function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
                            B::Option{<:TimeArray} = nothing,
                            iv::Option{<:TimeArray} = nothing,
                            ivpa::Option{<:Num_VecNum} = nothing,
@@ -307,6 +309,7 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer,
                            impute_method::Option{<:Impute.Imputor} = nothing)
+    @argcheck(!isempty(X))
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
     if !isnothing(missing_row_percent)
@@ -317,11 +320,13 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     asset_names = string.(colnames(X))
     factor_names = String[]
     benchmark_names = String[]
-    if !isempty(F)
+    if !isnothing(F)
+        @argcheck(!isempty(F))
         factor_names = string.(colnames(F))
         X = merge(X, F; method = join_method)
     end
-    if !isempty(B)
+    if !isnothing(B)
+        @argcheck(!isempty(B))
         benchmark_names = string.(colnames(B))
         X = merge(X, B; method = join_method)
     end
