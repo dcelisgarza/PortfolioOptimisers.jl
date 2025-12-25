@@ -96,7 +96,7 @@ Keyword arguments correspond to the fields above.
   - If `nx` or `X` is not `nothing`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
   - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
   - If `ts` is not `nothing`, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
-  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`, `!isnothing(ivpa)`.
+  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
 # Examples
@@ -150,7 +150,6 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
             end
         end
         if !isnothing(iv)
-            @argcheck(!isnothing(ivpa), IsNothingError)
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(size(iv) == size(X), DimensionMismatch)
@@ -266,7 +265,7 @@ Convert price data (and optionally factor data) in `TimeArray` format to returns
   - `0 < missing_row_percent <= 1`.
   - If `F` is not `nothing`, `!isempty(F)`.
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
-  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`, and `!isnothing(ivpa)`.
+  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
 # Details
@@ -389,7 +388,6 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
     end
     if !isnothing(iv)
         iv = values(iv)
-        @argcheck(!isnothing(ivpa), IsNothingError)
         assert_nonempty_nonneg_finite_val(iv, :iv)
         assert_nonempty_gt0_finite_val(ivpa, :ivpa)
         @argcheck(size(iv) == length(nx), DimensionMismatch)
