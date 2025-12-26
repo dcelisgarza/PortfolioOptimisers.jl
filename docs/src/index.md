@@ -44,8 +44,8 @@ CurrentModule = PortfolioOptimisers
 
 Portfolio optimisation is the science of either:
 
-- Minimising risk whilst keeping returns to acceptable levels.
-- Maximising returns whilst keeping risk to acceptable levels.
+  - Minimising risk whilst keeping returns to acceptable levels.
+  - Maximising returns whilst keeping risk to acceptable levels.
 
 To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
 
@@ -57,10 +57,10 @@ For more information on the package's *vast* feature list, please check out the 
 
 ## Caveat emptor
 
-- `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
-- The documentation is still under construction.
-- Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
-- Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
+  - `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
+  - The documentation is still under construction.
+  - Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
+  - Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
 
 ## Installation
 
@@ -76,10 +76,10 @@ The library is quite powerful and extremely flexible. Here is what a very basic 
 
 First we import the packages we will need for the example.
 
-- `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
-- `Clarabel` and `HiGHS` are the optimisers we will use.
-- `YFinance` and `TimeSeries` for downloading and preprocessing price data.
-- `PrettyTables` and `DataFrames` for displaying the results.
+  - `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
+  - `Clarabel` and `HiGHS` are the optimisers we will use.
+  - `YFinance` and `TimeSeries` for downloading and preprocessing price data.
+  - `PrettyTables` and `DataFrames` for displaying the results.
 
 ```@example 0_index
 # Import module and plotting extension.
@@ -247,65 +247,154 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ### Preprocessing
 
-- Prices to returns.
+  - Prices to returns
+  - Find complete indices
+
+### Matrix Processing
+
+  - Positive definite projection
+
+  - Denoising
+    
+      + Spectral
+      + Fixed
+      + Shrunk
+  - Detoning
+
+### Moment Estimation
+
+#### Expected Returns
+
+  - Optionally Weighted Expected Returns
+
+  - Equilibrium Expected Returns with Custom Covariance Estimator
+  - Excess Expected Returns with Custom Expected Returns Estimator
+  - Shrunk Expected Returns with Custom Expected Returns and Custom Covariance Estimators
+    
+      + Algorithms
+        
+          * JamesStein
+          * BayesStein
+          * BodnarOkhrinParolya
+    
+      + Targets: all algorithms can have any of the following targets
+        
+          * Grand Mean
+          * Volatility Weighted
+          * Mean Squared Error
+
+#### Variance
+
+  - Optionally Weighted Variance with Custom Expected Returns Estimator
+
+#### Covariance
+
+  - Optionally Weighted with Optional Custom Covariance and Mean Estimators
+    
+      + Full
+      + Semi
+  - Gerber Covariances with Custom Variance Estimators
+    - Unstandardised Algorithms
+      - Gerber 0
+      - Gerber 1
+      - Gerber 2
+    - Standardised Algorithms (Z-transforms the data beforehand) with Custom Expected Returns Estimators
+      - Gerber 0
+      - Gerber 1
+      - Gerber 2
+  - Smyth-Broby Extension of Gerber Covariances with Custom Expected Returns and Custom Variance Estimators
+    - Unstandardised Algorithms
+      - Smyth-Broby 0
+      - Smyth-Broby 1
+      - Smyth-Broby 2
+      - Smyth-Broby-Gerber 0
+      - Smyth-Broby-Gerber 1
+      - Smyth-Broby-Gerber 2
+    - Standardised Algorithms (Z-transforms the data beforehand)
+      - Smyth-Broby 0
+      - Smyth-Broby 1
+      - Smyth-Broby 2
+      - Smyth-Broby-Gerber 0
+      - Smyth-Broby-Gerber 1
+      - Smyth-Broby-Gerber 2
+
+#### Coskewness
+
+  - Full
+  - Semi
+
+#### Cokurtosis
+
+  - Full
+  - Semi
 
 ### Portfolio Optimisation
 
 #### Naïve
 
-- Equal Weighted
-- Inverse Volatility
-- Random (Dirichlet)
+  - Equal Weighted
+  - Inverse Volatility
+  - Random (Dirichlet)
 
 #### Traditional
 
-- Mean-Risk
-- Factor Risk Contribution
-- Near Optimal Centering
-- Risk Budgeting
-  - Asset Risk Budgeting
-  - Factor Risk Budgeting
-- Relaxed Risk Budgeting
-  - Asset Relaxed Risk Budgeting
-  - Factor Relaxed Risk Budgeting
+  - Mean-Risk
+
+  - Factor Risk Contribution
+  - Near Optimal Centering
+  - Risk Budgeting
+    
+      + Asset Risk Budgeting
+      + Factor Risk Budgeting
+  - Relaxed Risk Budgeting
+    
+      + Asset Relaxed Risk Budgeting
+      + Factor Relaxed Risk Budgeting
 
 ##### Traditional Optimisation Features
 
-- Objective Functions
-  - Minimum Risk
-  - Maximum Utility
-  - Maximum Return Over Risk Ratio
-  - Maximum Return
-  - Custom
-- Fees
-  - Proportional
-    - Long
-    - Short
-  - Fixed
-    - Long
-    - Short
-  - Turnover
-- Regularisation
-  - L1
-  - L2
-- Weight Constraints
-- Budget Constraints
+  - Objective Functions
+    
+      + Minimum Risk
+      + Maximum Utility
+      + Maximum Return Over Risk Ratio
+      + Maximum Return
+      + Custom
+
+  - Fees
+    
+      + Proportional
+        
+          * Long
+          * Short
+    
+      + Fixed
+        
+          * Long
+          * Short
+      + Turnover
+  - Regularisation
+    
+      + L1
+      + L2
+  - Weight Constraints
+  - Budget Constraints
 
 #### Clustering
 
-- Hierarchical Risk Parity
-- Hierarchical Equal Risk Parity
-- Schur Complementary Hierarchical Risk Parity
-- Nested Clustered
+  - Hierarchical Risk Parity
+  - Hierarchical Equal Risk Parity
+  - Schur Complementary Hierarchical Risk Parity
+  - Nested Clustered
 
 #### Ensemble
 
-- Stacking
+  - Stacking
 
 #### Finite Allocation
 
-- Discrete
-- Greedy
+  - Discrete
+  - Greedy
 
 ### Price data
 
