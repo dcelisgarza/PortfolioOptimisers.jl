@@ -146,7 +146,7 @@ end
 """
 function find_correlated_indices(X::MatNum;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                 threshold::Number = 0.95, absolute::Bool = false)
+                                 t::Number = 0.95, absolute::Bool = false)
     N = size(X, 2)
     rho = !absolute ? cor(ce, X) : abs.(cor(ce, X))
     mean_rho = mean(rho; dims = 1)

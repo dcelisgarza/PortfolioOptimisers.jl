@@ -91,13 +91,13 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     cv::T7
     cwf::T8
     strict::T9
-    executor::T10
+    exe::T10
     fb::T11
     function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              sets::Option{<:AssetSets}, opti::OptimisationEstimator,
                              opto::OptimisationEstimator,
                              cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
-                             strict::Bool, executor::FLoops.Transducers.Executor,
+                             strict::Bool, exe::FLoops.Transducers.Executor,
                              fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
         if !(opti === opto)
@@ -107,8 +107,8 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
-                   typeof(opto), typeof(cv), typeof(cwf), typeof(strict), typeof(executor),
-                   typeof(fb)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict, executor, fb)
+                   typeof(opto), typeof(cv), typeof(cwf), typeof(strict), typeof(exe),
+                   typeof(fb)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict, exe, fb)
     end
 end
 function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(),
@@ -119,9 +119,9 @@ function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(),
                          cv::Option{<:CrossValidationEstimator} = nothing,
                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
-                         executor::FLoops.Transducers.Executor = ThreadedEx(),
+                         exe::FLoops.Transducers.Executor = ThreadedEx(),
                          fb::Option{<:OptimisationEstimator} = nothing)
-    return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, executor, fb)
+    return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, exe, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)
     @argcheck(!isa(opt.cle, AbstractClusteringResult))
@@ -150,7 +150,7 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
     opto = opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, sets = sets, opti = opti,
                            opto = opto, cv = nco.cv, cwf = nco.cwf, strict = nco.strict,
-                           executor = nco.executor, fb = nco.fb)
+                           exe = nco.exe, fb = nco.fb)
 end
 function nested_clustering_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                      cwf::WeightFinaliser, strict::Bool, resi::VecOpt,
@@ -188,7 +188,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
     resi = Vector{OptimisationResult}(undef, clr.k)
-    @floop nco.executor for (i, cl) in pairs(cls)
+    @floop nco.exe for (i, cl) in pairs(cls)
         if length(cl) == 1
             wi[cl, i] .= one(eltype(pr.X))
             resi[i] = SingletonOptimisation(OptimisationSuccess(nothing))
