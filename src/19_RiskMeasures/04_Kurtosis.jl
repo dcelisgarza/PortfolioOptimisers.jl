@@ -160,7 +160,7 @@ function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     tgt = calc_moment_target(r, w, x)
-    return x .- target
+    return x .- tgt
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})(w::VecNum,
                                                                                  X::MatNum,

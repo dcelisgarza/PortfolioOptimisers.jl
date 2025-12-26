@@ -78,7 +78,7 @@ function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     tgt = calc_moment_target(r, w, x)
-    return x .- target
+    return x .- tgt
 end
 function factory(r::ThirdCentralMoment, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
