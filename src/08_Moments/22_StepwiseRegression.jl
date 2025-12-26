@@ -1,6 +1,6 @@
 """
     struct PValue{T1} <: AbstractStepwiseRegressionCriterion
-        t::T1
+        threshold::T1
     end
 
 Stepwise regression criterion based on p-value thresholding.
@@ -13,7 +13,7 @@ Stepwise regression criterion based on p-value thresholding.
 
 # Constructor
 
-    PValue(; t::Number = 0.05)
+    PValue(; threshold::Number = 0.05)
 
 Keyword arguments correspond to the fields above.
 
@@ -35,14 +35,14 @@ PValue
   - [`StepwiseRegression`](@ref)
 """
 struct PValue{T1} <: AbstractStepwiseRegressionCriterion
-    t::T1
-    function PValue(t::Number)
+    threshold::T1
+    function PValue(threshold::Number)
         @argcheck(zero(threshold) < threshold < one(threshold),
                   DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         return new{typeof(threshold)}(threshold)
     end
 end
-function PValue(; t::Number = 0.05)
+function PValue(; threshold::Number = 0.05)
     return PValue(threshold)
 end
 """
@@ -255,7 +255,7 @@ end
 """
     get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
                                value::VecNum, excluded::VecInt,
-                               included::VecInt, t::Number)
+                               included::VecInt, threshold::Number)
 
 Helper for forward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
 
@@ -271,7 +271,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 
 # Returns
 
-  - `t::Number`: Updated threshold value after inclusion (if any).
+  - `threshold::Number`: Updated threshold value after inclusion (if any).
 
 # Details
 
@@ -287,7 +287,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 """
 function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
                                     value::VecNum, excluded::VecInt, included::VecInt,
-                                    t::Number)
+                                    threshold::Number)
     val, idx = findmin(value)
     if val < threshold
         i = searchsortedfirst(excluded, idx)
@@ -299,7 +299,7 @@ end
 """
     get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
                                value::VecNum, excluded::VecInt,
-                               included::VecInt, t::Number)
+                               included::VecInt, threshold::Number)
 
 Helper for forward stepwise regression with maximum-value criteria (e.g., R²).
 
@@ -315,7 +315,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 
 # Returns
 
-  - `t::Number`: Updated threshold value after inclusion (if any).
+  - `threshold::Number`: Updated threshold value after inclusion (if any).
 
 # Details
 
@@ -331,7 +331,7 @@ This function updates the `included` and `excluded` variable sets in forward ste
 """
 function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
                                     value::VecNum, excluded::VecInt, included::VecInt,
-                                    t::Number)
+                                    threshold::Number)
     val, idx = findmax(value)
     if val > threshold
         i = searchsortedfirst(excluded, idx)
@@ -457,7 +457,7 @@ function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F:
 end
 """
     get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum,
-                           included::VecInt, t::Number)
+                           included::VecInt, threshold::Number)
 
 Helper for backward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
 
@@ -472,7 +472,7 @@ This function updates the `included` variable set in backward stepwise regressio
 
 # Returns
 
-  - `t::Number`: Updated threshold value after exclusion (if any).
+  - `threshold::Number`: Updated threshold value after exclusion (if any).
 
 # Details
 
@@ -486,7 +486,7 @@ This function updates the `included` variable set in backward stepwise regressio
   - [`regression`](@ref)
 """
 function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value::VecNum,
-                                included::VecInt, t::Number)
+                                included::VecInt, threshold::Number)
     val, idx = findmin(value)
     if val < threshold
         i = searchsortedfirst(included, idx)
@@ -497,7 +497,7 @@ function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, val
 end
 """
     get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum,
-                           included::VecInt, t::Number)
+                           included::VecInt, threshold::Number)
 
 Helper for backward stepwise regression with maximum-value criteria (e.g., R²).
 
@@ -512,7 +512,7 @@ This function updates the `included` variable set in backward stepwise regressio
 
 # Returns
 
-  - `t::Number`: Updated threshold value after exclusion (if any).
+  - `threshold::Number`: Updated threshold value after exclusion (if any).
 
 # Details
 
@@ -526,7 +526,7 @@ This function updates the `included` variable set in backward stepwise regressio
   - [`regression`](@ref)
 """
 function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, value::VecNum,
-                                included::VecInt, t::Number)
+                                included::VecInt, threshold::Number)
     val, idx = findmax(value)
     if val > threshold
         i = searchsortedfirst(included, idx)

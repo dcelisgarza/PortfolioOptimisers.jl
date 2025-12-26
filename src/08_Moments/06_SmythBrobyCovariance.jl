@@ -228,13 +228,13 @@ struct StandardisedSmythBrobyGerber2 <: StandardisedSmythBrobyCovarianceAlgorith
         me::T1
         ve::T2
         pdm::T3
-        t::T4
+        threshold::T4
         c1::T5
         c2::T6
         c3::T7
         n::T8
         alg::T9
-        exe::T10
+        executor::T10
     end
 
 A flexible container type for configuring and applying Smyth-Broby covariance estimators in PortfolioOptimisers.jl.
@@ -252,16 +252,16 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
   - `c3`: Zone of indecision upper bound.
   - `n`: Exponent parameter for the Smyth-Broby kernel.
   - `alg`: Smyth-Broby covariance algorithm variant.
-  - `exe`: Parallel execution strategy.
+  - `executor`: Parallel execution strategy.
 
 # Constructor
 
     SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                          ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                         pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
+                         pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
                          c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4, n::Number = 2,
                          alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                         exe::FLoops.Transducers.Executor = ThreadedEx())
+                         executor::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
 
@@ -293,7 +293,7 @@ SmythBrobyCovariance
          c3 ┼ Int64: 4
           n ┼ Int64: 2
         alg ┼ SmythBrobyGerber1()
-        exe ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+   executor ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -317,25 +317,25 @@ SmythBrobyCovariance
   - [`StandardisedSmythBrobyGerber0`](@ref)
   - [`StandardisedSmythBrobyGerber1`](@ref)
   - [`StandardisedSmythBrobyGerber2`](@ref)
-  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-exe)
+  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
 struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        BaseSmythBrobyCovariance
     me::T1
     ve::T2
     pdm::T3
-    t::T4
+    threshold::T4
     c1::T5
     c2::T6
     c3::T7
     n::T8
     alg::T9
-    exe::T10
+    executor::T10
     function SmythBrobyCovariance(me::AbstractExpectedReturnsEstimator,
                                   ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
-                                  t::Number, c1::Number, c2::Number, c3::Number, n::Number,
-                                  alg::SmythBrobyCovarianceAlgorithm,
-                                  exe::FLoops.Transducers.Executor)
+                                  threshold::Number, c1::Number, c2::Number, c3::Number,
+                                  n::Number, alg::SmythBrobyCovarianceAlgorithm,
+                                  executor::FLoops.Transducers.Executor)
         @argcheck(zero(threshold) < threshold < one(threshold),
                   DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
         @argcheck(zero(c1) < c1 <= one(c1),
@@ -344,27 +344,30 @@ struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                   DomainError("0 < c2 <= 1 must hold. Got\nc2 => $c2"))
         @argcheck(c2 < c3, DomainError)
         return new{typeof(me), typeof(ve), typeof(pdm), typeof(threshold), typeof(c1),
-                   typeof(c2), typeof(c3), typeof(n), typeof(alg), typeof(exe)}(me, ve, pdm,
-                                                                                threshold,
-                                                                                c1, c2, c3,
-                                                                                n, alg, exe)
+                   typeof(c2), typeof(c3), typeof(n), typeof(alg), typeof(executor)}(me, ve,
+                                                                                     pdm,
+                                                                                     threshold,
+                                                                                     c1, c2,
+                                                                                     c3, n,
+                                                                                     alg,
+                                                                                     executor)
     end
 end
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                               ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                              pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
+                              pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
                               c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4,
                               n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                              exe::FLoops.Transducers.Executor = ThreadedEx())
-    return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, exe)
+                              executor::FLoops.Transducers.Executor = ThreadedEx())
+    return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, executor)
 end
 function factory(ce::SmythBrobyCovariance, w::Option{<:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,
                                 c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg,
-                                exe = ce.exe)
+                                executor = ce.executor)
 end
 """
     sb_delta(xi::Number, xj::Number, mui::Number, muj::Number, sigmai::Number, sigmaj::Number, c1::Number,
@@ -473,7 +476,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i in 1:j
@@ -548,7 +551,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -621,7 +624,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i in 1:j
@@ -699,7 +702,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -780,7 +783,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i in 1:j
@@ -853,7 +856,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -926,7 +929,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i in 1:j
@@ -1008,7 +1011,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -1090,7 +1093,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i in 1:j
@@ -1178,7 +1181,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -1268,7 +1271,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i in 1:j
@@ -1346,7 +1349,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.exe for j in axes(X, 2)
+    @floop ce.executor for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
