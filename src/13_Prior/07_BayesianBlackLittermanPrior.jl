@@ -84,7 +84,7 @@ BayesianBlackLittermanPrior
              │       │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       │           │      │      │       pdm ┼ Posdef
              │       │           │      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()      
+             │       │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │           │      │      │   denoise ┼ nothing
              │       │           │      │      │    detone ┼ nothing
              │       │           │      │      │       alg ┼ nothing
@@ -101,11 +101,11 @@ BayesianBlackLittermanPrior
              │       │       alg ┼ nothing
              │       │     order ┴ DenoiseDetoneAlg()
              │    re ┼ StepwiseRegression
-             │       │     crit ┼ PValue
-             │       │          │   threshold ┴ Float64: 0.05
-             │       │      alg ┼ Forward()
-             │       │   target ┼ LinearModel
-             │       │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       │   crit ┼ PValue
+             │       │        │   t ┴ Float64: 0.05
+             │       │    alg ┼ Forward()
+             │       │    tgt ┼ LinearModel
+             │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │    ve ┼ SimpleVariance
              │       │          me ┼ SimpleExpectedReturns
              │       │             │   w ┴ nothing

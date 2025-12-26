@@ -22,7 +22,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
-    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
@@ -32,7 +32,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     else
         @expression(model, mean(flm, wi))
     end
-    model[Symbol(:cflm_mar_, i)] = @constraint(model, sc * ((net_X + flm) .- target) >= 0)
+    model[Symbol(:cflm_mar_, i)] = @constraint(model, sc * ((net_X + flm) .- tgt) >= 0)
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
     return flm_risk
 end
@@ -45,7 +45,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
-    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
@@ -55,7 +55,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     else
         @expression(model, 2 * mean(mad, wi))
     end
-    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * ((net_X + mad) .- target) >= 0)
+    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * ((net_X + mad) .- tgt) >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return mad_risk
 end
@@ -108,21 +108,20 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     bound_key = Symbol(:sqrt_second_moment_, i)
     sqrt_second_moment = model[bound_key] = @variable(model)
     if isa(r.alg.alg1, Full)
-        second_moment = model[Symbol(:second_moment_, i)] = @expression(model,
-                                                                        net_X .- target)
+        second_moment = model[Symbol(:second_moment_, i)] = @expression(model, net_X .- tgt)
     else
         second_moment = model[Symbol(:second_lower_moment_, i)] = @variable(model, [1:T],
                                                                             (lower_bound = 0))
         model[Symbol(:csecond_lower_moment_mar_, i)] = @constraint(model,
                                                                    sc *
                                                                    ((net_X + second_moment) .-
-                                                                    target) >= 0)
+                                                                    tgt) >= 0)
     end
     wi = nothing_scalar_array_selector(r.w, pr.w)
     second_moment_risk, factor = if isnothing(wi)

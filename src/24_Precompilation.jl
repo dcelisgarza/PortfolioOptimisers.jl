@@ -32,7 +32,7 @@
                                                                                                                            detone = Detone(),
                                                                                                                            alg = LoGo())),
                                                            horizon = 252)),
-               FactorPrior(; re = StepwiseRegression(; crit = PValue(; threshold = 0.8)),
+               FactorPrior(; re = StepwiseRegression(; crit = PValue(; t =  0.8)),
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   ce = GerberCovariance(;
@@ -49,11 +49,11 @@
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns(;
                                                                                                                                                        alg = BayesStein(;
-                                                                                                                                                                        target = VolatilityWeighted())))),
+                                                                                                                                                                        tgt = VolatilityWeighted())))),
                                                                                   mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                                denoise = Denoise(;
                                                                                                                                  alg = FixedDenoise())))),
-                           re = StepwiseRegression(; target = GeneralisedLinearModel(),
+                           re = StepwiseRegression(; tgt = GeneralisedLinearModel(),
                                                    crit = AIC(), alg = Backward()),
                            mp = DenoiseDetoneAlgMatrixProcessing()),
                FactorPrior(;
@@ -64,7 +64,7 @@
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns(;
                                                                                                                                                        alg = BodnarOkhrinParolya(;
-                                                                                                                                                                                 target = MeanSquaredError())))))),
+                                                                                                                                                                                 tgt = MeanSquaredError())))))),
                            re = StepwiseRegression(; crit = AICC()), rsd = false),
                FactorPrior(;
                            pe = EmpiricalPrior(;

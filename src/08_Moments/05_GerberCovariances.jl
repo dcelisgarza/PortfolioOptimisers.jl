@@ -252,32 +252,32 @@ end
     struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
         ve::T1
         pdm::T2
-        threshold::T3
+        t::T3
         alg::T4
     end
 
 A flexible container type for configuring and applying Gerber covariance estimators in PortfolioOptimisers.jl.
 
-`GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, threshold parameter, and the specific Gerber algorithm variant. This enables modular and extensible workflows for robust covariance estimation using Gerber statistics.
+`GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant. This enables modular and extensible workflows for robust covariance estimation using Gerber statistics.
 
 # Fields
 
   - `ve`: Variance estimator.
   - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `threshold`: Threshold parameter for Gerber covariance computation.
+  - `t`: Threshold parameter for Gerber covariance computation.
   - `alg`: Gerber covariance algorithm variant.
 
 # Constructor
 
     GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                     pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
+                     pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
                      alg::GerberCovarianceAlgorithm = Gerber1())
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `0 < threshold < 1`.
+  - `0 < t < 1`.
 
 # Related
 
@@ -296,20 +296,18 @@ Keyword arguments correspond to the fields above.
 struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     ve::T1
     pdm::T2
-    threshold::T3
+    t::T3
     alg::T4
     function GerberCovariance(ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
-                              threshold::Number, alg::GerberCovarianceAlgorithm)
-        @argcheck(zero(threshold) < threshold < one(threshold),
-                  DomainError("0 < threshold < 1 must hold. Got\nthreshold => $threshold"))
-        return new{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve, pdm,
-                                                                            threshold, alg)
+                              t::Number, alg::GerberCovarianceAlgorithm)
+        @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
+        return new{typeof(ve), typeof(pdm), typeof(t), typeof(alg)}(ve, pdm, t, alg)
     end
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Option{<:Posdef} = Posdef(), threshold::Number = 0.5,
+                          pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
-    return GerberCovariance(ve, pdm, threshold, alg)
+    return GerberCovariance(ve, pdm, t, alg)
 end
 """
     gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
@@ -335,8 +333,8 @@ The algorithm proceeds as follows:
 
  1. For each entry in `X`, compute two Boolean matrices:
 
-      + `U`: Entries where `X` exceeds `threshold * std_vec`.
-      + `D`: Entries where `X` is less than `-threshold * std_vec`.
+      + `U`: Entries where `X` exceeds `t * std_vec`.
+      + `D`: Entries where `X` is less than `-t * std_vec`.
 
  2. Compute `UmD = U - D` and `UpD = U + D`.
  3. The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
@@ -353,7 +351,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
-    std_vec = std_vec * ce.threshold
+    std_vec = std_vec * ce.t
     U .= X .>= std_vec
     D .= X .<= -std_vec
     # nconc = transpose(U) * U + transpose(D) * D
@@ -387,8 +385,8 @@ The algorithm proceeds as follows:
 
  1. For each entry in `X`, compute two Boolean matrices:
 
-      + `U`: Entries where `X` exceeds `ce.threshold`.
-      + `D`: Entries where `X` is less than `-ce.threshold`.
+      + `U`: Entries where `X` exceeds `ce.t`.
+      + `D`: Entries where `X` is less than `-ce.t`.
 
  2. Compute `UmD = U - D` and `UpD = U + D`.
  3. The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
@@ -404,8 +402,8 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
-    U .= X .>= ce.threshold
-    D .= X .<= -ce.threshold
+    U .= X .>= ce.t
+    D .= X .<= -ce.t
     # nconc = transpose(U) * U + transpose(D) * D
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
@@ -439,9 +437,9 @@ The algorithm proceeds as follows:
 
  1. For each entry in `X`, compute three Boolean matrices:
 
-      + `U`: Entries where `X` exceeds `threshold * std_vec`.
-      + `D`: Entries where `X` is less than `-threshold * std_vec`.
-      + `N`: Entries where `X` is within `[-threshold * std_vec, threshold * std_vec]` (i.e., neither up nor down).
+      + `U`: Entries where `X` exceeds `t * std_vec`.
+      + `D`: Entries where `X` is less than `-t * std_vec`.
+      + `N`: Entries where `X` is within `[-t * std_vec, t * std_vec]` (i.e., neither up nor down).
 
  2. Compute `UmD = U - D`.
  3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
@@ -453,7 +451,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
     N = Matrix{Bool}(undef, T, N)
-    std_vec = std_vec * ce.threshold
+    std_vec = std_vec * ce.t
     U .= X .>= std_vec
     D .= X .<= -std_vec
     N .= .!U .& .!D
@@ -487,9 +485,9 @@ The algorithm proceeds as follows:
 
  1. For each entry in `X`, compute three Boolean matrices:
 
-      + `U`: Entries where `X` exceeds `ce.threshold`.
-      + `D`: Entries where `X` is less than `-ce.threshold`.
-      + `N`: Entries where `X` is within `[-ce.threshold, ce.threshold]` (i.e., neither up nor down).
+      + `U`: Entries where `X` exceeds `ce.t`.
+      + `D`: Entries where `X` is less than `-ce.t`.
+      + `N`: Entries where `X` is within `[-ce.t, ce.t]` (i.e., neither up nor down).
 
  2. Compute `UmD = U - D`.
  3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
@@ -506,8 +504,8 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
     N = Matrix{Bool}(undef, T, N)
-    U .= X .>= ce.threshold
-    D .= X .<= -ce.threshold
+    U .= X .>= ce.t
+    D .= X .<= -ce.t
     N .= .!U .& .!D
     # nconc = transpose(U) * U + transpose(D) * D
     # ndisc = transpose(U) * D + transpose(D) * U
@@ -541,8 +539,8 @@ The algorithm proceeds as follows:
 
  1. For each entry in `X`, compute two Boolean matrices:
 
-      + `U`: Entries where `X` exceeds `threshold * std_vec`.
-      + `D`: Entries where `X` is less than `-threshold * std_vec`.
+      + `U`: Entries where `X` exceeds `t * std_vec`.
+      + `D`: Entries where `X` is less than `-t * std_vec`.
 
  2. Compute the signed indicator matrix `UmD = U - D`.
  3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
@@ -560,7 +558,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
-    std_vec = std_vec * ce.threshold
+    std_vec = std_vec * ce.t
     U .= X .>= std_vec
     D .= X .<= -std_vec
     # nconc = transpose(U) * U + transpose(D) * D
@@ -595,8 +593,8 @@ The algorithm proceeds as follows:
 
  1. For each entry in `X`, compute two Boolean matrices:
 
-      + `U`: Entries where `X` exceeds `ce.threshold`.
-      + `D`: Entries where `X` is less than `-ce.threshold`.
+      + `U`: Entries where `X` exceeds `ce.t`.
+      + `D`: Entries where `X` is less than `-ce.t`.
 
  2. Compute the signed indicator matrix `UmD = U - D`.
  3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
@@ -613,8 +611,8 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
-    U .= X .>= ce.threshold
-    D .= X .<= -ce.threshold
+    U .= X .>= ce.t
+    D .= X .<= -ce.t
     # nconc = transpose(U) * U + transpose(D) * D
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
@@ -749,7 +747,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
 end
 function factory(ce::GerberCovariance, w::Option{<:AbstractWeights} = nothing)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
-                            pdm = ce.pdm, threshold = ce.threshold)
+                            pdm = ce.pdm, t = ce.t)
 end
 
 export GerberCovariance, Gerber0, Gerber1, Gerber2, StandardisedGerber0,

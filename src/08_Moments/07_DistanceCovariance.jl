@@ -4,7 +4,7 @@
         args::T2
         kwargs::T3
         w::T4
-        executor::T5
+        ex::T5
     end
 
 A flexible container type for configuring and applying distance-based covariance estimators in PortfolioOptimisers.jl.
@@ -17,13 +17,13 @@ A flexible container type for configuring and applying distance-based covariance
   - `args`: Additional positional arguments for the distance metric.
   - `kwargs`: Additional keyword arguments for the distance metric.
   - `w`: Optional weights for observations.
-  - `executor`: Parallel execution strategy.
+  - `ex`: Parallel execution strategy.
 
 # Constructor
 
     DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
                        kwargs::NamedTuple = (;), w::Option{<:AbstractWeights} = nothing,
-                       executor::FLoops.Transducers.Executor = ThreadedEx())
+                       ex::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
 
@@ -32,11 +32,11 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DistanceCovariance()
 DistanceCovariance
-      dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
-         w ┼ nothing
-  executor ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+       w ┼ nothing
+      ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -44,33 +44,32 @@ DistanceCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
+  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     dist::T1
     args::T2
     kwargs::T3
     w::T4
-    executor::T5
+    ex::T5
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                                 w::Option{<:AbstractWeights},
-                                executor::FLoops.Transducers.Executor)
-        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(executor)}(dist,
-                                                                                            args,
-                                                                                            kwargs,
-                                                                                            w,
-                                                                                            executor)
+                                ex::FLoops.Transducers.Executor)
+        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(dist,
+                                                                                      args,
+                                                                                      kwargs,
+                                                                                      w, ex)
     end
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:AbstractWeights} = nothing,
-                            executor::FLoops.Transducers.Executor = ThreadedEx())
-    return DistanceCovariance(dist, args, kwargs, w, executor)
+                            ex::FLoops.Transducers.Executor = ThreadedEx())
+    return DistanceCovariance(dist, args, kwargs, w, ex)
 end
 function factory(ce::DistanceCovariance, w::Option{<:AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
-                              w = isnothing(w) ? ce.w : w, executor = ce.executor)
+                              w = isnothing(w) ? ce.w : w, ex = ce.ex)
 end
 """
     cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
@@ -146,7 +145,7 @@ This function computes the distance correlation between each pair of columns in 
 # Details
 
   - Iterates over all pairs of columns in `X`, computing the distance correlation for each pair using [`cor_distance(ce, v1, v2)`](@ref).
-  - Parallelizes computation using the estimator's `executor` field.
+  - Parallelizes computation using the estimator's `ex` field.
 
 # Related
 
@@ -156,7 +155,7 @@ This function computes the distance correlation between each pair of columns in 
 function cor_distance(ce::DistanceCovariance, X::MatNum)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    @floop ce.executor for j in axes(X, 2)
+    @floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
@@ -189,11 +188,11 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-      dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
-         w ┼ nothing
-  executor ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+       w ┼ nothing
+      ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
 julia> X = [1.0 2.0; 2.0 4.0; 3.0 6.0];
 
@@ -288,7 +287,7 @@ This function computes the distance covariance between each pair of columns in `
 # Details
 
   - Iterates over all pairs of columns in `X`, computing the distance covariance for each pair using [`cov_distance(ce, v1, v2)`](@ref).
-  - Parallelizes computation using the estimator's `executor` field.
+  - Parallelizes computation using the estimator's `ex` field.
 
 # Related
 
@@ -298,7 +297,7 @@ This function computes the distance covariance between each pair of columns in `
 function cov_distance(ce::DistanceCovariance, X::MatNum)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    @floop ce.executor for j in axes(X, 2)
+    @floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)
@@ -331,11 +330,11 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-      dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
-         w ┼ nothing
-  executor ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+       w ┼ nothing
+      ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
 julia> X = [1.0 2.0; 2.0 4.0; 3.0 6.0];
 

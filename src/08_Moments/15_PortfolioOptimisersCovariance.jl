@@ -146,12 +146,12 @@ end
 """
 function find_correlated_indices(X::MatNum;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                 threshold::Number = 0.95, absolute::Bool = false)
+                                 t::Number = 0.95, absolute::Bool = false)
     N = size(X, 2)
     rho = !absolute ? cor(ce, X) : abs.(cor(ce, X))
     mean_rho = mean(rho; dims = 1)
     tril_idx = findall(tril!(trues(size(rho)), -1))
-    candidate_idx = findall(rho[tril_idx] .>= threshold)
+    candidate_idx = findall(rho[tril_idx] .>= t)
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
     to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
     for idx in candidate_idx

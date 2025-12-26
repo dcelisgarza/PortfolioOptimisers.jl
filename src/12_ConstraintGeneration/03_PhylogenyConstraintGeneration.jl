@@ -710,7 +710,7 @@ const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
 
-`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or threshold, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
+`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or t, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
 
 # Arguments
 

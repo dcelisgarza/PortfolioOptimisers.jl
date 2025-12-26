@@ -24,28 +24,25 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     cv::T6
     cwf::T7
     strict::T8
-    executor::T9
+    ex::T9
     fb::T10
     function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                       opti::VecOptE_Opt, opto::OptimisationEstimator,
                       cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
-                      strict::Bool, executor::FLoops.Transducers.Executor,
+                      strict::Bool, ex::FLoops.Transducers.Executor,
                       fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                   typeof(cv), typeof(cwf), typeof(strict), typeof(executor), typeof(fb)}(pe,
-                                                                                          wb,
-                                                                                          sets,
-                                                                                          opti,
-                                                                                          opto,
-                                                                                          cv,
-                                                                                          cwf,
-                                                                                          strict,
-                                                                                          executor,
-                                                                                          fb)
+                   typeof(cv), typeof(cwf), typeof(strict), typeof(ex), typeof(fb)}(pe, wb,
+                                                                                    sets,
+                                                                                    opti,
+                                                                                    opto,
+                                                                                    cv, cwf,
+                                                                                    strict,
+                                                                                    ex, fb)
     end
 end
 function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
@@ -53,9 +50,9 @@ function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
                   opto::OptimisationEstimator,
                   cv::Option{<:CrossValidationEstimator} = nothing,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
-                  executor::FLoops.Transducers.Executor = ThreadedEx(),
+                  ex::FLoops.Transducers.Executor = ThreadedEx(),
                   fb::Option{<:OptimisationEstimator} = nothing)
-    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, executor, fb)
+    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, ex, fb)
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -81,7 +78,7 @@ function opt_view(st::Stacking, i, X::MatNum)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
     return Stacking(; pe = pe, wb = wb, opti = opti, opto = opto, cv = st.cv, cwf = st.cwf,
-                    sets = sets, strict = st.strict, executor = st.executor, fb = st.fb)
+                    sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
 function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
@@ -91,7 +88,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
-    @floop st.executor for (i, opt) in pairs(opti)
+    @floop st.ex for (i, opt) in pairs(opti)
         res = optimise(opt, rd; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?

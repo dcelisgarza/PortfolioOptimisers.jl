@@ -31,22 +31,21 @@
     rf = 4.34 / 100 / 252
     @testset "Expected ReturnsResult" begin
         mes = [ShrunkExpectedReturns(; alg = JamesStein()),
-               ShrunkExpectedReturns(; alg = JamesStein(; target = VolatilityWeighted())),
-               ShrunkExpectedReturns(; alg = JamesStein(; target = MeanSquaredError())),
+               ShrunkExpectedReturns(; alg = JamesStein(; tgt = VolatilityWeighted())),
+               ShrunkExpectedReturns(; alg = JamesStein(; tgt = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = JamesStein(),
                                      me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(; alg = BayesStein()),
-               ShrunkExpectedReturns(; alg = BayesStein(; target = VolatilityWeighted())),
-               ShrunkExpectedReturns(; alg = BayesStein(; target = MeanSquaredError())),
+               ShrunkExpectedReturns(; alg = BayesStein(; tgt = VolatilityWeighted())),
+               ShrunkExpectedReturns(; alg = BayesStein(; tgt = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = BayesStein(),
                                      me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya()),
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
-                                                               target = VolatilityWeighted())),
+                                                               tgt = VolatilityWeighted())),
                ShrunkExpectedReturns(;
-                                     alg = BodnarOkhrinParolya(;
-                                                               target = MeanSquaredError())),
+                                     alg = BodnarOkhrinParolya(; tgt = MeanSquaredError())),
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
                                      me = SimpleExpectedReturns(; w = ew)),
                EquilibriumExpectedReturns(), ExcessExpectedReturns(; rf = rf)]
@@ -64,7 +63,7 @@
                                     ce = PortfolioOptimisersCovariance(;
                                                                        ce = Covariance(;
                                                                                        alg = Semi())),
-                                    alg = JamesStein(; target = VolatilityWeighted()))
+                                    alg = JamesStein(; tgt = VolatilityWeighted()))
         me = PortfolioOptimisers.factory(me0, ew)
         @test !(me.me === me0.me)
         @test !(me.ce === me0.ce)
@@ -224,12 +223,12 @@
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
-                                                                  threshold = 0.1))
+                                                                  t = 0.1))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.alg === ce0.ce.alg
-        @test ce.ce.threshold == ce0.ce.threshold
+        @test ce.ce.t == ce0.ce.t
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
@@ -248,11 +247,11 @@
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(;
                                                                   alg = StandardisedGerber0(),
-                                                                  threshold = 0.2))
+                                                                  t = 0.2))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test ce.ce.pdm === ce0.ce.pdm
-        @test ce.ce.threshold == ce0.ce.threshold
+        @test ce.ce.t == ce0.ce.t
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
@@ -260,9 +259,9 @@
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),
-                                                                      threshold = 0.1,
-                                                                      c1 = 0.6, c2 = 0.2,
-                                                                      c3 = 2.2, n = 3))
+                                                                      t = 0.1, c1 = 0.6,
+                                                                      c2 = 0.2, c3 = 2.2,
+                                                                      n = 3))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test !(ce.ce.me === ce0.ce.me)
@@ -270,12 +269,12 @@
         @test ce.ce.ve.me.w === ew
         @test ce.ce.me.w === ew
         @test ce.ce.pdm === ce0.ce.pdm
-        @test ce.ce.threshold == ce0.ce.threshold
+        @test ce.ce.t == ce0.ce.t
         @test ce.ce.c1 == ce0.ce.c1
         @test ce.ce.c2 == ce0.ce.c2
         @test ce.ce.c3 == ce0.ce.c3
         @test ce.ce.n == ce0.ce.n
-        @test ce.ce.executor === ce0.ce.executor
+        @test ce.ce.ex === ce0.ce.ex
         @test ce.ce.alg === ce0.ce.alg
         @test isapprox(cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
                        cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
@@ -295,7 +294,7 @@
         @test ce.ce.dist === ce0.ce.dist
         @test ce.ce.args === ce0.ce.args
         @test ce.ce.kwargs === ce0.ce.kwargs
-        @test ce.ce.executor === ce0.ce.executor
+        @test ce.ce.ex === ce0.ce.ex
         @test ce.ce.w === ew
         @test isapprox(cov(DistanceCovariance(), rd.X),
                        cov(DistanceCovariance(), rd.X'; dims = 2))
@@ -309,7 +308,7 @@
         @test ce.ce.alpha == ce0.ce.alpha
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.executor === ce0.ce.executor
+        @test ce.ce.ex === ce0.ce.ex
         @test isapprox(cov(LowerTailDependenceCovariance(), rd.X),
                        cov(LowerTailDependenceCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(LowerTailDependenceCovariance(), rd.X),
@@ -398,8 +397,8 @@
                DimensionReductionRegression(),
                DimensionReductionRegression(; retgt = GeneralisedLinearModel(;)),
                DimensionReductionRegression(; drtgt = PPCA()),
-               StepwiseRegression(; crit = PValue(; threshold = 1e-15)),
-               StepwiseRegression(; crit = PValue(; threshold = 1e-15), alg = Backward())]
+               StepwiseRegression(; crit = PValue(; t = 1e-15)),
+               StepwiseRegression(; crit = PValue(; t = 1e-15), alg = Backward())]
         df = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv.gz"), DataFrame)
         for (i, re) in pairs(res)
             rr = regression(re, rd)

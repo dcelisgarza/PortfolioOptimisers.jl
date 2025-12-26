@@ -145,31 +145,31 @@
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
 
-        res = optimise(HierarchicalEqualRiskContribution(; executor = FLoops.SequentialEx(),
+        res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                          opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
         res = optimise(HierarchicalEqualRiskContribution(; ri = Variance(),
                                                          ro = Variance(; sigma = pr.sigma),
                                                          opt = opt,
-                                                         executor = FLoops.SequentialEx()))
+                                                         ex = FLoops.SequentialEx()))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
-        res = optimise(HierarchicalEqualRiskContribution(; executor = FLoops.SequentialEx(),
+        res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                          ri = [Variance()], opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
-        res = optimise(HierarchicalEqualRiskContribution(; executor = FLoops.SequentialEx(),
+        res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                          ri = [Variance()],
                                                          ro = [Variance()], opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
-        res = optimise(HierarchicalEqualRiskContribution(; executor = FLoops.SequentialEx(),
+        res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                          ri = [Variance()], ro = Variance(),
                                                          opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
-        res = optimise(HierarchicalEqualRiskContribution(; executor = FLoops.SequentialEx(),
+        res = optimise(HierarchicalEqualRiskContribution(; ex = FLoops.SequentialEx(),
                                                          ri = Variance(), ro = [Variance()],
                                                          opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -201,7 +201,7 @@
                                                                             settings = RiskMeasureSettings(;
                                                                                                            scale = 1e1))],
                                                              opt = opt, scei = sce,
-                                                             executor = FLoops.SequentialEx()))
+                                                             ex = FLoops.SequentialEx()))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success

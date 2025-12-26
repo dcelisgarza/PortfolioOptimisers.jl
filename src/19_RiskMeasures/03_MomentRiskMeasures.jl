@@ -814,7 +814,7 @@ Compute the target value for moment calculations when neither a target value (`m
 
 # Returns
 
-  - `target::eltype(x)`: The mean of the returns vector.
+  - `tgt::eltype(x)`: The mean of the returns vector.
 
 # Related
 
@@ -840,7 +840,7 @@ Compute the target value for moment calculations when the risk measure provides 
 
 # Returns
 
-  - `target::eltype(x)`: The weighted mean of the returns vector, using the observation weights from `r.w`.
+  - `tgt::eltype(x)`: The weighted mean of the returns vector, using the observation weights from `r.w`.
 
 # Related
 
@@ -866,7 +866,7 @@ Compute the target value for moment calculations when the risk measure provides 
 
 # Returns
 
-  - `target::eltype(w)`: The dot product of the asset weights and the expected returns vector.
+  - `tgt::eltype(w)`: The dot product of the asset weights and the expected returns vector.
 
 # Related
 
@@ -892,7 +892,7 @@ Compute the target value for moment calculations when the risk measure provides 
 
 # Returns
 
-  - `target::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `dot(w, r.mu.v) + r.mu.s`.
+  - `tgt::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `dot(w, r.mu.v) + r.mu.s`.
 
 # Related
 
@@ -919,7 +919,7 @@ Compute the target value for moment calculations when the risk measure provides 
 
 # Returns
 
-  - `target::Number`: The scalar value of `r.mu`.
+  - `tgt::Number`: The scalar value of `r.mu`.
 
 # Related
 
@@ -963,7 +963,7 @@ Compute the vector of deviations from the target value for moment-based risk mea
 function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
-    target = calc_moment_target(r, w, x)
+    tgt = calc_moment_target(r, w, x)
     return x .- target
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::VecNum, X::MatNum,
