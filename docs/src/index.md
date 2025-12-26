@@ -263,7 +263,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ### Moment Estimation
 
-#### Expected Returns
+#### [Expected Returns](@id readme-expected-returns)
 
   - Optionally Weighted Expected Returns
 
@@ -283,47 +283,57 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
           * Volatility Weighted
           * Mean Squared Error
 
-#### Variance
+#### [Variance](@id readme-variance)
 
   - Optionally Weighted Variance with Custom Expected Returns Estimator
 
-#### Covariance
+#### [Covariance](@id readme-covariance)
 
   - Optionally Weighted with Optional Custom Covariance and Mean Estimators
     
       + Full
       + Semi
-  - Gerber Covariances with Custom Variance Estimators
-    - Unstandardised Algorithms
-      - Gerber 0
-      - Gerber 1
-      - Gerber 2
-    - Standardised Algorithms (Z-transforms the data beforehand) with Custom Expected Returns Estimators
-      - Gerber 0
-      - Gerber 1
-      - Gerber 2
-  - Smyth-Broby Extension of Gerber Covariances with Custom Expected Returns and Custom Variance Estimators
-    - Unstandardised Algorithms
-      - Smyth-Broby 0
-      - Smyth-Broby 1
-      - Smyth-Broby 2
-      - Smyth-Broby-Gerber 0
-      - Smyth-Broby-Gerber 1
-      - Smyth-Broby-Gerber 2
-    - Standardised Algorithms (Z-transforms the data beforehand)
-      - Smyth-Broby 0
-      - Smyth-Broby 1
-      - Smyth-Broby 2
-      - Smyth-Broby-Gerber 0
-      - Smyth-Broby-Gerber 1
-      - Smyth-Broby-Gerber 2
 
-#### Coskewness
+  - Gerber Covariances with Custom Variance Estimators
+    
+      + Unstandardised Algorithms
+        
+          * Gerber 0
+          * Gerber 1
+          * Gerber 2
+    
+      + Standardised Algorithms (Z-transforms the data beforehand) with Custom Expected Returns Estimators
+        
+          * Gerber 0
+          * Gerber 1
+          * Gerber 2
+  - Smyth-Broby Extension of Gerber Covariances with Custom Expected Returns and Custom Variance Estimators
+    
+      + Unstandardised Algorithms
+        
+          * Smyth-Broby 0
+          * Smyth-Broby 1
+          * Smyth-Broby 2
+          * Smyth-Broby-Gerber 0
+          * Smyth-Broby-Gerber 1
+          * Smyth-Broby-Gerber 2
+    
+      + Standardised Algorithms (Z-transforms the data beforehand)
+        
+          * Smyth-Broby 0
+          * Smyth-Broby 1
+          * Smyth-Broby 2
+          * Smyth-Broby-Gerber 0
+          * Smyth-Broby-Gerber 1
+          * Smyth-Broby-Gerber 2
+  - Distance Covariance
+
+#### [Coskewness](@id readme-coskewness)
 
   - Full
   - Semi
 
-#### Cokurtosis
+#### [Cokurtosis](@id readme-cokurtosis)
 
   - Full
   - Semi
