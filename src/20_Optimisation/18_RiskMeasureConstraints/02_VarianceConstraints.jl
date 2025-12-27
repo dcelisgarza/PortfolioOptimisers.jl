@@ -225,7 +225,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
     if !haskey(model, :E)
         W = model[:W]
         N = size(W, 1)
-        JuMP.@variable(model, E[1:N, 1:N], LinearAlgebra.Symmetric)
+        JuMP.@variable(model, E[1:N, 1:N], Symmetric)
         JuMP.@expression(model, WpE, W + E)
         JuMP.@constraint(model, ceucs_variance, sc * E in JuMP.PSDCone())
     end

@@ -83,7 +83,7 @@ The lower tail dependence (LTD) between two assets quantifies the probability th
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
 
 # Details
 
@@ -134,7 +134,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of lower tail dependence correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence correlation coefficients.
 
 # Validation
 
@@ -169,7 +169,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of lower tail dependence covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of lower tail dependence covariances.
 
 # Validation
 

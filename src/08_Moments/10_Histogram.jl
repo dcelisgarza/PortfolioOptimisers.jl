@@ -331,7 +331,7 @@ This function computes the pairwise variation of information between all columns
 
 # Returns
 
-  - `var_mtx::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise variation of information values.
+  - `var_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise variation of information values.
 
 # Details
 
@@ -428,7 +428,7 @@ This function computes the pairwise mutual information between all columns of th
 
 # Returns
 
-  - `mut_mtx::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise mutual information values.
+  - `mut_mtx::Matrix{<:Number}`: Symmetric matrix of pairwise mutual information values.
 
 # Details
 

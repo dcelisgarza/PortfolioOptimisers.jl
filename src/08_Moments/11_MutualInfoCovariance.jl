@@ -82,7 +82,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of mutual information-based correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of mutual information-based correlation coefficients.
 
 # Validation
 
@@ -117,7 +117,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of mutual information-based covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of mutual information-based covariances.
 
 # Validation
 

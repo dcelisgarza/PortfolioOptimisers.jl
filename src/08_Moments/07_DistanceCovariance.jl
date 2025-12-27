@@ -177,7 +177,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise distance correlations.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations.
 
 # Validation
 
@@ -282,7 +282,7 @@ This function computes the distance covariance between each pair of columns in `
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
 
 # Details
 
@@ -319,7 +319,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
 
 # Validation
 

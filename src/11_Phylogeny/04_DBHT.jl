@@ -855,7 +855,7 @@ This method enforces a unique root in the clique hierarchy. If multiple root can
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
 
 # Related
 
@@ -903,7 +903,7 @@ This method creates a root from the adjacency tree of all root candidate cliques
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
 
 # Related
 
@@ -953,8 +953,8 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
-  - `H2::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the bubble hierarchy tree.
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H2::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the bubble hierarchy tree.
   - `Mb::Matrix{Int}`: Bubble membership matrix for 3-cliques (`Nc×Nb`), where `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
   - `CliqList::Matrix{Int}`: List of 3-cliques (`Nc×3`), each row contains the vertex indices of a 3-clique.
   - `Sb::Vector{Int}`: Vector indicating the size of the separating set for each 3-clique.

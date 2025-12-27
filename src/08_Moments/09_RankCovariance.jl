@@ -75,7 +75,7 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of Kendall's tau rank correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
 
 # Validation
 
@@ -109,7 +109,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of Kendall's tau rank covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of Kendall's tau rank covariances.
 
 # Validation
 
@@ -191,7 +191,7 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of Spearman's rho rank correlation coefficients.
+  - `rho::Matrix{<:Number}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
 
 # Validation
 
@@ -225,7 +225,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of Spearman's rho rank covariances.
+  - `sigma::Matrix{<:Number}`: Symmetric matrix of Spearman's rho rank covariances.
 
 # Validation
 
