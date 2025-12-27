@@ -1,11 +1,11 @@
 #=
-@setup_workload begin
+PrecompileTools.@setup_workload begin
     rng = Xoshiro(42)
     X = randn(rng, 252, 15) * 0.01
     F = randn(rng, 252, 5) * 0.01
     ew = eweights(1:(252), inv(252))
     rf = 4.2 / 100 / 252
-    @compile_workload begin
+    PrecompileTools.@compile_workload begin
         rd = ReturnsResult(; nx = ["_$i" for i in 1:15], X = X, nf = ["_$i" for i in 1:5],
                            F = F)
         sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["_$i" for i in 1:3:15]))

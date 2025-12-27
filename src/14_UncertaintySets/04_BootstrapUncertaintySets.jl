@@ -90,13 +90,16 @@ Creates a bootstrap generator for time series data using the specified bootstrap
   - [`ARCHBootstrapSet`](@ref)
 """
 function bootstrap_func(::StationaryBootstrap, block_size, X, seed)
-    return pyimport("arch.bootstrap").StationaryBootstrap(block_size, X; seed = seed)
+    return PythonCall.pyimport("arch.bootstrap").StationaryBootstrap(block_size, X;
+                                                                     seed = seed)
 end
 function bootstrap_func(::CircularBootstrap, block_size, X, seed)
-    return pyimport("arch.bootstrap").CircularBlockBootstrap(block_size, X; seed = seed)
+    return PythonCall.pyimport("arch.bootstrap").CircularBlockBootstrap(block_size, X;
+                                                                        seed = seed)
 end
 function bootstrap_func(::MovingBootstrap, block_size, X, seed)
-    return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
+    return PythonCall.pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X;
+                                                                      seed = seed)
 end
 """
     struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
@@ -238,9 +241,9 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
+    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = pyconvert(Array, data)[1][1]
+        X = PythonCall.pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
         sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
@@ -276,9 +279,9 @@ Generates bootstrap samples of expected return vectors for returns data using th
 """
 function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
+    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = pyconvert(Array, data)[1][1]
+        X = PythonCall.pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
     end
@@ -313,9 +316,9 @@ Generates bootstrap samples of covariance matrices for time series data using th
 """
 function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
+    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = pyconvert(Array, data)[1][1]
+        X = PythonCall.pyconvert(Array, data)[1][1]
         sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
     end
     return sigmas

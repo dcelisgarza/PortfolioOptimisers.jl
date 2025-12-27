@@ -127,7 +127,7 @@ function posdef!(pdm::Posdef, X::MatNum)
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)
     end
-    nearest_cor!(X, pdm.alg; pdm.kwargs...)
+    NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)
     if !LinearAlgebra.isposdef(X)
         @warn("Matrix could not be made positive definite.")
     end

@@ -139,13 +139,13 @@ julia> PortfolioOptimisers.get_bin_width_func(10)
   - [`HacineGharbiRavier`](@ref)
 """
 function get_bin_width_func(::Knuth)
-    return pyimport("astropy.stats").knuth_bin_width
+    return PythonCall.pyimport("astropy.stats").knuth_bin_width
 end
 function get_bin_width_func(::FreedmanDiaconis)
-    return pyimport("astropy.stats").freedman_bin_width
+    return PythonCall.pyimport("astropy.stats").freedman_bin_width
 end
 function get_bin_width_func(::Scott)
-    return pyimport("astropy.stats").scott_bin_width
+    return PythonCall.pyimport("astropy.stats").scott_bin_width
 end
 function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
@@ -187,12 +187,13 @@ This function determines the number of bins to use for histogram-based calculati
 function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        bin_width_func, ::Any)
     xjl, xju = extrema(xj)
-    k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))
+    k1 = (xju - xjl) /
+         PythonCall.pyconvert(eltype(xj), bin_width_func(PythonCall.Py(xj).to_numpy()))
     return round(Int,
                  if j != i
                      xil, xiu = extrema(xi)
-                     k2 = (xiu - xil) /
-                          pyconvert(eltype(xi), bin_width_func(Py(xi).to_numpy()))
+                     k2 = (xiu - xil) / PythonCall.pyconvert(eltype(xi),
+                                                             bin_width_func(PythonCall.Py(xi).to_numpy()))
                      max(k1, k2)
                  else
                      k1

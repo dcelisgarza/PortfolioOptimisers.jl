@@ -14,9 +14,20 @@ using InteractiveUtils: InteractiveUtils
 using Interfaces: Interfaces
 using JuMP: JuMP
 using LinearAlgebra: LinearAlgebra
-using LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim,
-      SimpleWeightedGraphs, StatsAPI, PythonCall, PrecompileTools, Random, Roots,
-      SparseArrays, Statistics, StatsBase, TimeSeries
+using LogExpFunctions: LogExpFunctions
+using MultivariateStats: MultivariateStats
+using NearestCorrelationMatrix: NearestCorrelationMatrix
+using Optim: Optim
+using PrecompileTools: PrecompileTools
+using PythonCall: PythonCall
+using Random: Random
+using Roots: Roots
+using SimpleWeightedGraphs: SimpleWeightedGraphs
+using SparseArrays: SparseArrays
+using Statistics: Statistics
+using StatsAPI: StatsAPI
+using StatsBase
+using TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let

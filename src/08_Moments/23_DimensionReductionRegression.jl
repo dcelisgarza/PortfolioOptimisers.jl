@@ -267,7 +267,7 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
     X_std = StatsBase.standardize(StatsBase.ZScoreTransform, transpose(X); dims = 2)
     model = fit(drtgt, X_std)
     Xp = transpose(predict(model, X_std))
-    Vp = projection(model)
+    Vp = MultivariateStats.projection(model)
     x1 = [ones(eltype(X), N) Xp]
     return x1, Vp
 end

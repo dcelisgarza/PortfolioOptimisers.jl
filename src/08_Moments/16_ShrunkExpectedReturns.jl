@@ -383,7 +383,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
     else
         target_mean(me.alg.tgt, mu, sigma; T = T)
     end
-    evals = eigvals(sigma)
+    evals = LinearAlgebra.eigvals(sigma)
     mb = mu - b
     alpha = (N * mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b

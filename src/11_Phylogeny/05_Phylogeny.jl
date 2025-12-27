@@ -922,7 +922,7 @@ Compute the adjacency matrix for a network estimator.
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::MatNum; dims::Int = 1, kwargs...)
     D = distance(ne.de, ne.ce, X; dims = dims, kwargs...)
-    G = SimpleWeightedGraph(D)
+    G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
 end

@@ -1436,7 +1436,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     end
     res = if N == 1
         try
-            [find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)]
+            [Roots.find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)]
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end
