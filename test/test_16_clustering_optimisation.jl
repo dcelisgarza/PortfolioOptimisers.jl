@@ -97,13 +97,13 @@
                 LogSumExpScalariser(; gamma = 1e6)]
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity2.csv.gz"),
                       DataFrame)
-        for (i, sce) in pairs(sces)
+        for (i, sca) in pairs(sces)
             res = optimise(HierarchicalRiskParity(;
                                                   r = [ConditionalValueatRisk(),
                                                        Variance(;
                                                                 settings = RiskMeasureSettings(;
                                                                                                scale = 2e2))],
-                                                  opt = opt, sce = sce))
+                                                  opt = opt, sca = sca))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
@@ -181,13 +181,13 @@
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/HierarchicalEqualRiskContribution2.csv.gz"),
                       DataFrame)
-        for (i, sce) in pairs(sces)
+        for (i, sca) in pairs(sces)
             res = optimise(HierarchicalEqualRiskContribution(;
                                                              ri = [ConditionalValueatRisk(),
                                                                    Variance(;
                                                                             settings = RiskMeasureSettings(;
                                                                                                            scale = 1e1))],
-                                                             opt = opt, scei = sce))
+                                                             opt = opt, scai = sca))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
@@ -200,7 +200,7 @@
                                                                    Variance(;
                                                                             settings = RiskMeasureSettings(;
                                                                                                            scale = 1e1))],
-                                                             opt = opt, scei = sce,
+                                                             opt = opt, scai = sca,
                                                              ex = FLoops.SequentialEx()))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])

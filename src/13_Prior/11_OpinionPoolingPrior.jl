@@ -417,7 +417,7 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
         pw = Matrix{eltype(X)}(undef, T, M)
     end
     let X = X, F = F, pw = pw
-        @floop pe.ex for (i, pe) in enumerate(pe.pes)
+        FLoops.@floop pe.ex for (i, pe) in enumerate(pe.pes)
             pr = prior(pe, X, F; strict = strict, kwargs...)
             pw[:, i] = pr.w
         end

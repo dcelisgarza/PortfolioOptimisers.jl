@@ -790,18 +790,18 @@
                         1.1094461786914318e-9, 0.07216633866035838, 0.033513028233384],
                        rtol = 1e-6)
 
-        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sca = MaxScalariser())
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
         w2 = optimise(mr, rd).w
 
-        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e-3))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sca = LogSumExpScalariser(; gamma = 1e-3))
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
         w3 = optimise(mr, rd).w
         @test isapprox(w3, w1, rtol = 5e-2)
 
-        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e5))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sca = LogSumExpScalariser(; gamma = 1e5))
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
         w4 = optimise(mr, rd).w

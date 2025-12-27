@@ -121,7 +121,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_l2_regularisation!(model, rb.opt.l2)
     set_non_fixed_fees!(model, fees)
     set_risk_constraints!(model, rb.r, rb, pr, plg, fees; rd = rd)
-    scalarise_risk_expression!(model, rb.opt.sce)
+    scalarise_risk_expression!(model, rb.opt.sca)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
     set_sdp_phylogeny_constraints!(model, plg)
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)

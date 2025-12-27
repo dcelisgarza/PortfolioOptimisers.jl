@@ -50,7 +50,7 @@ function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
                   opto::OptimisationEstimator,
                   cv::Option{<:CrossValidationEstimator} = nothing,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
-                  ex::FLoops.Transducers.Executor = ThreadedEx(),
+                  ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::Option{<:OptimisationEstimator} = nothing)
     return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, ex, fb)
 end
@@ -88,7 +88,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
-    @floop st.ex for (i, opt) in pairs(opti)
+    FLoops.@floop st.ex for (i, opt) in pairs(opti)
         res = optimise(opt, rd; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?

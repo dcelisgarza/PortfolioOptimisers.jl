@@ -142,7 +142,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     te::T21 # TrackingError
     fees::T22
     ret::T23
-    sce::T24
+    sca::T24
     ccnt::T25
     cobj::T26
     sc::T27
@@ -168,7 +168,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            plg::Option{<:PhCE_PhC_VecPhCE_PhC},
                            tn::Option{<:TnE_Tn_VecTnE_Tn}, te::Option{<:Tr_VecTr},
                            fees::Option{<:FeesE_Fees}, ret::JuMPReturnsEstimator,
-                           sce::Scalariser, ccnt::Option{<:CustomJuMPConstraint},
+                           sca::Scalariser, ccnt::Option{<:CustomJuMPConstraint},
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
@@ -294,7 +294,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(lt), typeof(st), typeof(lcs), typeof(cent), typeof(gcard),
                    typeof(sgcard), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
                    typeof(sglt), typeof(sgst), typeof(sets), typeof(plg), typeof(tn),
-                   typeof(te), typeof(fees), typeof(ret), typeof(sce), typeof(ccnt),
+                   typeof(te), typeof(fees), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(strict)}(pe,
                                                                                        slv,
@@ -319,7 +319,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                                                                        te,
                                                                                        fees,
                                                                                        ret,
-                                                                                       sce,
+                                                                                       sca,
                                                                                        ccnt,
                                                                                        cobj,
                                                                                        sc,
@@ -353,7 +353,7 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        te::Option{<:Tr_VecTr} = nothing,
                        fees::Option{<:FeesE_Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
-                       sce::Scalariser = SumScalariser(),
+                       sca::Scalariser = SumScalariser(),
                        ccnt::Option{<:CustomJuMPConstraint} = nothing,
                        cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
                        so::Number = 1, ss::Option{<:Number} = nothing,
@@ -362,7 +362,7 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, cent, gcard, sgcard, smtx,
-                         sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sce,
+                         sgmtx, slt, sst, sglt, sgst, sets, plg, tn, te, fees, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
@@ -402,7 +402,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          gcard = opt.gcard, sgcard = opt.sgcard, smtx = smtx, sgmtx = sgmtx,
                          slt = slt, sst = sst, sglt = sglt, sgst = sgst, sets = sets,
                          plg = opt.plg, tn = tn, te = te, fees = fees, ret = ret,
-                         sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
+                         sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, strict = opt.strict)
 end
@@ -462,7 +462,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          lt = lt, st = st, lcs = lcs, cent = cent, gcard = gcard,
                          sgcard = sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst,
                          sglt = sglt, sgst = sgst, sets = opt.sets, plg = plg, tn = tn,
-                         te = opt.te, fees = fees, ret = ret, sce = opt.sce,
+                         te = opt.te, fees = fees, ret = ret, sca = opt.sca,
                          ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, nea = opt.nea, l1 = opt.l1,
                          l2 = opt.l2, strict = opt.strict)

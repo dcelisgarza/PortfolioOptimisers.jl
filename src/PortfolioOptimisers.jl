@@ -6,10 +6,11 @@ using Clustering: Clustering
 using DataFrames: DataFrames
 using Distances: Distances
 using Distributions: Distributions
-using FLoops, GLM, Impute, InteractiveUtils, Interfaces, JuMP, LinearAlgebra,
-      LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
-      SimpleWeightedGraphs, StatsAPI, PythonCall, PrecompileTools, Random, Roots,
-      SparseArrays, Statistics, StatsBase, TimeSeries
+using FLoops: FLoops
+using GLM, Impute, InteractiveUtils, Interfaces, JuMP, LinearAlgebra, LogExpFunctions,
+      MultivariateStats, NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs,
+      StatsAPI, PythonCall, PrecompileTools, Random, Roots, SparseArrays, Statistics,
+      StatsBase, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let

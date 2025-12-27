@@ -14,14 +14,14 @@ function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     end
     return nothing
 end
-function scalarise_risk_expression!(model::JuMP.Model, sce::LogSumExpScalariser)
+function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
     if !haskey(model, :risk_vec)
         return nothing
     end
     risk_vec = model[:risk_vec]
     sc = model[:sc]
     N = length(risk_vec)
-    gamma = sce.gamma
+    gamma = sca.gamma
     @variables(model, begin
                    risk
                    u_risk[1:N]

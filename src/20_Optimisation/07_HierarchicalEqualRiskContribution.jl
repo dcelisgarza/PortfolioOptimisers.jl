@@ -3,13 +3,13 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
     opt::T1
     ri::T2
     ro::T3
-    scei::T4
-    sceo::T5
+    scai::T4
+    scao::T5
     ex::T6
     fb::T7
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
-                                               scei::Scalariser, sceo::Scalariser,
+                                               scai::Scalariser, scao::Scalariser,
                                                ex::FLoops.Transducers.Executor,
                                                fb::Option{<:OptimisationEstimator})
         if isa(ri, AbstractVector)
@@ -18,19 +18,19 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
         if isa(ro, AbstractVector)
             @argcheck(!isempty(ro))
         end
-        return new{typeof(opt), typeof(ri), typeof(ro), typeof(scei), typeof(sceo),
-                   typeof(ex), typeof(fb)}(opt, ri, ro, scei, sceo, ex, fb)
+        return new{typeof(opt), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
+                   typeof(ex), typeof(fb)}(opt, ri, ro, scai, scao, ex, fb)
     end
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                            ri::OptRM_VecOptRM = Variance(),
                                            ro::OptRM_VecOptRM = ri,
-                                           scei::Scalariser = SumScalariser(),
-                                           sceo::Scalariser = scei,
-                                           ex::FLoops.Transducers.Executor = ThreadedEx(),
+                                           scai::Scalariser = SumScalariser(),
+                                           scao::Scalariser = scai,
+                                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                            fb::Option{<:OptimisationEstimator} = nothing)
-    return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, ex, fb)
+    return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
@@ -43,8 +43,8 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
         ro = risk_measure_view(ro, i, X)
     end
     opt = opt_view(hec.opt, i)
-    return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scei = hec.scei,
-                                             sceo = hec.sceo, ex = hec.ex, fb = hec.fb)
+    return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
+                                             scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end
 function herc_scalarised_risk_o!(::SumScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
                                  cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
@@ -94,7 +94,7 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::VecNum, roku::MatNum, rkbo
     end
     return crisk
 end
-function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::VecNum, roku::VecNum,
+function herc_scalarised_risk_o!(sca::LogSumExpScalariser, wk::VecNum, roku::VecNum,
                                  rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
                                  fees::Option{<:Fees})
     crisk = Vector{eltype(X)}(undef, length(ros))
@@ -102,20 +102,20 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::VecNum, roku::Vec
         unitary_expected_risks!(wk, roku, ro, X, fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk[i] = ro.settings.scale * sce.gamma * expected_risk(ro, rkbo, X, fees)
+        crisk[i] = ro.settings.scale * sca.gamma * expected_risk(ro, rkbo, X, fees)
     end
-    return logsumexp(crisk) / sce.gamma
+    return logsumexp(crisk) / sca.gamma
 end
-function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::VecNum, roku::MatNum,
+function herc_scalarised_risk_o!(sca::LogSumExpScalariser, ::VecNum, roku::MatNum,
                                  rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
                                  fees::Option{<:Fees})
     crisk = Vector{eltype(X)}(undef, length(ros))
     for (i, ro) in enumerate(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
         rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk[i] = ro.settings.scale * sce.gamma * expected_risk(ro, rkbo, X, fees)
+        crisk[i] = ro.settings.scale * sca.gamma * expected_risk(ro, rkbo, X, fees)
     end
-    return logsumexp(crisk) / sce.gamma
+    return logsumexp(crisk) / sca.gamma
 end
 function herc_scalarised_risk_i!(::SumScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
                                  ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
@@ -171,31 +171,31 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::VecNum, riku::MatNum, cl::
     end
     return view(risk, :, 2)
 end
-function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::VecNum, riku::VecNum,
+function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::VecNum,
                                  cl::VecInt, ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl))
         risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += ri.settings.scale * sce.gamma * view(risk, :, 1)
+        risk[:, 2] += ri.settings.scale * sca.gamma * view(risk, :, 1)
     end
-    return log.(exp.(view(risk, :, 2))) / sce.gamma
+    return log.(exp.(view(risk, :, 2))) / sca.gamma
 end
-function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::VecNum, riku::MatNum,
+function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::MatNum,
                                  cl::VecInt, ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl, i))
         risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += ri.settings.scale * sce.gamma * view(risk, :, 1)
+        risk[:, 2] += ri.settings.scale * sca.gamma * view(risk, :, 1)
     end
-    return log.(exp.(view(risk, :, 2))) / sce.gamma
+    return log.(exp.(view(risk, :, 2))) / sca.gamma
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
-                                                          <:Any, <:SequentialEx},
+                                                          <:Any, <:FLoops.SequentialEx},
                    pr::AbstractPriorResult, cls::VecVecInt)
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
@@ -213,7 +213,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     let
         roku_i, ro_i = roku, ro
-        @floop hec.ex for (i, cl) in pairs(cls)
+        FLoops.@floop hec.ex for (i, cl) in pairs(cls)
             w[cl] .= inv.(view(riku, cl))
             w[cl] ./= sum(view(w, cl))
             rkbo[cl] .= inv.(view(roku_i, cl))
@@ -246,7 +246,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     let
         roku_i, ro_i = roku, ro
-        @floop hec.ex for (i, cl) in pairs(cls)
+        FLoops.@floop hec.ex for (i, cl) in pairs(cls)
             w[cl] .= inv.(view(riku, cl))
             w[cl] ./= sum(view(w, cl))
             rkbo[cl, i] .= inv.(view(roku_i, cl))
@@ -257,7 +257,8 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:VecOptRM,
-                                                          <:Any, <:Any, <:SequentialEx},
+                                                          <:Any, <:Any,
+                                                          <:FLoops.SequentialEx},
                    pr::AbstractPriorResult, cls::VecVecInt)
     ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
@@ -275,9 +276,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
                             datatype = eltype(pr.X))
     let
         rku_i, ro_i = rku, ro
-        @floop hec.ex for (i, cl) in pairs(cls)
-            w[cl] = herc_scalarised_risk_i!(hec.scei, wk, rku_i, cl, ri, pr.X, fees)
-            rkcl[i] = herc_scalarised_risk_o!(hec.sceo, wk, rku_i, rkbo, cl, ro_i, pr.X,
+        FLoops.@floop hec.ex for (i, cl) in pairs(cls)
+            w[cl] = herc_scalarised_risk_i!(hec.scai, wk, rku_i, cl, ri, pr.X, fees)
+            rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, rku_i, rkbo, cl, ro_i, pr.X,
                                               fees)
             rkbo[cl] .= zero(eltype(pr.X))
         end
@@ -304,10 +305,10 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
                             datatype = eltype(pr.X))
     let
         ro_i = ro
-        @floop hec.ex for (i, cl) in pairs(cls)
-            w[cl] = herc_scalarised_risk_i!(hec.scei, view(wk, :, i), view(rku, :, i), cl,
+        FLoops.@floop hec.ex for (i, cl) in pairs(cls)
+            w[cl] = herc_scalarised_risk_i!(hec.scai, view(wk, :, i), view(rku, :, i), cl,
                                             ri, pr.X, fees)
-            rkcl[i] = herc_scalarised_risk_o!(hec.sceo, view(wk, :, i), view(rku, :, i),
+            rkcl[i] = herc_scalarised_risk_o!(hec.scao, view(wk, :, i), view(rku, :, i),
                                               view(rkbo, :, i), cl, ro_i, pr.X, fees)
         end
     end
@@ -315,7 +316,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM, <:V
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:VecOptRM, <:Any, <:Any,
-                                                          <:SequentialEx},
+                                                          <:FLoops.SequentialEx},
                    pr::AbstractPriorResult, cls::VecVecInt)
     ri = factory(hec.ri, pr, hec.opt.slv)
     fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
@@ -327,10 +328,10 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     roku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
-    @floop hec.ex for (i, cl) in pairs(cls)
+    FLoops.@floop hec.ex for (i, cl) in pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
-        rkcl[i] = herc_scalarised_risk_o!(hec.sceo, wk, roku, rkbo, cl, ro, pr.X, fees)
+        rkcl[i] = herc_scalarised_risk_o!(hec.scao, wk, roku, rkbo, cl, ro, pr.X, fees)
         rkbo[cl] .= zero(eltype(pr.X))
     end
     return w, rkcl, fees
@@ -350,17 +351,17 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     roku = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), Nc)
     wk = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
-    @floop hec.ex for (i, cl) in pairs(cls)
+    FLoops.@floop hec.ex for (i, cl) in pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
-        rkcl[i] = herc_scalarised_risk_o!(hec.sceo, view(wk, :, i), view(roku, :, i),
+        rkcl[i] = herc_scalarised_risk_o!(hec.scao, view(wk, :, i), view(roku, :, i),
                                           view(rkbo, :, i), cl, ro, pr.X, fees)
     end
     return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
                                                           <:OptimisationRiskMeasure, <:Any,
-                                                          <:Any, <:SequentialEx},
+                                                          <:Any, <:FLoops.SequentialEx},
                    pr::AbstractPriorResult, cls::VecVecInt)
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
@@ -372,8 +373,8 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     riku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
-    @floop hec.ex for (i, cl) in pairs(cls)
-        w[cl] = herc_scalarised_risk_i!(hec.scei, wk, riku, cl, ri, pr.X, fees)
+    FLoops.@floop hec.ex for (i, cl) in pairs(cls)
+        w[cl] = herc_scalarised_risk_i!(hec.scai, wk, riku, cl, ri, pr.X, fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
         rkcl[i] = expected_risk(ro, rkbo, pr.X, fees)
@@ -397,8 +398,8 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
     wk = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     riku = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), Nc)
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
-    @floop hec.ex for (i, cl) in pairs(cls)
-        w[cl] = herc_scalarised_risk_i!(hec.scei, view(wk, :, i), view(riku, :, i), cl, ri,
+    FLoops.@floop hec.ex for (i, cl) in pairs(cls)
+        w[cl] = herc_scalarised_risk_i!(hec.scai, view(wk, :, i), view(riku, :, i), cl, ri,
                                         pr.X, fees)
         rkbo[cl, i] .= inv.(view(roku, cl))
         rkbo[cl, i] ./= sum(view(rkbo, cl, i))

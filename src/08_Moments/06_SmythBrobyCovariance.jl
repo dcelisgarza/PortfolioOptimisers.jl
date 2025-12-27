@@ -354,7 +354,7 @@ function SmythBrobyCovariance(;
                               c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4,
                               n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                              ex::FLoops.Transducers.Executor = ThreadedEx())
+                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return SmythBrobyCovariance(me, ve, pdm, t, c1, c2, c3, n, alg, ex)
 end
 function factory(ce::SmythBrobyCovariance, w::Option{<:AbstractWeights} = nothing)
@@ -469,7 +469,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         tj = t * sigmaj
@@ -544,7 +544,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -615,7 +615,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         tj = t * sigmaj
@@ -693,7 +693,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -772,7 +772,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         tj = t * sigmaj
@@ -845,7 +845,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -916,7 +916,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         tj = t * sigmaj
@@ -998,7 +998,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -1078,7 +1078,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         tj = t * sigmaj
@@ -1166,7 +1166,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -1254,7 +1254,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         tj = t * sigmaj
@@ -1332,7 +1332,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))

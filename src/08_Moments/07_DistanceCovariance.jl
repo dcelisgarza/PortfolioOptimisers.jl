@@ -64,7 +64,7 @@ end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:AbstractWeights} = nothing,
-                            ex::FLoops.Transducers.Executor = ThreadedEx())
+                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, ex)
 end
 function factory(ce::DistanceCovariance, w::Option{<:AbstractWeights} = nothing)
@@ -155,7 +155,7 @@ This function computes the distance correlation between each pair of columns in 
 function cor_distance(ce::DistanceCovariance, X::MatNum)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
@@ -297,7 +297,7 @@ This function computes the distance covariance between each pair of columns in `
 function cov_distance(ce::DistanceCovariance, X::MatNum)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    @floop ce.ex for j in axes(X, 2)
+    FLoops.@floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)

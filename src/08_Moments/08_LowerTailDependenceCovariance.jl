@@ -60,7 +60,7 @@ struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
 end
 function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                        alpha::Number = 0.05,
-                                       ex::FLoops.Transducers.Executor = ThreadedEx())
+                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
 function factory(ce::LowerTailDependenceCovariance, w::Option{<:AbstractWeights} = nothing)
@@ -97,13 +97,13 @@ The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
-                               ex::FLoops.Transducers.Executor = SequentialEx())
+                               ex::FLoops.Transducers.Executor = FLoops.SequentialEx())
     T, N = size(X)
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
     if k > 0
         let mv = sqrt(eps(eltype(X)))
-            @floop ex for j in axes(X, 2)
+            FLoops.@floop ex for j in axes(X, 2)
                 xj = view(X, :, j)
                 v = sort(xj)[k]
                 maskj = xj .<= v

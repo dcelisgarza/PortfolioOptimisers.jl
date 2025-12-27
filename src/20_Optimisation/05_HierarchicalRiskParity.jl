@@ -1,27 +1,27 @@
 struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     opt::T1
     r::T2
-    sce::T3
+    sca::T3
     fb::T4
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
-                                    sce::Scalariser, fb::Option{<:OptimisationEstimator})
+                                    sca::Scalariser, fb::Option{<:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
-        return new{typeof(opt), typeof(r), typeof(sce), typeof(fb)}(opt, r, sce, fb)
+        return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
-                                sce::Scalariser = SumScalariser(),
+                                sca::Scalariser = SumScalariser(),
                                 fb::Option{<:OptimisationEstimator} = nothing)
-    return HierarchicalRiskParity(opt, r, sce, fb)
+    return HierarchicalRiskParity(opt, r, sca, fb)
 end
 function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
-    return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce, fb = hrp.fb)
+    return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
 function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
                                          lc::VecNum, rc::VecNum)
@@ -118,7 +118,7 @@ function hrp_scalarised_risk(::MaxScalariser, wu::MatNum, wk::VecNum, rku::VecNu
     end
     return lrisk, rrisk
 end
-function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
                              lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
     lrisk = Vector{eltype(X)}(undef, length(rs))
@@ -130,11 +130,11 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::MatNum, wk::VecNum, r
         wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
         wu[rc, 2] ./= sum(view(wu, rc, 2))
-        scale = r.settings.scale * sce.gamma
+        scale = r.settings.scale * sca.gamma
         lrisk[i] = expected_risk(r, view(wu, :, 1), X, fees) * scale
         rrisk[i] = expected_risk(r, view(wu, :, 2), X, fees) * scale
     end
-    return logsumexp(lrisk) / sce.gamma, logsumexp(rrisk) / sce.gamma
+    return logsumexp(lrisk) / sca.gamma, logsumexp(rrisk) / sca.gamma
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
@@ -157,7 +157,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            lrisk, rrisk = hrp_scalarised_risk(hrp.sce, wu, wk, rku, lc, rc, r, pr.X, fees)
+            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, pr.X, fees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)

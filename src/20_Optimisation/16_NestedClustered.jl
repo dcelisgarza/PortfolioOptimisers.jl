@@ -119,7 +119,7 @@ function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(),
                          cv::Option{<:CrossValidationEstimator} = nothing,
                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
-                         ex::FLoops.Transducers.Executor = ThreadedEx(),
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::Option{<:OptimisationEstimator} = nothing)
     return NestedClustered(pe, cle, wb, sets, opti, opto, cv, cwf, strict, ex, fb)
 end
@@ -188,7 +188,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
     resi = Vector{OptimisationResult}(undef, clr.k)
-    @floop nco.ex for (i, cl) in pairs(cls)
+    FLoops.@floop nco.ex for (i, cl) in pairs(cls)
         if length(cl) == 1
             wi[cl, i] .= one(eltype(pr.X))
             resi[i] = SingletonOptimisation(OptimisationSuccess(nothing))
