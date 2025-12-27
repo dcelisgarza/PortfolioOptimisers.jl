@@ -28,24 +28,24 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     k = model[:k]
     sc = model[:sc]
     if !isnothing(lb) && w_finite_flag(lb)
-        @constraint(model, w_lb, sc * (w - k * lb) >= 0)
+        JuMP.@constraint(model, w_lb, sc * (w - k * lb) >= 0)
     end
     if !isnothing(ub) && w_finite_flag(ub)
-        @constraint(model, w_ub, sc * (w - k * ub) <= 0)
+        JuMP.@constraint(model, w_ub, sc * (w - k * ub) <= 0)
     end
     set_budget_constraints!(model, bgt, w)
     if flag
-        @variables(model, begin
-                       lw[1:N] >= 0
-                       sw[1:N] >= 0
-                   end)
-        @constraints(model, begin
-                         w_lw, sc * (w - lw) <= 0
-                         w_sw, sc * (w + sw) >= 0
-                     end)
+        JuMP.@variables(model, begin
+                            lw[1:N] >= 0
+                            sw[1:N] >= 0
+                        end)
+        JuMP.@constraints(model, begin
+                              w_lw, sc * (w - lw) <= 0
+                              w_sw, sc * (w + sw) >= 0
+                          end)
         set_long_short_budget_constraints!(model, bgt, sbgt)
     else
-        @expression(model, lw, w)
+        JuMP.@expression(model, lw, w)
     end
     return nothing
 end
@@ -70,12 +70,12 @@ function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc, key_i
         if !isnothing(lcm.ineq)
             A = lcm.ineq.A
             B = lcm.ineq.B
-            model[Symbol(key_ineq, i)] = @constraint(model, sc * (A * w - k * B) <= 0)
+            model[Symbol(key_ineq, i)] = JuMP.@constraint(model, sc * (A * w - k * B) <= 0)
         end
         if !isnothing(lcm.eq)
             A = lcm.eq.A
             B = lcm.eq.B
-            model[Symbol(key_eq, i)] = @constraint(model, sc * (A * w - k * B) == 0)
+            model[Symbol(key_eq, i)] = JuMP.@constraint(model, sc * (A * w - k * B) == 0)
         end
     end
     return nothing

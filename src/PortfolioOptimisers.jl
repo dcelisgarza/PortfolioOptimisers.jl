@@ -7,10 +7,15 @@ using DataFrames: DataFrames
 using Distances: Distances
 using Distributions: Distributions
 using FLoops: FLoops
-using GLM, Impute, InteractiveUtils, Interfaces, JuMP, LinearAlgebra, LogExpFunctions,
-      MultivariateStats, NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs,
-      StatsAPI, PythonCall, PrecompileTools, Random, Roots, SparseArrays, Statistics,
-      StatsBase, TimeSeries
+using GLM: GLM
+using Graphs: Graphs
+using Impute: Impute
+using InteractiveUtils: InteractiveUtils
+using Interfaces: Interfaces
+using JuMP: JuMP
+using LinearAlgebra, LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim,
+      SimpleWeightedGraphs, StatsAPI, PythonCall, PrecompileTools, Random, Roots,
+      SparseArrays, Statistics, StatsBase, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let

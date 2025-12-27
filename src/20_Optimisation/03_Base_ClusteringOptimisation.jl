@@ -41,11 +41,12 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
-    @variable(model, t)
-    @constraint(model,
-                [sc * t;
-                 sc * (w ⊘ wi .- one(eltype(wi)))] in MOI.NormOneCone(length(w) + 1))
-    @objective(model, Min, so * t)
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model,
+                     [sc * t;
+                      sc * (w ⊘ wi .- one(eltype(wi)))] in
+                     JuMP.MOI.NormOneCone(length(w) + 1))
+    JuMP.@objective(model, Min, so * t)
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
@@ -55,9 +56,10 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
-    @variable(model, t)
-    @constraint(model, [sc * t; sc * (w ⊘ wi .- one(eltype(wi)))] in SecondOrderCone())
-    @objective(model, Min, so * t)
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model,
+                     [sc * t; sc * (w ⊘ wi .- one(eltype(wi)))] in JuMP.SecondOrderCone())
+    JuMP.@objective(model, Min, so * t)
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
@@ -65,9 +67,9 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
-    @variable(model, t)
-    @constraint(model, [sc * t; sc * (w - wi)] in MOI.NormOneCone(length(w) + 1))
-    @objective(model, Min, so * t)
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model, [sc * t; sc * (w - wi)] in JuMP.MOI.NormOneCone(length(w) + 1))
+    JuMP.@objective(model, Min, so * t)
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
@@ -76,9 +78,9 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
-    @variable(model, t)
-    @constraint(model, [sc * t; sc * (w - wi)] in SecondOrderCone())
-    @objective(model, Min, so * t)
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model, [sc * t; sc * (w - wi)] in JuMP.SecondOrderCone())
+    JuMP.@objective(model, Min, so * t)
     return nothing
 end
 function opt_weight_bounds(cwf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum)
@@ -88,19 +90,19 @@ function opt_weight_bounds(cwf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNu
         return wi
     end
     model = JuMP.Model()
-    @expression(model, sc, cwf.sc)
-    @expression(model, so, cwf.so)
-    @variable(model, w[1:length(wi)])
-    @constraint(model, sc * (sum(w) - sum(wi)) == 0)
+    JuMP.@expression(model, sc, cwf.sc)
+    JuMP.@expression(model, so, cwf.so)
+    JuMP.@variable(model, w[1:length(wi)])
+    JuMP.@constraint(model, sc * (sum(w) - sum(wi)) == 0)
     if !isnothing(lb)
-        @constraint(model, sc * (w - lb) >= 0)
+        JuMP.@constraint(model, sc * (w - lb) >= 0)
     end
     if !isnothing(ub)
-        @constraint(model, sc * (w - ub) <= 0)
+        JuMP.@constraint(model, sc * (w - ub) <= 0)
     end
     set_clustering_weight_finaliser_alg!(model, cwf.alg, wi)
     return if optimise_JuMP_model!(model, cwf.slv).success
-        value.(model[:w])
+        JuMP.value.(model[:w])
     else
         @warn("Version: $(cwf.alg)\nReverting to Heuristic type.")
         opt_weight_bounds(IterativeWeightFinaliser(), wb, wi)

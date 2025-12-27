@@ -207,7 +207,8 @@ struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
+                                kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
 function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = nothing)

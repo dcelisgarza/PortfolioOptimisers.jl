@@ -51,7 +51,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
-    @constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in SecondOrderCone())
+    JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
     return nothing
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBudgeting,
@@ -60,15 +60,15 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
     sc = model[:sc]
     psi = model[:psi]
     G = cholesky(sigma).U
-    @variable(model, rho >= 0)
-    @constraints(model,
-                 begin
-                     creg_rrp_soc_1,
-                     [sc * 2 * psi;
-                      sc * 2 * G * w;
-                      sc * -2 * rho] in SecondOrderCone()
-                     creg_rrp_soc_2, [sc * rho; sc * G * w] in SecondOrderCone()
-                 end)
+    JuMP.@variable(model, rho >= 0)
+    JuMP.@constraints(model,
+                      begin
+                          creg_rrp_soc_1,
+                          [sc * 2 * psi;
+                           sc * 2 * G * w;
+                           sc * -2 * rho] in JuMP.SecondOrderCone()
+                          creg_rrp_soc_2, [sc * rho; sc * G * w] in JuMP.SecondOrderCone()
+                      end)
     return nothing
 end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
@@ -79,17 +79,17 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
     G = cholesky(sigma).U
     theta = Diagonal(sqrt.(diag(sigma)))
     p = alg.p
-    @variable(model, rho >= 0)
-    @constraints(model,
-                 begin
-                     creg_pen_rrp_soc_1,
-                     [sc * 2 * psi;
-                      sc * 2 * G * w;
-                      sc * -2 * rho] in SecondOrderCone()
-                     creg_pen_rrp_soc_2,
-                     [sc * rho;
-                      sc * sqrt(p) * theta * w] in SecondOrderCone()
-                 end)
+    JuMP.@variable(model, rho >= 0)
+    JuMP.@constraints(model,
+                      begin
+                          creg_pen_rrp_soc_1,
+                          [sc * 2 * psi;
+                           sc * 2 * G * w;
+                           sc * -2 * rho] in JuMP.SecondOrderCone()
+                          creg_pen_rrp_soc_2,
+                          [sc * rho;
+                           sc * sqrt(p) * theta * w] in JuMP.SecondOrderCone()
+                      end)
     return nothing
 end
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
@@ -99,21 +99,21 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
     sc = model[:sc]
-    @variables(model, begin
-                   psi >= 0
-                   gamma >= 0
-                   zeta[1:N] >= 0
-               end)
-    @expression(model, risk, psi - gamma)
+    JuMP.@variables(model, begin
+                        psi >= 0
+                        gamma >= 0
+                        zeta[1:N] >= 0
+                    end)
+    JuMP.@expression(model, risk, psi - gamma)
     # RRB constraints.
-    @constraints(model,
-                 begin
-                     crrp, sc * (zeta - sigma * w) == 0
-                     crrp_soc[i = 1:N],
-                     [sc * (w[i] + zeta[i])
-                      sc * (2 * gamma * sqrt(rb[i]))
-                      sc * (w[i] - zeta[i])] in SecondOrderCone()
-                 end)
+    JuMP.@constraints(model,
+                      begin
+                          crrp, sc * (zeta - sigma * w) == 0
+                          crrp_soc[i = 1:N],
+                          [sc * (w[i] + zeta[i])
+                           sc * (2 * gamma * sqrt(rb[i]))
+                           sc * (w[i] - zeta[i])] in JuMP.SecondOrderCone()
+                      end)
     set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma)
     return rkb
 end
@@ -147,9 +147,9 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
+    JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
-    @expression(model, k, 1)
+    JuMP.@expression(model, k, 1)
     prb = set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)

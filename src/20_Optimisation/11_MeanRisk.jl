@@ -44,11 +44,11 @@ function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
-    unregister(model, :obj_expr)
+    JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
-    unregister(model, :obj_expr)
+    JuMP.unregister(model, :obj_expr)
     rt_min = expected_return(ret, sol_min.w, pr, fees)
     rt_max = expected_return(ret, sol_max.w, pr, fees)
     return range(rt_min, rt_max; length = lbs.N)
@@ -64,11 +64,11 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     ret_expr = model[:ret]
     for lb in lbs
         if haskey(model, :ret_lb)
-            delete(model, model[:ret_lb])
-            unregister(model, :ret_lb)
-            unregister(model, :obj_expr)
+            JuMP.delete(model, model[:ret_lb])
+            JuMP.unregister(model, :ret_lb)
+            JuMP.unregister(model, :obj_expr)
         end
-        @constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
+        JuMP.@constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
         set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
         retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
         push!(retcodes, retcode)
@@ -98,11 +98,11 @@ function rebuild_risk_frontier(model::JuMP.Model,
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
-    unregister(model, :obj_expr)
+    JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
-    unregister(model, :obj_expr)
+    JuMP.unregister(model, :obj_expr)
     r = factory(view(mr.r, idx), pr, mr.opt.slv)
     for (i, ri) in zip(idx, r)
         risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, sol_min.w,
@@ -116,11 +116,11 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
-    unregister(model, :obj_expr)
+    JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
-    unregister(model, :obj_expr)
+    JuMP.unregister(model, :obj_expr)
     r = factory(mr.r, pr, mr.opt.slv)
     return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w)]
 end
@@ -152,14 +152,14 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     sc = model[:sc]
     for (keys, r_exprs, ubs) in zip(pitrs[1], pitrs[2], pitrs[3])
         if haskey(model, :obj_expr)
-            unregister(model, :obj_expr)
+            JuMP.unregister(model, :obj_expr)
         end
         for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
             if haskey(model, key)
-                delete(model, model[key])
-                unregister(model, key)
+                JuMP.delete(model, model[key])
+                JuMP.unregister(model, key)
             end
-            model[key] = @constraint(model, sc * (r_expr - ub * k) <= 0)
+            model[key] = JuMP.@constraint(model, sc * (r_expr - ub * k) <= 0)
         end
         set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
         retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
@@ -184,21 +184,21 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     ret_expr = model[:ret]
     for lb in lbs
         if haskey(model, :ret_lb)
-            delete(model, model[:ret_lb])
-            unregister(model, :ret_lb)
-            unregister(model, :obj_expr)
+            JuMP.delete(model, model[:ret_lb])
+            JuMP.unregister(model, :ret_lb)
+            JuMP.unregister(model, :obj_expr)
         end
-        @constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
+        JuMP.@constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
         for (keys, r_exprs, ubs) in zip(pitrs[1], pitrs[2], pitrs[3])
             if haskey(model, :obj_expr)
-                unregister(model, :obj_expr)
+                JuMP.unregister(model, :obj_expr)
             end
             for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
                 if haskey(model, key)
-                    delete(model, model[key])
-                    unregister(model, key)
+                    JuMP.delete(model, model[key])
+                    JuMP.unregister(model, key)
                 end
-                model[key] = @constraint(model, sc * (r_expr - ub * k) <= 0)
+                model[key] = JuMP.@constraint(model, sc * (r_expr - ub * k) <= 0)
             end
             set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
             retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
@@ -214,7 +214,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
+    JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
     set_w!(model, pr.X, mr.wi)

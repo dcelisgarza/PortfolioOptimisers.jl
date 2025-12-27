@@ -4,23 +4,23 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
         @argcheck(!isempty(slv))
     end
     model = JuMP.Model()
-    set_string_names_on_creation(model, false)
+    JuMP.set_string_names_on_creation(model, false)
     T = length(x)
-    @variables(model, begin
-                   t
-                   z >= 0
-                   u[1:T]
-               end)
+    JuMP.@variables(model, begin
+                        t
+                        z >= 0
+                        u[1:T]
+                    end)
     aT = if isnothing(w)
-        @constraint(model, sum(u) - z <= 0)
+        JuMP.@constraint(model, sum(u) - z <= 0)
         alpha * T
     else
-        @constraint(model, dot(w, u) - z <= 0)
+        JuMP.@constraint(model, dot(w, u) - z <= 0)
         alpha * sum(w)
     end
-    @constraint(model, [i = 1:T], [-x[i] - t, z, u[i]] in MOI.ExponentialCone())
-    @expression(model, risk, t - z * log(aT))
-    @objective(model, Min, risk)
+    JuMP.@constraint(model, [i = 1:T], [-x[i] - t, z, u[i]] in JuMP.MOI.ExponentialCone())
+    JuMP.@expression(model, risk, t - z * log(aT))
+    JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
     else

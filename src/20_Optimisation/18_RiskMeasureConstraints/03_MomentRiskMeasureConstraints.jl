@@ -25,14 +25,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
+    flm = model[Symbol(:flm_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     flm_risk = model[key] = if isnothing(wi)
-        @expression(model, mean(flm))
+        JuMP.@expression(model, mean(flm))
     else
-        @expression(model, mean(flm, wi))
+        JuMP.@expression(model, mean(flm, wi))
     end
-    model[Symbol(:cflm_mar_, i)] = @constraint(model, sc * ((net_X + flm) .- tgt) >= 0)
+    model[Symbol(:cflm_mar_, i)] = JuMP.@constraint(model, sc * ((net_X + flm) .- tgt) >= 0)
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
     return flm_risk
 end
@@ -48,43 +48,44 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
+    mad = model[Symbol(:mad_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
-        @expression(model, 2 * mean(mad))
+        JuMP.@expression(model, 2 * mean(mad))
     else
-        @expression(model, 2 * mean(mad, wi))
+        JuMP.@expression(model, 2 * mean(mad, wi))
     end
-    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * ((net_X + mad) .- tgt) >= 0)
+    model[Symbol(:cmar_mad_, i)] = JuMP.@constraint(model, sc * ((net_X + mad) .- tgt) >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return mad_risk
 end
 function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Number,
                                  second_moment, key::Symbol, args...)
-    return model[key] = @expression(model, factor * dot(second_moment, second_moment)),
+    return model[key] = JuMP.@expression(model, factor * dot(second_moment, second_moment)),
                         sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Number,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  args...)
     sc = model[:sc]
-    tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
-    model[Symbol(keyc, i)] = @constraint(model,
-                                         [sc * tsecond_moment;
-                                          0.5;
-                                          sc * second_moment] in RotatedSecondOrderCone())
-    return model[key] = @expression(model, factor * tsecond_moment), sqrt(factor)
+    tsecond_moment = model[Symbol(keyt, i)] = JuMP.@variable(model)
+    model[Symbol(keyc, i)] = JuMP.@constraint(model,
+                                              [sc * tsecond_moment;
+                                               0.5;
+                                               sc * second_moment] in
+                                              JuMP.RotatedSecondOrderCone())
+    return model[key] = JuMP.@expression(model, factor * tsecond_moment), sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SquaredSOCRiskExpr, i::Any,
                                  factor::Number, second_moment, key::Symbol, keyt::Symbol,
-                                 keyc::Symbol, tsecond_moment::AbstractJuMPScalar)
-    return model[key] = @expression(model, factor * tsecond_moment^2), sqrt(factor)
+                                 keyc::Symbol, tsecond_moment::JuMP.AbstractJuMPScalar)
+    return model[key] = JuMP.@expression(model, factor * tsecond_moment^2), sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Number,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
-                                 tsecond_moment::AbstractJuMPScalar)
+                                 tsecond_moment::JuMP.AbstractJuMPScalar)
     factor = sqrt(factor)
-    return model[key] = @expression(model, factor * tsecond_moment), factor
+    return model[key] = JuMP.@expression(model, factor * tsecond_moment), factor
 end
 """
 """
@@ -112,16 +113,18 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     bound_key = Symbol(:sqrt_second_moment_, i)
-    sqrt_second_moment = model[bound_key] = @variable(model)
+    sqrt_second_moment = model[bound_key] = JuMP.@variable(model)
     if isa(r.alg.alg1, Full)
-        second_moment = model[Symbol(:second_moment_, i)] = @expression(model, net_X .- tgt)
+        second_moment = model[Symbol(:second_moment_, i)] = JuMP.@expression(model,
+                                                                             net_X .- tgt)
     else
-        second_moment = model[Symbol(:second_lower_moment_, i)] = @variable(model, [1:T],
-                                                                            (lower_bound = 0))
-        model[Symbol(:csecond_lower_moment_mar_, i)] = @constraint(model,
-                                                                   sc *
-                                                                   ((net_X + second_moment) .-
-                                                                    tgt) >= 0)
+        second_moment = model[Symbol(:second_lower_moment_, i)] = JuMP.@variable(model,
+                                                                                 [1:T],
+                                                                                 (lower_bound = 0))
+        model[Symbol(:csecond_lower_moment_mar_, i)] = JuMP.@constraint(model,
+                                                                        sc * ((net_X +
+                                                                               second_moment) .-
+                                                                              tgt) >= 0)
     end
     wi = nothing_scalar_array_selector(r.w, pr.w)
     second_moment_risk, factor = if isnothing(wi)
@@ -132,17 +135,17 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
         wi = sqrt.(wi)
-        second_moment = model[Symbol(:scaled_second_moment_, i)] = @expression(model,
-                                                                               wi .*
-                                                                               second_moment)
+        second_moment = model[Symbol(:scaled_second_moment_, i)] = JuMP.@expression(model,
+                                                                                    wi .*
+                                                                                    second_moment)
         set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment, key,
                                 :tsecond_moment_risk_, :csecond_moment_rsoc_,
                                 sqrt_second_moment)
     end
-    model[Symbol(:csqrt_second_moment_soc_, i)] = @constraint(model,
-                                                              [sc * sqrt_second_moment
-                                                               sc * second_moment] in
-                                                              SecondOrderCone())
+    model[Symbol(:csqrt_second_moment_soc_, i)] = JuMP.@constraint(model,
+                                                                   [sc * sqrt_second_moment
+                                                                    sc * second_moment] in
+                                                                   JuMP.SecondOrderCone())
     ub = second_moment_bound_val(r.alg.alg2, r.settings.ub, factor)
     set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_moment, ub, bound_key,
                                              second_moment_risk, r.settings)

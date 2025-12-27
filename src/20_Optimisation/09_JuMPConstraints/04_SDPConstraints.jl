@@ -6,9 +6,9 @@ function set_sdp_constraints!(model::JuMP.Model)
     k = ifelse(haskey(model, :crkb), 1, model[:k])
     sc = model[:sc]
     N = length(w)
-    @variable(model, W[1:N, 1:N], Symmetric)
-    @expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
-    @constraint(model, M_PSD, sc * M in PSDCone())
+    JuMP.@variable(model, W[1:N, 1:N], Symmetric)
+    JuMP.@expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
+    JuMP.@constraint(model, M_PSD, sc * M in JuMP.PSDCone())
     return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
@@ -19,9 +19,9 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     sc = model[:sc]
     k = model[:k]
     Nf = length(w1)
-    @variable(model, frc_W[1:Nf, 1:Nf], Symmetric)
-    @expression(model, frc_M, hcat(vcat(frc_W, transpose(w1)), vcat(w1, k)))
-    @constraint(model, frc_M_PSD, sc * frc_M in PSDCone())
+    JuMP.@variable(model, frc_W[1:Nf, 1:Nf], Symmetric)
+    JuMP.@expression(model, frc_M, hcat(vcat(frc_W, transpose(w1)), vcat(w1, k)))
+    JuMP.@constraint(model, frc_M_PSD, sc * frc_M in JuMP.PSDCone())
     return frc_W
 end
 function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhC_VecPhC})
@@ -37,11 +37,11 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhC_Ve
         end
         key = Symbol(:sdp_plg_, i)
         A = plg.A
-        model[key] = @constraint(model, sc * A ⊙ W == 0)
+        model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
         if !haskey(model, :variance_flag)
             key = Symbol(key, :_p)
             p = plg.p
-            plp = model[key] = @expression(model, p * tr(W))
+            plp = model[key] = JuMP.@expression(model, p * tr(W))
             add_to_objective_penalty!(model, plp)
         end
     end
@@ -61,11 +61,11 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
         end
         key = Symbol(:frc_sdp_plg_, i)
         A = plg.A
-        model[key] = @constraint(model, sc * A ⊙ W == 0)
+        model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
         if !haskey(model, :variance_flag)
             key = Symbol(key, :_p)
             p = plg.p
-            plp = model[key] = @expression(model, p * tr(W))
+            plp = model[key] = JuMP.@expression(model, p * tr(W))
             add_to_objective_penalty!(model, plp)
         end
     end

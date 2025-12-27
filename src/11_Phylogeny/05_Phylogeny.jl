@@ -150,7 +150,7 @@ abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
 function centrality_vector(ph::PhylogenyResult{<:MatNum}, cent::AbstractCentralityAlgorithm,
                            args...; kwargs...)
-    G = SimpleGraph(ph.X)
+    G = Graphs.SimpleGraph(ph.X)
     return PhylogenyResult(; X = calc_centrality(cent, G))
 end
 """
@@ -465,7 +465,7 @@ function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality(args, kwargs)
 end
 """
-    calc_centrality(cent::AbstractCentralityAlgorithm, g::AbstractGraph)
+    calc_centrality(cent::AbstractCentralityAlgorithm, g::Graphs.AbstractGraph)
 
 Compute node centrality scores for a graph using the specified centrality algorithm.
 
@@ -502,28 +502,28 @@ This function dispatches to the appropriate centrality computation from [`Graphs
   - [`RadialityCentrality`](@ref)
   - [`StressCentrality`](@ref)
 """
-function calc_centrality(cent::BetweennessCentrality, g::AbstractGraph)
+function calc_centrality(cent::BetweennessCentrality, g::Graphs.AbstractGraph)
     return Graphs.betweenness_centrality(g, cent.args...; cent.kwargs...)
 end
-function calc_centrality(cent::ClosenessCentrality, g::AbstractGraph)
+function calc_centrality(cent::ClosenessCentrality, g::Graphs.AbstractGraph)
     return Graphs.closeness_centrality(g, cent.args...; cent.kwargs...)
 end
-function calc_centrality(cent::DegreeCentrality, g::AbstractGraph)
+function calc_centrality(cent::DegreeCentrality, g::Graphs.AbstractGraph)
     return Graphs._degree_centrality(g, cent.kind; cent.kwargs...)
 end
-function calc_centrality(::EigenvectorCentrality, g::AbstractGraph)
-    return Graphs.eigenvector_centrality(g::AbstractGraph)
+function calc_centrality(::EigenvectorCentrality, g::Graphs.AbstractGraph)
+    return Graphs.eigenvector_centrality(g::Graphs.AbstractGraph)
 end
-function calc_centrality(cent::KatzCentrality, g::AbstractGraph)
+function calc_centrality(cent::KatzCentrality, g::Graphs.AbstractGraph)
     return Graphs.katz_centrality(g, cent.alpha)
 end
-function calc_centrality(cent::Pagerank, g::AbstractGraph)
+function calc_centrality(cent::Pagerank, g::Graphs.AbstractGraph)
     return Graphs.pagerank(g, cent.alpha, cent.n, cent.epsilon)
 end
-function calc_centrality(::RadialityCentrality, g::AbstractGraph)
-    return Graphs.radiality_centrality(g::AbstractGraph)
+function calc_centrality(::RadialityCentrality, g::Graphs.AbstractGraph)
+    return Graphs.radiality_centrality(g::Graphs.AbstractGraph)
 end
-function calc_centrality(cent::StressCentrality, g::AbstractGraph)
+function calc_centrality(cent::StressCentrality, g::Graphs.AbstractGraph)
     return Graphs.stress_centrality(g, cent.args...; cent.kwargs...)
 end
 """
@@ -677,7 +677,7 @@ function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return PrimTree(args, kwargs)
 end
 """
-    calc_mst(alg::AbstractTreeType, g::AbstractGraph)
+    calc_mst(alg::AbstractTreeType, g::Graphs.AbstractGraph)
 
 Compute the minimum spanning tree (MST) of a graph using the specified algorithm.
 
@@ -691,7 +691,7 @@ This function dispatches to the appropriate MST computation from `Graphs.jl` bas
       + `alg::BoruvkaTree`: Computes the MST using Boruvka's algorithm.
       + `alg::PrimTree`: Computes the MST using Prim's algorithm.
 
-  - `g::AbstractGraph`: Graph to compute the MST on.
+  - `g::Graphs.AbstractGraph`: Graph to compute the MST on.
 
 # Returns
 
@@ -703,13 +703,13 @@ This function dispatches to the appropriate MST computation from `Graphs.jl` bas
   - [`BoruvkaTree`](@ref)
   - [`PrimTree`](@ref)
 """
-function calc_mst(cent::KruskalTree, g::AbstractGraph)
+function calc_mst(cent::KruskalTree, g::Graphs.AbstractGraph)
     return Graphs.kruskal_mst(g, cent.args...; cent.kwargs...)
 end
-function calc_mst(cent::BoruvkaTree, g::AbstractGraph)
+function calc_mst(cent::BoruvkaTree, g::Graphs.AbstractGraph)
     return Graphs.boruvka_mst(g, cent.args...; cent.kwargs...)[1]
 end
-function calc_mst(cent::PrimTree, g::AbstractGraph)
+function calc_mst(cent::PrimTree, g::Graphs.AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
 """
@@ -924,7 +924,7 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <
     D = distance(ne.de, ne.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
-    return adjacency_matrix(SimpleGraph(G[tree]))
+    return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
@@ -932,7 +932,7 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
     S, D = cor_and_dist(ne.de, ne.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
-    return adjacency_matrix(SimpleGraph(Rpm))
+    return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
 end
 """
     phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)

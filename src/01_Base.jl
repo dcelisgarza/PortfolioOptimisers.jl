@@ -300,7 +300,7 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
     return i == 1 ? obj : throw(BoundsError())
 end
 """
-    const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}}
+    const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 
 Alias for an abstract vector of numeric types or JuMP scalar types.
 
@@ -308,9 +308,9 @@ Alias for an abstract vector of numeric types or JuMP scalar types.
 
   - [`VecInt`](@ref)
   - [`MatNum`](@ref)
-  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
+  - [`JuMP.AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.JuMP.AbstractJuMPScalar)
 """
-const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:AbstractJuMPScalar}}}
+const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
     const VecInt = Union{<:AbstractVector{<:Integer}}
 
@@ -324,7 +324,7 @@ Alias for an abstract vector of integer types.
 """
 const VecInt = Union{<:AbstractVector{<:Integer}}
 """
-    const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}}
+    const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 
 Alias for an abstract matrix of numeric types or JuMP scalar types.
 
@@ -334,9 +334,9 @@ Alias for an abstract matrix of numeric types or JuMP scalar types.
   - [`ArrNum`](@ref)
   - [`VecMatNum`](@ref)
 """
-const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:AbstractJuMPScalar}}}
+const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
-    const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}}
+    const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 
 Alias for an abstract array of numeric types or JuMP scalar types.
 
@@ -345,7 +345,7 @@ Alias for an abstract array of numeric types or JuMP scalar types.
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
 """
-const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:AbstractJuMPScalar}}}
+const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
     const Num_VecNum = Union{<:Number, <:VecNum}
 
@@ -501,7 +501,7 @@ Alias for an abstract vector of pairs.
 """
 const VecPair = AbstractVector{<:Pair}
 """
-    const VecJuMPScalar = Union{<:AbstractVector{<:AbstractJuMPScalar}}
+    const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
 
 Alias for an abstract vector of JuMP scalar types.
 
@@ -509,7 +509,7 @@ Alias for an abstract vector of JuMP scalar types.
 
   - [`VecNum`](@ref)
 """
-const VecJuMPScalar = Union{<:AbstractVector{<:AbstractJuMPScalar}}
+const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
 """
     const Option{T} = Union{Nothing, T}
 

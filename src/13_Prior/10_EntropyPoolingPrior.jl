@@ -1171,96 +1171,98 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
                                                  <:ExpEntropyPooling})
     (; sc1, sc2, so, slv) = opt
     T = length(w)
-    model = Model()
-    @variables(model, begin
-                   t
-                   x[1:T] >= 0
-               end)
-    @constraints(model,
-                 begin
-                     sc1 * (sum(x) - one(eltype(w))) == 0
-                     [sc1 * t; sc1 * w; sc1 * x] in MOI.RelativeEntropyCone(2 * T + 1)
-                 end)
-    @expression(model, obj_expr, so * t)
+    model = JuMP.Model()
+    JuMP.@variables(model, begin
+                        t
+                        x[1:T] >= 0
+                    end)
+    JuMP.@constraints(model,
+                      begin
+                          sc1 * (sum(x) - one(eltype(w))) == 0
+                          [sc1 * t; sc1 * w; sc1 * x] in
+                          JuMP.MOI.RelativeEntropyCone(2 * T + 1)
+                      end)
+    JuMP.@expression(model, obj_expr, so * t)
     if haskey(epc, :eq)
         A, B = epc[:eq]
-        @constraint(model, ceq, sc1 * (A * x ⊖ B) == 0)
+        JuMP.@constraint(model, ceq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :ineq)
         A, B = epc[:ineq]
-        @constraint(model, cineq, sc1 * (A * x ⊖ B) <= 0)
+        JuMP.@constraint(model, cineq, sc1 * (A * x ⊖ B) <= 0)
     end
     if haskey(epc, :cvar_eq)
         A, B = epc[:cvar_eq]
-        @constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
+        JuMP.@constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :feq)
         A, B = epc[:feq]
         N = length(B)
-        @variables(model, begin
-                       tc
-                       c[1:N]
-                   end)
-        @constraints(model, begin
-                         cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
-                         [sc1 * tc; sc1 * c] in MOI.NormOneCone(N + 1)
-                     end)
-        add_to_expression!(obj_expr, so * sc2 * tc)
+        JuMP.@variables(model, begin
+                            tc
+                            c[1:N]
+                        end)
+        JuMP.@constraints(model, begin
+                              cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
+                              [sc1 * tc; sc1 * c] in JuMP.MOI.NormOneCone(N + 1)
+                          end)
+        JuMP.add_to_expression!(obj_expr, so * sc2 * tc)
     end
-    @objective(model, Min, obj_expr)
+    JuMP.@objective(model, Min, obj_expr)
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    return pweights(value.(x))
+    return pweights(JuMP.value.(x))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                  <:LogEntropyPooling})
     (; sc1, sc2, so, slv) = opt
-    model = Model()
+    model = JuMP.Model()
     T = length(w)
     log_p = log.(w)
     # Decision variables (posterior probabilities)
-    @variables(model, begin
-                   x[1:T]
-                   t
-               end)
-    @expression(model, obj_expr, so * t)
+    JuMP.@variables(model, begin
+                        x[1:T]
+                        t
+                    end)
+    JuMP.@expression(model, obj_expr, so * t)
     # Equality constraints from A_eq and B_eq and probabilities equal to 1
-    @constraints(model,
-                 begin
-                     sc1 * (sum(x) - one(eltype(w))) == 0
-                     [sc1 * t; fill(sc1, T); sc1 * x] in MOI.RelativeEntropyCone(2 * T + 1)
-                 end)
+    JuMP.@constraints(model,
+                      begin
+                          sc1 * (sum(x) - one(eltype(w))) == 0
+                          [sc1 * t; fill(sc1, T); sc1 * x] in
+                          JuMP.MOI.RelativeEntropyCone(2 * T + 1)
+                      end)
     if haskey(epc, :eq)
         A, B = epc[:eq]
-        @constraint(model, ceq, sc1 * (A * x ⊖ B) == 0)
+        JuMP.@constraint(model, ceq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :ineq)
         A, B = epc[:ineq]
-        @constraint(model, cineq, sc1 * (A * x ⊖ B) <= 0)
+        JuMP.@constraint(model, cineq, sc1 * (A * x ⊖ B) <= 0)
     end
     if haskey(epc, :cvar_eq)
         A, B = epc[:cvar_eq]
-        @constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
+        JuMP.@constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :feq)
         A, B = epc[:feq]
         N = length(B)
-        @variables(model, begin
-                       tc
-                       c[1:N]
-                   end)
-        @constraints(model, begin
-                         cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
-                         [sc1 * tc; sc1 * c] in MOI.NormOneCone(N + 1)
-                     end)
-        add_to_expression!(obj_expr, so * sc2 * tc)
+        JuMP.@variables(model, begin
+                            tc
+                            c[1:N]
+                        end)
+        JuMP.@constraints(model, begin
+                              cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
+                              [sc1 * tc; sc1 * c] in JuMP.MOI.NormOneCone(N + 1)
+                          end)
+        JuMP.add_to_expression!(obj_expr, so * sc2 * tc)
     end
-    @objective(model, Min, obj_expr - so * dot(x, log_p))
+    JuMP.@objective(model, Min, obj_expr - so * dot(x, log_p))
     # Solve the optimization problem
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    return pweights(value.(x))
+    return pweights(JuMP.value.(x))
 end
 """
     ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Number,

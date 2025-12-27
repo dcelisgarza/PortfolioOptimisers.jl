@@ -52,10 +52,11 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    @constraint(model,
-                [sc * u
-                 sc * ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
-                MOI.NormOneCone(length(x) + 1))
+    JuMP.@constraint(model,
+                     [sc * u
+                      sc *
+                      ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
+                     JuMP.MOI.NormOneCone(length(x) + 1))
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
@@ -68,10 +69,11 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    @constraint(model,
-                [sc * u;
-                 sc * ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
-                SecondOrderCone())
+    JuMP.@constraint(model,
+                     [sc * u;
+                      sc *
+                      ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
+                     JuMP.SecondOrderCone())
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
@@ -79,7 +81,9 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    @constraint(model, [sc * u; sc * (w * cash - x .* p)] in MOI.NormOneCone(length(x) + 1))
+    JuMP.@constraint(model,
+                     [sc * u; sc * (w * cash - x .* p)] in
+                     JuMP.MOI.NormOneCone(length(x) + 1))
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
@@ -87,8 +91,8 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    @constraint(model, [sc * u;
-                        sc * (w * cash - x .* p)] in SecondOrderCone())
+    JuMP.@constraint(model, [sc * u;
+                             sc * (w * cash - x .* p)] in JuMP.SecondOrderCone())
     return nothing
 end
 function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
@@ -98,37 +102,37 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                Vector{eltype(w)}(undef, 0), cash, nothing, nothing
     end
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
-    @expression(model, sc, da.sc)
-    @expression(model, so, da.so)
+    JuMP.set_string_names_on_creation(model, str_names)
+    JuMP.@expression(model, sc, da.sc)
+    JuMP.@expression(model, so, da.so)
     N = length(w)
     # Integer allocation
     # x := number of shares
     # u := bounding variable
-    @variables(model, begin
-                   x[1:N] >= 0, Int
-                   u
-               end)
+    JuMP.@variables(model, begin
+                        x[1:N] >= 0, Int
+                        u
+                    end)
     # r := remaining money
     # eta := ideal_investment - discrete_investment
-    @expression(model, r, cash - dot(x, p))
-    @constraint(model, sc * r >= 0)
+    JuMP.@expression(model, r, cash - dot(x, p))
+    JuMP.@constraint(model, sc * r >= 0)
     set_discrete_error!(model, w, p, cash, da.wf)
-    @objective(model, Min, so * (u + r))
+    JuMP.@objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)
     res = if res.success
         OptimisationSuccess(; res = res.trials)
     else
         OptimisationFailure(; res = res.trials)
     end
-    shares = round.(Int, value.(x))
+    shares = round.(Int, JuMP.value.(x))
     cost = shares .* p
     aw = if any(!iszero, cost)
         cost / sum(cost) * bgt
     else
         range(zero(eltype(w)), zero(eltype(w)); length = N)
     end
-    acash = value(r)
+    acash = JuMP.value(r)
     return shares, cost, aw, acash, res, model
 end
 function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 1e6,

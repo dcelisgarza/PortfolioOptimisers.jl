@@ -59,7 +59,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false)),
                       check_sol = (; allow_local = true, allow_almost = true)),
@@ -67,7 +67,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.95)),
@@ -76,7 +76,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.90)),
@@ -85,7 +85,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.85)),
@@ -94,7 +94,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.80)),
@@ -103,7 +103,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.75)),
@@ -112,7 +112,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.7)),
@@ -121,7 +121,7 @@
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
                                                          "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  MOI.Silent() => true),
+                                                                                                  JuMP.MOI.Silent() => true),
                                                          "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
                                                                                                      "verbose" => false,
                                                                                                      "max_step_fraction" => 0.6,
@@ -1425,7 +1425,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.001)
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
-        @test all(value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
+        @test all(JuMP.value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
         idx = [BitVector(res.plg.A[:, i]) for i in axes(res.plg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 1) for i in idx])
         @test (isapprox(res.w,
@@ -1453,7 +1453,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
         res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
-        @test all(value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
+        @test all(JuMP.value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
         idx = [BitVector(res.plg.A[:, i]) for i in axes(res.plg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 2) for i in idx])
         success = isapprox(res.w,
@@ -1471,7 +1471,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
-        @test isapprox(value.(res.plg.A .* res.model[:W]), zeros(size(pr.sigma)),
+        @test isapprox(JuMP.value.(res.plg.A .* res.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
 
         plc = SemiDefinitePhylogenyEstimator(; pe = ClusteringEstimator(), p = 1000)
@@ -1490,7 +1490,7 @@
                             wb = WeightBounds(; lb = -1, ub = 1))
         res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(),
                                  obj = MaximumRatio(; rf = rf), opt = opt))
-        @test isapprox(value.(res1.plg.A .* res1.model[:W]), zeros(size(pr.sigma)),
+        @test isapprox(JuMP.value.(res1.plg.A .* res1.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test isapprox(res1.w,
                        [2.630737181170687e-10, -0.19525137327795888, 3.3177497633887114e-10,
@@ -1506,7 +1506,7 @@
                             wb = WeightBounds(; lb = -1, ub = 1))
         res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(),
                                  obj = MaximumRatio(; rf = rf), opt = opt))
-        @test isapprox(value.(res2.plg.A .* res2.model[:W]), zeros(size(pr.sigma)),
+        @test isapprox(JuMP.value.(res2.plg.A .* res2.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test !isapprox(res1.w, res2.w; rtol = 0.25)
         @test isapprox(res2.w,
@@ -1524,7 +1524,7 @@
                             wb = WeightBounds(; lb = -1, ub = 1))
         res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
                                  opt = opt))
-        @test isapprox(value.(res1.plg.A .* res1.model[:W]), zeros(size(pr.sigma)),
+        @test isapprox(JuMP.value.(res1.plg.A .* res1.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test isapprox(res1.w,
                        [4.427061986438287e-10, -1.5714922493260265e-9,
@@ -1541,7 +1541,7 @@
                             wb = WeightBounds(; lb = -1, ub = 1))
         res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
                                  opt = opt))
-        @test isapprox(value.(res2.plg.A .* res2.model[:W]), zeros(size(pr.sigma)),
+        @test isapprox(JuMP.value.(res2.plg.A .* res2.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test isapprox(res2.w,
                        [2.17025563455507e-10, 6.087556118806929e-11, 7.438771978806892e-10,

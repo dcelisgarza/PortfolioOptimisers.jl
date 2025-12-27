@@ -11,62 +11,65 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
     ik2 = inv(2 * kappa)
     T = length(x)
     model = JuMP.Model()
-    set_string_names_on_creation(model, false)
-    @variables(model, begin
-                   t
-                   z >= 0
-                   omega[1:T]
-                   psi[1:T]
-                   theta[1:T]
-                   epsilon[1:T]
-               end)
+    JuMP.set_string_names_on_creation(model, false)
+    JuMP.@variables(model, begin
+                        t
+                        z >= 0
+                        omega[1:T]
+                        psi[1:T]
+                        theta[1:T]
+                        epsilon[1:T]
+                    end)
     if isnothing(w)
         invat = inv(alpha * T)
         ln_k = (invat^kappa - invat^(-kappa)) * ik2
-        @expression(model, risk, t + ln_k * z + sum(psi + theta))
+        JuMP.@expression(model, risk, t + ln_k * z + sum(psi + theta))
     else
         sw = sum(w)
         invat = inv(alpha * sw)
         ln_k = (invat^kappa - invat^(-kappa)) * ik2
-        @expression(model, risk, t + ln_k * z + dot(w, psi + theta))
+        JuMP.@expression(model, risk, t + ln_k * z + dot(w, psi + theta))
     end
-    @constraints(model,
-                 begin
-                     [i = 1:T],
-                     [z * opk * ik2, psi[i] * opk * ik, epsilon[i]] in MOI.PowerCone(iopk)
-                     [i = 1:T],
-                     [omega[i] * iomk, theta[i] * ik, -z * ik2] in MOI.PowerCone(omk)
-                     (epsilon + omega - x) .- t <= 0
-                 end)
-    @objective(model, Min, risk)
+    JuMP.@constraints(model,
+                      begin
+                          [i = 1:T],
+                          [z * opk * ik2, psi[i] * opk * ik, epsilon[i]] in
+                          JuMP.MOI.PowerCone(iopk)
+                          [i = 1:T],
+                          [omega[i] * iomk, theta[i] * ik, -z * ik2] in
+                          JuMP.MOI.PowerCone(omk)
+                          (epsilon + omega - x) .- t <= 0
+                      end)
+    JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
     else
         model = JuMP.Model()
-        set_string_names_on_creation(model, false)
-        @variables(model, begin
-                       z[1:T]
-                       nu[1:T]
-                       tau[1:T]
-                   end)
+        JuMP.set_string_names_on_creation(model, false)
+        JuMP.@variables(model, begin
+                            z[1:T]
+                            nu[1:T]
+                            tau[1:T]
+                        end)
         if isnothing(w)
-            @constraints(model, begin
-                             sum(z) - 1 == 0
-                             sum(nu - tau) * ik2 - ln_k <= 0
-                         end)
-            @expression(model, risk, -dot(z, x))
+            JuMP.@constraints(model, begin
+                                  sum(z) - 1 == 0
+                                  sum(nu - tau) * ik2 - ln_k <= 0
+                              end)
+            JuMP.@expression(model, risk, -dot(z, x))
         else
-            @constraints(model, begin
-                             dot(w, z) - 1 == 0
-                             dot(w, nu - tau) * ik2 - ln_k <= 0
-                         end)
-            @expression(model, risk, -dot(w .* z, x))
+            JuMP.@constraints(model, begin
+                                  dot(w, z) - 1 == 0
+                                  dot(w, nu - tau) * ik2 - ln_k <= 0
+                              end)
+            JuMP.@expression(model, risk, -dot(w .* z, x))
         end
-        @constraints(model, begin
-                         [i = 1:T], [nu[i], 1, z[i]] in MOI.PowerCone(iopk)
-                         [i = 1:T], [z[i], 1, tau[i]] in MOI.PowerCone(omk)
-                     end)
-        @objective(model, Max, risk)
+        JuMP.@constraints(model,
+                          begin
+                              [i = 1:T], [nu[i], 1, z[i]] in JuMP.MOI.PowerCone(iopk)
+                              [i = 1:T], [z[i], 1, tau[i]] in JuMP.MOI.PowerCone(omk)
+                          end)
+        JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
             objective_value(model)
         else

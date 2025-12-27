@@ -45,10 +45,10 @@ function JuMPOptimisationSolution(; w::ArrNum)
     return JuMPOptimisationSolution(w)
 end
 function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
-    @expressions(model, begin
-                     so, so
-                     sc, sc
-                 end)
+    JuMP.@expressions(model, begin
+                          so, so
+                          sc, sc
+                      end)
     return nothing
 end
 function set_initial_w!(args...)
@@ -56,21 +56,21 @@ function set_initial_w!(args...)
 end
 function set_initial_w!(w::VecNum, wi::VecNum)
     @argcheck(length(wi) == length(w))
-    set_start_value.(w, wi)
+    JuMP.set_start_value.(w, wi)
     return nothing
 end
 function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNum_VecVecNum})
-    @variable(model, w[1:size(X, 2)])
+    JuMP.@variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing
 end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
-    if termination_status(model) == JuMP.OPTIMIZE_NOT_CALLED
+    if JuMP.termination_status(model) == JuMP.OPTIMIZE_NOT_CALLED
         return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
     end
-    k = value(model[:k])
+    k = JuMP.value(model[:k])
     ik = !iszero(k) ? inv(k) : 1
-    w = value.(model[:w]) * ik
+    w = JuMP.value.(model[:w]) * ik
     return JuMPOptimisationSolution(; w = w)
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
@@ -79,7 +79,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     success = false
     for solver in opt.opt.slv
         try
-            set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
+            JuMP.set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
         catch err
             trials[solver.name] = Dict(:set_optimizer => err)
             continue
@@ -91,11 +91,11 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:optimize! => err)
             continue
         end
-        all_finite_weights = all(isfinite, value.(model[:w]))
+        all_finite_weights = all(isfinite, JuMP.value.(model[:w]))
         all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
-                                    abs.(value.(model[:w])))
+                                    abs.(JuMP.value.(model[:w])))
         try
-            assert_is_solved_and_feasible(model; solver.check_sol...)
+            JuMP.assert_is_solved_and_feasible(model; solver.check_sol...)
             if all_finite_weights && all_non_zero_weights
                 success = true
                 break
@@ -104,7 +104,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
                                        :settings => solver.settings)
         end
-        trials[solver.name] = Dict(:err => solution_summary(model),
+        trials[solver.name] = Dict(:err => JuMP.solution_summary(model),
                                    :settings => solver.settings)
     end
     retcode = if success
@@ -120,7 +120,7 @@ function set_portfolio_returns!(model::JuMP.Model, X::MatNum)
         return model[:X]
     end
     w = model[:w]
-    @expression(model, X, X * w)
+    JuMP.@expression(model, X, X * w)
     return X
 end
 function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
@@ -130,9 +130,9 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
     X = set_portfolio_returns!(model, X)
     if haskey(model, :fees)
         fees = model[:fees]
-        @expression(model, net_X, X .- fees)
+        JuMP.@expression(model, net_X, X .- fees)
     else
-        @expression(model, net_X, X)
+        JuMP.@expression(model, net_X, X)
     end
     return net_X
 end
@@ -140,7 +140,7 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
     if haskey(model, :Xap1)
         return model[:Xap1]
     end
-    @expression(model, Xap1, X .+ one(eltype(X)))
+    JuMP.@expression(model, Xap1, X .+ one(eltype(X)))
     return Xap1
 end
 function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
@@ -148,7 +148,7 @@ function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
         return model[:ddap1]
     end
     _ddap1 = absolute_drawdown_arr(X) .+ one(eltype(X))
-    @expression(model, ddap1, _ddap1)
+    JuMP.@expression(model, ddap1, _ddap1)
     return ddap1
 end
 function scalarise_risk_expression! end

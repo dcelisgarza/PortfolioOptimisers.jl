@@ -395,13 +395,13 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::VecNum)
-    dot_scalar(a::VecNum, b::Union{<:Number, <:AbstractJuMPScalar})
+    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum)
+    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar})
     dot_scalar(a::VecNum, b::VecNum)
 
 Efficient scalar and vector dot product utility.
 
-  - If one argument is a `Union{<:Number, <:AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
+  - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
 
 # Returns
@@ -424,12 +424,12 @@ julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
 # Related
 
   - [`VecNum`](@ref)
-  - [`AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.AbstractJuMPScalar)
+  - [`JuMP.AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.JuMP.AbstractJuMPScalar)
 """
-function dot_scalar(a::Union{<:Number, <:AbstractJuMPScalar}, b::VecNum)
+function dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum)
     return a * sum(b)
 end
-function dot_scalar(a::VecNum, b::Union{<:Number, <:AbstractJuMPScalar})
+function dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar})
     return sum(a) * b
 end
 function dot_scalar(a::VecNum, b::VecNum)
@@ -685,7 +685,7 @@ function traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing
     if isnothing(ctarr)
         ctarr = []
     end
-    sts = subtypes(t)
+    sts = InteractiveUtils.subtypes(t)
     for st in sts
         if !isstructtype(st)
             traverse_concrete_subtypes(st, ctarr)

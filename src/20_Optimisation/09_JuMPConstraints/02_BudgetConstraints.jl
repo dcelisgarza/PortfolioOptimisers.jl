@@ -145,7 +145,7 @@ end
 function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
     k = model[:k]
     sc = model[:sc]
-    @constraint(model, bgt, sc * (sum(w) - k * val) == 0)
+    JuMP.@constraint(model, bgt, sc * (sum(w) - k * val) == 0)
     return nothing
 end
 function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
@@ -154,10 +154,10 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
     lb = bgt.lb
     ub = bgt.ub
     if !isnothing(lb)
-        @constraint(model, bgt_lb, sc * (sum(w) - k * lb) >= 0)
+        JuMP.@constraint(model, bgt_lb, sc * (sum(w) - k * lb) >= 0)
     end
     if !isnothing(ub)
-        @constraint(model, bgt_ub, sc * (sum(w) - k * ub) <= 0)
+        JuMP.@constraint(model, bgt_ub, sc * (sum(w) - k * ub) <= 0)
     end
     return nothing
 end
@@ -168,14 +168,14 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, ::No
     lw = model[:lw]
     k = model[:k]
     sc = model[:sc]
-    @constraint(model, lbgt, sc * (sum(lw) - k * bgt) == 0)
+    JuMP.@constraint(model, lbgt, sc * (sum(lw) - k * bgt) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::Number)
     sw = model[:sw]
     k = model[:k]
     sc = model[:sc]
-    @constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
+    JuMP.@constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, sbgt::Number)
@@ -183,10 +183,10 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, sbgt
     sw = model[:sw]
     k = model[:k]
     sc = model[:sc]
-    @constraints(model, begin
-                     lbgt, sc * (sum(lw) - k * (bgt + sbgt)) == 0
-                     sbgt, sc * (sum(sw) - k * sbgt) == 0
-                 end)
+    JuMP.@constraints(model, begin
+                          lbgt, sc * (sum(lw) - k * (bgt + sbgt)) == 0
+                          sbgt, sc * (sum(sw) - k * sbgt) == 0
+                      end)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, ::Nothing)
@@ -195,11 +195,11 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     sc = model[:sc]
     lb = bgt.lb
     if !isnothing(lb)
-        @constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
+        JuMP.@constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
     end
     ub = bgt.ub
     if !isnothing(ub)
-        @constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
+        JuMP.@constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
     end
     return nothing
 end
@@ -209,11 +209,11 @@ function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::
     sc = model[:sc]
     lb = sbgt.lb
     if !isnothing(lb)
-        @constraint(model, sbgt_lb, sc * (sum(sw) - k * lb) >= 0)
+        JuMP.@constraint(model, sbgt_lb, sc * (sum(sw) - k * lb) >= 0)
     end
     ub = sbgt.ub
     if !isnothing(ub)
-        @constraint(model, sbgt_ub, sc * (sum(sw) - k * ub) <= 0)
+        JuMP.@constraint(model, sbgt_ub, sc * (sum(sw) - k * ub) <= 0)
     end
     return nothing
 end
@@ -225,13 +225,13 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     sc = model[:sc]
     lb = bgt.lb
     if !isnothing(lb)
-        @constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + sbgt)) >= 0)
+        JuMP.@constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + sbgt)) >= 0)
     end
     ub = bgt.ub
     if !isnothing(ub)
-        @constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + sbgt)) <= 0)
+        JuMP.@constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + sbgt)) <= 0)
     end
-    @constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
+    JuMP.@constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number,
@@ -242,17 +242,17 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number,
     sc = model[:sc]
     lb = sbgt.lb
     if !isnothing(lb)
-        @constraints(model, begin
-                         lbgt_lb, sc * (sum(lw) - k * (lb + bgt)) >= 0
-                         sbgt_lb, sc * (sum(sw) - k * lb) >= 0
-                     end)
+        JuMP.@constraints(model, begin
+                              lbgt_lb, sc * (sum(lw) - k * (lb + bgt)) >= 0
+                              sbgt_lb, sc * (sum(sw) - k * lb) >= 0
+                          end)
     end
     ub = sbgt.ub
     if !isnothing(ub)
-        @constraints(model, begin
-                         lbgt_ub, sc * (sum(lw) - k * (ub + bgt)) <= 0
-                         sbgt_ub, sc * (sum(sw) - k * ub) <= 0
-                     end)
+        JuMP.@constraints(model, begin
+                              lbgt_ub, sc * (sum(lw) - k * (ub + bgt)) <= 0
+                              sbgt_ub, sc * (sum(sw) - k * ub) <= 0
+                          end)
     end
     return nothing
 end
@@ -267,28 +267,28 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     lb_flag = isnothing(lb)
     slb_flag = isnothing(slb)
     if !lb_flag && !slb_flag
-        @constraints(model, begin
-                         lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0
-                         sbgt_lb, sc * (sum(sw) - k * slb) >= 0
-                     end)
+        JuMP.@constraints(model, begin
+                              lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0
+                              sbgt_lb, sc * (sum(sw) - k * slb) >= 0
+                          end)
     elseif !lb_flag && slb_flag
-        @constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
+        JuMP.@constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
     elseif lb_flag && !slb_flag
-        @constraint(model, sbgt_lb, sc * (sum(sw) - k * slb) >= 0)
+        JuMP.@constraint(model, sbgt_lb, sc * (sum(sw) - k * slb) >= 0)
     end
     ub = bgt.ub
     sub = sbgt.ub
     ub_flag = isnothing(ub)
     sub_flag = isnothing(sub)
     if !ub_flag && !sub_flag
-        @constraints(model, begin
-                         lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0
-                         sbgt_ub, sc * (sum(sw) - k * sub) <= 0
-                     end)
+        JuMP.@constraints(model, begin
+                              lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0
+                              sbgt_ub, sc * (sum(sw) - k * sub) <= 0
+                          end)
     elseif !ub_flag && sub_flag
-        @constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
+        JuMP.@constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
     elseif ub_flag && !sub_flag
-        @constraint(model, sbgt_ub, sc * (sum(sw) - k * sub) <= 0)
+        JuMP.@constraint(model, sbgt_ub, sc * (sum(sw) - k * sub) <= 0)
     end
     return nothing
 end
@@ -298,8 +298,8 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num
     sc = model[:sc]
     wp = model[:wp]
     wn = model[:wn]
-    @expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
-    @constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
+    JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
+    JuMP.@constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
 end
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
@@ -310,12 +310,12 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num
     wn = model[:wn]
     lb = bgt.lb
     ub = bgt.ub
-    @expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
+    JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
     if !isnothing(lb)
-        @constraint(model, cost_bgt_lb, sc * (sum(w) + cost_bgt_expr - k * lb) >= 0)
+        JuMP.@constraint(model, cost_bgt_lb, sc * (sum(w) + cost_bgt_expr - k * lb) >= 0)
     end
     if !isnothing(ub)
-        @constraint(model, cost_bgt_ub, sc * (sum(w) + cost_bgt_expr - k * ub) <= 0)
+        JuMP.@constraint(model, cost_bgt_ub, sc * (sum(w) + cost_bgt_expr - k * ub) <= 0)
     end
     return nothing
 end
@@ -325,15 +325,15 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
     un = bgt.un
     sc = model[:sc]
     N = length(w)
-    @variables(model, begin
-                   wp[1:N], (lower_bound = 0)
-                   wn[1:N], (lower_bound = 0)
-               end)
-    @constraints(model, begin
-                     sc * (wp ⊖ up) <= 0
-                     sc * (wn ⊖ un) <= 0
-                     sc * (w - wb - wp + wn) == 0
-                 end)
+    JuMP.@variables(model, begin
+                        wp[1:N], (lower_bound = 0)
+                        wn[1:N], (lower_bound = 0)
+                    end)
+    JuMP.@constraints(model, begin
+                          sc * (wp ⊖ up) <= 0
+                          sc * (wn ⊖ un) <= 0
+                          sc * (w - wb - wp + wn) == 0
+                      end)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
     return nothing
 end
@@ -344,19 +344,22 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
     beta = bgt.beta
     sc = model[:sc]
     N = length(w)
-    @variables(model, begin
-                   wp[1:N], (lower_bound = 0)
-                   wn[1:N], (lower_bound = 0)
-                   wip[1:N]
-                   win[1:N]
-               end)
-    @constraints(model, begin
-                     sc * (wp ⊖ up) <= 0
-                     sc * (wn ⊖ un) <= 0
-                     sc * (w - wb - wp + wn) == 0
-                     [i = 1:N], [sc * wip[i], sc, sc * wp[i]] in MOI.PowerCone(beta)
-                     [i = 1:N], [sc * win[i], sc, sc * wn[i]] in MOI.PowerCone(beta)
-                 end)
+    JuMP.@variables(model, begin
+                        wp[1:N], (lower_bound = 0)
+                        wn[1:N], (lower_bound = 0)
+                        wip[1:N]
+                        win[1:N]
+                    end)
+    JuMP.@constraints(model,
+                      begin
+                          sc * (wp ⊖ up) <= 0
+                          sc * (wn ⊖ un) <= 0
+                          sc * (w - wb - wp + wn) == 0
+                          [i = 1:N],
+                          [sc * wip[i], sc, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
+                          [i = 1:N],
+                          [sc * win[i], sc, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
+                      end)
     set_cost_budget_constraints!(model, wip, win, bgt.bgt, w)
     return nothing
 end

@@ -230,7 +230,7 @@ Iterates over the provided settings and applies each as a solver attribute.
 """
 function set_solver_attributes(model::JuMP.Model, settings::DictStrA_VecPairStrA)
     for (k, v) in settings
-        set_attribute(model, k, v)
+        JuMP.set_attribute(model, k, v)
     end
     return nothing
 end
@@ -254,7 +254,7 @@ Set a single solver attribute on a JuMP model.
   - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
 """
 function set_solver_attributes(model::JuMP.Model, settings::Pair)
-    set_attribute(model, settings...)
+    JuMP.set_attribute(model, settings...)
     return nothing
 end
 """
@@ -293,7 +293,7 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
     success = false
     for solver in slv
         try
-            set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
+            JuMP.set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
         catch err
             trials[solver.name] = Dict(:set_optimizer => err)
             continue
@@ -306,7 +306,7 @@ function optimise_JuMP_model!(model::JuMP.Model, slv::Slv_VecSlv)
             continue
         end
         try
-            assert_is_solved_and_feasible(model; solver.check_sol...)
+            JuMP.assert_is_solved_and_feasible(model; solver.check_sol...)
             success = true
             break
         catch err

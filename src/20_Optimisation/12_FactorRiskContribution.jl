@@ -54,14 +54,14 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
     if flag
         b2 = pinv(transpose(nullspace(Bt)))
         N = size(rr.M, 1)
-        @variables(model, begin
-                       w1[1:Nf]
-                       w2[1:(N - Nf)]
-                   end)
-        @expression(model, w, b1 * w1 + b2 * w2)
+        JuMP.@variables(model, begin
+                            w1[1:Nf]
+                            w2[1:(N - Nf)]
+                        end)
+        JuMP.@expression(model, w, b1 * w1 + b2 * w2)
     else
-        @variable(model, w1[1:Nf])
-        @expression(model, w, b1 * w1)
+        JuMP.@variable(model, w1[1:Nf])
+        JuMP.@expression(model, w, b1 * w1)
     end
     set_initial_w!(w1, wi)
     return b1, rr
@@ -72,7 +72,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
+    JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)

@@ -69,16 +69,16 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     rb = rkb.val
     @argcheck(length(rb) == N)
     sc = model[:sc]
-    @variables(model, begin
-                   k
-                   log_w[1:N]
-               end)
-    @constraints(model,
-                 begin
-                     clog_w[i = 1:N],
-                     [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
-                     crkb, sc * dot(rb, log_w) >= 0
-                 end)
+    JuMP.@variables(model, begin
+                        k
+                        log_w[1:N]
+                    end)
+    JuMP.@constraints(model,
+                      begin
+                          clog_w[i = 1:N],
+                          [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone()
+                          crkb, sc * dot(rb, log_w) >= 0
+                      end)
     return rkb
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -106,7 +106,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
+    JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)

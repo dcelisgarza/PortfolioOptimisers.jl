@@ -55,11 +55,11 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
-                @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+                @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
         else
             if isa(r, QuadExpressionRiskMeasures)
-                @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+                @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
         end
         if !isnothing(w_min)
@@ -295,24 +295,26 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Number, 
     risk = model[:risk]
     ret = model[:ret]
     N = length(w)
-    @variables(model, begin
-                   log_ret
-                   log_risk
-                   log_w[1:N]
-                   log_delta_w[1:N]
-               end)
-    @constraints(model,
-                 begin
-                     clog_risk,
-                     [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
-                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
-                     clog_w[i = 1:N],
-                     [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
-                     clog_delta_w[i = 1:N],
-                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in
-                     MOI.ExponentialCone()
-                 end)
-    @expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
+    JuMP.@variables(model, begin
+                        log_ret
+                        log_risk
+                        log_w[1:N]
+                        log_delta_w[1:N]
+                    end)
+    JuMP.@constraints(model,
+                      begin
+                          clog_risk,
+                          [sc * log_risk, sc, sc * (rk - risk)] in
+                          JuMP.MOI.ExponentialCone()
+                          clog_ret,
+                          [sc * log_ret, sc, sc * (ret - rt)] in JuMP.MOI.ExponentialCone()
+                          clog_w[i = 1:N],
+                          [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone()
+                          clog_delta_w[i = 1:N],
+                          [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in
+                          JuMP.MOI.ExponentialCone()
+                      end)
+    JuMP.@expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
     return obj_expr
 end
 function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
@@ -320,7 +322,7 @@ function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCenterin
                                               opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
-    @objective(model, Min, so * obj_expr)
+    JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
 function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
@@ -330,30 +332,30 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
     add_penalty_to_objective!(model, 1, obj_expr)
     add_custom_objective_term!(model, opt.ret, opt.cobj, obj_expr, opt, opt.pe)
-    @objective(model, Min, so * obj_expr)
+    JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
 function unregister_noc_variables!(model::JuMP.Model)
     if !haskey(model, :log_ret)
         return nothing
     end
-    delete(model, model[:log_ret])
-    unregister(model, :log_ret)
-    delete(model, model[:log_risk])
-    unregister(model, :log_risk)
-    delete(model, model[:log_w])
-    unregister(model, :log_w)
-    delete(model, model[:log_delta_w])
-    unregister(model, :log_delta_w)
-    delete(model, model[:clog_risk])
-    unregister(model, :clog_risk)
-    delete(model, model[:clog_ret])
-    unregister(model, :clog_ret)
-    delete(model, model[:clog_w])
-    unregister(model, :clog_w)
-    delete(model, model[:clog_delta_w])
-    unregister(model, :clog_delta_w)
-    unregister(model, :obj_expr)
+    JuMP.delete(model, model[:log_ret])
+    JuMP.unregister(model, :log_ret)
+    JuMP.delete(model, model[:log_risk])
+    JuMP.unregister(model, :log_risk)
+    JuMP.delete(model, model[:log_w])
+    JuMP.unregister(model, :log_w)
+    JuMP.delete(model, model[:log_delta_w])
+    JuMP.unregister(model, :log_delta_w)
+    JuMP.delete(model, model[:clog_risk])
+    JuMP.unregister(model, :clog_risk)
+    JuMP.delete(model, model[:clog_ret])
+    JuMP.unregister(model, :clog_ret)
+    JuMP.delete(model, model[:clog_w])
+    JuMP.unregister(model, :clog_w)
+    JuMP.delete(model, model[:clog_delta_w])
+    JuMP.unregister(model, :clog_delta_w)
+    JuMP.unregister(model, :obj_expr)
     return nothing
 end
 function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number,
@@ -393,11 +395,11 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
     for (i, (rk_opt, rt_opt, lb)) in enumerate(zip(rk_opts, rt_opts, lbs))
         if i != 1
-            delete(model, model[:ret_lb])
-            unregister(model, :ret_lb)
-            unregister(model, :obj_expr)
+            JuMP.delete(model, model[:ret_lb])
+            JuMP.unregister(model, :ret_lb)
+            JuMP.unregister(model, :obj_expr)
         end
-        @constraint(model, ret_lb, sc * (ret_expr - lb) >= 0)
+        JuMP.@constraint(model, ret_lb, sc * (ret_expr - lb) >= 0)
         unregister_noc_variables!(model)
         set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
@@ -470,10 +472,10 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
         unregister_noc_variables!(model)
         for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
             if haskey(model, key)
-                delete(model, model[key])
-                unregister(model, key)
+                JuMP.delete(model, model[key])
+                JuMP.unregister(model, key)
             end
-            model[key] = @constraint(model, sc * (r_expr - ub) <= 0)
+            model[key] = JuMP.@constraint(model, sc * (r_expr - ub) <= 0)
         end
         set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
@@ -516,9 +518,9 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                                                                   rd;
                                                                                                                   dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
+    JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
-    @expression(model, k, 1)
+    JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
@@ -556,9 +558,9 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                                                                                                 rd;
                                                                                                                                                 dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
+    JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
-    @expression(model, k, 1)
+    JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq_, :lcs_eq_)

@@ -213,7 +213,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)
     posdef!(ue.pe.ce.mp.pdm, sigma_u)
-    mu_u = Distributions.cquantile(Normal(), q) * sqrt.(diag(sigma_mu)) * 2
+    mu_u = Distributions.cquantile(Distributions.Normal(), q) * sqrt.(diag(sigma_mu)) * 2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = N)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
@@ -258,7 +258,9 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     q = ue.q * 0.5
-    mu_u = Distributions.cquantile(Normal(), q) * sqrt.(diag(sigma / size(pr.X, 1))) * 2
+    mu_u = Distributions.cquantile(Distributions.Normal(), q) *
+           sqrt.(diag(sigma / size(pr.X, 1))) *
+           2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = size(pr.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
