@@ -25,7 +25,7 @@ struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
     sigma::T2
     dist::T3
     function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
-                                     dist::Distribution)
+                                     dist::Distributions.Distribution)
         if !isnothing(mu)
             @argcheck(!isempty(mu))
         end
@@ -37,7 +37,7 @@ struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
 end
 function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  sigma::Option{<:MatNum} = nothing,
-                                 dist::Distribution = Normal())
+                                 dist::Distributions.Distribution = Distributions.Normal())
     return DistributionValueatRisk(mu, sigma, dist)
 end
 struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure

@@ -71,7 +71,11 @@ function optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
-    w = isnothing(rw.rng) ? rand(Dirichlet(N, 1)) : rand(rw.rng, Dirichlet(N, 1))
+    w = if isnothing(rw.rng)
+        rand(Distributions.Dirichlet(N, 1))
+    else
+        rand(rw.rng, Distributions.Dirichlet(N, 1))
+    end
     return NaiveOptimisation(typeof(rw), nothing, w, OptimisationSuccess(nothing), nothing)
 end
 

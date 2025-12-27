@@ -189,7 +189,7 @@
         @test_throws IsEmptyError TurnoverEstimator(; w = [1, Inf],
                                                     val = Pair{String, Number}[])
 
-        @test_throws DomainError TurnoverEstimator(; w = [1], val = val = "a" => 1,
+        @test_throws DomainError TurnoverEstimator(; w = [1], val =  val = "a" => 1 ,
                                                    dval = -eps())
 
         te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))

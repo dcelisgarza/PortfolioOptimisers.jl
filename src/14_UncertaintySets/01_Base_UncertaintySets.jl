@@ -459,7 +459,7 @@ function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
 function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
-    return sqrt(cquantile(Chisq(size(X, 1)), q))
+    return sqrt(Distributions.cquantile(Distributions.Chisq(size(X, 1)), q))
 end
 function k_ucs(type::Number, args...)
     return type

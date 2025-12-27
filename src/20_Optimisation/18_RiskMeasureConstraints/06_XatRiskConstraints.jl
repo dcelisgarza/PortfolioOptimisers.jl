@@ -102,26 +102,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
-function compute_value_at_risk_z(dist::Normal, alpha::Number)
-    return cquantile(dist, alpha)
+function compute_value_at_risk_z(dist::Distributions.Normal, alpha::Number)
+    return Distributions.cquantile(dist, alpha)
 end
-function compute_value_at_risk_z(dist::TDist, alpha::Number)
+function compute_value_at_risk_z(dist::Distributions.TDist, alpha::Number)
     d = dof(dist)
     @argcheck(d > 2)
-    return cquantile(dist, alpha) * sqrt((d - 2) / d)
+    return Distributions.cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_z(::Laplace, alpha::Number)
+function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
     return -log(2 * alpha) / sqrt(2)
 end
-function compute_value_at_risk_cz(dist::Normal, alpha::Number)
+function compute_value_at_risk_cz(dist::Distributions.Normal, alpha::Number)
     return quantile(dist, alpha)
 end
-function compute_value_at_risk_cz(dist::TDist, alpha::Number)
+function compute_value_at_risk_cz(dist::Distributions.TDist, alpha::Number)
     d = dof(dist)
     @argcheck(d > 2)
     return quantile(dist, alpha) * sqrt((d - 2) / d)
 end
-function compute_value_at_risk_cz(::Laplace, alpha::Number)
+function compute_value_at_risk_cz(::Distributions.Laplace, alpha::Number)
     return -log(2 * (one(alpha) - alpha)) / sqrt(2)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,

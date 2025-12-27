@@ -201,7 +201,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
-    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
+    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j in 1:N
@@ -213,7 +213,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)
     posdef!(ue.pe.ce.mp.pdm, sigma_u)
-    mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma_mu)) * 2
+    mu_u = Distributions.cquantile(Normal(), q) * sqrt.(diag(sigma_mu)) * 2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = N)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
@@ -258,7 +258,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     q = ue.q * 0.5
-    mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pr.X, 1))) * 2
+    mu_u = Distributions.cquantile(Normal(), q) * sqrt.(diag(sigma / size(pr.X, 1))) * 2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = size(pr.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
@@ -309,7 +309,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
-    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
+    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j in 1:N
@@ -375,8 +375,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
-    X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
-    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
+    X_mu = transpose(rand(ue.rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
+    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i in axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
@@ -569,7 +569,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
-    X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
+    X_mu = transpose(rand(ue.rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
     if ue.alg.diagonal
         sigma_mu = Diagonal(sigma_mu)
     end
@@ -737,7 +737,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
-    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
+    sigmas = rand(ue.rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i in axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma

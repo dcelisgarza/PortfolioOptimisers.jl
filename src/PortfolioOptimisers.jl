@@ -4,9 +4,11 @@ using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering
 using DataFrames: DataFrames
-using Distances, Distributions, FLoops, GLM, Impute, InteractiveUtils, Interfaces, JuMP,
-      LinearAlgebra, LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim,
-      Graphs, SimpleWeightedGraphs, StatsAPI, PythonCall, PrecompileTools, Random, Roots,
+using Distances: Distances
+using Distributions: Distributions
+using FLoops, GLM, Impute, InteractiveUtils, Interfaces, JuMP, LinearAlgebra,
+      LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
+      SimpleWeightedGraphs, StatsAPI, PythonCall, PrecompileTools, Random, Roots,
       SparseArrays, Statistics, StatsBase, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
@@ -18,7 +20,7 @@ end PortfolioOptimisers
 
 #=
 src_files = String[]
-sizehint!(src_files, 140)
+sizehint!(src_files, 142)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files
         if file == "PortfolioOptimisers.jl"
