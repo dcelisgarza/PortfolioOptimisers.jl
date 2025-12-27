@@ -204,8 +204,8 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
         W = model[:W]
         N = size(W, 1)
         JuMP.@variables(model, begin
-                            Au[1:N, 1:N] >= 0, LinearAlgebra.Symmetric
-                            Al[1:N, 1:N] >= 0, LinearAlgebra.Symmetric
+                            Au[1:N, 1:N] >= 0, Symmetric
+                            Al[1:N, 1:N] >= 0, Symmetric
                         end)
         JuMP.@constraint(model, cbucs_variance, sc * (Au - Al - W) == 0)
     end
