@@ -24,7 +24,7 @@ function (::UlcerIndex)(x::VecNum)
     # popfirst!(x)
     # return sqrt(val / length(x))
     dd = absolute_drawdown_vec(x)
-    return norm(dd, 2) / sqrt(length(x))
+    return LinearAlgebra.norm(dd, 2) / sqrt(length(x))
 end
 struct RelativeUlcerIndex{T1} <: HierarchicalRiskMeasure
     settings::T1
@@ -55,7 +55,7 @@ function (::RelativeUlcerIndex)(x::VecNum)
     return sqrt(val / length(x))
     =#
     dd = relative_drawdown_vec(x)
-    return norm(dd, 2) / sqrt(length(x))
+    return LinearAlgebra.norm(dd, 2) / sqrt(length(x))
 end
 
 export UlcerIndex, RelativeUlcerIndex

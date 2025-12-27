@@ -26,7 +26,7 @@
     N = size(pr.X, 2)
 
     res = optimise(InverseVolatility(; pe = pr), rd)
-    w = inv.(sqrt.(diag(pr.sigma)))
+    w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     w /= sum(w)
     @test isapprox(res.w, w)
 

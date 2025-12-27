@@ -19,7 +19,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
         r.alpha * T
     else
         model[Symbol(:cevar_, i)] = JuMP.@constraint(model,
-                                                     sc * (dot(wi, u_evar) - z_evar) <= 0)
+                                                     sc *
+                                                     (LinearAlgebra.dot(wi, u_evar) -
+                                                      z_evar) <= 0)
         r.alpha * sum(wi)
     end
     model[Symbol(:cevar_exp_cone_, i)] = JuMP.@constraint(model, [i = 1:T],
@@ -68,13 +70,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
         model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = JuMP.@constraints(model,
                                                                                      begin
                                                                                          sc *
-                                                                                         (dot(wi,
-                                                                                              u_evar_l) -
+                                                                                         (LinearAlgebra.dot(wi,
+                                                                                                            u_evar_l) -
                                                                                           z_evar_l) <=
                                                                                          0
                                                                                          sc *
-                                                                                         (dot(wi,
-                                                                                              u_evar_h) -
+                                                                                         (LinearAlgebra.dot(wi,
+                                                                                                            u_evar_h) -
                                                                                           z_evar_h) >=
                                                                                          0
                                                                                      end)
@@ -136,7 +138,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatR
         r.alpha * T
     else
         model[Symbol(:cedar_, i)] = JuMP.@constraint(model,
-                                                     sc * (dot(wi, u_edar) - z_edar) <= 0)
+                                                     sc *
+                                                     (LinearAlgebra.dot(wi, u_edar) -
+                                                      z_edar) <= 0)
         r.alpha * sum(wi)
     end
     model[Symbol(:cedar_exp_cone_, i)] = JuMP.@constraint(model, [i = 1:T],

@@ -13,7 +13,8 @@ using Impute: Impute
 using InteractiveUtils: InteractiveUtils
 using Interfaces: Interfaces
 using JuMP: JuMP
-using LinearAlgebra, LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim,
+using LinearAlgebra: LinearAlgebra
+using LogExpFunctions, MultivariateStats, NearestCorrelationMatrix, Optim,
       SimpleWeightedGraphs, StatsAPI, PythonCall, PrecompileTools, Random, Roots,
       SparseArrays, Statistics, StatsBase, TimeSeries
 

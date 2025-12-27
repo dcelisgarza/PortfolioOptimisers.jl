@@ -534,8 +534,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:A
     sigma_mu = cov(ue.pe.ce, X_mu)
     sigma_sigma = cov(ue.pe.ce, X_sigma)
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
@@ -592,7 +592,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, 
     X_mu = transpose(X_mu)
     sigma_mu = cov(ue.pe.ce, X_mu)
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
@@ -646,7 +646,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorith
     X_sigma = transpose(X_sigma)
     sigma_sigma = cov(ue.pe.ce, X_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,

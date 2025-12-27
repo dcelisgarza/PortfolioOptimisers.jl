@@ -110,14 +110,14 @@ function __coskewness(cskew::MatNum, X::MatNum, mp::AbstractMatrixProcessingEsti
         j = (i - 1) * N + 1
         k = i * N
         coskew_jk = view(cskew, :, j:k)
-        vals, vecs = eigen(coskew_jk)
+        vals, vecs = LinearAlgebra.eigen(coskew_jk)
         if isa(eltype(vals), Number)
             vals .= clamp.(vals, typemin(eltype(cskew)), zero(eltype(cskew)))
-            V .-= vecs * Diagonal(vals) * transpose(vecs)
+            V .-= vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs)
         else
             vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
                     clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
-            V .-= real(vecs * Diagonal(vals) * transpose(vecs))
+            V .-= real(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
         end
     end
     matrix_processing!(mp, V, X)

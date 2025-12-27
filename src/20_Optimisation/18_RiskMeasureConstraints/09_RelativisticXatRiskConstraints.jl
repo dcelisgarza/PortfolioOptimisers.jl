@@ -31,7 +31,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     else
         iat = inv(alpha * sum(wi))
         lnk = (iat^kappa - iat^(-kappa)) * ik2
-        JuMP.@expression(model, t_rlvar + lnk * z_rlvar + dot(wi, psi_rlvar + theta_rlvar))
+        JuMP.@expression(model,
+                         t_rlvar +
+                         lnk * z_rlvar +
+                         LinearAlgebra.dot(wi, psi_rlvar + theta_rlvar))
     end
     model[Symbol(:crlvar_pcone_a_, i)], model[Symbol(:crlvar_pcone_b_, i)], model[Symbol(:crlvar_, i)] = JuMP.@constraints(model,
                                                                                                                            begin
@@ -123,10 +126,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                           begin
                               t_rlvar_l +
                               lnk_a * z_rlvar_l +
-                              dot(wi, psi_rlvar_l + theta_rlvar_l)
+                              LinearAlgebra.dot(wi, psi_rlvar_l + theta_rlvar_l)
                               t_rlvar_h +
                               lnk_b * z_rlvar_h +
-                              dot(wi, psi_rlvar_h + theta_rlvar_h)
+                              LinearAlgebra.dot(wi, psi_rlvar_h + theta_rlvar_h)
                           end)
     end
     opk_a = one(kappa_a) + kappa_a
@@ -241,7 +244,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
     else
         iat = inv(alpha * sum(wi))
         lnk = (iat^kappa - iat^(-kappa)) * ik2
-        JuMP.@expression(model, t_rldar + lnk * z_rldar + dot(wi, psi_rldar + theta_rldar))
+        JuMP.@expression(model,
+                         t_rldar +
+                         lnk * z_rldar +
+                         LinearAlgebra.dot(wi, psi_rldar + theta_rldar))
     end
     model[Symbol(:crldar_pcone_a_, i)], model[Symbol(:crldar_pcone_b_, i)], model[Symbol(:crldar_, i)] = JuMP.@constraints(model,
                                                                                                                            begin

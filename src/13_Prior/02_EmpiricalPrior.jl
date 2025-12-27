@@ -165,7 +165,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
     sigma = cov(pe.ce, X_log; kwargs...)
     mu .*= pe.horizon
     sigma .*= pe.horizon
-    mu .= exp.(mu + 0.5 * diag(sigma))
+    mu .= exp.(mu + 0.5 * LinearAlgebra.diag(sigma))
     sigma .= (mu ⊗ mu) ⊙ (exp.(sigma) .- one(eltype(sigma)))
     mu .-= one(eltype(mu))
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)

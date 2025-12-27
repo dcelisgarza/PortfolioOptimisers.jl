@@ -71,7 +71,7 @@ function (r::RMCVaR{<:AbstractWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
@@ -193,7 +193,7 @@ function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 
@@ -206,7 +206,7 @@ function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)
-        -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+        -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_x[idx] * (beta - cum_w[idx - 1])) / (beta)
     end
     return loss - gain
@@ -286,7 +286,7 @@ function (r::RMCDaR{<:AbstractWeights})(x::VecNum)
         -sorted_dd[1]
     else
         idx = ifelse(idx > length(dd), idx - 1, idx)
-        -(dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+        -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
@@ -333,7 +333,7 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:AbstractWeights})
         -sorted_dd[1]
     else
         idx = ifelse(idx > length(dd), idx - 1, idx)
-        -(dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+        -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end

@@ -265,13 +265,13 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= zero(eltype(X))
-    X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
+    X .= cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return nothing
 end
 function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
-    X .= cov2cor(vecs * Diagonal(vals) * transpose(vecs))
+    X .= cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return nothing
 end
 function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
@@ -284,10 +284,12 @@ function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     vals_r = vals[(num_factors + 1):end]
     vecs_r = vecs[:, (num_factors + 1):end]
 
-    corr0 = vecs_r * Diagonal(vals_r) * transpose(vecs_r)
-    corr1 = vecs_l * Diagonal(vals_l) * transpose(vecs_l)
+    corr0 = vecs_r * LinearAlgebra.Diagonal(vals_r) * transpose(vecs_r)
+    corr1 = vecs_l * LinearAlgebra.Diagonal(vals_l) * transpose(vecs_l)
 
-    X .= corr0 + de.alpha * corr1 + (one(de.alpha) - de.alpha) * Diagonal(corr1)
+    X .= corr0 +
+         de.alpha * corr1 +
+         (one(de.alpha) - de.alpha) * LinearAlgebra.Diagonal(corr1)
     return nothing
 end
 """
@@ -455,13 +457,13 @@ function denoise!(::Nothing, args...)
 end
 function denoise!(de::Denoise, X::MatNum, q::Number)
     assert_matrix_issquare(X, :X)
-    s = diag(X)
+    s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)
     end
-    vals, vecs = eigen(X)
+    vals, vecs = LinearAlgebra.eigen(X)
     max_val = find_max_eval(vals, q, de.kernel, de.m, de.n, de.args, de.kwargs)[1]
     num_factors = searchsortedlast(vals, max_val)
     _denoise!(de.alg, X, vals, vecs, num_factors)

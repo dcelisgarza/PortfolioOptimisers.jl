@@ -876,7 +876,7 @@ Compute the target value for moment calculations when the risk measure provides 
 """
 function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any}, w::VecNum,
                             ::Any)
-    return dot(w, r.mu)
+    return LinearAlgebra.dot(w, r.mu)
 end
 """
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
@@ -892,7 +892,7 @@ Compute the target value for moment calculations when the risk measure provides 
 
 # Returns
 
-  - `tgt::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `dot(w, r.mu.v) + r.mu.s`.
+  - `tgt::promote_type(eltype(w), eltype(r.mu.v), typeof(r.mu.s))`: The sum of the dot product of the asset weights and the expected returns vector plus the scalar offset, `LinearAlgebra.dot(w, r.mu.v) + r.mu.s`.
 
 # Related
 
@@ -903,7 +903,7 @@ Compute the target value for moment calculations when the risk measure provides 
 """
 function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any}, w::VecNum,
                             ::Any)
-    return dot(w, r.mu.v) + r.mu.s
+    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
 end
 """
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},

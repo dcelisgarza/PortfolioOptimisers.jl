@@ -91,7 +91,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     owa_s = sum(owa_w)
     owa_l = minimum(owa_w)
     owa_h = maximum(owa_w)
-    owa_d = [norm(owa_w, p) for p in owa_p]
+    owa_d = [LinearAlgebra.norm(owa_w, p) for p in owa_p]
     aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = model[key], model[Symbol(:neg_owa_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = JuMP.@expressions(model,
                                                                                                                                                            begin
                                                                                                                                                                owa_s *
@@ -100,8 +100,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                sum(owa_nu) +
                                                                                                                                                                owa_h *
                                                                                                                                                                sum(owa_eta) +
-                                                                                                                                                               dot(owa_d,
-                                                                                                                                                                   owa_y)
+                                                                                                                                                               LinearAlgebra.dot(owa_d,
+                                                                                                                                                                                 owa_y)
                                                                                                                                                                -owa_z .*
                                                                                                                                                                owa_p
                                                                                                                                                                owa_p ./
@@ -182,12 +182,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     owa_l_s = sum(owa_l_w)
     owa_l_l = minimum(owa_l_w)
     owa_l_h = maximum(owa_l_w)
-    owa_l_d = [norm(owa_l_w, p) for p in owa_p]
+    owa_l_d = [LinearAlgebra.norm(owa_l_w, p) for p in owa_p]
     owa_h_w = isnothing(r.w2) ? reverse(owa_l_w) : -r.w2
     owa_h_s = sum(owa_h_w)
     owa_h_l = minimum(owa_h_w)
     owa_h_h = maximum(owa_h_w)
-    owa_h_d = [norm(owa_h_w, p) for p in owa_p]
+    owa_h_d = [LinearAlgebra.norm(owa_h_w, p) for p in owa_p]
     owa_l_risk, neg_owa_l_z_owa_p, owa_h_risk, neg_owa_h_z_owa_p, owa_p_o_owa_pm1 = model[Symbol(:owa_l_risk_, i)], model[Symbol(:neg_owa_l_z_owa_p_, i)], model[Symbol(:owa_h_risk_, i)], model[Symbol(:neg_owa_h_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = JuMP.@expressions(model,
                                                                                                                                                                                                                                                                                           begin
                                                                                                                                                                                                                                                                                               owa_l_s *
@@ -196,8 +196,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                               sum(owa_l_nu) +
                                                                                                                                                                                                                                                                                               owa_l_h *
                                                                                                                                                                                                                                                                                               sum(owa_l_eta) +
-                                                                                                                                                                                                                                                                                              dot(owa_l_d,
-                                                                                                                                                                                                                                                                                                  owa_l_y)
+                                                                                                                                                                                                                                                                                              LinearAlgebra.dot(owa_l_d,
+                                                                                                                                                                                                                                                                                                                owa_l_y)
                                                                                                                                                                                                                                                                                               -owa_l_z .*
                                                                                                                                                                                                                                                                                               owa_p
                                                                                                                                                                                                                                                                                               owa_h_s *
@@ -206,8 +206,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                               sum(owa_h_nu) +
                                                                                                                                                                                                                                                                                               owa_h_h *
                                                                                                                                                                                                                                                                                               sum(owa_h_eta) +
-                                                                                                                                                                                                                                                                                              dot(owa_h_d,
-                                                                                                                                                                                                                                                                                                  owa_h_y)
+                                                                                                                                                                                                                                                                                              LinearAlgebra.dot(owa_h_d,
+                                                                                                                                                                                                                                                                                                                owa_h_y)
                                                                                                                                                                                                                                                                                               -owa_h_z .*
                                                                                                                                                                                                                                                                                               owa_p
                                                                                                                                                                                                                                                                                               owa_p ./

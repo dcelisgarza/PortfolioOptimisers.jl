@@ -1118,7 +1118,7 @@ function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettin
 end
 function (r::OrderedWeightsArray)(x::VecNum)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
-    return dot(w, sort!(x))
+    return LinearAlgebra.dot(w, sort!(x))
 end
 struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
@@ -1161,7 +1161,7 @@ function (r::OrderedWeightsArrayRange)(x::VecNum)
     w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1
     w2 = isnothing(r.w2) ? reverse(w1) : r.w2
     w = w1 - w2
-    return dot(w, sort!(x))
+    return LinearAlgebra.dot(w, sort!(x))
 end
 
 export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDistance,

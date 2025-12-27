@@ -1,6 +1,6 @@
 function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :GV)
-        G = cholesky(pr.V).U
+        G = LinearAlgebra.cholesky(pr.V).U
         JuMP.@expression(model, GV, G)
     end
     return model[:GV]
@@ -33,7 +33,8 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      nskew_risk::JuMP.AbstractJuMPScalar, key::Symbol,
                                      V::MatNum)
     w = model[:w]
-    qnskew_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model, dot(w, V, w))
+    qnskew_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model,
+                                                              LinearAlgebra.dot(w, V, w))
     ub = variance_risk_bounds_val(false, r.settings.ub)
     set_risk_upper_bound!(model, opt, nskew_risk, ub, key)
     set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
@@ -45,7 +46,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
     key = Symbol(:nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    V, G = isnothing(r.V) ? (pr.V, get_chol_or_V_pm(model, pr)) : (r.V, cholesky(r.V).U)
+    V, G = if isnothing(r.V)
+        (pr.V, get_chol_or_V_pm(model, pr))
+    else
+        (r.V, LinearAlgebra.cholesky(r.V).U)
+    end
     nskew_risk = model[key] = JuMP.@variable(model)
     model[Symbol(:cnskew_soc_, i)] = JuMP.@constraint(model,
                                                       [sc * nskew_risk; sc * G * w] in

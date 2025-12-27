@@ -60,7 +60,7 @@ function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:AbstractWeights,
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecNum, <:Any},
                             w::VecNum, ::Any)
-    return dot(w, r.mu)
+    return LinearAlgebra.dot(w, r.mu)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:Number, <:Any},
                             ::Any, ::Any)
@@ -68,7 +68,7 @@ function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:Number, <
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecScalar, <:Any},
                             w::VecNum, ::Any)
-    return dot(w, r.mu.v) + r.mu.s
+    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
 end
 function calc_deviations_vec(r::MedianAbsoluteDeviation, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)

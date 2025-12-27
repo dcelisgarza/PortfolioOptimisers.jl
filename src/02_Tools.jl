@@ -433,7 +433,7 @@ function dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar})
     return sum(a) * b
 end
 function dot_scalar(a::VecNum, b::VecNum)
-    return dot(a, b)
+    return LinearAlgebra.dot(a, b)
 end
 """
     nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any)

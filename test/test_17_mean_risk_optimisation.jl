@@ -1355,11 +1355,11 @@
     @testset "Number of effective assets" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 10)
         res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
-        @test round(inv(dot(res.w, res.w))) >= 10
+        @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 10
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 15)
         res = optimise(MeanRisk(; obj = MaximumUtility(), opt = opt))
-        @test round(inv(dot(res.w, res.w))) >= 15
+        @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 15
     end
     @testset "Tracking" begin
         rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
@@ -1370,28 +1370,28 @@
                                                err = 3e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
-        @test norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
+        @test LinearAlgebra.norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             te = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 2.5e-3, alg = NOCTracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
-        @test norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
+        @test LinearAlgebra.norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             te = TrackingError(; tr = WeightsTracking(; w = w0),
                                                err = 2e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
-        @test norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
+        @test LinearAlgebra.norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             te = [TrackingError(; tr = WeightsTracking(; w = w0),
                                                 err = 2e-3, alg = NOCTracking())])
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
-        @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
+        @test LinearAlgebra.norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
 
         tr = RiskTrackingError(; err = 0.0, tr = WeightsTracking(; w = w0),
                                alg = DependentVariableTracking())

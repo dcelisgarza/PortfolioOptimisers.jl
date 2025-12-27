@@ -1,14 +1,14 @@
 function calc_risk_constraint_target(::LoHiOrderMoment{<:Any, <:Any, Nothing, <:Any},
                                      w::VecNum, mu::VecNum, args...)
-    return dot(w, mu)
+    return LinearAlgebra.dot(w, mu)
 end
 function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
                                      w::VecNum, args...)
-    return dot(w, r.mu)
+    return LinearAlgebra.dot(w, r.mu)
 end
 function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      w::VecNum, ::Any, k)
-    return dot(w, r.mu.v) + r.mu.s * k
+    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s * k
 end
 function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
                                      ::Any, ::Any, k)
@@ -61,7 +61,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Number,
                                  second_moment, key::Symbol, args...)
-    return model[key] = JuMP.@expression(model, factor * dot(second_moment, second_moment)),
+    return model[key] = JuMP.@expression(model,
+                                         factor *
+                                         LinearAlgebra.dot(second_moment, second_moment)),
                         sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Number,

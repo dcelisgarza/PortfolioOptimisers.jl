@@ -321,13 +321,13 @@ end
 function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum; isigma = nothing,
                      kwargs...)
     if isnothing(isigma)
-        isigma = sigma \ I
+        isigma = sigma \ LinearAlgebra.I
     end
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
 function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum; T::Integer, kwargs...)
-    val = tr(sigma) / T
+    val = LinearAlgebra.tr(sigma) / T
     return range(val, val; length = length(mu))
 end
 """
@@ -385,7 +385,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
     end
     evals = eigvals(sigma)
     mb = mu - b
-    alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
+    alpha = (N * mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
@@ -393,14 +393,14 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
-    isigma = sigma \ I
+    isigma = sigma \ LinearAlgebra.I
     b = if isone(dims)
         transpose(target_mean(me.alg.tgt, transpose(mu), sigma; isigma = isigma, T = T))
     else
         target_mean(me.alg.tgt, mu, sigma; isigma = isigma, T = T)
     end
     mb = vec(mu - b)
-    alpha = (N + 2) / ((N + 2) + T * dot(mb, isigma, mb))
+    alpha = (N + 2) / ((N + 2) + T * LinearAlgebra.dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
@@ -408,15 +408,15 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
-    isigma = sigma \ I
+    isigma = sigma \ LinearAlgebra.I
     b = if isone(dims)
         transpose(target_mean(me.alg.tgt, transpose(mu), sigma; isigma = isigma, T = T))
     else
         target_mean(me.alg.tgt, mu, sigma; isigma = isigma, T = T)
     end
-    u = dot(reshape(mu, :, 1), isigma, reshape(mu, :, 1))
-    v = dot(reshape(b, :, 1), isigma, reshape(b, :, 1))
-    w = dot(reshape(mu, :, 1), isigma, reshape(b, :, 1))
+    u = LinearAlgebra.dot(reshape(mu, :, 1), isigma, reshape(mu, :, 1))
+    v = LinearAlgebra.dot(reshape(b, :, 1), isigma, reshape(b, :, 1))
+    w = LinearAlgebra.dot(reshape(mu, :, 1), isigma, reshape(b, :, 1))
     alpha = (u - N / (T - N)) * v - w^2
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u

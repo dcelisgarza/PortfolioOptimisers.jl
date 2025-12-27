@@ -24,7 +24,7 @@ function (::BrownianDistanceVariance)(x::VecNum)
     D .= x
     D .-= transpose(x)
     D .= abs.(D)
-    val = iT2 * (dot(D, D) + iT2 * sum(D)^2)
+    val = iT2 * (LinearAlgebra.dot(D, D) + iT2 * sum(D)^2)
     return val
 end
 

@@ -117,14 +117,14 @@ function schur_augmentation(A::MatNum, B::MatNum, C::MatNum, gamma::Number)
     return (A_aug + transpose(A_aug)) / 2
 end
 function naive_portfolio_risk(::Variance, sigma::MatNum)
-    w = inv.(diag(sigma))
+    w = inv.(LinearAlgebra.diag(sigma))
     w ./= sum(w)
-    return dot(w, sigma, w)
+    return LinearAlgebra.dot(w, sigma, w)
 end
 function naive_portfolio_risk(::StandardDeviation, sigma::MatNum)
-    w = inv.(diag(sigma))
+    w = inv.(LinearAlgebra.diag(sigma))
     w ./= sum(w)
-    return sqrt(dot(w, sigma, w))
+    return sqrt(LinearAlgebra.dot(w, sigma, w))
 end
 function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                   wb::WeightBounds,
@@ -165,7 +165,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                     throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchurComplement()` or reduce gamma: $gamma."))
                 end
             else
-                if !isposdef(A_aug) || !isposdef(C_aug)
+                if !LinearAlgebra.isposdef(A_aug) || !LinearAlgebra.isposdef(C_aug)
                     return nothing, nothing
                 end
             end
@@ -226,7 +226,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                       alg = NonMonotonicSchurComplement(), flag = false)
     function objective(x::Number)
         w = schur_complement_weights(pr, items, wb, nm_params, x)[1]
-        risk = isnothing(w) ? typemax(eltype(pr.X)) : dot(w, r.sigma, w)
+        risk = isnothing(w) ? typemax(eltype(pr.X)) : LinearAlgebra.dot(w, r.sigma, w)
         return w, risk
     end
     gammas = range(zero(max_gamma), max_gamma; length = params.alg.N)

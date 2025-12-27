@@ -251,12 +251,12 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
     f_omega = tau * calc_omega(pe.views_conf, P, f_sigma)
     (; b, M) = rr
-    sigma_hat = f_sigma \ I + transpose(P) * (f_omega \ P)
+    sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (f_omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (f_omega \ Q))
     v1 = prior_sigma \ M
     v2 = sigma_hat + transpose(M) * v1
-    v3 = prior_sigma \ I
-    posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ I
+    v3 = prior_sigma \ LinearAlgebra.I
+    posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,

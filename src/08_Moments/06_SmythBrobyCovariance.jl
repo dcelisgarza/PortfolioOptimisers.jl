@@ -794,8 +794,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos - neg
         end
     end
-    h = sqrt.(diag(rho))
-    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
+    h = sqrt.(LinearAlgebra.diag(rho))
+    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -863,8 +863,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos - neg
         end
     end
-    h = sqrt.(diag(rho))
-    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
+    h = sqrt.(LinearAlgebra.diag(rho))
+    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -1280,8 +1280,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos * cpos - neg * cneg
         end
     end
-    h = sqrt.(diag(rho))
-    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
+    h = sqrt.(LinearAlgebra.diag(rho))
+    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -1354,8 +1354,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos * cpos - neg * cneg
         end
     end
-    h = sqrt.(diag(rho))
-    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
+    h = sqrt.(LinearAlgebra.diag(rho))
+    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end

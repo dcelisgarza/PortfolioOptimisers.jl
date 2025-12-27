@@ -183,7 +183,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
     catch
         sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
             sigma = StatsBase.cov2cor(Matrix(sigma))
         end
@@ -197,7 +197,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
     else
         sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
             sigma = StatsBase.cov2cor(Matrix(sigma))
         end
@@ -216,7 +216,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWei
     catch
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
             sigma = StatsBase.cov2cor(Matrix(sigma))
         end
@@ -230,7 +230,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWei
     else
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
             sigma = StatsBase.cov2cor(Matrix(sigma))
         end

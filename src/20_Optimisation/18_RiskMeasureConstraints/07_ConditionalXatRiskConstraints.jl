@@ -17,7 +17,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
         JuMP.@expression(model, var + sum(z_cvar) * iat)
     else
         iat = inv(r.alpha * sum(wi))
-        JuMP.@expression(model, var + dot(wi, z_cvar) * iat)
+        JuMP.@expression(model, var + LinearAlgebra.dot(wi, z_cvar) * iat)
     end
     model[Symbol(:ccvar_, i)] = JuMP.@constraint(model, sc * ((z_cvar + net_X) .+ var) >= 0)
     set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, key)
@@ -59,12 +59,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
         model[Symbol(:cvar_risk_l_, i)], model[Symbol(:cvar_risk_h_, i)] = JuMP.@expressions(model,
                                                                                              begin
                                                                                                  var_l +
-                                                                                                 dot(wi,
-                                                                                                     z_cvar_l) *
+                                                                                                 LinearAlgebra.dot(wi,
+                                                                                                                   z_cvar_l) *
                                                                                                  iat
                                                                                                  var_h +
-                                                                                                 dot(wi,
-                                                                                                     z_cvar_h) *
+                                                                                                 LinearAlgebra.dot(wi,
+                                                                                                                   z_cvar_h) *
                                                                                                  ibt
                                                                                              end)
     end
@@ -369,7 +369,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
         JuMP.@expression(model, dar + sum(z_cdar) * iat)
     else
         iat = inv(r.alpha * sum(wi))
-        JuMP.@expression(model, dar + dot(wi, z_cdar) * iat)
+        JuMP.@expression(model, dar + LinearAlgebra.dot(wi, z_cdar) * iat)
     end
     model[Symbol(:ccdar_, i)] = JuMP.@constraint(model,
                                                  sc *

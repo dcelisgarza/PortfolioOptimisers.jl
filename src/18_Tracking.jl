@@ -241,9 +241,9 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Details
 
-  - For `SOCTracking`, computes `norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is not `nothing`, else unscaled.
-  - For `SquaredSOCTracking`, computes `norm(a - b, 2)^2 / (N - f.ddof)` if `N` is not `nothing`, else unscaled.
-  - For `NOCTracking`, computes `norm(a - b, 1) / N` if `N` is not `nothing`, else unscaled.
+  - For `SOCTracking`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is not `nothing`, else unscaled.
+  - For `SquaredSOCTracking`, computes `LinearAlgebra.norm(a - b, 2)^2 / (N - f.ddof)` if `N` is not `nothing`, else unscaled.
+  - For `NOCTracking`, computes `LinearAlgebra.norm(a - b, 1) / N` if `N` is not `nothing`, else unscaled.
 
 # Examples
 
@@ -264,16 +264,16 @@ julia> PortfolioOptimisers.norm_tracking(NOCTracking(), [0.5, 0.5], [0.6, 0.4], 
 """
 function norm_tracking(f::SOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
-    return norm(a - b, 2) / factor
+    return LinearAlgebra.norm(a - b, 2) / factor
 end
 function norm_tracking(f::SquaredSOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : (N - f.ddof)
-    val = norm(a - b, 2)
+    val = LinearAlgebra.norm(a - b, 2)
     return val^2 / factor
 end
 function norm_tracking(::NOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = ifelse(isnothing(N), 1, N)
-    return norm(a - b, 1) / factor
+    return LinearAlgebra.norm(a - b, 1) / factor
 end
 """
     struct IndependentVariableTracking <: VariableTracking end

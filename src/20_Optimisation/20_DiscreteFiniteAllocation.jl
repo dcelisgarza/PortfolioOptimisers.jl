@@ -115,7 +115,7 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                     end)
     # r := remaining money
     # eta := ideal_investment - discrete_investment
-    JuMP.@expression(model, r, cash - dot(x, p))
+    JuMP.@expression(model, r, cash - LinearAlgebra.dot(x, p))
     JuMP.@constraint(model, sc * r >= 0)
     set_discrete_error!(model, w, p, cash, da.wf)
     JuMP.@objective(model, Min, so * (u + r))

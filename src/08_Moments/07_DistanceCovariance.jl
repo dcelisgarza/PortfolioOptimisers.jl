@@ -121,9 +121,9 @@ function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
     mu_a3, mu_b3 = mean(a), mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-    dcov2_xx = dot(A, A) / N2
-    dcov2_xy = dot(A, B) / N2
-    dcov2_yy = dot(B, B) / N2
+    dcov2_xx = LinearAlgebra.dot(A, A) / N2
+    dcov2_xy = LinearAlgebra.dot(A, B) / N2
+    dcov2_yy = LinearAlgebra.dot(B, B) / N2
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
 """
@@ -177,7 +177,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations.
+  - `rho::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise distance correlations.
 
 # Validation
 
@@ -265,7 +265,7 @@ function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
     mu_a3, mu_b3 = mean(a), mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-    dcov2_xy = dot(A, B) / N2
+    dcov2_xy = LinearAlgebra.dot(A, B) / N2
     return sqrt(dcov2_xy)
 end
 """
@@ -282,7 +282,7 @@ This function computes the distance covariance between each pair of columns in `
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise distance covariances.
 
 # Details
 
@@ -319,7 +319,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: LinearAlgebra.Symmetric matrix of pairwise distance covariances.
 
 # Validation
 

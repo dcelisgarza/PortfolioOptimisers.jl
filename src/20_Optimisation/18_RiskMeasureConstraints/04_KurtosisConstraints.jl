@@ -1,6 +1,6 @@
 function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :Gkt)
-        G = cholesky(pr.S2 * pr.kt * transpose(pr.S2)).U
+        G = LinearAlgebra.cholesky(pr.S2 * pr.kt * transpose(pr.S2)).U
         JuMP.@expression(model, Gkt, G)
     end
     return model[:Gkt]
@@ -9,7 +9,7 @@ function get_kt_Akt_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :vecs_Akt)
         N = length(pr.mu)
         A = block_vec_pq(pr.kt, N, N)
-        vals_A, vecs_A = eigen(A)
+        vals_A, vecs_A = LinearAlgebra.eigen(A)
         vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
         JuMP.@expressions(model, begin
                               vecs_Akt, vecs_A
@@ -45,7 +45,8 @@ function set_kurtosis_risk!(model::JuMP.Model,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt,
                             key::Symbol, args...)
     qsqrt_kurtosis_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model,
-                                                                      dot(x_kurt, x_kurt))
+                                                                      LinearAlgebra.dot(x_kurt,
+                                                                                        x_kurt))
     ub = variance_risk_bounds_val(false, r.settings.ub)
     set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub, key)
     set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
@@ -89,7 +90,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         get_kt_Akt_pm(model, pr)
     else
         A = block_vec_pq(r.kt, N, N)
-        vals_A, vecs_A = eigen(A)
+        vals_A, vecs_A = LinearAlgebra.eigen(A)
         vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
         vals_A, vecs_A
     end
@@ -110,8 +111,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                    [i = 1:Nf],
                                                                                                    sc *
                                                                                                    (x_kurt[i] -
-                                                                                                    tr(Bi[i] *
-                                                                                                       W)) ==
+                                                                                                    LinearAlgebra.tr(Bi[i] *
+                                                                                                                     W)) ==
                                                                                                    0
                                                                                                end)
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, key, i)
@@ -126,7 +127,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     G = if isnothing(r.kt)
         get_chol_or_Gkt_pm(model, pr)
     else
-        cholesky(pr.S2 * r.kt * transpose(pr.S2)).U
+        LinearAlgebra.cholesky(pr.S2 * r.kt * transpose(pr.S2)).U
     end
     sqrt_kurtosis_risk = model[key] = JuMP.@variable(model)
     L2W = if !haskey(model, :L2W)

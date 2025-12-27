@@ -1,6 +1,6 @@
 function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     if !haskey(model, :G)
-        G = isnothing(pr.chol) ? cholesky(pr.sigma).U : pr.chol
+        G = isnothing(pr.chol) ? LinearAlgebra.cholesky(pr.sigma).U : pr.chol
         JuMP.@expression(model, G, G)
     end
     return model[:G]
@@ -21,7 +21,11 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
     key = Symbol(:sd_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
+    G = if isnothing(r.sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        LinearAlgebra.cholesky(r.sigma).U
+    end
     sd_risk = model[key] = JuMP.@variable(model)
     model[Symbol(:csd_risk_soc_, i)] = JuMP.@constraint(model,
                                                         [sc * sd_risk; sc * G * w] in
@@ -64,14 +68,18 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
     W = set_sdp_constraints!(model)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = JuMP.@expression(model, sigma * W)
-    return model[key] = JuMP.@expression(model, tr(sigma_W))
+    return model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
+    G = if isnothing(r.sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        LinearAlgebra.cholesky(r.sigma).U
+    end
     key_dev = Symbol(:dev_, i)
     dev = model[key_dev] = JuMP.@variable(model)
     model[Symbol(key_dev, :_soc)] = JuMP.@constraint(model,
@@ -85,12 +93,16 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     w = model[:w]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
+    G = if isnothing(r.sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        LinearAlgebra.cholesky(r.sigma).U
+    end
     dev = model[Symbol(:dev_, i)] = JuMP.@variable(model)
     model[Symbol(:cdev_soc_, i)] = JuMP.@constraint(model,
                                                     [sc * dev; sc * G * w] in
                                                     JuMP.SecondOrderCone())
-    return model[key] = JuMP.@expression(model, dot(w, sigma, w))
+    return model[key] = JuMP.@expression(model, LinearAlgebra.dot(w, sigma, w))
 end
 function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
     return if flag
@@ -126,7 +138,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
         JuMP.@expression(model, rc_variance, true)
     end
     rc_key = Symbol(:rc_variance_, i)
-    vsw = vec(diag(sigma_W))
+    vsw = vec(LinearAlgebra.diag(sigma_W))
     if !isnothing(rc.A_ineq)
         model[Symbol(rc_key, :_ineq)] = JuMP.@constraint(model,
                                                          sc * (rc.A_ineq * vsw -
@@ -178,7 +190,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = JuMP.@expression(model,
                                                              transpose(b1) * sigma * b1 * W)
-    variance_risk = model[key] = JuMP.@expression(model, tr(sigma_W))
+    variance_risk = model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
     rc_variance_constraints!(model, i, rc, variance_risk)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, true)
     ub = variance_risk_bounds_val(true, r.settings.ub)
@@ -192,8 +204,8 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
         W = model[:W]
         N = size(W, 1)
         JuMP.@variables(model, begin
-                            Au[1:N, 1:N] >= 0, Symmetric
-                            Al[1:N, 1:N] >= 0, Symmetric
+                            Au[1:N, 1:N] >= 0, LinearAlgebra.Symmetric
+                            Al[1:N, 1:N] >= 0, LinearAlgebra.Symmetric
                         end)
         JuMP.@constraint(model, cbucs_variance, sc * (Au - Al - W) == 0)
     end
@@ -202,7 +214,9 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     Al = model[:Al]
     ub = ucs.ub
     lb = ucs.lb
-    ucs_variance_risk = model[key] = JuMP.@expression(model, tr(Au * ub) - tr(Al * lb))
+    ucs_variance_risk = model[key] = JuMP.@expression(model,
+                                                      LinearAlgebra.tr(Au * ub) -
+                                                      LinearAlgebra.tr(Al * lb))
     return ucs_variance_risk, key
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
@@ -211,21 +225,21 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
     if !haskey(model, :E)
         W = model[:W]
         N = size(W, 1)
-        JuMP.@variable(model, E[1:N, 1:N], Symmetric)
+        JuMP.@variable(model, E[1:N, 1:N], LinearAlgebra.Symmetric)
         JuMP.@expression(model, WpE, W + E)
         JuMP.@constraint(model, ceucs_variance, sc * E in JuMP.PSDCone())
     end
     key = Symbol(:eucs_variance_risk_, i)
     WpE = model[:WpE]
     k = ucs.k
-    G = cholesky(ucs.sigma).U
+    G = LinearAlgebra.cholesky(ucs.sigma).U
     t_eucs = model[Symbol(:t_eucs, i)] = JuMP.@variable(model)
     x_eucs, ucs_variance_risk = model[Symbol(:x_eucs, i)], model[key] = JuMP.@expressions(model,
                                                                                           begin
                                                                                               G *
                                                                                               vec(WpE)
-                                                                                              tr(sigma *
-                                                                                                 WpE) +
+                                                                                              LinearAlgebra.tr(sigma *
+                                                                                                               WpE) +
                                                                                               k *
                                                                                               t_eucs
                                                                                           end)

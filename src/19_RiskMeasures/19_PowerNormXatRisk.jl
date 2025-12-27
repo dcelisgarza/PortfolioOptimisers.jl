@@ -18,7 +18,7 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
         JuMP.@constraint(model, sum(pvar_v) - pvar_t <= 0)
         inv(alpha * T^ip)
     else
-        JuMP.@constraint(model, dot(w, pvar_v) - pvar_t <= 0)
+        JuMP.@constraint(model, LinearAlgebra.dot(w, pvar_v) - pvar_t <= 0)
         inv(alpha * sum(w)^ip)
     end
     JuMP.@constraints(model,
@@ -29,7 +29,7 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
                       end)
     JuMP.@objective(model, Min, pvar_eta + iaT * pvar_t)
     return if optimise_JuMP_model!(model, slv).success
-        objective_value(model)
+        JuMP.objective_value(model)
     else
         NaN
     end

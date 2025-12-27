@@ -164,10 +164,10 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * cholesky(f_sigma).L
+    posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
     if pe.rsd
         err = X - posterior_X
-        err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
+        err_sigma = LinearAlgebra.diagm(vec(var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end

@@ -24,9 +24,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     else
         sw = sum(wi)
         model[Symbol(:csvar_, i)] = JuMP.@constraint(model,
-                                                     sc *
-                                                     (dot(wi, z_var) - alpha * sw + s * sw) <=
-                                                     0)
+                                                     sc * (LinearAlgebra.dot(wi, z_var) -
+                                                           alpha * sw + s * sw) <= 0)
     end
     model[Symbol(:cvar_, i)] = JuMP.@constraint(model,
                                                 sc * ((net_X + b * z_var) .+ var_risk) >= 0)
@@ -80,16 +79,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = JuMP.@constraints(model,
                                                                                      begin
                                                                                          sc *
-                                                                                         (dot(wi,
-                                                                                              z_var_l) -
+                                                                                         (LinearAlgebra.dot(wi,
+                                                                                                            z_var_l) -
                                                                                           alpha *
                                                                                           sw +
                                                                                           s *
                                                                                           sw) <=
                                                                                          0
                                                                                          sc *
-                                                                                         (dot(wi,
-                                                                                              z_var_h) -
+                                                                                         (LinearAlgebra.dot(wi,
+                                                                                                            z_var_h) -
                                                                                           beta *
                                                                                           sw +
                                                                                           s *
@@ -139,13 +138,17 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
+    G = if isnothing(alg.sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        LinearAlgebra.cholesky(alg.sigma).U
+    end
     w = model[:w]
     sc = model[:sc]
     z = compute_value_at_risk_z(r.alg.dist, r.alpha)
     key = Symbol(:var_risk_, i)
     g_var = model[Symbol(:g_var_, i)] = JuMP.@variable(model)
-    var_risk = model[key] = JuMP.@expression(model, -dot(mu, w) + z * g_var)
+    var_risk = model[key] = JuMP.@expression(model, -LinearAlgebra.dot(mu, w) + z * g_var)
     model[Symbol(:cvar_soc_, i)] = JuMP.@constraint(model,
                                                     [sc * g_var; sc * G * w] in
                                                     JuMP.SecondOrderCone())
@@ -159,7 +162,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
+    G = if isnothing(alg.sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        LinearAlgebra.cholesky(alg.sigma).U
+    end
     w = model[:w]
     sc = model[:sc]
     dist = r.alg.dist
@@ -167,7 +174,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     z_h = compute_value_at_risk_cz(dist, r.beta)
     key = Symbol(:var_range_risk_, i)
     g_var = model[Symbol(:g_var_range_, i)] = JuMP.@variable(model)
-    var_range_mu = model[Symbol(:var_range_mu_, i)] = JuMP.@expression(model, dot(mu, w))
+    var_range_mu = model[Symbol(:var_range_mu_, i)] = JuMP.@expression(model,
+                                                                       LinearAlgebra.dot(mu,
+                                                                                         w))
     var_risk_l, var_risk_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:var_risk_h_, i)] = JuMP.@expressions(model,
                                                                                                                 begin
                                                                                                                     -var_range_mu +
@@ -211,9 +220,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
     else
         sw = sum(wi)
         model[Symbol(:csdar_, i)] = JuMP.@constraint(model,
-                                                     sc *
-                                                     (dot(wi, z_dar) - alpha * sw + s * sw) <=
-                                                     0)
+                                                     sc * (LinearAlgebra.dot(wi, z_dar) -
+                                                           alpha * sw + s * sw) <= 0)
     end
     model[Symbol(:cdar_, i)] = JuMP.@constraint(model,
                                                 sc *

@@ -44,7 +44,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::MatNum,
     ax = Axis(f[fpos...]; ax_kwargs...)
     ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     ret = view(ret, :, idx)
     nx = view(nx, idx)
     for i in 1:N
@@ -71,7 +71,7 @@ function plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
                                                    xticklabelrotation = pi / 3),
                           bar_kwargs::NamedTuple = (;))
     M = length(w)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
@@ -207,7 +207,7 @@ function plot_clusters(clr::AbstractClusteringResult, X::MatNum,
                                                         origin = Point2d(0,
                                                                          clr.clustering.heights[end])))
     assert_matrix_issquare(X)
-    iscov = any(!isone, diag(X))
+    iscov = any(!isone, LinearAlgebra.diag(X))
     if iscov
         X = cov2cor(X)
     end

@@ -66,10 +66,10 @@ function calc_moment_target(r::TCM_Sk{<:AbstractWeights, Nothing}, ::Any, x::Vec
     return mean(x, r.w)
 end
 function calc_moment_target(r::TCM_Sk{<:Any, <:VecNum}, w::VecNum, ::Any)
-    return dot(w, r.mu)
+    return LinearAlgebra.dot(w, r.mu)
 end
 function calc_moment_target(r::TCM_Sk{<:Any, <:VecScalar}, w::VecNum, ::Any)
-    return dot(w, r.mu.v) + r.mu.s
+    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::TCM_Sk{<:Any, <:Number}, ::Any, ::Any)
     return r.mu

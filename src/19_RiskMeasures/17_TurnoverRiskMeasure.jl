@@ -11,7 +11,7 @@ function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettin
     return TurnoverRiskMeasure(settings, w)
 end
 function (r::TurnoverRiskMeasure)(w::VecNum)
-    return norm(r.w - w, 1)
+    return LinearAlgebra.norm(r.w - w, 1)
 end
 function risk_measure_view(r::TurnoverRiskMeasure, i, args...)
     w = view(r.w, i)

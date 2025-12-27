@@ -310,7 +310,7 @@ function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, si
     fit_result = fit(re.retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
-    beta0 = mean_y - dot(beta, mu)
+    beta0 = mean_y - LinearAlgebra.dot(beta, mu)
     pushfirst!(beta, beta0)
     return beta
 end
@@ -360,7 +360,7 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     end
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)
-    L = transpose(pinv(Vp) * transpose(M .* transpose(sigma)))
+    L = transpose(LinearAlgebra.pinv(Vp) * transpose(M .* transpose(sigma)))
     return Regression(; b = b, M = M, L = L)
 end
 

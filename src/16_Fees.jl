@@ -646,11 +646,11 @@ function calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)
 end
 function calc_fees(w::VecNum, p::VecNum, fees::Number, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return fees * dot(w[idx], p[idx])
+    return fees * LinearAlgebra.dot(w[idx], p[idx])
 end
 function calc_fees(w::VecNum, p::VecNum, fees::VecNum, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return dot(fees[idx], w[idx] .* p[idx])
+    return LinearAlgebra.dot(fees[idx], w[idx] .* p[idx])
 end
 """
     calc_fees(w::VecNum, p::VecNum, ::Nothing)
@@ -694,10 +694,10 @@ function calc_fees(w::VecNum, p::VecNum, ::Nothing)
     return zero(promote_type(eltype(w), eltype(p)))
 end
 function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:Number})
-    return tn.val * dot(abs.(w - tn.w), p)
+    return tn.val * LinearAlgebra.dot(abs.(w - tn.w), p)
 end
 function calc_fees(w::VecNum, p::VecNum, tn::Turnover{<:Any, <:VecNum})
-    return dot(tn.val, abs.(w - tn.w) .* p)
+    return LinearAlgebra.dot(tn.val, abs.(w - tn.w) .* p)
 end
 """
     calc_fees(w::VecNum, p::VecNum, fees::Fees)
@@ -790,7 +790,7 @@ function calc_fees(w::VecNum, fees::Number, op::Function)
 end
 function calc_fees(w::VecNum, fees::VecNum, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    return dot(fees[idx], w[idx])
+    return LinearAlgebra.dot(fees[idx], w[idx])
 end
 """
     calc_fees(w::VecNum, ::Nothing)
@@ -836,7 +836,7 @@ function calc_fees(w::VecNum, tn::Turnover{<:Any, <:Number})
     return tn.val * sum(abs.(w - tn.w))
 end
 function calc_fees(w::VecNum, tn::Turnover{<:Any, <:VecNum})
-    return dot(tn.val, abs.(w - tn.w))
+    return LinearAlgebra.dot(tn.val, abs.(w - tn.w))
 end
 """
     calc_fixed_fees(w::VecNum, ::Nothing, kwargs::NamedTuple, ::Function)

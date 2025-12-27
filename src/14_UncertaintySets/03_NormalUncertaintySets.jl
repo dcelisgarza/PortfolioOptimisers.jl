@@ -213,7 +213,9 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)
     posdef!(ue.pe.ce.mp.pdm, sigma_u)
-    mu_u = Distributions.cquantile(Distributions.Normal(), q) * sqrt.(diag(sigma_mu)) * 2
+    mu_u = Distributions.cquantile(Distributions.Normal(), q) *
+           sqrt.(LinearAlgebra.diag(sigma_mu)) *
+           2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = N)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
@@ -259,7 +261,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     sigma = pr.sigma
     q = ue.q * 0.5
     mu_u = Distributions.cquantile(Distributions.Normal(), q) *
-           sqrt.(diag(sigma / size(pr.X, 1))) *
+           sqrt.(LinearAlgebra.diag(sigma / size(pr.X, 1))) *
            2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = size(pr.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
@@ -388,8 +390,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
@@ -452,8 +454,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
@@ -511,8 +513,8 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q)
     k_sigma = k_ucs(ue.alg.method, ue.q)
@@ -573,7 +575,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     end
     X_mu = transpose(rand(ue.rng, Distributions.MvNormal(mu, sigma), ue.n_sim))
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_mu = LinearAlgebra.LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
@@ -628,7 +630,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
@@ -682,7 +684,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
@@ -749,7 +751,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
@@ -808,7 +810,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
@@ -864,7 +866,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q)
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,

@@ -146,11 +146,11 @@ function calc_moment_target(r::Kurtosis{<:Any, <:AbstractWeights, Nothing, <:Any
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, <:Any, <:Any, <:Any, <:Any},
                             w::VecNum, ::Any)
-    return dot(w, r.mu)
+    return LinearAlgebra.dot(w, r.mu)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, <:Any, <:Any, <:Any,
                                         <:Any}, w::VecNum, ::Any)
-    return dot(w, r.mu.v) + r.mu.s
+    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, <:Any, <:Any, <:Any, <:Any},
                             ::Any, ::Any)

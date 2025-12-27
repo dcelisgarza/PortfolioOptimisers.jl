@@ -452,7 +452,7 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
   - [`EllipseUncertaintySetAlgorithm`](@ref)
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
-    k_mus = diag(X * (sigma_X \ transpose(X)))
+    k_mus = LinearAlgebra.diag(X * (sigma_X \ transpose(X)))
     return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)

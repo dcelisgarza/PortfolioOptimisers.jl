@@ -48,11 +48,11 @@
         sigma4 = posdef(Posdef(), sigma1)
 
         posdef!(Posdef(), sigma1)
-        @test isposdef(sigma1)
+        @test LinearAlgebra.isposdef(sigma1)
         @test sigma4 == sigma1
 
         posdef!(nothing, sigma2)
-        @test !isposdef(sigma2)
+        @test !LinearAlgebra.isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
 
         @test isnothing(posdef(nothing))

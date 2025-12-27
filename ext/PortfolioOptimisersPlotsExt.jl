@@ -34,8 +34,10 @@ function compute_relevant_assets(w::VecNum, M::Number, N::Number)
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Option{<:Number} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -49,7 +51,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            ekwargs...)
     ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     ret = view(ret, :, idx)
     nx = view(nx, idx)
     f = plot(; f_kwargs...)
@@ -78,7 +80,7 @@ function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:
                                                                     legend = false),
                                               ekwargs...)
     M = length(w)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     return if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
@@ -125,7 +127,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
                       kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",
@@ -187,7 +190,7 @@ function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::ClE_Cl,
     nx = !isnothing(rd.nx) ? rd.nx : (1:size(pr.X, 2))
 
     X = copy(clr.S)
-    s = diag(X)
+    s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)

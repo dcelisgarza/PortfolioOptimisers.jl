@@ -23,8 +23,8 @@ Keyword arguments correspond to the fields above.
 
   - If `X` is a `MatNum`:
 
-      + Must be symmetric, `issymmetric(X) == true`.
-      + Must have zero diagonal, `all(iszero, diag(X)) == true`.
+      + Must be symmetric, `LinearAlgebra.issymmetric(X) == true`.
+      + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X)) == true`.
 
 # Examples
 
@@ -49,8 +49,8 @@ struct PhylogenyResult{T} <: AbstractPhylogenyResult
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, MatNum)
-            @argcheck(issymmetric(X))
-            @argcheck(all(iszero, diag(X)))
+            @argcheck(LinearAlgebra.issymmetric(X))
+            @argcheck(all(iszero, LinearAlgebra.diag(X)))
         end
         return new{typeof(X)}(X)
     end
@@ -1091,7 +1091,7 @@ This function computes the centrality vector and returns the weighted average us
 """
 function average_centrality(ne::PhE_Ph, cent::AbstractCentralityAlgorithm, w::VecNum,
                             X::MatNum; dims::Int = 1, kwargs...)
-    return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
+    return LinearAlgebra.dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, X::MatNum;
@@ -1145,7 +1145,7 @@ This function computes the weighted sum of the phylogeny matrix, normalised by t
 """
 function asset_phylogeny(w::VecNum, X::MatNum)
     aw = abs.(w * transpose(w))
-    c = dot(X, aw)
+    c = LinearAlgebra.dot(X, aw)
     c /= sum(aw)
     return c
 end

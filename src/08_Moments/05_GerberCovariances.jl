@@ -544,7 +544,7 @@ The algorithm proceeds as follows:
 
  2. Compute the signed indicator matrix `UmD = U - D`.
  3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
- 4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(diag(H))`.
+ 4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
  5. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -566,7 +566,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
     # H = nconc - ndisc
     UmD = U - D
     H = transpose(UmD) * (UmD)
-    h = sqrt.(diag(H))
+    h = sqrt.(LinearAlgebra.diag(H))
     rho = H ⊘ (h * transpose(h))
     posdef!(ce.pdm, rho)
     return rho
@@ -598,7 +598,7 @@ The algorithm proceeds as follows:
 
  2. Compute the signed indicator matrix `UmD = U - D`.
  3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
- 4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(diag(H))`.
+ 4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
  5. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -618,7 +618,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}
     # H = nconc - ndisc
     UmD = U - D
     H = transpose(UmD) * (UmD)
-    h = sqrt.(diag(H))
+    h = sqrt.(LinearAlgebra.diag(H))
     rho = H ⊘ (h * transpose(h))
     posdef!(ce.pdm, rho)
     return rho

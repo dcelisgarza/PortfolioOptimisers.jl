@@ -22,8 +22,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
         inv(r.alpha * T^ip)
     else
         model[Symbol(:cpvar_eq_, i)] = JuMP.@constraint(model,
-                                                        sc * (dot(wi, pvar_v) - pvar_t) <=
-                                                        0)
+                                                        sc *
+                                                        (LinearAlgebra.dot(wi, pvar_v) -
+                                                         pvar_t) <= 0)
         inv(r.alpha * sum(wi)^ip)
     end
     model[Symbol(:cpvar_, i)], model[Symbol(:cpvar_pcone_, i)] = JuMP.@constraints(model,
@@ -87,13 +88,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
         model[Symbol(:cpvar_eq_l_, i)], model[Symbol(:cpvar_eq_h_, i)] = JuMP.@constraints(model,
                                                                                            begin
                                                                                                sc *
-                                                                                               (dot(wi,
-                                                                                                    pvar_v_l) -
+                                                                                               (LinearAlgebra.dot(wi,
+                                                                                                                  pvar_v_l) -
                                                                                                 pvar_t_l) <=
                                                                                                0
                                                                                                sc *
-                                                                                               (dot(wi,
-                                                                                                    pvar_v_h) -
+                                                                                               (LinearAlgebra.dot(wi,
+                                                                                                                  pvar_v_h) -
                                                                                                 pvar_t_h) >=
                                                                                                0
                                                                                            end)
@@ -164,8 +165,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownat
         inv(r.alpha * T^ip)
     else
         model[Symbol(:cpdar_eq_, i)] = JuMP.@constraint(model,
-                                                        sc * (dot(wi, pdar_v) - pdar_t) <=
-                                                        0)
+                                                        sc *
+                                                        (LinearAlgebra.dot(wi, pdar_v) -
+                                                         pdar_t) <= 0)
         inv(r.alpha * sum(wi)^ip)
     end
     model[Symbol(:cpdar_, i)], model[Symbol(:cpdar_pcone_, i)] = JuMP.@constraints(model,

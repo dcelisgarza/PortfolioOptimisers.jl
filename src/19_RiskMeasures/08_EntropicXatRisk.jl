@@ -15,14 +15,14 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
         JuMP.@constraint(model, sum(u) - z <= 0)
         alpha * T
     else
-        JuMP.@constraint(model, dot(w, u) - z <= 0)
+        JuMP.@constraint(model, LinearAlgebra.dot(w, u) - z <= 0)
         alpha * sum(w)
     end
     JuMP.@constraint(model, [i = 1:T], [-x[i] - t, z, u[i]] in JuMP.MOI.ExponentialCone())
     JuMP.@expression(model, risk, t - z * log(aT))
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
-        objective_value(model)
+        JuMP.objective_value(model)
     else
         NaN
     end

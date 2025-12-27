@@ -39,7 +39,7 @@ end
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
     pr = prior(iv.pe, rd; dims = dims)
-    w = inv.(sqrt.(diag(pr.sigma)))
+    w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     return NaiveOptimisation(typeof(iv), pr, w / sum(w), OptimisationSuccess(nothing),
                              nothing)
 end

@@ -424,7 +424,7 @@ This function computes the distance matrix containing the lengths of the shortes
 function distance_wei(L::MatNum)
     N = size(L, 1)
     D = fill(typemax(eltype(L)), N, N)
-    D[diagind(D)] .= 0  # Distance matrix
+    D[LinearAlgebra.diagind(D)] .= 0  # Distance matrix
     B = zeros(Int, N, N)     # Number of edges matrix
 
     for u in axes(L, 1)
@@ -490,11 +490,11 @@ This function identifies all 3-cliques (triangles) in the adjacency matrix `A` o
   - [`DBHT`](@ref)
 """
 function clique3(A::MatNum)
-    A = A - Diagonal(A)
+    A = A - LinearAlgebra.Diagonal(A)
     A = A .!= 0
     A2 = A * A
     P = (A2 .!= 0) ⊙ (A .!= 0)
-    P = sparse(UpperTriangular(P))
+    P = sparse(LinearAlgebra.UpperTriangular(P))
     r, c = findnz(P .!= 0)[1:2]
     E = hcat(r, c)
 
@@ -829,7 +829,7 @@ function BubbleHierarchy(Pred::VecNum, Sb::VecNum)
     end
 
     H = H + transpose(H)
-    H = H - Diagonal(H)
+    H = H - LinearAlgebra.Diagonal(H)
     return H, Mb
 end
 """
@@ -855,7 +855,7 @@ This method enforces a unique root in the clique hierarchy. If multiple root can
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
 
 # Related
 
@@ -903,7 +903,7 @@ This method creates a root from the adjacency tree of all root candidate cliques
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
 
 # Related
 
@@ -953,8 +953,8 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
 # Returns
 
-  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
-  - `H2::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the bubble hierarchy tree.
+  - `H::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H2::SparseMatrixCSC{Int, Int}`: LinearAlgebra.Symmetric adjacency matrix representing the bubble hierarchy tree.
   - `Mb::Matrix{Int}`: Bubble membership matrix for 3-cliques (`Nc×Nb`), where `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
   - `CliqList::Matrix{Int}`: List of 3-cliques (`Nc×3`), each row contains the vertex indices of a 3-clique.
   - `Sb::Vector{Int}`: Vector indicating the size of the separating set for each 3-clique.
@@ -1044,7 +1044,7 @@ This function assigns directions to each separating 3-clique in the undirected b
 """
 function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::MatNum)
     Hb = Hb .!= 0
-    r, c, _ = findnz(sparse(UpperTriangular(Hb) .!= 0))
+    r, c, _ = findnz(sparse(LinearAlgebra.UpperTriangular(Hb) .!= 0))
     CliqEdge = Matrix{Int}(undef, 0, 3)
     for n in eachindex(r)
         data = findall(Mb[:, r[n]] .!= 0 .&& Mb[:, c[n]] .!= 0)
@@ -1168,7 +1168,7 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
         Tc[v] .= ci
 
         # Compute the distance between a vertex and the converging bubbles
-        Udjv = Dpm * Mdjv * diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
+        Udjv = Dpm * Mdjv * LinearAlgebra.diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
         Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 
         imn = vec(getindex.(argmin(Udjv[vec(sum(Mdjv; dims = 2)) .== 0, :]; dims = 2), 2))  # Look for the closest converging bubble
@@ -1220,7 +1220,7 @@ function BubbleMember(Rpm::MatNum, Mv::MatNum, Mc::MatNum)
     for n in eachindex(vu)
         bub = findall(Mc[vu[n], :] .!= 0)
         vu_bub = vec(sum(Rpm[:, vu[n]] ⊙ Mv[:, bub]; dims = 1))
-        all_bub = diag(transpose(Mv[:, bub]) * Rpm * Mv[:, bub]) / 2
+        all_bub = LinearAlgebra.diag(transpose(Mv[:, bub]) * Rpm * Mv[:, bub]) / 2
         frac = vu_bub ⊘ all_bub
         imx = vec(argmax(frac; dims = 1))
         Mvv[vu[n], bub[imx]] .= 1
@@ -1540,8 +1540,8 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
 
 # Validation
 
-  - `!isempty(D) && issymmetric(D)`.
-  - `!isempty(S) && issymmetric(S)`.
+  - `!isempty(D) && LinearAlgebra.issymmetric(D)`.
+  - `!isempty(S) && LinearAlgebra.issymmetric(S)`.
   - `size(D) == size(S)`.
 
 # Details
@@ -1977,7 +1977,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.dist, sigma, X)
-    s = diag(sigma)
+    s = LinearAlgebra.diag(sigma)
     iscov = any(!isone, s)
     S = if iscov
         s .= sqrt.(s)
@@ -1988,7 +1988,7 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     D = distance(je.dist, S, X; dims = dims, kwargs...)
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
-    sigma .= J_LoGo(sigma, separators, cliques) \ I
+    sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I
     posdef!(je.pdm, sigma)
     return nothing
 end

@@ -132,7 +132,7 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 
 ## Validation
 
-  - `issymmetric(A)` and `all(iszero, diag(A))`.
+  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`.
   - `p >= 0`.
 
 # Examples
@@ -154,8 +154,8 @@ struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
     function SemiDefinitePhylogeny(A::MatNum, p::Number)
-        @argcheck(all(iszero, diag(A)))
-        @argcheck(issymmetric(A))
+        @argcheck(all(iszero, LinearAlgebra.diag(A)))
+        @argcheck(LinearAlgebra.issymmetric(A))
         @argcheck(p >= zero(p))
         return new{typeof(A), typeof(p)}(A, p)
     end
@@ -364,7 +364,7 @@ Container for the result of integer phylogeny-based constraint generation.
 
 ## Validation
 
-  - `issymmetric(A)` and `all(iszero, diag(A))`.
+  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`.
 
   - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
@@ -391,8 +391,8 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     B::T2
     scale::T3
     function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
-        @argcheck(all(iszero, diag(A)))
-        @argcheck(issymmetric(A))
+        @argcheck(all(iszero, LinearAlgebra.diag(A)))
+        @argcheck(LinearAlgebra.issymmetric(A))
         A = unique(A + I; dims = 1)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)

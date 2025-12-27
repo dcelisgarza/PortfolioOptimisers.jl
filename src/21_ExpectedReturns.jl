@@ -45,7 +45,7 @@ Compute the expected portfolio return using the specified return estimator.
 function expected_return(::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     mu = pr.mu
-    return dot(w, mu) - calc_fees(w, fees)
+    return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
 end
 function expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
@@ -646,7 +646,7 @@ function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
     end
 
     ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
-    ret_b = dot(ret, wb)
+    ret_b = LinearAlgebra.dot(ret, wb)
 
     classes = asset_classes[!, col]
     unique_classes = unique(classes)
@@ -661,11 +661,11 @@ function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
     for (i, class_i) in enumerate(unique_classes)
         sets_i = view(sets_mat, :, i)
 
-        w_i = dot(sets_i, w)
-        wb_i = dot(sets_i, wb)
+        w_i = LinearAlgebra.dot(sets_i, w)
+        wb_i = LinearAlgebra.dot(sets_i, wb)
 
-        ret_i = dot(ret .* sets_i, w) / w_i
-        ret_b_i = dot(ret .* sets_i, wb) / wb_i
+        ret_i = LinearAlgebra.dot(ret .* sets_i, w) / w_i
+        ret_b_i = LinearAlgebra.dot(ret .* sets_i, wb) / wb_i
 
         w_diff_i = w_i - wb_i
         ret_diff_i = ret_i - ret_b_i

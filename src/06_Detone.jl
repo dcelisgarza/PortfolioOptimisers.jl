@@ -143,14 +143,14 @@ function detone!(de::Detone, X::MatNum)
     @argcheck(zero(n) < n <= size(X, 2),
               DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
-    s = diag(X)
+    s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)
     end
-    vals, vecs = eigen(X)
-    vals = Diagonal(vals)[(end - n):end, (end - n):end]
+    vals, vecs = LinearAlgebra.eigen(X)
+    vals = LinearAlgebra.Diagonal(vals)[(end - n):end, (end - n):end]
     vecs = vecs[:, (end - n):end]
     X .-= vecs * vals * transpose(vecs)
     X .= cov2cor(X)

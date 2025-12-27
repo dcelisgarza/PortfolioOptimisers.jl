@@ -28,7 +28,7 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
         sw = sum(w)
         invat = inv(alpha * sw)
         ln_k = (invat^kappa - invat^(-kappa)) * ik2
-        JuMP.@expression(model, risk, t + ln_k * z + dot(w, psi + theta))
+        JuMP.@expression(model, risk, t + ln_k * z + LinearAlgebra.dot(w, psi + theta))
     end
     JuMP.@constraints(model,
                       begin
@@ -42,7 +42,7 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                       end)
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
-        objective_value(model)
+        JuMP.objective_value(model)
     else
         model = JuMP.Model()
         JuMP.set_string_names_on_creation(model, false)
@@ -56,13 +56,13 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                                   sum(z) - 1 == 0
                                   sum(nu - tau) * ik2 - ln_k <= 0
                               end)
-            JuMP.@expression(model, risk, -dot(z, x))
+            JuMP.@expression(model, risk, -LinearAlgebra.dot(z, x))
         else
             JuMP.@constraints(model, begin
-                                  dot(w, z) - 1 == 0
-                                  dot(w, nu - tau) * ik2 - ln_k <= 0
+                                  LinearAlgebra.dot(w, z) - 1 == 0
+                                  LinearAlgebra.dot(w, nu - tau) * ik2 - ln_k <= 0
                               end)
-            JuMP.@expression(model, risk, -dot(w .* z, x))
+            JuMP.@expression(model, risk, -LinearAlgebra.dot(w .* z, x))
         end
         JuMP.@constraints(model,
                           begin
@@ -71,7 +71,7 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
                           end)
         JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
-            objective_value(model)
+            JuMP.objective_value(model)
         else
             NaN
         end

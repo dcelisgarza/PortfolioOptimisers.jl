@@ -248,7 +248,7 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     return Variance(settings, sigma, rc, alg)
 end
 function (r::Variance)(w::VecNum)
-    return dot(w, r.sigma, w)
+    return LinearAlgebra.dot(w, r.sigma, w)
 end
 """
     factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
@@ -389,7 +389,7 @@ function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings
     return StandardDeviation(settings, sigma)
 end
 function (r::StandardDeviation)(w::VecNum)
-    return sqrt(dot(w, r.sigma, w))
+    return sqrt(LinearAlgebra.dot(w, r.sigma, w))
 end
 """
     factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
@@ -619,7 +619,7 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
     return UncertaintySetVariance(settings, ucs, sigma)
 end
 function (r::UncertaintySetVariance)(w::VecNum)
-    return dot(w, r.sigma, w)
+    return LinearAlgebra.dot(w, r.sigma, w)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance,
                                 flag::Union{Val{false}, Val{true}, Nothing} = nothing)

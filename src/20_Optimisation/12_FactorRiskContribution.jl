@@ -49,10 +49,10 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
                                                    wi::Option{<:VecNum})
     rr = regression(re, rd.X, rd.F)
     Bt = transpose(rr.L)
-    b1 = pinv(Bt)
+    b1 = LinearAlgebra.pinv(Bt)
     Nf = size(b1, 2)
     if flag
-        b2 = pinv(transpose(nullspace(Bt)))
+        b2 = LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt)))
         N = size(rr.M, 1)
         JuMP.@variables(model, begin
                             w1[1:Nf]

@@ -120,11 +120,11 @@ function return_constraints(port, type, ::Any, kelly::AKelly, mu, sigma, returns
                                model, mu, sigma, returns)
         end
         variance_risk = model[:variance_risk]
-        JuMP.@expression(model, ret, dot(mu, w) - fees - 0.5 * variance_risk)
+        JuMP.@expression(model, ret, LinearAlgebra.dot(mu, w) - fees - 0.5 * variance_risk)
     else
         variance_risk = model[:variance_risk]
         JuMP.@expression(model, ret,
-                    dot(mu, w) - fees - 0.5 * variance_risk[kelly_approx_idx[1]])
+                    LinearAlgebra.dot(mu, w) - fees - 0.5 * variance_risk[kelly_approx_idx[1]])
     end
 
     return_bounds(port)
@@ -159,7 +159,7 @@ function return_sharpe_akelly_constraints(port, type, obj::Sharpe, kelly::AKelly
     rf = obj.rf
     JuMP.@variable(model, tapprox_kelly)
     JuMP.@constraint(model, constr_sr_akelly_risk, scale_constr * risk <= scale_constr * ohf)
-    JuMP.@expression(model, ret, dot(mu, w) - fees - 0.5 * tapprox_kelly - k * rf)
+    JuMP.@expression(model, ret, LinearAlgebra.dot(mu, w) - fees - 0.5 * tapprox_kelly - k * rf)
     if isnothing(kelly_approx_idx) ||
        isempty(kelly_approx_idx) ||
        iszero(kelly_approx_idx[1])
@@ -317,7 +317,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
     JuMP.@variable(model, bucs_w[1:N])
     JuMP.@constraint(model, bucs_ret[i = 1:N],
                      [sc * bucs_w[i]; sc * w[i]] in JuMP.MOI.NormOneCone(2))
-    JuMP.@expression(model, ret, dot_scalar(mu, w) - dot(d_mu, bucs_w))
+    JuMP.@expression(model, ret, dot_scalar(mu, w) - LinearAlgebra.dot(d_mu, bucs_w))
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
     return nothing
@@ -326,7 +326,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
                                      mu::Num_VecNum)
     sc = model[:sc]
     w = model[:w]
-    G = cholesky(ucs.sigma).U
+    G = LinearAlgebra.cholesky(ucs.sigma).U
     k = ucs.k
     JuMP.@expression(model, x_eucs_w, G * w)
     JuMP.@variable(model, t_eucs_gw)

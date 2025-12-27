@@ -285,7 +285,7 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
   - [`cor_and_dist`](@ref)
 """
 function distance(::Distance{Nothing, <:SimpleDistance}, rho::MatNum, args...; kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -296,7 +296,7 @@ function distance(::Distance{Nothing, <:SimpleDistance}, rho::MatNum, args...; k
 end
 function distance(de::Distance{<:Integer, <:SimpleDistance}, rho::MatNum, args...;
                   kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -308,7 +308,7 @@ function distance(de::Distance{<:Integer, <:SimpleDistance}, rho::MatNum, args..
 end
 function distance(::Distance{Nothing, <:SimpleAbsoluteDistance}, rho::MatNum, args...;
                   kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -319,7 +319,7 @@ function distance(::Distance{Nothing, <:SimpleAbsoluteDistance}, rho::MatNum, ar
 end
 function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::MatNum, args...;
                   kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -330,7 +330,7 @@ function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::MatNum
                         zero(eltype(rho)), one(eltype(rho))))
 end
 function distance(::Distance{Nothing, <:LogDistance}, rho::MatNum, args...; kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -339,7 +339,7 @@ function distance(::Distance{Nothing, <:LogDistance}, rho::MatNum, args...; kwar
     return -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, rho::MatNum, args...; kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -350,7 +350,7 @@ end
 function distance(::Distance{Nothing, <:CorrelationDistance}, rho::MatNum, args...;
                   kwargs...)
     assert_matrix_issquare(rho, :rho)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
@@ -361,7 +361,7 @@ end
 function distance(de::Distance{<:Integer, <:CorrelationDistance}, rho::MatNum, args...;
                   kwargs...)
     assert_matrix_issquare(rho, :rho)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)

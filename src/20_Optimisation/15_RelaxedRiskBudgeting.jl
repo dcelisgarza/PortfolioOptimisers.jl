@@ -50,7 +50,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
                                                      sigma::MatNum)
     sc = model[:sc]
     psi = model[:psi]
-    G = cholesky(sigma).U
+    G = LinearAlgebra.cholesky(sigma).U
     JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
     return nothing
 end
@@ -59,7 +59,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
                                                      sigma::MatNum)
     sc = model[:sc]
     psi = model[:psi]
-    G = cholesky(sigma).U
+    G = LinearAlgebra.cholesky(sigma).U
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
                       begin
@@ -76,8 +76,8 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                                                      sigma::MatNum)
     sc = model[:sc]
     psi = model[:psi]
-    G = cholesky(sigma).U
-    theta = Diagonal(sqrt.(diag(sigma)))
+    G = LinearAlgebra.cholesky(sigma).U
+    theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma)))
     p = alg.p
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
@@ -126,7 +126,9 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     b1, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, rrb.rba.flag,
                                                        rrb.wi)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w1],
-                                                   Matrix(Symmetric(rr.L \ pr.sigma * b1)))
+                                                   Matrix(LinearAlgebra.Symmetric(rr.L \
+                                                                                  pr.sigma *
+                                                                                  b1)))
     set_weight_constraints!(model, wb, rrb.opt.bgt, rrb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end

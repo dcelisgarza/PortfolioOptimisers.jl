@@ -504,9 +504,9 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
         if !isnothing(w)
             @argcheck(!isempty(w))
             if ismutable(w.values)
-                normalize!(w, 1)
+                LinearAlgebra.normalize!(w, 1)
             else
-                w = pweights(normalize(w, 1))
+                w = pweights(LinearAlgebra.normalize(w, 1))
             end
         end
         if !isnothing(mu_views) ||
@@ -617,7 +617,7 @@ Add an entropy pooling view constraint to the constraint dictionary.
   - [`EntropyPoolingPrior`](@ref)
 """
 function add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Symbol)
-    sc = norm(lhs)
+    sc = LinearAlgebra.norm(lhs)
     lhs /= sc
     rhs /= sc
     epc[key] = if !haskey(epc, key)
@@ -1065,7 +1065,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     function f(x)
         common_op(x)
-        return opt.sc1 * sum(y) + dot(x, B)
+        return opt.sc1 * sum(y) + LinearAlgebra.dot(x, B)
     end
     function g!(G, x)
         common_op(x)
@@ -1118,7 +1118,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     function f(x)
         common_op(x)
-        return opt.sc1 * (dot(x, grad) - dot(y, log_x - log_p))
+        return opt.sc1 * (LinearAlgebra.dot(x, grad) - LinearAlgebra.dot(y, log_x - log_p))
     end
     function g!(G, x)
         common_op(x)
@@ -1258,7 +1258,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
                           end)
         JuMP.add_to_expression!(obj_expr, so * sc2 * tc)
     end
-    JuMP.@objective(model, Min, obj_expr - so * dot(x, log_p))
+    JuMP.@objective(model, Min, obj_expr - so * LinearAlgebra.dot(x, log_p))
     # Solve the optimization problem
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
@@ -1429,8 +1429,8 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
         else
-            norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) - B[i]
-                  for i in 1:N]) / sqrt(N)
+            LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) -
+                                B[i] for i in 1:N]) / sqrt(N)
         end
         return wi, err
     end
@@ -1475,7 +1475,7 @@ Extract the variance for asset `i` from a prior result.
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
-    return diag(pr.sigma)[i]
+    return LinearAlgebra.diag(pr.sigma)[i]
 end
 """
     ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -1551,7 +1551,7 @@ Add constraints to fix the variance of specified assets in entropy pooling.
 # Details
 
   - Adds a fixed equality constraint (`:feq`) for each asset in `to_fix` that is not yet fixed.
-  - Uses the prior variance values from `diag(pr.sigma)` for the constraint right-hand side.
+  - Uses the prior variance values from `LinearAlgebra.diag(pr.sigma)` for the constraint right-hand side.
 
 # Related
 
@@ -1560,7 +1560,7 @@ Add constraints to fix the variance of specified assets in entropy pooling.
 """
 function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
                     pr::AbstractPriorResult)
-    sigma = diag(pr.sigma)
+    sigma = LinearAlgebra.diag(pr.sigma)
     fix = to_fix .& .!fixed
     if any(fix)
         add_ep_constraint!(epc, transpose(pr.X[:, fix] .- transpose(pr.mu[fix])) .^ 2,
@@ -1718,7 +1718,7 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
     return cov2cor(pr.sigma)[i, j]
 end
 function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
-    return norm(cov2cor(pr.sigma)[i, j]) / length(i)
+    return LinearAlgebra.norm(cov2cor(pr.sigma)[i, j]) / length(i)
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -1759,7 +1759,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
     rho_views = replace_prior_views(rho_views, pr, sets; strict = strict)
     to_fix = falses(size(pr.X, 2))
-    sigma = diag(pr.sigma)
+    sigma = LinearAlgebra.diag(pr.sigma)
     for rho_view in rho_views
         @argcheck(length(rho_view.vars) == 1,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
@@ -1770,7 +1770,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
         sigma_ij = if !isa(i, AbstractVector)
             sqrt(sigma[i] * sigma[j])
         else
-            norm(sigma[i] .* sigma[j])
+            LinearAlgebra.norm(sigma[i] .* sigma[j])
         end
         Ai = d * rho_view.coef[1] * view(pr.X, :, i) .* view(pr.X, :, j)
         Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ rho_view.rhs ⊙ sigma_ij
@@ -1850,7 +1850,7 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false)
     skew_views = replace_prior_views(skew_views, pr, sets, :skew; strict = strict)
     lcs = get_linear_constraints(skew_views, sets; datatype = eltype(pr.X), strict = strict)
-    sigma = diag(pr.sigma)
+    sigma = LinearAlgebra.diag(pr.sigma)
     tmp = transpose((pr.X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
                     transpose(sigma .* sqrt.(sigma)))
     to_fix = falses(size(pr.X, 2))
@@ -1942,7 +1942,7 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
     mu_sq = pr.mu .^ 2
     tmp = transpose((X_sq .* X_sq .- 4 * transpose(pr.mu) .* X_sq .* pr.X .+
                      6 * transpose(mu_sq) .* X_sq .- 3 * transpose(mu_sq .* mu_sq)) ./
-                    transpose(diag(pr.sigma)) .^ 2)
+                    transpose(LinearAlgebra.diag(pr.sigma)) .^ 2)
     to_fix = falses(size(pr.X, 2))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
