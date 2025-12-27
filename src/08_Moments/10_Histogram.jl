@@ -337,7 +337,7 @@ This function computes the pairwise variation of information between all columns
 
   - For each pair of variables, the function computes marginal entropies and the joint histogram using `calc_hist_data`.
   - The mutual information is computed using `intrinsic_mutual_info`.
-  - VI is calculated as `H(X) + H(Y) - 2 * I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
+  - VI is calculated as `H(X) + H(Y) - 2 * LinearAlgebra.I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
   - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
 
 # Related

@@ -368,7 +368,7 @@ Container for the result of integer phylogeny-based constraint generation.
 
   - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
-      + `AbstractVector`: `size(unique(A + I; dims = 1), 1) == length(B)`.
+      + `AbstractVector`: `size(unique(A + LinearAlgebra.I; dims = 1), 1) == length(B)`.
 
 # Examples
 
@@ -393,7 +393,7 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
-        A = unique(A + I; dims = 1)
+        A = unique(A + LinearAlgebra.I; dims = 1)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             @argcheck(size(A, 1) == length(B))

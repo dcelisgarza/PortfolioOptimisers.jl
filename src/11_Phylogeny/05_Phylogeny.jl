@@ -963,7 +963,7 @@ function phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1
     for i in 0:(ne.n)
         P .+= A^i
     end
-    P .= clamp!(P, 0, 1) - I
+    P .= clamp!(P, 0, 1) - LinearAlgebra.I
     return PhylogenyResult(; X = P)
 end
 """
@@ -1002,7 +1002,7 @@ function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal
         idx = clusters .== i
         P[idx, i] .= one(eltype(P))
     end
-    return PhylogenyResult(; X = P * transpose(P) - I)
+    return PhylogenyResult(; X = P * transpose(P) - LinearAlgebra.I)
 end
 """
     centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,

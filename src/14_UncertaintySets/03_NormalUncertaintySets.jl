@@ -387,7 +387,7 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     K = commutation_matrix(sigma)
-    sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -451,7 +451,7 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
-    sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -510,7 +510,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
-    sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -748,7 +748,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     K = commutation_matrix(sigma)
-    sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -807,7 +807,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
-    sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -863,7 +863,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
-    sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)

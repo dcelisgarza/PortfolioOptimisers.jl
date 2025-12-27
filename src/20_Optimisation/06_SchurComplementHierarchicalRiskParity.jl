@@ -90,14 +90,14 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     @argcheck(abs(n1 - n2) <= 1)
 
     if n1 == n2
-        return I(n1)
+        return LinearAlgebra.I(n1)
     elseif n1 < n2
         return transpose(symmetric_step_up_matrix(n2, n1)) * n1 / n2
     end
 
     m = zeros(n1, n2)
     row = fill(inv(n2), n2)
-    e = I(n2)
+    e = LinearAlgebra.I(n2)
     for i in axes(m, 1)
         mj = vcat(e[1:(i - 1), :], row', e[i:end, :])
         m .+= mj / n1
@@ -112,7 +112,7 @@ function schur_augmentation(A::MatNum, B::MatNum, C::MatNum, gamma::Number)
     end
     A_aug = A - gamma * B * (C \ transpose(B))
     m = symmetric_step_up_matrix(Na, Nc)
-    r = I - gamma * transpose(transpose(C) \ transpose(B)) * transpose(m)
+    r = LinearAlgebra.I - gamma * transpose(transpose(C) \ transpose(B)) * transpose(m)
     A_aug = r \ A_aug
     return (A_aug + transpose(A_aug)) / 2
 end
