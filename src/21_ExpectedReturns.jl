@@ -633,8 +633,9 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
   - [brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).
 """
-function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum, asset_classes::DataFrame,
-                             col, date0 = nothing, date1 = nothing)
+function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
+                             asset_classes::DataFrames.DataFrame, col, date0 = nothing,
+                             date1 = nothing)
     # Efficient filtering of date range
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)

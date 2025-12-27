@@ -1614,7 +1614,7 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
         Clustering.orderbranches_r!(hmer)
     end
 
-    Z_hclust = Hclust(hmer, :DBHT)
+    Z_hclust = Clustering.Hclust(hmer, :DBHT)
 
     return T8, Rpm, Adjv, Dpm, Mv, Z, Z_hclust
 end

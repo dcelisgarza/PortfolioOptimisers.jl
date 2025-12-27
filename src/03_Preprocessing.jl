@@ -353,29 +353,30 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
     if !isempty(collapse_args)
         X = collapse(X, collapse_args...)
     end
-    X = DataFrame(X)
+    X = DataFrames.DataFrame(X)
 
     f(x) = isa(x, Number) && isnan(x) ? missing : x
 
-    DataFrames.transform!(X, 2:ncol(X) .=> ByRow((x) -> f(x)); renamecols = false)
+    DataFrames.transform!(X, 2:DataFrames.DataAPI.ncol(X) .=> DataFrames.ByRow((x) -> f(x));
+                          renamecols = false)
     if !isnothing(impute_method)
         X = Impute.impute(X, impute_method)
     end
     missing_mtx = ismissing.(Matrix(X[!, 2:end]))
     missings_cols = vec(count(missing_mtx; dims = 2))
-    keep_rows = missings_cols .<= (ncol(X) - 1) * missing_col_percent
+    keep_rows = missings_cols .<= (DataFrames.DataAPI.ncol(X) - 1) * missing_col_percent
     X = X[keep_rows, :]
     missings_rows = vec(count(missing_mtx; dims = 1))
     keep_cols = if !isnothing(missing_row_percent)
-        missings_rows .<= nrow(X) * missing_row_percent
+        missings_rows .<= DataFrames.DataAPI.nrow(X) * missing_row_percent
     else
         missings_rows .== StatsBase.mode(missings_rows)
     end
     X = X[!, [true; keep_cols]]
-    select!(X, Not(names(X, Missing)))
-    dropmissing!(X)
+    DataFrames.select!(X, DataFrames.InvertedIndices.Not(names(X, Missing)))
+    DataFrames.dropmissing!(X)
     X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
-    X = DataFrame(X)
+    X = DataFrames.DataFrame(X)
     col_names = names(X)
     nx = intersect(col_names, asset_names)
     nf = intersect(col_names, factor_names)

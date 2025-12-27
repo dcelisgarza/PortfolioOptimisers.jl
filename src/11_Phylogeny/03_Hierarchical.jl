@@ -216,7 +216,7 @@ This function takes a hierarchical clustering object from [`Clustering.jl`](http
   - [`ClusterNode`](@ref)
   - [`pre_order`](@ref)
 """
-function to_tree(a::Hclust)
+function to_tree(a::Clustering.Hclust)
     N = length(a.order)
     d = Vector{ClusterNode}(undef, 2 * N - 1)
     for i in eachindex(a.order)
@@ -264,12 +264,12 @@ This function applies the specified clustering estimator to the input data matri
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
-    clustering = hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
+    clustering = Clustering.hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
     k = optimal_number_clusters(cle.onc, clustering, D)
     return HierarchicalClustering(; clustering = clustering, S = S, D = D, k = k)
 end
 """
-    validate_k_value(clustering::Hclust, nodes::VecClN, k::Integer)
+    validate_k_value(clustering::Clustering.Hclust, nodes::VecClN, k::Integer)
 
 Validate whether a given number of clusters `k` is consistent with the hierarchical clustering tree.
 
@@ -290,8 +290,8 @@ This function checks if the clustering assignment for `k` clusters is compatible
   - [`optimal_number_clusters`](@ref)
   - [`ClusterNode`](@ref)
 """
-function validate_k_value(clustering::Hclust, nodes::VecClN, k::Integer)
-    idx = cutree(clustering; k = k)
+function validate_k_value(clustering::Clustering.Hclust, nodes::VecClN, k::Integer)
+    idx = Clustering.cutree(clustering; k = k)
     clusters = Vector{Vector{Int}}(undef, length(minimum(idx):maximum(idx)))
     for i in eachindex(clusters)
         clusters[i] = findall(idx .== i)
@@ -335,7 +335,7 @@ This function iteratively searches for a valid `k` (number of clusters) by check
   - [`validate_k_value`](@ref)
   - [`optimal_number_clusters`](@ref)
 """
-function valid_k_clusters(clustering::Hclust, arr::VecNum)
+function valid_k_clusters(clustering::Clustering.Hclust, arr::VecNum)
     nodes = to_tree(clustering)[2]
     heights = [i.height for i in nodes]
     nodes = nodes[sortperm(heights; rev = true)]
@@ -383,7 +383,7 @@ This function applies the specified optimal number of clusters estimator (`onc`)
   - [`validate_k_value`](@ref)
 """
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
-                                 clustering::Hclust, args...)
+                                 clustering::Clustering.Hclust, args...)
     k = onc.alg
     max_k = onc.max_k
     N = length(clustering.order)
@@ -440,14 +440,14 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     return k
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                                 clustering::Hclust, dist::MatNum)
+                                 clustering::Clustering.Hclust, dist::MatNum)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
-    cluster_lvls = [cutree(clustering; k = i) for i in 1:c1]
+    cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
@@ -481,19 +481,19 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
                                                             <:StandardisedSilhouetteScore},
-                                 clustering::Hclust, dist::MatNum)
+                                 clustering::Clustering.Hclust, dist::MatNum)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
-    cluster_lvls = [cutree(clustering; k = i) for i in 1:c1]
+    cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
         lvl = cluster_lvls[i]
-        sl = silhouettes(lvl, dist; metric = onc.alg.metric)
+        sl = Clustering.silhouettes(lvl, dist; metric = onc.alg.metric)
         msl = mean(sl)
         W_list[i] = msl / std(sl; mean = msl)
     end
