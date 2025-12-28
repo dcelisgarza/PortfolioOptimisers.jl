@@ -233,7 +233,7 @@ This function computes the normalised histograms (probability mass functions) fo
 
 # Details
 
-  - The histograms are computed using `StatsBase.StatsAPI.fit(StatsBase.Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
+  - The histograms are computed using `StatsAPI.fit(StatsBase.Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
   - The marginal histograms are normalised to sum to 1 before entropy calculation.
   - The joint histogram is not normalised, as it is used directly in mutual information calculations.
 
@@ -251,18 +251,17 @@ function calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
     xil = minimum(xi) - eps(eltype(xi))
     xih = maximum(xi) + eps(eltype(xi))
 
-    hx = StatsBase.StatsAPI.fit(StatsBase.Histogram, xj, range(xjl, xjh; length = bp1)).weights
+    hx = StatsAPI.fit(StatsBase.Histogram, xj, range(xjl, xjh; length = bp1)).weights
     hx /= sum(hx)
 
-    hy = StatsBase.StatsAPI.fit(StatsBase.Histogram, xi, range(xil, xih; length = bp1)).weights
+    hy = StatsAPI.fit(StatsBase.Histogram, xi, range(xil, xih; length = bp1)).weights
     hy /= sum(hy)
 
     ex = StatsBase.entropy(hx)
     ey = StatsBase.entropy(hy)
 
-    hxy = StatsBase.StatsAPI.fit(StatsBase.Histogram, (xj, xi),
-                                 (range(xjl, xjh; length = bp1),
-                                  range(xil, xih; length = bp1))).weights
+    hxy = StatsAPI.fit(StatsBase.Histogram, (xj, xi),
+                       (range(xjl, xjh; length = bp1), range(xil, xih; length = bp1))).weights
 
     return ex, ey, hxy
 end
