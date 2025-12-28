@@ -22,7 +22,7 @@ A flexible container type for configuring and applying distance-based covariance
 # Constructor
 
     DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                       kwargs::NamedTuple = (;), w::Option{<:AbstractWeights} = nothing,
+                       kwargs::NamedTuple = (;), w::Option{<:StatsBase.AbstractWeights} = nothing,
                        ex::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
@@ -43,7 +43,7 @@ DistanceCovariance
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
@@ -53,7 +53,7 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     w::T4
     ex::T5
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Option{<:AbstractWeights},
+                                w::Option{<:StatsBase.AbstractWeights},
                                 ex::FLoops.Transducers.Executor)
         return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(dist,
                                                                                       args,
@@ -63,11 +63,11 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Option{<:AbstractWeights} = nothing,
+                            w::Option{<:StatsBase.AbstractWeights} = nothing,
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, ex)
 end
-function factory(ce::DistanceCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::DistanceCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, ex = ce.ex)
 end
@@ -116,9 +116,9 @@ function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
         Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
-    mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
-    mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
-    mu_a3, mu_b3 = mean(a), mean(b)
+    mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
+    mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
+    mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
     dcov2_xx = LinearAlgebra.dot(A, A) / N2
@@ -196,7 +196,7 @@ DistanceCovariance
 
 julia> X = [1.0 2.0; 2.0 4.0; 3.0 6.0];
 
-julia> cor(ce, X)
+julia> Statistics.cor(ce, X)
 2×2 Matrix{Float64}:
  1.0  1.0
  1.0  1.0
@@ -260,9 +260,9 @@ function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
         Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
-    mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
-    mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
-    mu_a3, mu_b3 = mean(a), mean(b)
+    mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
+    mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
+    mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
     dcov2_xy = LinearAlgebra.dot(A, B) / N2
@@ -338,7 +338,7 @@ DistanceCovariance
 
 julia> X = [1.0 2.0; 2.0 4.0; 3.0 6.0];
 
-julia> cov(ce, X)
+julia> Statistics.cov(ce, X)
 2×2 Matrix{Float64}:
  0.702728  0.993808
  0.993808  1.40546

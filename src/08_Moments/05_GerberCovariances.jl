@@ -243,7 +243,8 @@ for alg in (Gerber0, Gerber1, Gerber2)
 end
 for alg in (StandardisedGerber0, StandardisedGerber1, StandardisedGerber2)
     eval(quote
-             function factory(alg::$(alg), w::Option{<:AbstractWeights} = nothing)
+             function factory(alg::$(alg),
+                              w::Option{<:StatsBase.AbstractWeights} = nothing)
                  return $(alg)(; me = factory(alg.me, w))
              end
          end)
@@ -624,7 +625,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}
     return rho
 end
 """
-    cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Gerber correlation matrix using an unstandardised Gerber covariance estimator.
 
@@ -685,7 +686,7 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     return gerber(ce, X)
 end
 """
-    cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Gerber covariance matrix using an unstandardised Gerber covariance estimator.
 
@@ -745,7 +746,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::GerberCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::GerberCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
                             pdm = ce.pdm, t = ce.t)
 end

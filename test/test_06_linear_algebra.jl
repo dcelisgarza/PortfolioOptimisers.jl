@@ -42,7 +42,7 @@
     @testset "Non Positive Definite Matrices" begin
         rng = StableRNG(123456789)
         X = randn(rng, 10, 20)
-        sigma1 = cov(X)
+        sigma1 = Statistics.cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
         sigma4 = posdef(Posdef(), sigma1)

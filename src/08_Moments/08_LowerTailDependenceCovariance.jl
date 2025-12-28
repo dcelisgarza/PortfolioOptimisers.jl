@@ -63,7 +63,8 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
-function factory(ce::LowerTailDependenceCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::LowerTailDependenceCovariance,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          ex = ce.ex)
 end
@@ -119,7 +120,7 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
     return rho
 end
 """
-    cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -154,7 +155,7 @@ function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     return lower_tail_dependence(X, ce.alpha, ce.ex)
 end
 """
-    cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence covariance matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 

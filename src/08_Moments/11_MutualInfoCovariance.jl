@@ -62,12 +62,12 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
                               bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true)
     return MutualInfoCovariance(ve, bins, normalise)
 end
-function factory(ce::MutualInfoCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::MutualInfoCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end
 """
-    cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -102,7 +102,7 @@ function Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwar
     return mutual_info(X, ce.bins, ce.normalise)
 end
 """
-    cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 

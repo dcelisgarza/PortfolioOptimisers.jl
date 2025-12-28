@@ -608,10 +608,10 @@ function vec_to_real_measure(::MinValue, val::VecNum)
     return minimum(val)
 end
 function vec_to_real_measure(::MeanValue, val::VecNum)
-    return mean(val)
+    return Statistics.mean(val)
 end
 function vec_to_real_measure(::MedianValue, val::VecNum)
-    return median(val)
+    return Statistics.median(val)
 end
 function vec_to_real_measure(::MaxValue, val::VecNum)
     return maximum(val)

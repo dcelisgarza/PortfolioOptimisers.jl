@@ -307,7 +307,7 @@ function robust_probabilities(ow::VecNum, args...)
 end
 function robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
     c = pw * ow
-    kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
+    kldivs = [sum(StatsBase.kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
     ow /= sum(ow)
     return ow
@@ -328,7 +328,7 @@ Compute the consensus posterior return distribution from individual prior distri
 
 # Returns
 
-  - `w::ProbabilityWeights`: Consensus posterior probability weights.
+  - `w::StatsBase.ProbabilityWeights`: Consensus posterior probability weights.
 
 # Details
 
@@ -426,8 +426,8 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     w = compute_pooling(pe.alg, ow, pw)
     pe2 = factory(pe.pe2, w)
     (; X, mu, sigma, chol, rr, f_mu, f_sigma) = prior(pe2, X, F; strict = strict, kwargs...)
-    ens = exp(entropy(w))
-    kld = [kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
+    ens = exp(StatsBase.entropy(w))
+    kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w, ens = ens,
                          kld = kld, ow = ow, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = ifelse(!isnothing(rr), w, nothing))

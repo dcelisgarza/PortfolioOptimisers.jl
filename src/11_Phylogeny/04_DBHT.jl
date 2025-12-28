@@ -292,7 +292,7 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     clique3 = zeros(Int, N - 4, 3)   # Initialize list of 3-cliques (non-face triangles)
 
     # Find 3 vertices with largest strength
-    s = sum(W ⊙ (W .> mean(W)); dims = 2)
+    s = sum(W ⊙ (W .> Statistics.mean(W)); dims = 2)
     j = sortperm(vec(s); rev = true)
 
     in_v[1:4] = j[1:4]

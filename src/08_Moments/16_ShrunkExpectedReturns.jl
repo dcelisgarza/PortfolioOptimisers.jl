@@ -315,7 +315,7 @@ Compute the shrinkage target vector for expected returns estimation.
   - [`ShrunkExpectedReturns`](@ref)
 """
 function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum; kwargs...)
-    val = mean(mu)
+    val = Statistics.mean(mu)
     return range(val, val; length = length(mu))
 end
 function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum; isigma = nothing,
@@ -331,7 +331,7 @@ function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum; T::Integer, 
     return range(val, val; length = length(mu))
 end
 """
-    mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute shrunk expected returns using the specified estimator.
 
@@ -375,8 +375,8 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
     b = if isone(dims)
         transpose(target_mean(me.alg.tgt, transpose(mu), sigma; T = T))
@@ -385,13 +385,14 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
     end
     evals = LinearAlgebra.eigvals(sigma)
     mb = mu - b
-    alpha = (N * mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) / T
+    alpha = (N * Statistics.mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) /
+            T
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
     isigma = sigma \ LinearAlgebra.I
     b = if isone(dims)
@@ -405,8 +406,8 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
     isigma = sigma \ LinearAlgebra.I
     b = if isone(dims)
@@ -422,7 +423,8 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::ShrunkExpectedReturns,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)
 end

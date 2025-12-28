@@ -27,7 +27,7 @@ using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
 using Statistics: Statistics
 using StatsAPI: StatsAPI
-using StatsBase
+using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.

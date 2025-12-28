@@ -227,7 +227,8 @@ function DimensionReductionRegression(;
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression, w::Option{<:AbstractWeights} = nothing)
+function factory(re::DimensionReductionRegression,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
@@ -265,8 +266,8 @@ This helper function standardizes the feature matrix `X` (using Z-score normaliz
 function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
     N = size(X, 1)
     X_std = StatsBase.standardize(StatsBase.ZScoreTransform, transpose(X); dims = 2)
-    model = fit(drtgt, X_std)
-    Xp = transpose(predict(model, X_std))
+    model = StatsAPI.fit(drtgt, X_std)
+    Xp = transpose(StatsAPI.predict(model, X_std))
     Vp = MultivariateStats.projection(model)
     x1 = [ones(eltype(X), N) Xp]
     return x1, Vp
@@ -306,9 +307,13 @@ This function fits a regression model (as specified by `retgt`) to the response 
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
-    mean_y = !haskey(re.retgt.kwargs, :wts) ? mean(y) : mean(y, re.retgt.kwargs.wts)
-    fit_result = fit(re.retgt, x1, y)
-    beta_pc = coef(fit_result)[2:end]
+    mean_y = if !haskey(re.retgt.kwargs, :wts)
+        Statistics.mean(y)
+    else
+        Statistics.mean(y, re.retgt.kwargs.wts)
+    end
+    fit_result = StatsAPI.fit(re.retgt, x1, y)
+    beta_pc = StatsAPI.coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
     beta0 = mean_y - LinearAlgebra.dot(beta, mu)
     pushfirst!(beta, beta0)
@@ -352,7 +357,7 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
-    mu = mean(re.me, F; dims = 1)
+    mu = Statistics.mean(re.me, F; dims = 1)
     sigma = vec(std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)

@@ -243,7 +243,7 @@ function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum, slv::Slv_VecSl
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3,
-                                            rw::Option{<:AbstractWeights} = nothing,
+                                            rw::Option{<:StatsBase.AbstractWeights} = nothing,
                                             theme::Symbol = :Dark2_5,
                                             dd_kwargs = (;
                                                          label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
@@ -340,7 +340,7 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSl
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
-                                            rw::Option{<:AbstractWeights} = nothing,
+                                            rw::Option{<:StatsBase.AbstractWeights} = nothing,
                                             theme::Symbol = :Paired_10,
                                             h_kwargs::NamedTuple = (;
                                                                     ylabel = "Probability Density",
@@ -350,7 +350,7 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSl
                                             pdf_kwargs::NamedTuple = (; linewidth = 2),
                                             e_kwargs...)
     ret = calc_net_returns(w, X, fees)
-    mu = mean(ret)
+    mu = Statistics.mean(ret)
     sigma = std(ret)
     mir, mar = extrema(ret)
     x = range(mir, mar; length = points)
@@ -379,7 +379,7 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSl
     for (i, (risk, label)) in enumerate(zip(risks, risk_labels)) #! Do not change this enumerate to pairs.
         vline!([risk]; label = label, color = colours[i + 1], l_kwargs...)
     end
-    D = fit(Normal, ret)
+    D = StatsAPI.fit(Normal, ret)
     if flag
         density!(ret;
                  label = "Normal: μ = $(round(mean(D), digits=2))%, σ = $(round(std(D), digits=2))%",

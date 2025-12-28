@@ -80,7 +80,7 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing)
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::EmpiricalPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end
@@ -121,7 +121,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; di
         X = transpose(X)
     end
     mu = vec(mean(pe.me, X; kwargs...))
-    sigma = cov(pe.ce, X; kwargs...)
+    sigma = Statistics.cov(pe.ce, X; kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 """
@@ -162,7 +162,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
     end
     X_log = log1p.(X)
     mu = vec(mean(pe.me, X_log; kwargs...))
-    sigma = cov(pe.ce, X_log; kwargs...)
+    sigma = Statistics.cov(pe.ce, X_log; kwargs...)
     mu .*= pe.horizon
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * LinearAlgebra.diag(sigma))

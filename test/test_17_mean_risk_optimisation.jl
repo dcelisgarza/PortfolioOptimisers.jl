@@ -1581,14 +1581,14 @@
                                                     cent = ces[2],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[2].A, res.w, pr) <=
-              mean(centrality_vector(ces[2].A, pr).X)
+              Statistics.mean(centrality_vector(ces[2].A, pr).X)
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
                                                     cent = ces[3],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[3].A, res.w, pr),
-                       median(centrality_vector(ces[3].A, pr).X))
+                       Statistics.median(centrality_vector(ces[3].A, pr).X))
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,

@@ -1,7 +1,8 @@
 struct AverageDrawdown{T1, T2} <: RiskMeasure
     settings::T1
     w::T2
-    function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:AbstractWeights})
+    function AverageDrawdown(settings::RiskMeasureSettings,
+                             w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -9,12 +10,12 @@ struct AverageDrawdown{T1, T2} <: RiskMeasure
     end
 end
 function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::Option{<:AbstractWeights} = nothing)
+                         w::Option{<:StatsBase.AbstractWeights} = nothing)
     return AverageDrawdown(settings, w)
 end
 function (r::AverageDrawdown)(x::VecNum)
     dd = absolute_drawdown_vec(x)
-    return -(isnothing(r.w) ? mean(dd) : mean(dd, r.w))
+    return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, r.w))
 end
 #=
 function (::AverageDrawdown{<:Any, Nothing})(x::VecNum)
@@ -34,7 +35,7 @@ function (::AverageDrawdown{<:Any, Nothing})(x::VecNum)
     popfirst!(x)
     return val / length(x)
 end
-function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::VecNum)
+function (r::AverageDrawdown{<:Any, <:StatsBase.AbstractWeights})(x::VecNum)
     @argcheck(length(r.w) == length(x))
     pushfirst!(x, 1)
     cs = cumsum(x)
@@ -58,7 +59,7 @@ struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
-                                     w::Option{<:AbstractWeights})
+                                     w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -67,12 +68,12 @@ struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
 end
 function RelativeAverageDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::Option{<:AbstractWeights} = nothing)
+                                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown)(x::VecNum)
     dd = relative_drawdown_vec(x)
-    return -(isnothing(r.w) ? mean(dd) : mean(dd, r.w))
+    return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, r.w))
 end
 #=
 function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::VecNum)
@@ -92,7 +93,7 @@ function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::VecNum)
     popfirst!(x)
     return val / length(x)
 end
-function (r::RelativeAverageDrawdown{<:Any, <:AbstractWeights})(x::VecNum)
+function (r::RelativeAverageDrawdown{<:Any, <:StatsBase.AbstractWeights})(x::VecNum)
     @argcheck(length(r.w) == length(x))
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)

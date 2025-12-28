@@ -456,7 +456,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
     LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                   chol::Option{<:MatNum} = nothing,
-                  w::Option{<:AbstractWeights} = nothing,
+                  w::Option{<:StatsBase.AbstractWeights} = nothing,
                   ens::Option{<:Number} = nothing,
                   kld::Option{<:Num_VecNum} = nothing,
                   ow::Option{<:VecNum} = nothing,
@@ -521,7 +521,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_sigma::T11
     f_w::T12
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
-                           w::Option{<:AbstractWeights}, ens::Option{<:Number},
+                           w::Option{<:StatsBase.AbstractWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
                            f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
@@ -569,7 +569,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
 end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        chol::Option{<:MatNum} = nothing,
-                       w::Option{<:AbstractWeights} = nothing,
+                       w::Option{<:StatsBase.AbstractWeights} = nothing,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,

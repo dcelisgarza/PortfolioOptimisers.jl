@@ -128,7 +128,7 @@
         pr = prior(HighOrderPriorEstimator(), rd)
         @test isapprox(pr.X, rd.X)
         @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
-        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(pr.sigma, Statistics.cov(PortfolioOptimisersCovariance(), rd.X))
         @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
         @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Full()), rd.X)))
 
@@ -137,7 +137,7 @@
         pr = prior(pe, transpose(rd.X); dims = 2)
         @test isapprox(pr.X, rd.X)
         @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
-        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(pr.sigma, Statistics.cov(PortfolioOptimisersCovariance(), rd.X))
         @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Semi()), rd.X))
         @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Semi()), rd.X)))
 
@@ -568,8 +568,8 @@
 
         rho_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == prior(AAPL,XOM)*0.94")
         pr = prior(EntropyPoolingPrior(; sets = sets, rho_views = rho_views), rd)
-        @test isapprox(cov2cor(pr.sigma)[1, end], cov2cor(pr0.sigma)[1, end] * 0.94,
-                       rtol = 5e-6)
+        @test isapprox(cov2cor(pr.sigma)[1, end],
+                       StatsBase.cov2cor(pr0.sigma)[1, end] * 0.94, rtol = 5e-6)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  rho_views = rho_views), rd).w, rtol = 5e-2)
@@ -894,8 +894,8 @@
 
         rho_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == prior(AAPL,XOM)*0.94")
         pr = prior(EntropyPoolingPrior(; sets = sets, rho_views = rho_views, opt = opt), rd)
-        @test isapprox(cov2cor(pr.sigma)[1, end], cov2cor(pr0.sigma)[1, end] * 0.94,
-                       rtol = 5e-6)
+        @test isapprox(cov2cor(pr.sigma)[1, end],
+                       StatsBase.cov2cor(pr0.sigma)[1, end] * 0.94, rtol = 5e-6)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  rho_views = rho_views), rd).w, rtol = 5e-2)
