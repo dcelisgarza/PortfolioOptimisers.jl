@@ -247,29 +247,30 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ### Preprocessing
 
-  - Prices to returns
-  - Find complete indices
+  - Prices to returns [`prices_to_returns`](@ref)
+  - Find complete indices [`find_complete_indices`](@ref)
 
 ### Matrix Processing
 
-  - Positive definite projection
+  - Positive definite projection [`Posdef`](@ref), [`posdef!`](@ref), [`posdef`](@ref)
 
-  - Denoising
+  - Denoising [`Denoise`](@ref), [`denoise!`](@ref), [`denoise`](@ref)
     
-      + Spectral
-      + Fixed
-      + Shrunk
-  - Detoning
+      + Spectral [`SpectralDenoise`](@ref)
+      + Fixed [`FixedDenoise`](@ref)
+      + Shrunk [`ShrunkDenoise`](@ref)
+  - Detoning [`Detone`](@ref), [`detone!`](@ref), [`detone`](@ref)
+  - Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing`](@ref), [`DenoiseDetoneAlg`](@ref), [`DenoiseAlgDetone`](@ref), [`DetoneDenoiseAlg`](@ref), [`DetoneAlgDenoise`](@ref), [`AlgDenoiseDetone`](@ref), [`AlgDetoneDenoise`](@ref)
 
 ### Moment Estimation
 
 #### [Expected Returns](@id readme-expected-returns)
 
-  - Optionally Weighted Expected Returns
+  - Optionally weighted expected returns [`SimpleExpectedReturns`](@ref)
 
-  - Equilibrium Expected Returns with Custom Covariance Estimator
-  - Excess Expected Returns with Custom Expected Returns Estimator
-  - Shrunk Expected Returns with Custom Expected Returns and Custom Covariance Estimators
+  - Equilibrium expected returns with custom covariance estimator
+  - Excess expected returns with custom expected returns estimator
+  - Shrunk expected returns with custom expected returns and custom covariance estimators
     
       + Algorithms
         

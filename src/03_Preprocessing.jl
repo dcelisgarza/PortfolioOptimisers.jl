@@ -228,15 +228,16 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
-    prices_to_returns(X::TimeArray; F::Option{TimeArray} = nothing;
-                      B::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
+    prices_to_returns(X::TimeSeries.TimeArray; F::Option{TimeSeries.TimeArray} = nothing;
+                      B::Option{<:TimeSeries.TimeArray} = nothing,
+                      iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
                       padding::Bool = false, missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
                       map_func::Option{<:Function} = nothing, join_method::Symbol = :outer,
                       impute_method::Option{<:Impute.Imputor} = nothing)
 
-Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
+Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
 # Arguments
 
