@@ -120,7 +120,7 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
     return rho
 end
 """
-    cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -155,7 +155,7 @@ function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     return lower_tail_dependence(X, ce.alpha, ce.ex)
 end
 """
-    cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the lower tail dependence covariance matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
 
@@ -187,7 +187,7 @@ function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     return lower_tail_dependence(X, ce.alpha, ce.ex) ⊙ (std_vec ⊗ std_vec)
 end
 

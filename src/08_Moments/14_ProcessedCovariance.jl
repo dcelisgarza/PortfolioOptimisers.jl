@@ -28,7 +28,7 @@ ProcessedCovariance
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
       │    ce ┼ GeneralCovariance
-      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │       │    w ┴ nothing
       │   alg ┴ Full()
   alg ┼ nothing
@@ -62,7 +62,7 @@ function factory(ce::ProcessedCovariance, w::Option{<:StatsBase.AbstractWeights}
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end
 """
-    cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the processed and positive definite projected covariance matrix for the data matrix `X` using the specified `ProcessedCovariance` estimator.
 
@@ -102,7 +102,7 @@ function Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    sigma = cov(ce.ce, X; kwargs...)
+    sigma = Statistics.cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
@@ -111,7 +111,7 @@ function Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
     return sigma
 end
 """
-    cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the processed and positive definite projected correlation matrix for the data matrix `X` using the specified `ProcessedCovariance` estimator.
 
@@ -151,7 +151,7 @@ function Statistics.cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    rho = cor(ce.ce, X; kwargs...)
+    rho = Statistics.cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end

@@ -116,9 +116,9 @@ function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
         Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
-    mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
-    mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
-    mu_a3, mu_b3 = mean(a), mean(b)
+    mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
+    mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
+    mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
     dcov2_xx = LinearAlgebra.dot(A, A) / N2
@@ -260,9 +260,9 @@ function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
         Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
-    mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
-    mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
-    mu_a3, mu_b3 = mean(a), mean(b)
+    mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
+    mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
+    mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
     dcov2_xy = LinearAlgebra.dot(A, B) / N2

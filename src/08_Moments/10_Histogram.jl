@@ -201,7 +201,7 @@ function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Int
 end
 function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        ::Any, T::Integer)
-    corr = cor(xj, xi)
+    corr = Statistics.cor(xj, xi)
     return round(Int, if isone(corr)
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
                      z / 6 + 2 / (3 * z) + 1 / 3

@@ -25,9 +25,9 @@ using Random: Random
 using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
-using Statistics: Statistics
+using Statistics: Statistics, mean, std, var, cor, cov
 using StatsAPI: StatsAPI
-using StatsBase
+using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.

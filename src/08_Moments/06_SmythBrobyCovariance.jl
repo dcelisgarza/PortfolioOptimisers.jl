@@ -1360,7 +1360,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 """
-    cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the Smyth-Broby correlation matrix.
 
@@ -1415,7 +1415,7 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     mean_vec = isnothing(mean) ? Statistics.mean(ce.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     return smythbroby(ce, X, mean_vec, std_vec)
@@ -1430,14 +1430,14 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     mean_vec = isnothing(mean) ? Statistics.mean(ce.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
     return smythbroby(ce, X)
 end
 """
-    cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the Smyth-Broby covariance matrix.
 
@@ -1492,7 +1492,7 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     mean_vec = isnothing(mean) ? Statistics.mean(ce.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     return smythbroby(ce, X, mean_vec, std_vec) ⊙ (std_vec ⊗ std_vec)
@@ -1507,7 +1507,7 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     mean_vec = isnothing(mean) ? Statistics.mean(ce.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec

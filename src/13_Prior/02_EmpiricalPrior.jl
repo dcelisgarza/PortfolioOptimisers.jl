@@ -120,8 +120,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; di
     if dims == 2
         X = transpose(X)
     end
-    mu = vec(mean(pe.me, X; kwargs...))
-    sigma = cov(pe.ce, X; kwargs...)
+    mu = vec(Statistics.mean(pe.me, X; kwargs...))
+    sigma = Statistics.cov(pe.ce, X; kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 """
@@ -161,8 +161,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
         X = transpose(X)
     end
     X_log = log1p.(X)
-    mu = vec(mean(pe.me, X_log; kwargs...))
-    sigma = cov(pe.ce, X_log; kwargs...)
+    mu = vec(Statistics.mean(pe.me, X_log; kwargs...))
+    sigma = Statistics.cov(pe.ce, X_log; kwargs...)
     mu .*= pe.horizon
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * LinearAlgebra.diag(sigma))

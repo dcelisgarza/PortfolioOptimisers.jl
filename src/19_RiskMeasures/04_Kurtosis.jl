@@ -138,11 +138,11 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
 end
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
                             ::Any, x::VecNum)
-    return mean(x)
+    return Statistics.mean(x)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any,
                                         <:Any, <:Any, <:Any}, ::Any, x::VecNum)
-    return mean(x, r.w)
+    return Statistics.mean(x, r.w)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, <:Any, <:Any, <:Any, <:Any},
                             w::VecNum, ::Any)
@@ -167,28 +167,28 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})
                                                                                  fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
-    return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
+    return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::VecNum,
                                                                                  X::MatNum,
                                                                                  fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
-    return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
+    return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
                       <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
                                                        fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
-    return isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
                       <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
                                                        fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
-    return isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)

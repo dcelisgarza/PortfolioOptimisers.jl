@@ -156,7 +156,7 @@ ARCHUncertaintySet
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
@@ -244,9 +244,9 @@ function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = PythonCall.pyconvert(Array, data)[1][1]
-        mu = mean(ue.pe.me, X; dims = 1, kwargs...)
+        mu = Statistics.mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
-        sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
+        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, X; dims = 1, kwargs...)
     end
     return mus, sigmas
 end
@@ -282,7 +282,7 @@ function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = PythonCall.pyconvert(Array, data)[1][1]
-        mu = mean(ue.pe.me, X; dims = 1, kwargs...)
+        mu = Statistics.mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
     end
     return mus
@@ -319,7 +319,7 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = PythonCall.pyconvert(Array, data)[1][1]
-        sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
+        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, X; dims = 1, kwargs...)
     end
     return sigmas
 end
@@ -534,8 +534,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:A
     end
     X_mu = transpose(X_mu)
     X_sigma = transpose(X_sigma)
-    sigma_mu = cov(ue.pe.ce, X_mu)
-    sigma_sigma = cov(ue.pe.ce, X_sigma)
+    sigma_mu = Statistics.cov(ue.pe.ce, X_mu)
+    sigma_sigma = Statistics.cov(ue.pe.ce, X_sigma)
     if ue.alg.diagonal
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -593,7 +593,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, 
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
     end
     X_mu = transpose(X_mu)
-    sigma_mu = cov(ue.pe.ce, X_mu)
+    sigma_mu = Statistics.cov(ue.pe.ce, X_mu)
     if ue.alg.diagonal
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
@@ -647,7 +647,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorith
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
     X_sigma = transpose(X_sigma)
-    sigma_sigma = cov(ue.pe.ce, X_sigma)
+    sigma_sigma = Statistics.cov(ue.pe.ce, X_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end

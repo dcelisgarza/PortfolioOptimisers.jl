@@ -11,7 +11,7 @@ function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanReturn(w)
 end
 function (r::MeanReturn)(x::VecNum)
-    return isnothing(r.w) ? mean(x) : mean(x, r.w)
+    return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
 function factory(r::MeanReturn, pr::AbstractPriorResult, args...)
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -60,11 +60,11 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
 end
 const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
 function calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
-    return mean(x)
+    return Statistics.mean(x)
 end
 function calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any,
                             x::VecNum)
-    return mean(x, r.w)
+    return Statistics.mean(x, r.w)
 end
 function calc_moment_target(r::TCM_Sk{<:Any, <:VecNum}, w::VecNum, ::Any)
     return LinearAlgebra.dot(w, r.mu)
@@ -93,7 +93,7 @@ end
 function (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 3
-    return isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function factory(r::Skewness, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -108,7 +108,7 @@ function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
-    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
+    res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^3
 end
 

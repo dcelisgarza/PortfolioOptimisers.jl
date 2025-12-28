@@ -42,21 +42,21 @@ function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)
 end
 function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCentering,
                                                       <:Any}, ::Any, x::VecNum)
-    return mean(x)
+    return Statistics.mean(x)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:StatsBase.AbstractWeights,
                                                        <:MeanCentering, <:Any}, ::Any,
                             x::VecNum)
-    return mean(x, r.w)
+    return Statistics.mean(x, r.w)
 end
 function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MedianCentering,
                                                       <:Any}, ::Any, x::VecNum)
-    return median(x)
+    return Statistics.median(x)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:StatsBase.AbstractWeights,
                                                        <:MedianCentering, <:Any}, ::Any,
                             x::VecNum)
-    return median(x, r.w)
+    return Statistics.median(x, r.w)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecNum, <:Any},
                             w::VecNum, ::Any)

@@ -39,7 +39,7 @@ function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothin
     return SimpleExpectedReturns(w)
 end
 """
-    mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
@@ -90,7 +90,11 @@ julia> mean(serw, X)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
+    return if isnothing(me.w)
+        Statistics.mean(X; dims = dims)
+    else
+        Statistics.mean(X, me.w; dims = dims)
+    end
 end
 """
     factory(me::SimpleExpectedReturns, w::Option{<:StatsBase.AbstractWeights} = nothing)
@@ -125,4 +129,4 @@ function factory(me::SimpleExpectedReturns,
     return SimpleExpectedReturns(; w = ifelse(isnothing(w), me.w, w))
 end
 
-export SimpleExpectedReturns
+export SimpleExpectedReturns, mean

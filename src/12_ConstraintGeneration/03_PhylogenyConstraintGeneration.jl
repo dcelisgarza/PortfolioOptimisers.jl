@@ -70,7 +70,7 @@ SemiDefinitePhylogenyEstimator
      │       │      │    me ┼ SimpleExpectedReturns
      │       │      │       │   w ┴ nothing
      │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)        
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │      │       │    w ┴ nothing
      │       │      │   alg ┴ Full()
      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -293,7 +293,7 @@ IntegerPhylogenyEstimator
         │       │      │    me ┼ SimpleExpectedReturns
         │       │      │       │   w ┴ nothing
         │       │      │    ce ┼ GeneralCovariance
-        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)     
+        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
         │       │      │       │    w ┴ nothing
         │       │      │   alg ┴ Full()
         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -608,10 +608,10 @@ function vec_to_real_measure(::MinValue, val::VecNum)
     return minimum(val)
 end
 function vec_to_real_measure(::MeanValue, val::VecNum)
-    return mean(val)
+    return Statistics.mean(val)
 end
 function vec_to_real_measure(::MedianValue, val::VecNum)
-    return median(val)
+    return Statistics.median(val)
 end
 function vec_to_real_measure(::MaxValue, val::VecNum)
     return maximum(val)
@@ -660,7 +660,7 @@ CentralityConstraint
        │        │       │      │   alg ┴ Full()
        │        │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
        │        │       │      │       pdm ┼ Posdef
-       │        │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton        
+       │        │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
        │        │       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
        │        │       │      │   denoise ┼ nothing
        │        │       │      │    detone ┼ nothing

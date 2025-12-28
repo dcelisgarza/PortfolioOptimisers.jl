@@ -234,7 +234,7 @@ struct MaximumReturn <: ObjectiveFunction end
 function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
                                              obj::MaximumRatio)
     ohf = if isnothing(obj.ohf)
-        min(1e3, max(1e-3, mean(abs.(mu))))
+        min(1e3, max(1e-3, Statistics.mean(abs.(mu))))
     else
         @argcheck(obj.ohf > zero(obj.ohf))
         obj.ohf
@@ -369,9 +369,9 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     JuMP.@variable(model, t_ekelly[1:T])
     wi = nothing_scalar_array_selector(pret.w, pr.w)
     if isnothing(wi)
-        JuMP.@expression(model, ret, mean(t_ekelly))
+        JuMP.@expression(model, ret, Statistics.mean(t_ekelly))
     else
-        JuMP.@expression(model, ret, mean(t_ekelly, wi))
+        JuMP.@expression(model, ret, Statistics.mean(t_ekelly, wi))
     end
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)

@@ -77,7 +77,7 @@ function factory(ce::DenoiseCovariance, w::Option{<:StatsBase.AbstractWeights} =
     return DenoiseCovariance(; ce = factory(ce.ce, w), denoise = ce.denoise, pdm = ce.pdm)
 end
 """
-    cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the denoised and positive definite projected covariance matrix for the data matrix `X` using the specified `DenoiseCovariance` estimator.
 
@@ -117,7 +117,7 @@ function Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    sigma = cov(ce.ce, X; kwargs...)
+    sigma = Statistics.cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
@@ -127,7 +127,7 @@ function Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     return sigma
 end
 """
-    cor(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cor(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the denoised and positive definite projected correlation matrix for the data matrix `X` using the specified `DenoiseCovariance` estimator.
 
@@ -167,7 +167,7 @@ function Statistics.cor(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    rho = cor(ce.ce, X; kwargs...)
+    rho = Statistics.cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end

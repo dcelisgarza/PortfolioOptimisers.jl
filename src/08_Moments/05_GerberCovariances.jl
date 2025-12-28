@@ -625,7 +625,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}
     return rho
 end
 """
-    cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Gerber correlation matrix using an unstandardised Gerber covariance estimator.
 
@@ -668,7 +668,7 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     return gerber(ce, X, std_vec)
 end
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
@@ -679,14 +679,14 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
         X = transpose(X)
     end
     mean_vec = isnothing(mean) ? Statistics.mean(ce.alg.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X)
 end
 """
-    cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Gerber covariance matrix using an unstandardised Gerber covariance estimator.
 
@@ -729,7 +729,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
 end
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
@@ -740,7 +740,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
         X = transpose(X)
     end
     mean_vec = isnothing(mean) ? Statistics.mean(ce.alg.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec

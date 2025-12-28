@@ -299,7 +299,7 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     posterior_csigma = M * LinearAlgebra.cholesky(f_posterior_sigma).L
     if pe.rsd
         err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(var(pe.ve, err; dims = 1)))
+        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end

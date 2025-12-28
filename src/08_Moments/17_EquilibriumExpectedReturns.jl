@@ -78,7 +78,7 @@ function factory(ce::EquilibriumExpectedReturns,
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """
-    mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
@@ -101,7 +101,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 """
 function Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
     return me.l * sigma * w
 end

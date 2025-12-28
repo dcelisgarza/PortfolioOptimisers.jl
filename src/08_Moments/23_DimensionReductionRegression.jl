@@ -307,7 +307,11 @@ This function fits a regression model (as specified by `retgt`) to the response 
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
-    mean_y = !haskey(re.retgt.kwargs, :wts) ? mean(y) : mean(y, re.retgt.kwargs.wts)
+    mean_y = if !haskey(re.retgt.kwargs, :wts)
+        Statistics.mean(y)
+    else
+        Statistics.mean(y, re.retgt.kwargs.wts)
+    end
     fit_result = StatsAPI.fit(re.retgt, x1, y)
     beta_pc = StatsAPI.coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
@@ -353,8 +357,8 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
-    mu = mean(re.me, F; dims = 1)
-    sigma = vec(std(re.ve, F; dims = 1))
+    mu = Statistics.mean(re.me, F; dims = 1)
+    sigma = vec(Statistics.std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)
         rr[i, :] = _regression(re, view(X, :, i), mu, sigma, f1, Vp)

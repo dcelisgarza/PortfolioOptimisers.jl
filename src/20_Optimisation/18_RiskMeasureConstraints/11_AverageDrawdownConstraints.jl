@@ -6,9 +6,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::AverageDrawdown,
     T = length(dd) - 1
     wi = nothing_scalar_array_selector(r.w, pr.w)
     add_risk = model[Symbol(key)] = if isnothing(wi)
-        JuMP.@expression(model, mean(view(dd, 2:(T + 1))))
+        JuMP.@expression(model, Statistics.mean(view(dd, 2:(T + 1))))
     else
-        JuMP.@expression(model, mean(view(dd, 2:(T + 1)), wi))
+        JuMP.@expression(model, Statistics.mean(view(dd, 2:(T + 1)), wi))
     end
     set_risk_bounds_and_expression!(model, opt, add_risk, r.settings, key)
     return add_risk

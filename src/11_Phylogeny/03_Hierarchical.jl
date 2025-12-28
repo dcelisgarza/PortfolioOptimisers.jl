@@ -469,7 +469,11 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
                     k += 1
                 end
             end
-            D_list[j] = k == 1 ? zero(eltype(dist)) : std(C_list; corrected = false)
+            D_list[j] = if k == 1
+                zero(eltype(dist))
+            else
+                Statistics.std(C_list; corrected = false)
+            end
         end
         W_list[i] = sum(D_list)
     end
@@ -494,8 +498,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
     for i in 2:c1
         lvl = cluster_lvls[i]
         sl = Clustering.silhouettes(lvl, dist; metric = onc.alg.metric)
-        msl = mean(sl)
-        W_list[i] = msl / std(sl; mean = msl)
+        msl = Statistics.mean(sl)
+        W_list[i] = msl / Statistics.std(sl; mean = msl)
     end
     return valid_k_clusters(clustering, W_list)
 end

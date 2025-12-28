@@ -60,7 +60,7 @@ function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return KendallCovariance(ve)
 end
 """
-    cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Kendall's tau rank correlation matrix using a [`KendallCovariance`](@ref) estimator.
 
@@ -94,7 +94,7 @@ function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...
     return StatsBase.corkendall(X)
 end
 """
-    cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Kendall's tau rank covariance matrix using a [`KendallCovariance`](@ref) estimator.
 
@@ -125,7 +125,7 @@ function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs.
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     return StatsBase.corkendall(X) ⊙ (std_vec ⊗ std_vec)
 end
 """
@@ -176,7 +176,7 @@ function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return SpearmanCovariance(ve)
 end
 """
-    cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Spearman's rho rank correlation matrix using a [`SpearmanCovariance`](@ref) estimator.
 
@@ -210,7 +210,7 @@ function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs..
     return StatsBase.corspearman(X)
 end
 """
-    cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Spearman's rho rank covariance matrix using a [`SpearmanCovariance`](@ref) estimator.
 
@@ -241,7 +241,7 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     return StatsBase.corspearman(X) ⊙ (std_vec ⊗ std_vec)
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
