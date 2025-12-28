@@ -633,13 +633,14 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
   - [brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).
 """
-function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
+function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
                              asset_classes::DataFrames.DataFrame, col, date0 = nothing,
                              date1 = nothing)
     # Efficient filtering of date range
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
-        timestamps = timestamp(X)
-        idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
+        timestamps = TimeSeries.timestamp(X)
+        idx = (Dates.DateTime(date0) .<= timestamps) .&
+              (timestamps .<= Dates.DateTime(date1))
         findfirst(idx), findlast(idx)
     else
         1, length(X)
@@ -651,9 +652,9 @@ function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
     classes = asset_classes[!, col]
     unique_classes = unique(classes)
 
-    df = DataFrame(;
-                   index = ["Asset Allocation", "Security Selection", "Interaction",
-                            "Total Excess Return"])
+    df = DataFrames.DataFrame(;
+                              index = ["Asset Allocation", "Security Selection",
+                                       "Interaction", "Total Excess Return"])
 
     # Precompute class membership matrix for efficiency
     sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]

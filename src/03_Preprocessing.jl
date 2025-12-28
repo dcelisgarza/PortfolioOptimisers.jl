@@ -265,7 +265,7 @@ Convert price data (and optionally factor data) in `TimeArray` format to returns
   - `0 < missing_row_percent <= 1`.
   - If `F` is not `nothing`, `!isempty(F)`.
   - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
-  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
+  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
 # Details
@@ -314,9 +314,10 @@ ReturnsResult
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
   - [`Impute`](https://github.com/invenia/Impute.jl)
 """
-function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
-                           B::Option{<:TimeArray} = nothing,
-                           iv::Option{<:TimeArray} = nothing,
+function prices_to_returns(X::TimeSeries.TimeArray,
+                           F::Option{<:TimeSeries.TimeArray} = nothing;
+                           B::Option{<:TimeSeries.TimeArray} = nothing,
+                           iv::Option{<:TimeSeries.TimeArray} = nothing,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Number = 1.0,
@@ -333,25 +334,25 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
                   missing_row_percent <=
                   one(missing_row_percent), DomainError)
     end
-    asset_names = string.(colnames(X))
+    asset_names = string.(TimeSeries.colnames(X))
     factor_names = String[]
     benchmark_names = String[]
     if !isnothing(F)
         @argcheck(!isempty(F), IsEmptyError)
-        factor_names = string.(colnames(F))
-        X = merge(X, F; method = join_method)
+        factor_names = string.(TimeSeries.colnames(F))
+        X = TimeSeries.merge(X, F; method = join_method)
     end
     if !isnothing(B)
         @argcheck(!isempty(B), IsEmptyError)
-        benchmark_names = string.(colnames(B))
+        benchmark_names = string.(TimeSeries.colnames(B))
         @argcheck(length(benchmark_names) in (1, length(asset_names)), DimensionMismatch)
-        X = merge(X, B; method = join_method)
+        X = TimeSeries.merge(X, B; method = join_method)
     end
     if !isnothing(map_func)
         X = map(map_func, X)
     end
     if !isempty(collapse_args)
-        X = collapse(X, collapse_args...)
+        X = TimeSeries.collapse(X, collapse_args...)
     end
     X = DataFrames.DataFrame(X)
 
@@ -375,7 +376,8 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
     X = X[!, [true; keep_cols]]
     DataFrames.select!(X, DataFrames.InvertedIndices.Not(names(X, Missing)))
     DataFrames.dropmissing!(X)
-    X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
+    X = TimeSeries.percentchange(TimeSeries.TimeArray(X; timestamp = :timestamp),
+                                 ret_method; padding = padding)
     X = DataFrames.DataFrame(X)
     col_names = names(X)
     nx = intersect(col_names, asset_names)
@@ -384,7 +386,7 @@ function prices_to_returns(X::TimeArray, F::Option{<:TimeArray} = nothing;
     oc = setdiff(col_names, union(nx, nf, nb))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @argcheck(issubset(ts, timestamp(iv)), ValueError)
+        @argcheck(issubset(ts, TimeSeries.timestamp(iv)), ValueError)
         iv = iv[ts]
     end
     if !isnothing(iv)

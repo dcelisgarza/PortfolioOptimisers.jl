@@ -4,6 +4,7 @@ using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering
 using DataFrames: DataFrames
+using Dates: Dates
 using Distances: Distances
 using Distributions: Distributions
 using FLoops: FLoops
@@ -27,7 +28,7 @@ using SparseArrays: SparseArrays
 using Statistics: Statistics
 using StatsAPI: StatsAPI
 using StatsBase
-using TimeSeries
+using TimeSeries: TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
