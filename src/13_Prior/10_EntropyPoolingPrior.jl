@@ -383,7 +383,7 @@ Entropy pooling prior estimator for asset returns.
                         ds_opt::Option{<:CVaREntropyPooling} = nothing,
                         dm_opt::Option{<:OptimEntropyPooling} = nothing,
                         opt::NonCVaREP = OptimEntropyPooling(),
-                        w::Option{<:ProbabilityWeights} = nothing,
+                        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
                         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
 
 Keyword arguments correspond to the fields above.
@@ -499,14 +499,14 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                  sets::Option{<:AssetSets},
                                  ds_opt::Option{<:CVaREntropyPooling},
                                  dm_opt::Option{<:OptimEntropyPooling}, opt::NonCVaREP,
-                                 w::Option{<:ProbabilityWeights},
+                                 w::Option{<:StatsBase.ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
         if !isnothing(w)
             @argcheck(!isempty(w))
             if ismutable(w.values)
                 LinearAlgebra.normalize!(w, 1)
             else
-                w = pweights(LinearAlgebra.normalize(w, 1))
+                w = StatsBase.pweights(LinearAlgebra.normalize(w, 1))
             end
         end
         if !isnothing(mu_views) ||
@@ -567,7 +567,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              ds_opt::Option{<:CVaREntropyPooling} = nothing,
                              dm_opt::Option{<:OptimEntropyPooling} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
-                             w::Option{<:ProbabilityWeights} = nothing,
+                             w::Option{<:StatsBase.ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
@@ -583,7 +583,7 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     end
 end
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::EntropyPoolingPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
@@ -1014,7 +1014,7 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
 
 # Returns
 
-  - `pw::ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
 
 # Details
 
@@ -1077,7 +1077,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
+    return StatsBase.pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -1130,7 +1130,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
+    return StatsBase.pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
@@ -1151,7 +1151,7 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
 
 # Returns
 
-  - `pw::ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
 
 # Details
 
@@ -1211,7 +1211,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     JuMP.@objective(model, Min, obj_expr)
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    return pweights(JuMP.value.(x))
+    return StatsBase.pweights(JuMP.value.(x))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -1262,11 +1262,11 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     # Solve the optimization problem
     @argcheck(optimise_JuMP_model!(model, slv).success,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
-    return pweights(JuMP.value.(x))
+    return StatsBase.pweights(JuMP.value.(x))
 end
 """
     ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Number,
-                         w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
+                         w::StatsBase.AbstractWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
                          kwargs...)
 
 Solve entropy pooling views when no CVaR views are specified.
@@ -1283,7 +1283,7 @@ Solve entropy pooling views when no CVaR views are specified.
 
 # Returns
 
-  - `pw::ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
 
 # Details
 
@@ -1299,8 +1299,8 @@ Solve entropy pooling views when no CVaR views are specified.
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Any,
-                              w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
-                              ::Any, ::Any; kwargs...)
+                              w::StatsBase.AbstractWeights,
+                              opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any; kwargs...)
     return entropy_pooling(w, epc, opt)
 end
 """
@@ -1336,7 +1336,7 @@ end
 """
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                          pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
-                         w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
+                         w::StatsBase.AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
                          ds_opt::Option{<:CVaREntropyPooling},
                          dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
 
@@ -1359,7 +1359,7 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
 
 # Returns
 
-  - `pw::ProbabilityWeights`: Posterior probability weights satisfying CVaR view constraints.
+  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying CVaR view constraints.
 
 # Details
 
@@ -1379,7 +1379,8 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
 """
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
-                              w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
+                              w::StatsBase.AbstractWeights,
+                              opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Option{<:CVaREntropyPooling},
                               dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
     cvar_views = parse_equation(cvar_views.val; ops1 = ("==",), ops2 = (:call, :(==)),
@@ -1715,10 +1716,10 @@ Extract the prior correlation value between assets `i` and `j` from a prior resu
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
-    return cov2cor(pr.sigma)[i, j]
+    return StatsBase.cov2cor(pr.sigma)[i, j]
 end
 function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
-    return LinearAlgebra.norm(cov2cor(pr.sigma)[i, j]) / length(i)
+    return LinearAlgebra.norm(StatsBase.cov2cor(pr.sigma)[i, j]) / length(i)
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -2025,7 +2026,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     T, N = size(X)
     w1 = w0 = if isnothing(pe.w)
         iT = inv(T)
-        pweights(range(iT, iT; length = T))
+        StatsBase.pweights(range(iT, iT; length = T))
     else
         @argcheck(length(pe.w) == T)
         pe.w
@@ -2079,8 +2080,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
     (; X, mu, sigma, chol, rr, f_mu, f_sigma) = pr
-    ens = exp(entropy(w1))
-    kld = kldivergence(w1, w0)
+    ens = exp(StatsBase.entropy(w1))
+    kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
                          kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = !isnothing(rr) ? w1 : nothing)
@@ -2150,7 +2151,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     T = size(X, 1)
     w0 = if isnothing(pe.w)
         iT = inv(T)
-        pweights(range(iT, iT; length = T))
+        StatsBase.pweights(range(iT, iT; length = T))
     else
         @argcheck(length(pe.w) == T)
         pe.w
@@ -2184,8 +2185,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     pe = factory(pe, w1)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     (; X, mu, sigma, chol, rr, f_mu, f_sigma) = pr
-    ens = exp(entropy(w1))
-    kld = kldivergence(w1, w0)
+    ens = exp(StatsBase.entropy(w1))
+    kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
                          kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = !isnothing(rr) ? w1 : nothing)

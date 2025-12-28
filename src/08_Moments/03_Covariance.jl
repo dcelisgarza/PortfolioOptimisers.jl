@@ -18,7 +18,7 @@ A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary 
     GeneralCovariance(;
                       ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                      corrected = true),
-                      w::Option{<:AbstractWeights} = nothing)
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -49,14 +49,14 @@ GeneralCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Option`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     w::T2
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
-                               w::Option{<:AbstractWeights})
+                               w::Option{<:StatsBase.AbstractWeights})
         assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
     end
@@ -64,7 +64,7 @@ end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:AbstractWeights} = nothing)
+                           w::Option{<:StatsBase.AbstractWeights} = nothing)
     return GeneralCovariance(ce, w)
 end
 """
@@ -135,7 +135,7 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
-function factory(ce::GeneralCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::GeneralCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return GeneralCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
 """
@@ -198,7 +198,7 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance(me, ce, alg)
 end
-function factory(ce::Covariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::Covariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """

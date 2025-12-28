@@ -25,7 +25,7 @@
                                      timestamp = :Date)[(end - 252):end])
     pr = prior(HighOrderPriorEstimator(; pe = EmpiricalPrior()), rd)
     w = fill(inv(size(rd.X, 2)), size(rd.X, 2))
-    wt = pweights(fill(inv(size(rd.X, 1)), size(rd.X, 1)))
+    wt = StatsBase.pweights(fill(inv(size(rd.X, 1)), size(rd.X, 1)))
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = Dict("verbose" => false)),

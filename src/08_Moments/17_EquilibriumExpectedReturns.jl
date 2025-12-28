@@ -56,7 +56,7 @@ EquilibriumExpectedReturns
 
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     ce::T1
@@ -73,7 +73,8 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::EquilibriumExpectedReturns,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """

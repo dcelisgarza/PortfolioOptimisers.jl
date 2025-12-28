@@ -147,13 +147,13 @@ function detone!(de::Detone, X::MatNum)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.cov2cor!(X, s)
+        StatsBase.StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
     vals = LinearAlgebra.Diagonal(vals)[(end - n):end, (end - n):end]
     vecs = vecs[:, (end - n):end]
     X .-= vecs * vals * transpose(vecs)
-    X .= cov2cor(X)
+    X .= StatsBase.cov2cor(X)
     posdef!(de.pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)

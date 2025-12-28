@@ -91,7 +91,7 @@ function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...
     if dims == 2
         X = transpose(X)
     end
-    return corkendall(X)
+    return StatsBase.corkendall(X)
 end
 """
     cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
@@ -126,7 +126,7 @@ function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs.
         X = transpose(X)
     end
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
-    return corkendall(X) ⊙ (std_vec ⊗ std_vec)
+    return StatsBase.corkendall(X) ⊙ (std_vec ⊗ std_vec)
 end
 """
     struct SpearmanCovariance{T1} <: RankCovarianceEstimator
@@ -207,7 +207,7 @@ function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs..
     if dims == 2
         X = transpose(X)
     end
-    return corspearman(X)
+    return StatsBase.corspearman(X)
 end
 """
     cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
@@ -242,11 +242,11 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
         X = transpose(X)
     end
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
-    return corspearman(X) ⊙ (std_vec ⊗ std_vec)
+    return StatsBase.corspearman(X) ⊙ (std_vec ⊗ std_vec)
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote
-             function factory(ce::$(ce), w::Option{<:AbstractWeights} = nothing)
+             function factory(ce::$(ce), w::Option{<:StatsBase.AbstractWeights} = nothing)
                  return $(ce)(; ve = factory(ce.ve, w))
              end
          end)

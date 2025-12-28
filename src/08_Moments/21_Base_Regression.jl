@@ -126,7 +126,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::Option{<:AbstractWeights} = nothing)
+function factory(re::LinearModel, w::Option{<:StatsBase.AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -162,7 +162,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
 function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
-    return GLM.fit(GLM.LinearModel, X, y; tgt.kwargs...)
+    return StatsAPI.fit(GLM.LinearModel, X, y; tgt.kwargs...)
 end
 """
     struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
@@ -211,7 +211,8 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = nothing)
+function factory(re::GeneralisedLinearModel,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -247,7 +248,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
 function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
-    return GLM.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; tgt.kwargs...)
+    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; tgt.kwargs...)
 end
 """
     abstract type AbstractMinMaxValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end

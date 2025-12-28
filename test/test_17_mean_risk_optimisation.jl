@@ -166,8 +166,8 @@
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
-    wp = pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
-                        length = size(pr.X, 1)))
+    wp = StatsBase.pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
+                                  length = size(pr.X, 1)))
     ucs1 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
                                           rng = StableRNG(987654321),
                                           alg = BoxUncertaintySetAlgorithm()), rd.X)

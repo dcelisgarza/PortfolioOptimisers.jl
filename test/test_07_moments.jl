@@ -162,7 +162,7 @@
             cei = PortfolioOptimisersCovariance(; ce = ce)
             sigma = cov(cei, rd.X'; dims = 2)
             rho = cor(cei, rd.X'; dims = 2)
-            @test isapprox(cov2cor(sigma), rho)
+            @test isapprox(StatsBase.cov2cor(sigma), rho)
             success = isapprox(vec(sigma), df[!, i])
             if !success
                 println("Counter: $i")

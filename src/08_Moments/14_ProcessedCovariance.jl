@@ -58,7 +58,7 @@ function ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                              pdm::Option{<:Posdef} = Posdef())
     return ProcessedCovariance(ce, alg, pdm)
 end
-function factory(ce::ProcessedCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::ProcessedCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end
 """

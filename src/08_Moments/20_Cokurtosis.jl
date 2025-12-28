@@ -75,7 +75,7 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis(me, mp, alg)
 end
-function factory(ce::Cokurtosis, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::Cokurtosis, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """

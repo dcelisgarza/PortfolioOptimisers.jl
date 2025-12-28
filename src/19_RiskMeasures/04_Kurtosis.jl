@@ -26,7 +26,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 # Constructors
 
     Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       w::Option{<:AbstractWeights} = nothing,
+                       w::Option{<:StatsBase.AbstractWeights} = nothing,
                        mu::Option{<:Num_VecNum_VecScalar} = nothing,
                        kt::Option{<:MatNum} = nothing,
                        N::Option{<:Integer} = nothing,
@@ -97,7 +97,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     N::T5
     alg1::T6
     alg2::T7
-    function Kurtosis(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
+    function Kurtosis(settings::RiskMeasureSettings, w::Option{<:StatsBase.AbstractWeights},
                       mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
                       N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,
                       alg2::SecondMomentFormulation)
@@ -129,7 +129,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::Option{<:AbstractWeights} = nothing,
+                  w::Option{<:StatsBase.AbstractWeights} = nothing,
                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
                   kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
@@ -140,8 +140,8 @@ function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:
                             ::Any, x::VecNum)
     return mean(x)
 end
-function calc_moment_target(r::Kurtosis{<:Any, <:AbstractWeights, Nothing, <:Any, <:Any,
-                                        <:Any, <:Any}, ::Any, x::VecNum)
+function calc_moment_target(r::Kurtosis{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any,
+                                        <:Any, <:Any, <:Any}, ::Any, x::VecNum)
     return mean(x, r.w)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, <:Any, <:Any, <:Any, <:Any},

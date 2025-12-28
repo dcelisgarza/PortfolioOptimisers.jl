@@ -371,12 +371,12 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
     sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = quantile(mu_j, q)
-        mu_u[j] = quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
         end
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
@@ -427,8 +427,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     mu_u = Vector{eltype(pr.X)}(undef, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = quantile(mu_j, q)
-        mu_u[j] = quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
@@ -478,8 +478,8 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
     for j in 1:N
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
         end
     end
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)

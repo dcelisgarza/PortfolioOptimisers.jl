@@ -125,7 +125,7 @@ function posdef!(pdm::Posdef, X::MatNum)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.cov2cor!(X, s)
+        StatsBase.StatsBase.cov2cor!(X, s)
     end
     NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)
     if !LinearAlgebra.isposdef(X)

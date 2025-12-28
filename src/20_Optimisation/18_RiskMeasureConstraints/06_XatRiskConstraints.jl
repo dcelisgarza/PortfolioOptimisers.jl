@@ -113,7 +113,7 @@ function compute_value_at_risk_z(dist::Distributions.Normal, alpha::Number)
     return Distributions.cquantile(dist, alpha)
 end
 function compute_value_at_risk_z(dist::Distributions.TDist, alpha::Number)
-    d = dof(dist)
+    d = StatsAPI.dof(dist)
     @argcheck(d > 2)
     return Distributions.cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
@@ -121,12 +121,12 @@ function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
     return -log(2 * alpha) / sqrt(2)
 end
 function compute_value_at_risk_cz(dist::Distributions.Normal, alpha::Number)
-    return quantile(dist, alpha)
+    return Statistics.quantile(dist, alpha)
 end
 function compute_value_at_risk_cz(dist::Distributions.TDist, alpha::Number)
-    d = dof(dist)
+    d = StatsAPI.dof(dist)
     @argcheck(d > 2)
-    return quantile(dist, alpha) * sqrt((d - 2) / d)
+    return Statistics.quantile(dist, alpha) * sqrt((d - 2) / d)
 end
 function compute_value_at_risk_cz(::Distributions.Laplace, alpha::Number)
     return -log(2 * (one(alpha) - alpha)) / sqrt(2)

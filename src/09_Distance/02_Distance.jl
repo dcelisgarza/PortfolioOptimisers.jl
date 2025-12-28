@@ -289,7 +289,7 @@ function distance(::Distance{Nothing, <:SimpleDistance}, rho::MatNum, args...; k
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!((one(eltype(rho)) .- rho) * 0.5, zero(eltype(rho)),
                         one(eltype(rho))))
@@ -300,7 +300,7 @@ function distance(de::Distance{<:Integer, <:SimpleDistance}, rho::MatNum, args..
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     scale = isodd(de.power) ? 0.5 : 1.0
     return sqrt.(clamp!((one(eltype(rho)) .- rho .^ de.power) * scale, zero(eltype(rho)),
@@ -312,7 +312,7 @@ function distance(::Distance{Nothing, <:SimpleAbsoluteDistance}, rho::MatNum, ar
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)),
                         zero(eltype(rho)), one(eltype(rho))))
@@ -323,7 +323,7 @@ function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::MatNum
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .-
                         (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power,
@@ -334,7 +334,7 @@ function distance(::Distance{Nothing, <:LogDistance}, rho::MatNum, args...; kwar
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
@@ -343,7 +343,7 @@ function distance(de::Distance{<:Integer, <:LogDistance}, rho::MatNum, args...; 
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return -log.((all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power)
 end
@@ -354,7 +354,7 @@ function distance(::Distance{Nothing, <:CorrelationDistance}, rho::MatNum, args.
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .- rho, zero(eltype(rho)), one(eltype(rho))))
 end
@@ -365,7 +365,7 @@ function distance(de::Distance{<:Integer, <:CorrelationDistance}, rho::MatNum, a
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .- rho .^ de.power, zero(eltype(rho)),
                         one(eltype(rho))))

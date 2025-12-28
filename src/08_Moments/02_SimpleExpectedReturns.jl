@@ -13,7 +13,7 @@ A simple expected returns estimator for PortfolioOptimisers.jl, representing the
 
 # Constructor
 
-    SimpleExpectedReturns(; w::Option{<:AbstractWeights} = nothing)
+    SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -25,17 +25,17 @@ Keyword arguments correspond to the fields above.
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`Option`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
-    function SimpleExpectedReturns(w::Option{<:AbstractWeights})
+    function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights})
         assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::Option{<:AbstractWeights} = nothing)
+function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return SimpleExpectedReturns(w)
 end
 """
@@ -93,7 +93,7 @@ function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kw
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
 """
-    factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+    factory(me::SimpleExpectedReturns, w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Create a new `SimpleExpectedReturns` estimator with updated observation weights.
 
@@ -117,10 +117,11 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionall
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(me::SimpleExpectedReturns,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return SimpleExpectedReturns(; w = ifelse(isnothing(w), me.w, w))
 end
 

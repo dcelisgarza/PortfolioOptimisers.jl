@@ -44,8 +44,8 @@
     pr = prior(HighOrderPriorEstimator(), rd)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
-    wp = pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
-                        length = size(pr.X, 1)))
+    wp = StatsBase.pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
+                                  length = size(pr.X, 1)))
     rf = 4.2 / 100 / 252
     rs = [StandardDeviation(), Variance(), LowOrderMoment(),
           LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),

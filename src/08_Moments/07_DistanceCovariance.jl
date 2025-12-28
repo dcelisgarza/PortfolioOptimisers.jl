@@ -22,7 +22,7 @@ A flexible container type for configuring and applying distance-based covariance
 # Constructor
 
     DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                       kwargs::NamedTuple = (;), w::Option{<:AbstractWeights} = nothing,
+                       kwargs::NamedTuple = (;), w::Option{<:StatsBase.AbstractWeights} = nothing,
                        ex::FLoops.Transducers.Executor = ThreadedEx())
 
 Keyword arguments correspond to the fields above.
@@ -43,7 +43,7 @@ DistanceCovariance
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
@@ -53,7 +53,7 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     w::T4
     ex::T5
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Option{<:AbstractWeights},
+                                w::Option{<:StatsBase.AbstractWeights},
                                 ex::FLoops.Transducers.Executor)
         return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(dist,
                                                                                       args,
@@ -63,11 +63,11 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Option{<:AbstractWeights} = nothing,
+                            w::Option{<:StatsBase.AbstractWeights} = nothing,
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, ex)
 end
-function factory(ce::DistanceCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::DistanceCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, ex = ce.ex)
 end

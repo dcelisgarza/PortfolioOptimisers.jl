@@ -1,5 +1,5 @@
 function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
-             w::Option{<:AbstractWeights} = nothing)
+             w::Option{<:StatsBase.AbstractWeights} = nothing)
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv))
     end
@@ -33,7 +33,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     alpha::T3
     w::T4
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
-                                 alpha::Number, w::Option{<:AbstractWeights})
+                                 alpha::Number, w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -47,7 +47,7 @@ struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                             w::Option{<:AbstractWeights} = nothing)
+                             w::Option{<:StatsBase.AbstractWeights} = nothing)
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::VecNum)
@@ -61,7 +61,7 @@ struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T5
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                      beta::Number, w::Option{<:AbstractWeights})
+                                      beta::Number, w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -80,7 +80,7 @@ end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
                                   beta::Number = 0.05,
-                                  w::Option{<:AbstractWeights} = nothing)
+                                  w::Option{<:StatsBase.AbstractWeights} = nothing)
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
 function (r::EntropicValueatRiskRange)(x::VecNum)
@@ -100,7 +100,7 @@ struct EntropicDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     w::T4
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                    w::Option{<:AbstractWeights})
+                                    w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -114,7 +114,7 @@ struct EntropicDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                w::Option{<:AbstractWeights} = nothing)
+                                w::Option{<:StatsBase.AbstractWeights} = nothing)
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicDrawdownatRisk)(x::VecNum)
@@ -128,7 +128,7 @@ struct RelativeEntropicDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
     w::T4
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                            w::Option{<:AbstractWeights})
+                                            w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -144,7 +144,7 @@ function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
                                         alpha::Number = 0.05,
-                                        w::Option{<:AbstractWeights} = nothing)
+                                        w::Option{<:StatsBase.AbstractWeights} = nothing)
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
