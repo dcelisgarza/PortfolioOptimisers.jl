@@ -26,7 +26,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 # Constructors
 
     Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       w::Option{<:StatsBase.AbstractWeights} = nothing,
+                       w::Option{<:AbstractWeights} = nothing,
                        mu::Option{<:Num_VecNum_VecScalar} = nothing,
                        kt::Option{<:MatNum} = nothing,
                        N::Option{<:Integer} = nothing,
@@ -97,7 +97,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     N::T5
     alg1::T6
     alg2::T7
-    function Kurtosis(settings::RiskMeasureSettings, w::Option{<:StatsBase.AbstractWeights},
+    function Kurtosis(settings::RiskMeasureSettings, w::Option{<:AbstractWeights},
                       mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
                       N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,
                       alg2::SecondMomentFormulation)
@@ -129,7 +129,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  w::Option{<:StatsBase.AbstractWeights} = nothing,
+                  w::Option{<:AbstractWeights} = nothing,
                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
                   kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
@@ -138,11 +138,11 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
 end
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
                             ::Any, x::VecNum)
-    return Statistics.mean(x)
+    return mean(x)
 end
-function calc_moment_target(r::Kurtosis{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any,
-                                        <:Any, <:Any, <:Any}, ::Any, x::VecNum)
-    return Statistics.mean(x, r.w)
+function calc_moment_target(r::Kurtosis{<:Any, <:AbstractWeights, Nothing, <:Any, <:Any,
+                                        <:Any, <:Any}, ::Any, x::VecNum)
+    return mean(x, r.w)
 end
 function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, <:Any, <:Any, <:Any, <:Any},
                             w::VecNum, ::Any)
@@ -167,28 +167,28 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full, <:SOCRiskExpr})
                                                                                  fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
-    return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
+    return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi, <:SOCRiskExpr})(w::VecNum,
                                                                                  X::MatNum,
                                                                                  fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
-    return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
+    return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full,
                       <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
                                                        fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+    return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
                       <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
                                                        fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+    return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)

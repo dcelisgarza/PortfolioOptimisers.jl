@@ -28,9 +28,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     flm = model[Symbol(:flm_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     flm_risk = model[key] = if isnothing(wi)
-        JuMP.@expression(model, Statistics.mean(flm))
+        JuMP.@expression(model, mean(flm))
     else
-        JuMP.@expression(model, Statistics.mean(flm, wi))
+        JuMP.@expression(model, mean(flm, wi))
     end
     model[Symbol(:cflm_mar_, i)] = JuMP.@constraint(model, sc * ((net_X + flm) .- tgt) >= 0)
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
@@ -51,9 +51,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     mad = model[Symbol(:mad_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
-        JuMP.@expression(model, 2 * Statistics.mean(mad))
+        JuMP.@expression(model, 2 * mean(mad))
     else
-        JuMP.@expression(model, 2 * Statistics.mean(mad, wi))
+        JuMP.@expression(model, 2 * mean(mad, wi))
     end
     model[Symbol(:cmar_mad_, i)] = JuMP.@constraint(model, sc * ((net_X + mad) .- tgt) >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)

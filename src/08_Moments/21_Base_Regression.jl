@@ -126,7 +126,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(re::LinearModel, w::Option{<:AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)
@@ -211,8 +211,7 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = nothing)
     kwargs = re.kwargs
     if !isnothing(w)
         kwargs = if !haskey(kwargs, :wts)

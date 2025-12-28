@@ -46,7 +46,7 @@ Factor Black-Litterman prior estimator for asset returns.
                               views::Lc_BLV,
                               sets::Option{<:AssetSets} = nothing,
                               views_conf::Option{<:Num_VecNum} = nothing,
-                              w::Option{<:StatsBase.AbstractWeights} = nothing, rf::Number = 0.0,
+                              w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
                               l::Option{<:Number} = nothing,
                               tau::Option{<:Number} = nothing, rsd::Bool = true)
 
@@ -191,8 +191,7 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::FactorBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,

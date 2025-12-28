@@ -209,7 +209,7 @@ function plot_clusters(clr::AbstractClusteringResult, X::MatNum,
     assert_matrix_issquare(X)
     iscov = any(!isone, LinearAlgebra.diag(X))
     if iscov
-        X = StatsBase.cov2cor(X)
+        X = cov2cor(X)
     end
     colorrange = color_func(X)
     N = size(X, 1)

@@ -357,7 +357,7 @@ function SmythBrobyCovariance(;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return SmythBrobyCovariance(me, ve, pdm, t, c1, c2, c3, n, alg, ex)
 end
-function factory(ce::SmythBrobyCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::SmythBrobyCovariance, w::Option{<:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, t = ce.t, c1 = ce.c1, c2 = ce.c2, c3 = ce.c3,
                                 n = ce.n, alg = ce.alg, ex = ce.ex)
@@ -1360,7 +1360,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 """
-    Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the Smyth-Broby correlation matrix.
 
@@ -1437,7 +1437,7 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     return smythbroby(ce, X)
 end
 """
-    Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the Smyth-Broby covariance matrix.
 

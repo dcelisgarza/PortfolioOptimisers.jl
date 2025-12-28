@@ -58,11 +58,11 @@ function ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                              pdm::Option{<:Posdef} = Posdef())
     return ProcessedCovariance(ce, alg, pdm)
 end
-function factory(ce::ProcessedCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::ProcessedCovariance, w::Option{<:AbstractWeights} = nothing)
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end
 """
-    Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
+    cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the processed and positive definite projected covariance matrix for the data matrix `X` using the specified `ProcessedCovariance` estimator.
 
@@ -102,7 +102,7 @@ function Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    sigma = Statistics.cov(ce.ce, X; kwargs...)
+    sigma = cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
@@ -111,7 +111,7 @@ function Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
     return sigma
 end
 """
-    Statistics.cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
+    cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the processed and positive definite projected correlation matrix for the data matrix `X` using the specified `ProcessedCovariance` estimator.
 
@@ -151,7 +151,7 @@ function Statistics.cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    rho = Statistics.cor(ce.ce, X; kwargs...)
+    rho = cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end

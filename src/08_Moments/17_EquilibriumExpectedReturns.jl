@@ -56,7 +56,7 @@ EquilibriumExpectedReturns
 
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     ce::T1
@@ -73,12 +73,11 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::EquilibriumExpectedReturns, w::Option{<:AbstractWeights} = nothing)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """
-    Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
@@ -101,7 +100,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 """
 function Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
-    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
+    sigma = cov(me.ce, X; dims = dims, kwargs...)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
     return me.l * sigma * w
 end

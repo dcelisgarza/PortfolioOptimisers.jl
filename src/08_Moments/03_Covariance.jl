@@ -18,7 +18,7 @@ A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary 
     GeneralCovariance(;
                       ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                      corrected = true),
-                      w::Option{<:StatsBase.AbstractWeights} = nothing)
+                      w::Option{<:AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -49,14 +49,14 @@ GeneralCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Option`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     w::T2
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
-                               w::Option{<:StatsBase.AbstractWeights})
+                               w::Option{<:AbstractWeights})
         assert_nonempty_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
     end
@@ -64,11 +64,11 @@ end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:StatsBase.AbstractWeights} = nothing)
+                           w::Option{<:AbstractWeights} = nothing)
     return GeneralCovariance(ce, w)
 end
 """
-    Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
 
@@ -102,7 +102,7 @@ function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
     end
 end
 """
-    Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
 
@@ -135,7 +135,7 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
-function factory(ce::GeneralCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::GeneralCovariance, w::Option{<:AbstractWeights} = nothing)
     return GeneralCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
 """
@@ -198,11 +198,11 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance(me, ce, alg)
 end
-function factory(ce::Covariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::Covariance, w::Option{<:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """
-    Statistics.cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
@@ -234,16 +234,16 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
-    return Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
+    return cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return Statistics.cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+    return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 """
-    Statistics.cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
@@ -275,13 +275,13 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
-    return Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
+    return cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return Statistics.cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+    return cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 
 export GeneralCovariance, Covariance

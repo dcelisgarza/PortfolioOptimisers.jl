@@ -260,7 +260,7 @@
         X = rd.X
         ce = PortfolioOptimisersCovariance()
         de = Distance(; alg = SimpleDistance())
-        rho = Statistics.cor(ce, X)
+        rho = cor(ce, X)
         dist = distance(de, rho, X)
 
         @test isapprox(PortfolioOptimisers.dbht_similarity(GeneralExponentialSimilarity();
@@ -582,7 +582,7 @@
         rd = prices_to_returns(X[(end - 252):end])
         X = rd.X
         ce = PortfolioOptimisersCovariance()
-        sigma = Statistics.cov(ce, X)
+        sigma = cov(ce, X)
 
         logo_t = CSV.read(joinpath(@__DIR__, "./assets/LoGo-MaximumDistanceSimilarity.csv"),
                           DataFrame)

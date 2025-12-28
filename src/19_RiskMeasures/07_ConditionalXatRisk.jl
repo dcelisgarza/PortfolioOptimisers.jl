@@ -3,7 +3,7 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     alpha::T2
     w::T3
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
-                                    w::Option{<:StatsBase.AbstractWeights})
+                                    w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -13,7 +13,7 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 alpha::Number = 0.05,
-                                w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
 struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
@@ -25,7 +25,7 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
                                                           r::Number,
-                                                          w::Option{<:StatsBase.AbstractWeights})
+                                                          w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(l > zero(l))
         @argcheck(r > zero(r))
@@ -42,7 +42,7 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                       alpha::Number = 0.05, l::Number = 1.0,
                                                       r::Number = 0.02,
-                                                      w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                                      w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
 const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
@@ -59,7 +59,7 @@ function (r::RMCVaR{Nothing})(x::VecNum)
     end
     return var - sum_var / aT
 end
-function (r::RMCVaR{<:StatsBase.AbstractWeights})(x::VecNum)
+function (r::RMCVaR{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -81,8 +81,7 @@ struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     beta::T3
     w::T4
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
-                                         beta::Number,
-                                         w::Option{<:StatsBase.AbstractWeights})
+                                         beta::Number, w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -95,7 +94,7 @@ end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Number = 0.05, beta::Number = 0.05,
-                                     w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                     w::Option{<:AbstractWeights} = nothing)
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
 function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
@@ -118,7 +117,7 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
                                                                alpha::Number, l_a::Number,
                                                                r_a::Number, beta::Number,
                                                                l_b::Number, r_b::Number,
-                                                               w::Option{<:StatsBase.AbstractWeights})
+                                                               w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         @argcheck(l_a > zero(l_a))
@@ -141,7 +140,7 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            beta::Number = 0.05,
                                                            l_b::Number = 1.0,
                                                            r_b::Number = 0.02,
-                                                           w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                                           w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
@@ -182,7 +181,7 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     gain = var2 - sum_var2 / bT
     return loss - gain
 end
-function (r::RMCVaRRg{<:StatsBase.AbstractWeights})(x::VecNum)
+function (r::RMCVaRRg{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -217,7 +216,7 @@ struct ConditionalDrawdownatRisk{T1, T2, T3} <: RiskMeasure
     alpha::T2
     w::T3
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
-                                       w::Option{<:StatsBase.AbstractWeights})
+                                       w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -227,7 +226,7 @@ struct ConditionalDrawdownatRisk{T1, T2, T3} <: RiskMeasure
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    alpha::Number = 0.05,
-                                   w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                   w::Option{<:AbstractWeights} = nothing)
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
 struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
@@ -239,7 +238,7 @@ struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4, T5} <: Ri
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Number, l::Number,
                                                              r::Number,
-                                                             w::Option{<:StatsBase.AbstractWeights})
+                                                             w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(l > zero(l))
         @argcheck(r > zero(r))
@@ -256,7 +255,7 @@ function DistributionallyRobustConditionalDrawdownatRisk(;
                                                          settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                          alpha::Number = 0.05,
                                                          l::Number = 1.0, r::Number = 0.02,
-                                                         w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                                         w::Option{<:AbstractWeights} = nothing)
     return DistributionallyRobustConditionalDrawdownatRisk(settings, alpha, l, r, w)
 end
 const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
@@ -274,7 +273,7 @@ function (r::RMCDaR{Nothing})(x::VecNum)
     end
     return var - sum_var / aT
 end
-function (r::RMCDaR{<:StatsBase.AbstractWeights})(x::VecNum)
+function (r::RMCDaR{<:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     dd = absolute_drawdown_vec(x)
     order = sortperm(dd)
@@ -296,8 +295,7 @@ struct RelativeConditionalDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     alpha::T2
     w::T3
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                               alpha::Number,
-                                               w::Option{<:StatsBase.AbstractWeights})
+                                               alpha::Number, w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -308,7 +306,7 @@ end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                            alpha::Number = 0.05,
-                                           w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                           w::Option{<:AbstractWeights} = nothing)
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end
 function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
@@ -322,7 +320,7 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum
     end
     return var - sum_var / aT
 end
-function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     sw = sum(r.w)
     dd = relative_drawdown_vec(x)
     order = sortperm(dd)

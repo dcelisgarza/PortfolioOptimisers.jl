@@ -37,7 +37,7 @@ function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            af::Number = 252)
     return ImpliedVolatility(ce, mp, alg, af)
 end
-function factory(ce::ImpliedVolatility, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::ImpliedVolatility, w::Option{<:AbstractWeights} = nothing)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
@@ -89,12 +89,12 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
         X_t = [ovec view(X, 1:(T2 - 1), :)]
         X_p = [one(eltype(X)) transpose(view(X, T2, :))]
         y_t = view(rv, 2:T2, i)
-        fri = StatsAPI.fit(alg.re, X_t, y_t)
-        # params = StatsAPI.coef(fri)
+        fri = fit(alg.re, X_t, y_t)
+        # params = coef(fri)
         # reg[i, 1] = params[1]
         # reg[i, 2:3] .= params[2:end]
         # r2s[i] = criterion_func(fri)
-        rv_pi = StatsAPI.predict(fri, X_p)[1]
+        rv_pi = predict(fri, X_p)[1]
         rv_p[i] = exp(rv_pi)
         # push!(fr, fri)
     end
@@ -103,7 +103,7 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
 end
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
-    sigma = Statistics.cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    sigma = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
     StatsBase.cov2cor!(sigma, iv)
@@ -112,7 +112,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
 end
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
-    rho = Statistics.cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
     StatsBase.cor2cov!(rho, iv)

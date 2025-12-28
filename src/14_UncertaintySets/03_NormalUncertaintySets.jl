@@ -208,8 +208,8 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     for j in 1:N
         for i in j:N
             sigma_ij = getindex.(sigmas[:], i, j)
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
+            sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)
@@ -320,8 +320,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
     for j in 1:N
         for i in j:N
             sigma_ij = getindex.(sigmas[:], i, j)
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
+            sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)

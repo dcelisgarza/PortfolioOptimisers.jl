@@ -1,5 +1,5 @@
 function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
-             w::Option{<:StatsBase.AbstractWeights} = nothing)
+             w::Option{<:AbstractWeights} = nothing)
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv))
     end
@@ -85,7 +85,7 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T5
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                     kappa::Number, w::Option{<:StatsBase.AbstractWeights})
+                                     kappa::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -104,7 +104,7 @@ end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
                                  kappa::Number = 0.3,
-                                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                 w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativisticValueatRisk)(x::VecNum)
@@ -121,7 +121,7 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
                                           slv::Option{<:Slv_VecSlv}, alpha::Number,
                                           kappa_a::Number, beta::Number, kappa_b::Number,
-                                          w::Option{<:StatsBase.AbstractWeights})
+                                          w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -142,7 +142,7 @@ function RelativisticValueatRiskRange(;
                                       slv::Option{<:Slv_VecSlv} = nothing,
                                       alpha::Number = 0.05, kappa_a::Number = 0.3,
                                       beta::Number = 0.05, kappa_b::Number = 0.3,
-                                      w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                      w::Option{<:AbstractWeights} = nothing)
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
@@ -162,8 +162,7 @@ struct RelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     kappa::T4
     w::T5
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                        kappa::Number,
-                                        w::Option{<:StatsBase.AbstractWeights})
+                                        kappa::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -182,7 +181,7 @@ end
 function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
                                     alpha::Number = 0.05, kappa::Number = 0.3,
-                                    w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                    w::Option{<:AbstractWeights} = nothing)
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
@@ -197,8 +196,7 @@ struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRis
     w::T5
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                                kappa::Number,
-                                                w::Option{<:StatsBase.AbstractWeights})
+                                                kappa::Number, w::Option{<:AbstractWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -218,7 +216,7 @@ function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             alpha::Number = 0.05, kappa::Number = 0.3,
-                                            w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                            w::Option{<:AbstractWeights} = nothing)
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)

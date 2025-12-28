@@ -51,11 +51,7 @@ function expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     rw = ret.w
     X = pr.X
-    kret = if isnothing(rw)
-        Statistics.mean(log1p.(X * w))
-    else
-        Statistics.mean(log1p.(X * w), rw)
-    end
+    kret = isnothing(rw) ? mean(log1p.(X * w)) : mean(log1p.(X * w), rw)
     return kret - calc_fees(w, fees)
 end
 function expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult,

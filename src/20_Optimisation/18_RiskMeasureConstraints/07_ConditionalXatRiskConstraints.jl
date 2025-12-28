@@ -172,9 +172,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                        end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     drcvar_risk = model[key] = if isnothing(wi)
-        JuMP.@expression(model, radius * lb + Statistics.mean(s))
+        JuMP.@expression(model, radius * lb + mean(s))
     else
-        JuMP.@expression(model, radius * lb + Statistics.mean(s, wi))
+        JuMP.@expression(model, radius * lb + mean(s, wi))
     end
     set_risk_bounds_and_expression!(model, opt, drcvar_risk, r.settings, key)
     return drcvar_risk
@@ -336,13 +336,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     wi = nothing_scalar_array_selector(r.w, pr.w)
     drcvar_risk_l, drcvar_risk_h = model[Symbol(:drcvar_risk_l_, i)], model[Symbol(:drcvar_risk_h_, i)] = if isnothing(wi)
         JuMP.@expressions(model, begin
-                              radius_l * lb_l + Statistics.mean(s_l)
-                              radius_h * lb_h + Statistics.mean(s_h)
+                              radius_l * lb_l + mean(s_l)
+                              radius_h * lb_h + mean(s_h)
                           end)
     else
         JuMP.@expressions(model, begin
-                              radius_l * lb_l + Statistics.mean(s_l, wi)
-                              radius_h * lb_h + Statistics.mean(s_h, wi)
+                              radius_l * lb_l + mean(s_l, wi)
+                              radius_h * lb_h + mean(s_h, wi)
                           end)
     end
     drcvar_risk_range = model[key] = JuMP.@expression(model, drcvar_risk_l - drcvar_risk_h)
@@ -467,9 +467,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                        end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
     drcdar_risk = model[key] = if isnothing(wi)
-        JuMP.@expression(model, radius * lb + Statistics.mean(s))
+        JuMP.@expression(model, radius * lb + mean(s))
     else
-        JuMP.@expression(model, radius * lb + Statistics.mean(s, wi))
+        JuMP.@expression(model, radius * lb + mean(s, wi))
     end
     set_risk_bounds_and_expression!(model, opt, drcdar_risk, r.settings, key)
     return drcdar_risk

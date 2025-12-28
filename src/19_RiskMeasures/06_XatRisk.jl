@@ -46,8 +46,7 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     w::T3
     alg::T4
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
-                         w::Option{<:StatsBase.AbstractWeights},
-                         alg::ValueatRiskFormulation)
+                         w::Option{<:AbstractWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -57,14 +56,14 @@ struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                     alpha::Number = 0.05, w::Option{<:StatsBase.AbstractWeights} = nothing,
+                     alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
-function (r::ValueatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     order = sortperm(x)
     sorted_x = view(x, order)
     sorted_w = view(r.w, order)
@@ -80,8 +79,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     w::T4
     alg::T5
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
-                              w::Option{<:StatsBase.AbstractWeights},
-                              alg::ValueatRiskFormulation)
+                              w::Option{<:AbstractWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         if !isnothing(w)
@@ -96,7 +94,7 @@ struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           alpha::Number = 0.05, beta::Number = 0.05,
-                          w::Option{<:StatsBase.AbstractWeights} = nothing,
+                          w::Option{<:AbstractWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
@@ -111,7 +109,7 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
     return loss - gain
 end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::VecNum)
     w = r.w
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -136,7 +134,7 @@ struct DrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     w::T3
     alg::T4
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
-                            w::Option{<:StatsBase.AbstractWeights}, alg::MIPValueatRisk)
+                            w::Option{<:AbstractWeights}, alg::MIPValueatRisk)
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -146,8 +144,7 @@ struct DrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     end
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        alpha::Number = 0.05,
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
+                        alpha::Number = 0.05, w::Option{<:AbstractWeights} = nothing,
                         alg::MIPValueatRisk = MIPValueatRisk())
     return DrawdownatRisk(settings, alpha, w, alg)
 end
@@ -176,7 +173,7 @@ function (r::DrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
-function (r::DrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::DrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     dd = absolute_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
@@ -191,7 +188,7 @@ struct RelativeDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
     alpha::T2
     w::T3
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                    alpha::Number, w::Option{<:StatsBase.AbstractWeights})
+                                    alpha::Number, w::Option{<:AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -202,7 +199,7 @@ end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                 alpha::Number = 0.05,
-                                w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                w::Option{<:AbstractWeights} = nothing)
     return RelativeDrawdownatRisk(settings, alpha, w)
 end
 function relative_drawdown_vec(x::VecNum)
@@ -222,7 +219,7 @@ function (r::RelativeDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     dd = relative_drawdown_vec(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
-function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:AbstractWeights})(x::VecNum)
     dd = relative_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)

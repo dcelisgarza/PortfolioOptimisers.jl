@@ -130,7 +130,7 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             tgt::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, tgt)
 end
-function factory(re::StepwiseRegression, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(re::StepwiseRegression, w::Option{<:AbstractWeights} = nothing)
     return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """
@@ -174,8 +174,8 @@ function add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,
     for i in 1:N
         factors = [included; i]
         f1 = [ovec view(F, :, factors)]
-        fri = StatsAPI.fit(tgt, f1, x)
-        new_pvals = StatsAPI.coeftable(fri).cols[4][2:end]
+        fri = fit(tgt, f1, x)
+        new_pvals = coeftable(fri).cols[4][2:end]
         idx = searchsortedfirst(factors, i)
         test_pval = new_pvals[idx]
         if best_pval > test_pval
@@ -232,8 +232,8 @@ function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::
         for i in excluded
             factors = [included; i]
             f1 = [ovec view(F, :, factors)]
-            fri = StatsAPI.fit(re.tgt, f1, x)
-            new_pvals = StatsAPI.coeftable(fri).cols[4][2:end]
+            fri = fit(re.tgt, f1, x)
+            new_pvals = coeftable(fri).cols[4][2:end]
             idx = findfirst(x -> x == i, factors)
             test_pval = new_pvals[idx]
             if best_pval > test_pval && maximum(new_pvals) <= re.crit.t
@@ -389,7 +389,7 @@ function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressio
             factors = copy(included)
             push!(factors, i)
             f1 = [ovec view(F, :, factors)]
-            fri = StatsAPI.fit(re.tgt, f1, x)
+            fri = fit(re.tgt, f1, x)
             value[i] = criterion_func(fri)
         end
         t = get_forward_reg_incl_excl!(re.crit, value, excluded, included, t)
@@ -432,11 +432,11 @@ This method implements backward elimination for stepwise regression, where all v
 """
 function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F::MatNum)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
-    fri = StatsAPI.fit(re.tgt, [ovec F], x)
+    fri = fit(re.tgt, [ovec F], x)
     included = 1:size(F, 2)
     indices = 1:size(F, 2)
     excluded = Vector{eltype(indices)}(undef, 0)
-    pvals = StatsAPI.coeftable(fri).cols[4][2:end]
+    pvals = coeftable(fri).cols[4][2:end]
     val = maximum(pvals)
     while val > re.crit.t
         included = setdiff(indices, excluded)
@@ -444,8 +444,8 @@ function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F:
             break
         end
         f1 = [ovec view(F, :, included)]
-        fri = StatsAPI.fit(re.tgt, f1, x)
-        pvals = StatsAPI.coeftable(fri).cols[4][2:end]
+        fri = fit(re.tgt, f1, x)
+        pvals = coeftable(fri).cols[4][2:end]
         val, idx = findmax(pvals)
         push!(excluded, included[idx])
     end
@@ -571,7 +571,7 @@ function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressio
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
-    fri = StatsAPI.fit(re.tgt, [ovec F], x)
+    fri = fit(re.tgt, [ovec F], x)
     criterion_func = regression_criterion_func(re.crit)
     t = criterion_func(fri)
     value = fill(ifelse(isa(re.crit, AbstractMinValStepwiseRegressionCriterion),
@@ -587,7 +587,7 @@ function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressio
             else
                 f1 = reshape(ovec, :, 1)
             end
-            fri = StatsAPI.fit(re.tgt, f1, x)
+            fri = fit(re.tgt, f1, x)
             value[factor] = criterion_func(fri)
         end
         t = get_backward_reg_incl!(re.crit, value, included, t)
@@ -638,8 +638,8 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     for i in axes(rr, 1)
         included = _regression(re, view(X, :, i), F)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
-        fri = StatsAPI.fit(re.tgt, x1, view(X, :, i))
-        params = StatsAPI.coef(fri)
+        fri = fit(re.tgt, x1, view(X, :, i))
+        params = coef(fri)
         rr[i, 1] = params[1]
         idx = [searchsortedfirst(features, i) + 1 for i in included]
         rr[i, idx] = params[2:end]

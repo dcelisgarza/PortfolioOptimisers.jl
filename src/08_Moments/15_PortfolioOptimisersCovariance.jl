@@ -59,12 +59,11 @@ function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covar
                                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
-function factory(ce::PortfolioOptimisersCovariance,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::PortfolioOptimisersCovariance, w::Option{<:AbstractWeights} = nothing)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
-    Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
+    cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -96,7 +95,7 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     if dims == 2
         X = transpose(X)
     end
-    sigma = Statistics.cov(ce.ce, X; kwargs...)
+    sigma = cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
@@ -104,7 +103,7 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     return sigma
 end
 """
-    Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
+    cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -136,7 +135,7 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     if dims == 2
         X = transpose(X)
     end
-    rho = Statistics.cor(ce.ce, X; kwargs...)
+    rho = cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end
@@ -149,8 +148,8 @@ function find_correlated_indices(X::MatNum;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                  t::Number = 0.95, absolute::Bool = false)
     N = size(X, 2)
-    rho = !absolute ? Statistics.cor(ce, X) : abs.(cor(ce, X))
-    mean_rho = Statistics.mean(rho; dims = 1)
+    rho = !absolute ? cor(ce, X) : abs.(cor(ce, X))
+    mean_rho = mean(rho; dims = 1)
     tril_idx = findall(LinearAlgebra.tril!(trues(size(rho)), -1))
     candidate_idx = findall(rho[tril_idx] .>= t)
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]

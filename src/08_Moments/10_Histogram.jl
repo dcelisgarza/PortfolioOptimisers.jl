@@ -201,7 +201,7 @@ function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Int
 end
 function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        ::Any, T::Integer)
-    corr = Statistics.cor(xj, xi)
+    corr = cor(xj, xi)
     return round(Int, if isone(corr)
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
                      z / 6 + 2 / (3 * z) + 1 / 3
@@ -233,7 +233,7 @@ This function computes the normalised histograms (probability mass functions) fo
 
 # Details
 
-  - The histograms are computed using `StatsAPI.fit(StatsBase.Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
+  - The histograms are computed using `StatsBase.fit(Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
   - The marginal histograms are normalised to sum to 1 before entropy calculation.
   - The joint histogram is not normalised, as it is used directly in mutual information calculations.
 
@@ -251,17 +251,17 @@ function calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
     xil = minimum(xi) - eps(eltype(xi))
     xih = maximum(xi) + eps(eltype(xi))
 
-    hx = StatsAPI.fit(StatsBase.Histogram, xj, range(xjl, xjh; length = bp1)).weights
+    hx = StatsBase.fit(Histogram, xj, range(xjl, xjh; length = bp1)).weights
     hx /= sum(hx)
 
-    hy = StatsAPI.fit(StatsBase.Histogram, xi, range(xil, xih; length = bp1)).weights
+    hy = StatsBase.fit(Histogram, xi, range(xil, xih; length = bp1)).weights
     hy /= sum(hy)
 
-    ex = StatsBase.entropy(hx)
-    ey = StatsBase.entropy(hy)
+    ex = entropy(hx)
+    ey = entropy(hy)
 
-    hxy = StatsAPI.fit(StatsBase.Histogram, (xj, xi),
-                       (range(xjl, xjh; length = bp1), range(xil, xih; length = bp1))).weights
+    hxy = StatsBase.fit(Histogram, (xj, xi),
+                        (range(xjl, xjh; length = bp1), range(xil, xih; length = bp1))).weights
 
     return ex, ey, hxy
 end

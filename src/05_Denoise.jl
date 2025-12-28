@@ -265,13 +265,13 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= zero(eltype(X))
-    X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
+    X .= cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return nothing
 end
 function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
-    X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
+    X .= cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return nothing
 end
 function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,

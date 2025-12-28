@@ -19,7 +19,7 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
     SimpleVariance(;
                    me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                   w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+                   w::Option{<:AbstractWeights} = nothing, corrected::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -54,7 +54,7 @@ SimpleVariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
@@ -65,15 +65,14 @@ struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     w::T2
     corrected::T3
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
-                            w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
+                            w::Option{<:AbstractWeights}, corrected::Bool)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
     end
 end
 function SimpleVariance(;
                         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
-                        corrected::Bool = true)
+                        w::Option{<:AbstractWeights} = nothing, corrected::Bool = true)
     return SimpleVariance(me, w, corrected)
 end
 """
@@ -307,7 +306,7 @@ function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
         var(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function factory(ve::SimpleVariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ve::SimpleVariance, w::Option{<:AbstractWeights} = nothing)
     return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
                           corrected = ve.corrected)
 end
