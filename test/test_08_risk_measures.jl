@@ -183,13 +183,15 @@
                 5e-2
             elseif i in (20, 23, 24, 54)
                 0.25
-            elseif i in (33, 57)
+            elseif i in (33, 55)
                 5e-5
             elseif i == 60
                 5e-4
+            elseif i == 57
+                1e-4
             elseif i == 36
                 5e-3
-            elseif i in (49, 55, 58)
+            elseif i in (49, 58)
                 5e-6
             elseif i in (45, 48)
                 1e-3
