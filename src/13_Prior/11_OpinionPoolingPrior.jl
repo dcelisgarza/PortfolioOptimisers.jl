@@ -333,7 +333,7 @@ Compute the consensus posterior return distribution from individual prior distri
 # Details
 
   - For `LinearOpinionPooling`, computes the weighted arithmetic mean of the individual prior weights: `w = pw * ow`.
-  - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - logsumexp(log.(pw) * ow))`.
+  - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - LogExpFunctions.logsumexp(log.(pw) * ow))`.
   - Used internally by [`OpinionPoolingPrior`](@ref) to form the consensus prior distribution.
 
 # Related
@@ -347,7 +347,7 @@ function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
 end
 function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     u = log.(pw) * ow
-    lse = logsumexp(u)
+    lse = LogExpFunctions.logsumexp(u)
     return pweights(vec(exp.(u .- lse)))
 end
 """

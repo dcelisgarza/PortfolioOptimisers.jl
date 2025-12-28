@@ -104,7 +104,7 @@ function herc_scalarised_risk_o!(sca::LogSumExpScalariser, wk::VecNum, roku::Vec
         rkbo[cl] ./= sum(view(rkbo, cl))
         crisk[i] = ro.settings.scale * sca.gamma * expected_risk(ro, rkbo, X, fees)
     end
-    return logsumexp(crisk) / sca.gamma
+    return LogExpFunctions.logsumexp(crisk) / sca.gamma
 end
 function herc_scalarised_risk_o!(sca::LogSumExpScalariser, ::VecNum, roku::MatNum,
                                  rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
@@ -115,7 +115,7 @@ function herc_scalarised_risk_o!(sca::LogSumExpScalariser, ::VecNum, roku::MatNu
         rkbo[cl] ./= sum(view(rkbo, cl))
         crisk[i] = ro.settings.scale * sca.gamma * expected_risk(ro, rkbo, X, fees)
     end
-    return logsumexp(crisk) / sca.gamma
+    return LogExpFunctions.logsumexp(crisk) / sca.gamma
 end
 function herc_scalarised_risk_i!(::SumScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
                                  ris::VecOptRM, X::MatNum, fees::Option{<:Fees})

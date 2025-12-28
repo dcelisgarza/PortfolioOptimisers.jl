@@ -134,8 +134,8 @@ function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, r
         lrisk[i] = expected_risk(r, view(wu, :, 1), X, fees) * scale
         rrisk[i] = expected_risk(r, view(wu, :, 2), X, fees) * scale
     end
-    return LogExpFunctions.logsumexp(lrisk) / sca.gamma,
-           LogExpFunctions.logsumexp(rrisk) / sca.gamma
+    return LogExpFunctions.LogExpFunctions.logsumexp(lrisk) / sca.gamma,
+           LogExpFunctions.LogExpFunctions.logsumexp(rrisk) / sca.gamma
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
