@@ -34,7 +34,7 @@ authors:
 CurrentModule = PortfolioOptimisers
 ```
 
-# Welcome to PortfolioOptimisers.jl!
+# Welcome to PortfolioOptimisers.jl
 
 [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
@@ -67,7 +67,8 @@ For more information on the package's *vast* feature list, please check out the 
 `PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
 
 ```julia
-julia> ]add PortfolioOptimisers
+julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
+using Pkg
 ```
 
 ## Quickstart
@@ -197,8 +198,8 @@ da = DiscreteAllocation(; slv = mip_slv)
 The discrete allocation minimises the absolute or relative L1- or L2-norm (configurable) between the ideal allocation to the one you can afford plus the leftover cash. As such, it needs to know a few extra things, namely the optimal weights `res.w`, a vector of latest prices `vec(values(prices[end]))`, and available cash which we define to be `4206.90`.
 
 ```@example 0_index
-# Perform the finite discrete allocation, uses the final asset 
-# prices, and an available cash amount. This is for us mortals 
+# Perform the finite discrete allocation, uses the final asset
+# prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
 mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
 ```
@@ -288,44 +289,64 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
   - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`](@ref)
 
-#### [Covariance](@id readme-covariance)
+#### [Covariance and Correlation](@id readme-covariance-correlation)
 
-  - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](ref)
-  - Full or semi covariance with custom covariance estimator [`Covariance`](@ref)
+All covariance estimators also work as correlation estimators by calling `cov(estimator, X)` or `cor(estimator, X)`.
 
+  - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](@ref)
+
+  - Covariance with custom covariance estimator [`Covariance`](@ref)
+    
+      + Full covariance [`Full`](@ref)
+      + Semi (downside) covariance [`Semi`](@ref)
   - Gerber covariances with custom variance estimators [`GerberCovariance`](@ref)
     
-      + Unstandardised Algorithms
+      + Unstandardised algorithms
         
           * Gerber 0 [`Gerber0`](@ref)
           * Gerber 1 [`Gerber1`](@ref)
           * Gerber 2 [`Gerber2`](@ref)
     
-      + Standardised Algorithms (Z-transforms the data beforehand) with Custom Expected Returns Estimators
+      + Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimators
         
           * Gerber 0 [`StandardisedGerber0`](@ref)
           * Gerber 1 [`StandardisedGerber1`](@ref)
           * Gerber 2 [`StandardisedGerber2`](@ref)
-  - Smyth-Broby Extension of Gerber Covariances with Custom Expected Returns and Custom Variance Estimators
+  - Smyth-Broby extension of Gerber covariances with custom expected returns and custom variance estimators [`SmythBrobyCovariance`](@ref)
     
-      + Unstandardised Algorithms
+      + Unstandardised algorithms
         
-          * Smyth-Broby 0
-          * Smyth-Broby 1
-          * Smyth-Broby 2
-          * Smyth-Broby-Gerber 0
-          * Smyth-Broby-Gerber 1
-          * Smyth-Broby-Gerber 2
+          * Smyth-Broby 0 [`SmythBroby0`](@ref)
+          * Smyth-Broby 1 [`SmythBroby1`](@ref)
+          * Smyth-Broby 2 [`SmythBroby2`](@ref)
+          * Smyth-Broby-Gerber 0 [`SmythBrobyGerber0`](@ref)
+          * Smyth-Broby-Gerber 1 [`SmythBrobyGerber1`](@ref)
+          * Smyth-Broby-Gerber 2 [`SmythBrobyGerber2`](@ref)
     
-      + Standardised Algorithms (Z-transforms the data beforehand)
+      + Standardised algorithms (Z-transforms the data beforehand)
         
-          * Smyth-Broby 0
-          * Smyth-Broby 1
-          * Smyth-Broby 2
-          * Smyth-Broby-Gerber 0
-          * Smyth-Broby-Gerber 1
-          * Smyth-Broby-Gerber 2
-  - Distance Covariance
+          * Smyth-Broby 0 [`StandardisedSmythBroby0`](@ref)
+          * Smyth-Broby 1 [`StandardisedSmythBroby1`](@ref)
+          * Smyth-Broby 2 [`StandardisedSmythBroby2`](@ref)
+          * Smyth-Broby-Gerber 0 [`StandardisedSmythBrobyGerber0`](@ref)
+          * Smyth-Broby-Gerber 1 [`StandardisedSmythBrobyGerber1`](@ref)
+          * Smyth-Broby-Gerber 2 [`StandardisedSmythBrobyGerber2`](@ref)
+  - Distance covariance with custom distance estimators via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
+  - Lower Tail Dependence covariance [`LowerTailDependenceCovariance`](@ref)
+  - Rank covariances
+    
+      + Kendall covariance [`KendallCovariance`](@ref)
+      + Spearman covariance [`SpearmanCovariance`](@ref)
+  - Mutual information covariance with various binning algorithms [`MutualInfoCovariance`](@ref)
+    
+      + [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
+        
+          * Knuth's optimal bin width [`Knuth`](@ref)
+          * Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
+          * Scott's bin width [`Scott`](@ref)
+    
+      + Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
+      + Predefined number of bins
 
 #### [Coskewness](@id readme-coskewness)
 
