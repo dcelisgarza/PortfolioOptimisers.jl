@@ -290,7 +290,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 #### [Covariance](@id readme-covariance)
 
-  - Optionally weighted covariance with custom covariance estimator [`GeneralWeightedCovariance`](ref)
+  - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](ref)
   - Full or semi covariance with custom covariance estimator [`Covariance`](@ref)
 
   - Gerber Covariances with Custom Variance Estimators
