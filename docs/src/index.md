@@ -293,19 +293,19 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
   - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](ref)
   - Full or semi covariance with custom covariance estimator [`Covariance`](@ref)
 
-  - Gerber Covariances with Custom Variance Estimators
+  - Gerber covariances with custom variance estimators [`GerberCovariance`](@ref)
     
       + Unstandardised Algorithms
         
-          * Gerber 0
-          * Gerber 1
-          * Gerber 2
+          * Gerber 0 [`Gerber0`](@ref)
+          * Gerber 1 [`Gerber1`](@ref)
+          * Gerber 2 [`Gerber2`](@ref)
     
       + Standardised Algorithms (Z-transforms the data beforehand) with Custom Expected Returns Estimators
         
-          * Gerber 0
-          * Gerber 1
-          * Gerber 2
+          * Gerber 0 [`StandardisedGerber0`](@ref)
+          * Gerber 1 [`StandardisedGerber1`](@ref)
+          * Gerber 2 [`StandardisedGerber2`](@ref)
   - Smyth-Broby Extension of Gerber Covariances with Custom Expected Returns and Custom Variance Estimators
     
       + Unstandardised Algorithms
