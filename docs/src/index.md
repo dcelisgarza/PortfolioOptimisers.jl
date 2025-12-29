@@ -268,32 +268,30 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
   - Optionally weighted expected returns [`SimpleExpectedReturns`](@ref)
 
-  - Equilibrium expected returns with custom covariance estimator
-  - Excess expected returns with custom expected returns estimator
-  - Shrunk expected returns with custom expected returns and custom covariance estimators
+  - Equilibrium expected returns with custom covariance [`EquilibriumExpectedReturns`](@ref)
+  - Excess expected returns with custom expected returns estimator [`ExcessExpectedReturns`](@ref)
+  - Shrunk expected returns with custom expected returns and custom covariance estimators [`ShrunkExpectedReturns`](@ref)
     
       + Algorithms
         
-          * JamesStein
-          * BayesStein
-          * BodnarOkhrinParolya
+          * JamesStein [`JamesStein`](@ref)
+          * BayesStein [`BayesStein`](@ref)
+          * BodnarOkhrinParolya [`BodnarOkhrinParolya`](@ref)
     
       + Targets: all algorithms can have any of the following targets
         
-          * Grand Mean
-          * Volatility Weighted
-          * Mean Squared Error
+          * Grand Mean [`GrandMean`](@ref)
+          * Volatility Weighted [`VolatilityWeighted`](@ref)
+          * Mean Squared Error [`MeanSquaredError`](@ref)
 
 #### [Variance](@id readme-variance)
 
-  - Optionally Weighted Variance with Custom Expected Returns Estimator
+  - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`](@ref)
 
 #### [Covariance](@id readme-covariance)
 
-  - Optionally Weighted with Optional Custom Covariance and Mean Estimators
-    
-      + Full
-      + Semi
+  - Optionally weighted covariance with custom covariance estimator [`GeneralWeightedCovariance`](ref)
+  - Full or semi covariance with custom covariance estimator [`Covariance`](@ref)
 
   - Gerber Covariances with Custom Variance Estimators
     
