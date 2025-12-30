@@ -9,7 +9,7 @@ GeneralExponentialSimilarity
 DBHT
 LoGo
 DBHTClustering
-clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
+clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::MatNum; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
 DBHTRootMethod

@@ -207,7 +207,7 @@ function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end
 """
-    clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+    clusterise(cle::AbstractClusteringEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
 
@@ -225,15 +225,15 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 
 # Related
 
-  - [`ClusteringEstimator`](@ref)
+  - [`HierarchicalClusteringEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`clusterise`](@ref)
 """
-function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+function clusterise(cle::AbstractClusteringEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-    phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult;
+    phylogeny_matrix(necle::PhE_Cl, pr::AbstractPriorResult;
                      kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
@@ -253,11 +253,11 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 # Related
 
   - [`NetworkEstimator`](@ref)
-  - [`ClusteringEstimator`](@ref)
+  - [`HierarchicalClusteringEstimator`](@ref)
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
+function phylogeny_matrix(necle::PhE_Cl, pr::AbstractPriorResult; kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """
@@ -287,7 +287,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::PhE_Cl, cent::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -312,7 +312,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+function centrality_vector(ne::PhE_Cl, cent::AbstractCentralityAlgorithm,
                            pr::AbstractPriorResult; kwargs...)
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end

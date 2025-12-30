@@ -166,7 +166,7 @@
                                                      "Consumer_Staples"]))
     pr = prior(HighOrderPriorEstimator(), rd)
     rr = regression(DimensionReductionRegression(), rd)
-    clr = clusterise(ClusteringEstimator(), pr)
+    clr = clusterise(HierarchicalClusteringEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
         jopti = JuMPOptimiser(; pe = pr, slv = slv)

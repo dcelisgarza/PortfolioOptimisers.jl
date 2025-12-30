@@ -7,7 +7,7 @@ PreorderTreeByID
 pre_order
 to_tree
 optimal_number_clusters
-clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any}, X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any}, X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
 get_node_property
 AbstractPreorderBy
 validate_k_value

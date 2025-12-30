@@ -403,7 +403,7 @@ The distance estimators are used together with various distance matrix algorithm
 
 ### Clustering
 
-Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClusteringEstimator`](@ref) and `clusterise(estimator, X; kwargs...)`.
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref) and `clusterise(estimator, X; kwargs...)`.
 
   - Hierarchical clustering.
     

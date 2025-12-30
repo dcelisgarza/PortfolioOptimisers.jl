@@ -4,7 +4,7 @@ using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, 
       Clustering, Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
-                            MatNum_Pr, PrE_Pr, ClE_Cl, VecVecNum
+                            MatNum_Pr, PrE_Pr, HClE_HCl, VecVecNum
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                                          fees::Option{<:Fees} = nothing;
@@ -139,7 +139,7 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
     return areaplot(transpose(w); xticks = (1:M, 1:M), label = permutedims(nx), kwargs...,
                     ekwargs...)
 end
-function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractClusteringResult,
+function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractHierarchicalClusteringResult,
                                              nx::AbstractVector = 1:length(clr.clustering.order);
                                              dend_theme = :Spectral,
                                              dend_kwargs = (; xrotation = 90),
@@ -169,7 +169,7 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
     end
     return plot(dend1; fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::ClE_Cl,
+function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::HClE_HCl,
                                            rd::PortfolioOptimisers.ReturnsResult = ReturnsResult();
                                            dims::Integer = 1,
                                            color_func = x -> if any(x .< zero(eltype(x)))

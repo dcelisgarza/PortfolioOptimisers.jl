@@ -725,7 +725,8 @@ All concrete types implementing network-based estimation algorithms should subty
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
-const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
+const PhE_Ph = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:HClE_HCl}
+const PhE_Cl = Union{<:AbstractNetworkEstimator, <:HClE_HCl}
 """
     struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
         ce::T1
@@ -967,7 +968,7 @@ function phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1
     return PhylogenyResult(; X = P)
 end
 """
-    phylogeny_matrix(cle::ClE_Cl,
+    phylogeny_matrix(cle::HClE_HCl,
                      X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                      kwargs...)
 
@@ -989,11 +990,11 @@ This function clusterises the data, cuts the tree into the optimal number of clu
 
 # Related
 
-  - [`ClusteringEstimator`](@ref)
+  - [`HierarchicalClusteringEstimator`](@ref)
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal,
+function phylogeny_matrix(cle::HClE_HCl, X::MatNum; branchorder::Symbol = :optimal,
                           dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = Clustering.cutree(res.clustering; k = res.k)
@@ -1005,7 +1006,7 @@ function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal
     return PhylogenyResult(; X = P * transpose(P) - LinearAlgebra.I)
 end
 """
-    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::PhE_Cl, cent::AbstractCentralityAlgorithm,
                       X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
@@ -1030,7 +1031,7 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`CentralityEstimator`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm, X::MatNum;
+function centrality_vector(ne::PhE_Cl, cent::AbstractCentralityAlgorithm, X::MatNum;
                            dims::Int = 1, kwargs...)
     P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
     return centrality_vector(P, cent; dims = dims, kwargs...)

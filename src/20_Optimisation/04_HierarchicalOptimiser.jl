@@ -22,7 +22,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sets::T6
     cwf::T7
     strict::T8
-    function HierarchicalOptimiser(pe::PrE_Pr, cle::ClE_Cl, slv::Option{<:Slv_VecSlv},
+    function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    fees::Option{<:FeesE_Fees}, wb::Option{<:WbE_Wb},
                                    sets::Option{<:AssetSets}, cwf::WeightFinaliser,
                                    strict::Bool)
@@ -35,7 +35,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     end
 end
 function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
-                               cle::ClE_Cl = ClusteringEstimator(),
+                               cle::HClE_HCl = HierarchicalClusteringEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                fees::Option{<:FeesE_Fees} = nothing,
                                wb::Option{<:WbE_Wb} = WeightBounds(),

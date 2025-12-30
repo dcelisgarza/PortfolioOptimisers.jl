@@ -24,11 +24,13 @@
                                      timestamp = :Date)[(end - 252):end])
     pr = prior(EmpiricalPrior(), rd)
     @testset "Clustering tests" begin
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = Distance(; alg = CanonicalDistance()),
-                                             alg = HClustAlgorithm(),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = SecondOrderDifference())),
+        clr = clusterise(HierarchicalClusteringEstimator(;
+                                                         ce = PortfolioOptimisersCovariance(),
+                                                         de = Distance(;
+                                                                       alg = CanonicalDistance()),
+                                                         alg = HClustAlgorithm(),
+                                                         onc = OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference())),
                          pr.X)
         clr2 = clusterise(clr)
         @test clr === clr2
@@ -65,11 +67,13 @@
         @test isapprox(clr.clustering.heights, clr_t.heights)
         @test clr.clustering.labels == clr_t.labels
         @test clr.clustering.linkage == clr_t.linkage
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = Distance(; alg = CanonicalDistance()),
-                                             alg = DBHT(),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = SecondOrderDifference())),
+        clr = clusterise(HierarchicalClusteringEstimator(;
+                                                         ce = PortfolioOptimisersCovariance(),
+                                                         de = Distance(;
+                                                                       alg = CanonicalDistance()),
+                                                         alg = DBHT(),
+                                                         onc = OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference())),
                          pr.X)
         clr_t = Hclust{Float64}([-1 -13;
                                  -7 -4;
@@ -155,29 +159,38 @@
                                                                                 max_k = 2),
                                                           clr.clustering, clr.D)
 
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = DistanceDistance(;
-                                                                   alg = CanonicalDistance()),
-                                             alg = HClustAlgorithm(),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = StandardisedSilhouetteScore())),
+        clr = clusterise(HierarchicalClusteringEstimator(;
+                                                         ce = PortfolioOptimisersCovariance(),
+                                                         de = DistanceDistance(;
+                                                                               alg = CanonicalDistance()),
+                                                         alg = HClustAlgorithm(),
+                                                         onc = OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore())),
                          pr.X)
         @test clr.k == 2
 
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = DistanceDistance(;
-                                                                   alg = CanonicalDistance()),
-                                             alg = DBHT(; sim = MaximumDistanceSimilarity(),
-                                                        root = UniqueRoot()),
-                                             onc = OptimalNumberClusters(; alg = 5)), pr.X)
+        clr = clusterise(HierarchicalClusteringEstimator(;
+                                                         ce = PortfolioOptimisersCovariance(),
+                                                         de = DistanceDistance(;
+                                                                               alg = CanonicalDistance()),
+                                                         alg = DBHT(;
+                                                                    sim = MaximumDistanceSimilarity(),
+                                                                    root = UniqueRoot()),
+                                                         onc = OptimalNumberClusters(;
+                                                                                     alg = 5)),
+                         pr.X)
         @test clr.k == 4
 
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = DistanceDistance(;
-                                                                   alg = CanonicalDistance()),
-                                             alg = DBHT(; sim = MaximumDistanceSimilarity(),
-                                                        root = EqualRoot()),
-                                             onc = OptimalNumberClusters(; alg = 2)), pr.X)
+        clr = clusterise(HierarchicalClusteringEstimator(;
+                                                         ce = PortfolioOptimisersCovariance(),
+                                                         de = DistanceDistance(;
+                                                                               alg = CanonicalDistance()),
+                                                         alg = DBHT(;
+                                                                    sim = MaximumDistanceSimilarity(),
+                                                                    root = EqualRoot()),
+                                                         onc = OptimalNumberClusters(;
+                                                                                     alg = 2)),
+                         pr.X)
         @test clr.k == 2
     end
     @testset "Centrality tests" begin
@@ -236,12 +249,13 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix3.csv.gz"), DataFrame)
-        A = phylogeny_matrix(ClusteringEstimator(), pr).X
+        A = phylogeny_matrix(HierarchicalClusteringEstimator(), pr).X
         @test isapprox(vec(A), df[!, 1])
 
         w = fill(inv(20), 20)
         @test isapprox(asset_phylogeny(NetworkEstimator(), w, pr), 0.09500000000000008)
-        @test isapprox(asset_phylogeny(ClusteringEstimator(), w, pr), 0.3350000000000003)
+        @test isapprox(asset_phylogeny(HierarchicalClusteringEstimator(), w, pr),
+                       0.3350000000000003)
 
         A1 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = KruskalTree()),
                                                 pr.X)

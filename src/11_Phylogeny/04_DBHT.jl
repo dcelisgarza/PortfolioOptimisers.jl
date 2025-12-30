@@ -191,7 +191,7 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::MatNum, kwargs...)
     return exp.(-coef * D .^ power)
 end
 """
-    struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
+    struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
         sim::T1
         root::T2
     end
@@ -223,7 +223,7 @@ DBHT
 
 # Related
 
-  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
@@ -232,7 +232,7 @@ DBHT
   - [`UniqueRoot`](@ref)
   - [`EqualRoot`](@ref)
 """
-struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
+struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
     sim::T1
     root::T2
     function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
@@ -1714,7 +1714,7 @@ function J_LoGo(sigma::MatNum, separators::MatNum, cliques::MatNum)
     return jlogo
 end
 """
-    struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+    struct DBHTClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
         clustering::T1
         S::T2
         D::T3
@@ -1752,7 +1752,7 @@ Keyword arguments correspond to the fields above.
   - [`clusterise`](@ref)
   - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
 """
-struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+struct DBHTClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
     clustering::T1
     S::T2
     D::T3
@@ -1769,16 +1769,16 @@ function DBHTClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum, k
     return DBHTClustering(clustering, S, D, k)
 end
 """
-    clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
+    clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
 
-Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `ClusteringEstimator` configured with a `DBHT` algorithm.
+Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `HierarchicalClusteringEstimator` configured with a `DBHT` algorithm.
 
 This method computes the similarity and distance matrices from the input data matrix `X` using the estimator's configured estimators and algorithms, applies the DBHT clustering pipeline, and returns a [`DBHTClustering`](@ref) result containing the hierarchical clustering, similarity and distance matrices, and the optimal number of clusters.
 
 # Arguments
 
-  - `cle`: A `ClusteringEstimator` whose algorithm is a [`DBHT`](@ref) instance.
+  - `cle`: A `HierarchicalClusteringEstimator` whose algorithm is a [`DBHT`](@ref) instance.
   - `X`: Data matrix (`observations × assets` or `assets × observations` depending on `dims`).
   - `branchorder`: Symbol specifying the dendrogram branch ordering method. Accepts `:optimal` (default), `:barjoseph`, or `:r`.
   - `dims`: Integer specifying the dimension along which to compute statistics (`1` for columns/assets, `2` for rows).
@@ -1802,10 +1802,10 @@ This method computes the similarity and distance matrices from the input data ma
   - [`DBHTClustering`](@ref)
   - [`DBHTs`](@ref)
   - [`dbht_similarity`](@ref)
-  - [`ClusteringEstimator`](@ref)
+  - [`HierarchicalClusteringEstimator`](@ref)
 """
-function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
-                    branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+function clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
+                    X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]

@@ -236,7 +236,7 @@ function to_tree(a::Clustering.Hclust)
     return nd, d
 end
 """
-    clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
+    clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
                X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                kwargs...)
 
@@ -259,10 +259,11 @@ This function applies the specified clustering estimator to the input data matri
 # Related
 
   - [`HierarchicalClustering`](@ref)
-  - [`ClusteringEstimator`](@ref)
+  - [`HierarchicalClusteringEstimator`](@ref)
 """
-function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-                    X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+function clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm,
+                                                         <:Any}, X::MatNum;
+                    branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     clustering = Clustering.hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
     k = optimal_number_clusters(cle.onc, clustering, D)
