@@ -299,7 +299,7 @@ All covariance estimators also work as correlation estimators by calling `cov(es
     
       + Full covariance [`Full`](@ref)
       + Semi (downside) covariance [`Semi`](@ref)
-  - Gerber covariances with custom variance estimators [`GerberCovariance`](@ref)
+  - Gerber covariances with custom variance estimator [`GerberCovariance`](@ref)
     
       + Unstandardised algorithms
         
@@ -307,12 +307,12 @@ All covariance estimators also work as correlation estimators by calling `cov(es
           * Gerber 1 [`Gerber1`](@ref)
           * Gerber 2 [`Gerber2`](@ref)
     
-      + Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimators
+      + Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimator
         
           * Gerber 0 [`StandardisedGerber0`](@ref)
           * Gerber 1 [`StandardisedGerber1`](@ref)
           * Gerber 2 [`StandardisedGerber2`](@ref)
-  - Smyth-Broby extension of Gerber covariances with custom expected returns and custom variance estimators [`SmythBrobyCovariance`](@ref)
+  - Smyth-Broby extension of Gerber covariances with custom expected returns and variance estimators [`SmythBrobyCovariance`](@ref)
     
       + Unstandardised algorithms
         
@@ -331,13 +331,13 @@ All covariance estimators also work as correlation estimators by calling `cov(es
           * Smyth-Broby-Gerber 0 [`StandardisedSmythBrobyGerber0`](@ref)
           * Smyth-Broby-Gerber 1 [`StandardisedSmythBrobyGerber1`](@ref)
           * Smyth-Broby-Gerber 2 [`StandardisedSmythBrobyGerber2`](@ref)
-  - Distance covariance with custom distance estimators via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
+  - Distance covariance with custom distance estimator via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
   - Lower Tail Dependence covariance [`LowerTailDependenceCovariance`](@ref)
   - Rank covariances
     
       + Kendall covariance [`KendallCovariance`](@ref)
       + Spearman covariance [`SpearmanCovariance`](@ref)
-  - Mutual information covariance with various binning algorithms [`MutualInfoCovariance`](@ref)
+  - Mutual information covariance with custom variance estimator and various binning algorithms [`MutualInfoCovariance`](@ref)
     
       + [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
         
@@ -347,16 +347,51 @@ All covariance estimators also work as correlation estimators by calling `cov(es
     
       + Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
       + Predefined number of bins
+  - Denoised covariance with custom covariance estimator [`DenoiseCovariance`](@ref)
+  - Detoned covariance with custom covariance estimator [`DetoneCovariance`](@ref)
+  - Custom processed covariance with custom covariance estimator [`ProcessedCovariance`](@ref)
+  - Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`](@ref)
+  - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
 
 #### [Coskewness](@id readme-coskewness)
 
-  - Full
-  - Semi
+  - Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
+    
+      + Full coskewness [`Full`](@ref)
+      + Semi (downside) coskewness [`Semi`](@ref)
 
 #### [Cokurtosis](@id readme-cokurtosis)
 
-  - Full
-  - Semi
+  - Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
+    
+      + Full cokurtosis [`Full`](@ref)
+      + Semi (downside) cokurtosis [`Semi`](@ref)
+
+### Distance Matrices
+
+`PortfolioOptimisers.jl` provides various distance algorithms.
+
+  - Simple distance [`SimpleDistance`](@ref)
+
+  - Simple absolute distance [`SimpleAbsoluteDistance`](@ref)
+  - Logarithmic distance [`LogDistance`](@ref)
+  - Correlation distance [`CorrelationDistance`](@ref)
+  - Variation of Information distance with various binning algorithms [`VariationInfoDistance`](@ref)
+    
+      + [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
+        
+          * Knuth's optimal bin width [`Knuth`](@ref)
+          * Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
+          * Scott's bin width [`Scott`](@ref)
+    
+      + Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
+      + Predefined number of bins
+  - Canonical distance [`CanonicalDistance`](@ref)
+
+The algorithms are used by first order and second order distance estimators accessed by `distance(estimator, args...)` and `cor_and_dist(estimator, args...)`.
+
+  - First order distance with custom distance algorithm, and optional exponent [`Distance`](@ref)
+  - Second order distance with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent.
 
 ### Portfolio Optimisation
 

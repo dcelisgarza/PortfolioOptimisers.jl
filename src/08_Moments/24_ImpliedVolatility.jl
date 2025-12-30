@@ -19,6 +19,8 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
     return ImpliedVolatilityRegression(ve, ws, re)
 end
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
+"""
+"""
 struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     ce::T1
     mp::T2
