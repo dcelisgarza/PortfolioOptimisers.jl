@@ -158,6 +158,7 @@ Overloading this method to return `true` indicates that type already has a custo
 has_pretty_show_method(::Any) = false
 has_pretty_show_method(::JuMP.Model) = true
 has_pretty_show_method(::Clustering.Hclust) = true
+has_pretty_show_method(::Clustering.KmeansResult) = true
 function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                         <:AbstractResult})
     return true

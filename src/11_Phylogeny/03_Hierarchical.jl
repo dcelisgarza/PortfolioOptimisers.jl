@@ -504,5 +504,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
     end
     return valid_k_clusters(clustering, W_list)
 end
+function get_clustering_indices(clr::HierarchicalClustering)
+    return Clustering.cutree(clr.clustering; k = clr.k)
+end
 
 export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters

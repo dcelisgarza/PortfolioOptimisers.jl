@@ -183,7 +183,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
     pr = prior(nco.pe, rd; dims = dims)
     clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
-    idx = Clustering.cutree(clr.clustering; k = clr.k)
+    idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti

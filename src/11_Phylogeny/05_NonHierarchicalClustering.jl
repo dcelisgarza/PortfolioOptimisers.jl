@@ -1,14 +1,19 @@
 struct KMeansAlgorithm{T1, T2} <: AbstractNonHierarchicalClusteringAlgorithm
     w::T1
     kwargs::T2
-    function KMeansAlgorithm(w::Option{<:StatsBase.AbstractWeights},
-                             kwargs::NamedTuple = (;))
+    function KMeansAlgorithm(w::Option{<:StatsBase.AbstractWeights}, kwargs::NamedTuple)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+        end
         return new{typeof(w), typeof(kwargs)}(w, kwargs)
     end
 end
 function KMeansAlgorithm(; w::Option{<:StatsBase.AbstractWeights} = nothing,
                          kwargs::NamedTuple = (;))
     return KMeansAlgorithm(w, kwargs)
+end
+function factory(alg::KMeansAlgorithm, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return KMeansAlgorithm(; w = ifelse(isnothing(alg.w), alg.w, w), kwargs = alg.kwargs)
 end
 struct NonHierarchicalClustering{T1, T2} <: AbstractNonHierarchicalClusteringResult
     clustering::T1
@@ -34,5 +39,89 @@ function NonHierarchicalClusteringEstimator(;
                                             onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
     return NonHierarchicalClusteringEstimator(alg, onc)
 end
+function factory(cle::NonHierarchicalClusteringEstimator,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return NonHierarchicalClusteringEstimator(; alg = factory(cle.alg, w), onc = cle.onc)
+end
+function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm,
+                                                                         <:OptimalNumberClusters{<:Any,
+                                                                                                 <:Integer}},
+                                 X::MatNum)
+    onc = cle.onc
+    k = onc.alg
+    max_k = onc.max_k
+    N = size(X, 1)
+    if isnothing(max_k)
+        max_k = ceil(Int, sqrt(N))
+    end
+    max_k = min(ceil(Int, sqrt(N)), max_k)
+    if k > max_k
+        k = max_k
+    end
+    clustering = kmeans(X, k; weights = cle.alg.w, cle.alg.kwargs...)
+    return clustering, k
+end
+function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm,
+                                                                         <:OptimalNumberClusters{<:Any,
+                                                                                                 <:SecondOrderDifference}},
+                                 X::MatNum)
+    onc = cle.onc
+    max_k = onc.max_k
+    N = size(X, 2)
+    if isnothing(max_k)
+        max_k = ceil(Int, sqrt(N))
+    end
+    c1 = min(ceil(Int, sqrt(N)), max_k)
+    cluster_lvls = [Clustering.kmeans(X, i; weights = cle.alg.w, cle.alg.kwargs...)
+                    for i in 1:c1]
+    W_list = Vector{eltype(X)}(undef, c1)
+    for (i, lvl) in enumerate(cluster_lvls)
+        W_list[i] = lvl.totalcost
+    end
+    gaps = fill(typemin(eltype(X)), c1)
+    if c1 > 2
+        gaps[1:(end - 2)] = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+    end
+    k = all(!isfinite, gaps) ? length(gaps) : argmax(gaps)
+    return cluster_lvls[k], k
+end
+function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm,
+                                                                         <:OptimalNumberClusters{<:Any,
+                                                                                                 <:StandardisedSilhouetteScore}},
+                                 X::MatNum)
+    onc = cle.onc
+    max_k = onc.max_k
+    N = size(X, 2)
+    if isnothing(max_k)
+        max_k = ceil(Int, sqrt(N))
+    end
+    c1 = min(ceil(Int, sqrt(N)), max_k)
+    cluster_lvls = [Clustering.kmeans(X, i; weights = cle.alg.w, cle.alg.kwargs...)
+                    for i in 1:c1]
+    W_list = Vector{eltype(X)}(undef, c1)
+    metric = onc.alg.metric
+    if isnothing(metric)
+        metric = Distances.SqEuclidean()
+    end
+    for (i, lvl) in enumerate(cluster_lvls)
+        sl = Clustering.silhouettes(lvl.assignments, X; metric = metric)
+        msl = Statistics.mean(sl)
+        W_list[i] = msl / Statistics.std(sl; mean = msl)
+    end
+    k = all(!isfinite, W_list) ? length(W_list) : argmax(W_list)
+    return cluster_lvls[k], k
+end
+function clusterise(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm}, X::MatNum;
+                    dims::Int = 1, kwargs...)
+    @argcheck(dims in (1, 2), DomainError)
+    if dims == 2
+        X = transpose(X)
+    end
+    clustering, k = optimal_number_clusters(cle, X)
+    return NonHierarchicalClustering(; clustering = clustering, k = k)
+end
+function get_clustering_indices(clr::NonHierarchicalClustering{<:Clustering.KmeansResult})
+    return clr.clustering.assignments
+end
 
-export NonHierarchicalClustering
+export NonHierarchicalClusteringEstimator, NonHierarchicalClustering, KMeansAlgorithm
