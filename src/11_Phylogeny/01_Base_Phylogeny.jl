@@ -37,3 +37,10 @@ All concrete types representing the result of a phylogeny estimation should subt
   - [`AbstractPhylogenyAlgorithm`](@ref)
 """
 abstract type AbstractPhylogenyResult <: AbstractResult end
+const PhE_Ph = Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult}
+function factory(ph::PhE_Ph, args...)
+    return ph
+end
+function factory(alg::AbstractPhylogenyAlgorithm, args...)
+    return alg
+end

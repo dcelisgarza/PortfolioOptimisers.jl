@@ -1,3 +1,15 @@
+struct KMeansAlgorithm{T1, T2} <: AbstractNonHierarchicalClusteringAlgorithm
+    w::T1
+    kwargs::T2
+    function KMeansAlgorithm(w::Option{<:StatsBase.AbstractWeights},
+                             kwargs::NamedTuple = (;))
+        return new{typeof(w), typeof(kwargs)}(w, kwargs)
+    end
+end
+function KMeansAlgorithm(; w::Option{<:StatsBase.AbstractWeights} = nothing,
+                         kwargs::NamedTuple = (;))
+    return KMeansAlgorithm(w, kwargs)
+end
 struct NonHierarchicalClustering{T1, T2} <: AbstractNonHierarchicalClusteringResult
     clustering::T1
     k::T2
@@ -18,7 +30,7 @@ struct NonHierarchicalClusteringEstimator{T1, T2} <: AbstractClusteringEstimator
     end
 end
 function NonHierarchicalClusteringEstimator(;
-                                            alg::AbstractNonHierarchicalClusteringAlgorithm = HClustAlgorithm(),
+                                            alg::AbstractNonHierarchicalClusteringAlgorithm = KMeansAlgorithm(),
                                             onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
     return NonHierarchicalClusteringEstimator(alg, onc)
 end
