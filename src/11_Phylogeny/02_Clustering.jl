@@ -78,6 +78,7 @@ abstract type AbstractHierarchicalClusteringResult <: AbstractClusteringResult e
 abstract type AbstractNonHierarchicalClusteringResult <: AbstractClusteringResult end
 const HClE_HCl = Union{<:AbstractHierarchicalClusteringEstimator,
                        <:AbstractHierarchicalClusteringResult}
+const ClE_Cl = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
 """
     struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
         clustering::T1

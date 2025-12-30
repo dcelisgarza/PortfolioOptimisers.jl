@@ -120,7 +120,7 @@ function clusterise(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm}, 
     clustering, k = optimal_number_clusters(cle, X)
     return NonHierarchicalClustering(; clustering = clustering, k = k)
 end
-function get_clustering_indices(clr::NonHierarchicalClustering{<:Clustering.KmeansResult})
+function get_clustering_indices(clr::NonHierarchicalClustering)
     return clr.clustering.assignments
 end
 

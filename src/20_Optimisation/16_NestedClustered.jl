@@ -93,7 +93,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     strict::T9
     ex::T10
     fb::T11
-    function NestedClustered(pe::PrE_Pr, cle::HClE_HCl, wb::Option{<:WbE_Wb},
+    function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              sets::Option{<:AssetSets}, opti::OptimisationEstimator,
                              opto::OptimisationEstimator,
                              cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
@@ -112,7 +112,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     end
 end
 function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(),
-                         cle::HClE_HCl = HierarchicalClusteringEstimator(),
+                         cle::ClE_Cl = HierarchicalClusteringEstimator(),
                          wb::Option{<:WbE_Wb} = nothing,
                          sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,
                          opto::OptimisationEstimator,
