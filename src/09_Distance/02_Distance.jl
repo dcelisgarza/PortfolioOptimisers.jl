@@ -377,7 +377,7 @@ end
     cor_and_dist(de::Distance{<:Any,
                               <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
                                       <:LogDistance, <:VariationInfoDistance,
-                                      <:CorrelationDistance}}, Nothing,
+                                      <:CorrelationDistance}},
                  ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute and return the correlation and distance matrices. The distance matrix depends on the combination of distance and covariance estimators (see [`distance`](@ref)).
@@ -582,4 +582,4 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_AllInter
                     dims = dims, kwargs...)
 end
 
-export Distance
+export Distance, distance, cor_and_dist

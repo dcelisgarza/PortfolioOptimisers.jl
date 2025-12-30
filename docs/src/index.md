@@ -267,6 +267,8 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 #### [Expected Returns](@id readme-expected-returns)
 
+Overloads `Statistics.mean` as `mean(estimator, X; kwargs...)`.
+
   - Optionally weighted expected returns [`SimpleExpectedReturns`](@ref)
 
   - Equilibrium expected returns with custom covariance [`EquilibriumExpectedReturns`](@ref)
@@ -285,13 +287,15 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
           * Volatility Weighted [`VolatilityWeighted`](@ref)
           * Mean Squared Error [`MeanSquaredError`](@ref)
 
-#### [Variance](@id readme-variance)
+#### [Variance and Standard Deviation](@id readme-variance)
+
+Overloads `Statistics.var` and `Statistics.std` as `var(estimator, X; kwargs...)` and `std(estimator, X; kwargs...)`
 
   - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`](@ref)
 
 #### [Covariance and Correlation](@id readme-covariance-correlation)
 
-All covariance estimators also work as correlation estimators by calling `cov(estimator, X)` or `cor(estimator, X)`.
+Overloads `Statistics.cov` and `Statistics.cor` as `cov(estimator, X; kwargs...)` and `cor(estimator, X; kwargs...)`.
 
   - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](@ref)
 
@@ -355,12 +359,16 @@ All covariance estimators also work as correlation estimators by calling `cov(es
 
 #### [Coskewness](@id readme-coskewness)
 
+Implements `coskewness(estimator, X; kwargs...)`.
+
   - Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
     
       + Full coskewness [`Full`](@ref)
       + Semi (downside) coskewness [`Semi`](@ref)
 
 #### [Cokurtosis](@id readme-cokurtosis)
+
+Implements `cokurtosis(estimator, X; kwargs...)`.
 
   - Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
     
@@ -369,7 +377,12 @@ All covariance estimators also work as correlation estimators by calling `cov(es
 
 ### Distance Matrices
 
-`PortfolioOptimisers.jl` provides various distance algorithms.
+Implements `distance(estimator, X; kwargs...)`, `distance(distance_estimator, covariance_estimator, X; kwargs...)`, `cor_and_dist(distance_estimator, covariance_estimator, X; kwargs...)`.
+
+  - First order distance estimator with custom distance algorithm, and optional exponent [`Distance`](@ref)
+  - Second order distance estimator with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent [`DistanceDistance`](@ref)
+
+The distance estimators are used together with various distance matrix algorithms.
 
   - Simple distance [`SimpleDistance`](@ref)
 
@@ -388,10 +401,14 @@ All covariance estimators also work as correlation estimators by calling `cov(es
       + Predefined number of bins
   - Canonical distance [`CanonicalDistance`](@ref)
 
-The algorithms are used by first order and second order distance estimators accessed by `distance(estimator, args...)` and `cor_and_dist(estimator, args...)`.
+### Clustering
 
-  - First order distance with custom distance algorithm, and optional exponent [`Distance`](@ref)
-  - Second order distance with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent.
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClusteringEstimator`](@ref) and `clusterise(estimator, X; kwargs...)`.
+
+  - Hierarchical clustering.
+    
+      + [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl) [`HClustAlgorithm`](@ref)
+      + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
 
 ### Portfolio Optimisation
 

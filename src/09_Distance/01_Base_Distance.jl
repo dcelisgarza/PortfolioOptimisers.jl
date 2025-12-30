@@ -205,8 +205,6 @@ When used with a covariance matrix directly, uses [`SimpleDistance`](@ref).
   - [`cor_and_dist`](@ref)
 """
 struct CanonicalDistance <: AbstractDistanceAlgorithm end
-function distance end
-function cor_and_dist end
 
 export SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance,
-       VariationInfoDistance, CanonicalDistance, distance, cor_and_dist
+       VariationInfoDistance, CanonicalDistance
