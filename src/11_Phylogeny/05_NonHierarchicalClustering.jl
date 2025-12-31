@@ -75,7 +75,9 @@ function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMean
     cluster_lvls = [Clustering.kmeans(X, i; weights = cle.alg.w, cle.alg.kwargs...)
                     for i in 1:c1]
     W_list = Vector{eltype(X)}(undef, c1)
-    for (i, lvl) in enumerate(cluster_lvls)
+    W_list[1] = typemin(eltype(X))
+    for i in 2:c1
+        lvl = cluster_lvls[i]
         totalcost = lvl.totalcost
         W_list[i] = totalcost / N
     end
