@@ -71,18 +71,20 @@ function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMean
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
-    c1 = min(ceil(Int, sqrt(N)), max_k)
+    c1 = min(min(ceil(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.kmeans(X, i; weights = cle.alg.w, cle.alg.kwargs...)
                     for i in 1:c1]
     W_list = Vector{eltype(X)}(undef, c1)
     for (i, lvl) in enumerate(cluster_lvls)
-        W_list[i] = lvl.totalcost
+        totalcost = lvl.totalcost
+        W_list[i] = totalcost / N
     end
-    gaps = fill(typemin(eltype(X)), c1)
-    if c1 > 2
-        gaps[1:(end - 2)] = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+    k = if c1 > 2
+        gaps = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+        all(!isfinite, gaps) ? length(gaps) : argmax(gaps)
+    else
+        c1
     end
-    k = all(!isfinite, gaps) ? length(gaps) : argmax(gaps)
     return cluster_lvls[k], k
 end
 function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm,
@@ -103,7 +105,8 @@ function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMean
     if isnothing(metric)
         metric = Distances.SqEuclidean()
     end
-    for (i, lvl) in enumerate(cluster_lvls)
+    for i in 2:c1
+        lvl = cluster_lvls[i]
         sl = Clustering.silhouettes(lvl.assignments, X; metric = metric)
         msl = Statistics.mean(sl)
         W_list[i] = msl / Statistics.std(sl; mean = msl)

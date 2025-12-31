@@ -447,16 +447,15 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
-    c1 = min(ceil(Int, sqrt(N)), max_k) + 1
+    c1 = min(min(ceil(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
-    W_list[1] = typemin(eltype(dist))
-    for i in 2:c1
+    for i in 1:c1
         lvl = cluster_lvls[i]
         c2 = maximum(unique(lvl))
         D_list = Vector{eltype(dist)}(undef, c2)
         for j in 1:c2
-            cluster = findall(lvl .== j)
+            cluster = lvl .== j
             cluster_dist = dist[cluster, cluster]
             if isempty(cluster_dist)
                 continue
@@ -473,16 +472,17 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
             D_list[j] = if k == 1
                 zero(eltype(dist))
             else
-                Statistics.std(C_list; corrected = false)
+                Statistics.mean(C_list)
             end
         end
         W_list[i] = sum(D_list)
     end
-    gaps = fill(typemin(eltype(dist)), c1)
-    if c1 > 2
-        gaps[1:(end - 2)] = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+    return if c1 > 2
+        gaps = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+        valid_k_clusters(clustering, gaps)
+    else
+        c1
     end
-    return valid_k_clusters(clustering, gaps)
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
                                                             <:StandardisedSilhouetteScore},
@@ -498,7 +498,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
         lvl = cluster_lvls[i]
-        sl = Clustering.silhouettes(lvl, dist; metric = onc.alg.metric)
+        sl = Clustering.silhouettes(lvl, dist)
         msl = Statistics.mean(sl)
         W_list[i] = msl / Statistics.std(sl; mean = msl)
     end
