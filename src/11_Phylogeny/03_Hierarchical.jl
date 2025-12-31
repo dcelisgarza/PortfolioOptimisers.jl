@@ -450,7 +450,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     c1 = min(min(ceil(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
-    for i in 1:c1
+    W_list[1] = typemin(eltype(dist))
+    for i in 2:c1
         lvl = cluster_lvls[i]
         c2 = maximum(unique(lvl))
         D_list = Vector{eltype(dist)}(undef, c2)
