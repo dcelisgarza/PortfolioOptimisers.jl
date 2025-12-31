@@ -447,7 +447,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
-    c1 = min(ceil(Int, sqrt(N)), max_k)
+    c1 = min(ceil(Int, sqrt(N)), max_k) + 1
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
