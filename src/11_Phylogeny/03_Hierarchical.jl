@@ -355,12 +355,12 @@ end
                             args...)
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
                             clustering::Hclust, dist::MatNum)
-    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore},
+    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
                             clustering::Hclust, dist::MatNum)
 
 Select the optimal number of clusters for a hierarchical clustering tree.
 
-This function applies the specified optimal number of clusters estimator (`onc`) to a hierarchical clustering result and distance matrix, using the configured algorithm (e.g., [`SecondOrderDifference`](@ref), [`StandardisedSilhouetteScore`](@ref), or given directly). The selection is based on cluster validity and scoring metrics.
+This function applies the specified optimal number of clusters estimator (`onc`) to a hierarchical clustering result and distance matrix, using the configured algorithm (e.g., [`SecondOrderDifference`](@ref), [`SilhouetteScore`](@ref), or given directly). The selection is based on cluster validity and scoring metrics.
 
 # Arguments
 
@@ -368,7 +368,7 @@ This function applies the specified optimal number of clusters estimator (`onc`)
 
       + `onc::OptimalNumberClusters{<:Any, <:Integer}`: Uses a user-specified fixed number of clusters `k` directly. If `k` is not valid, searches above and below for the nearest valid cluster count.
       + `onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}`: Computes the second-order difference of a clustering evaluation metric for each possible cluster count, and selects the first valid `k` that maximises the difference.
-      + `onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore}`: Computes the standardised silhouette score for each possible cluster count, and selects the first valid `k` that maximises the score.
+      + `onc::OptimalNumberClusters{<:Any, <:SilhouetteScore}`: Computes the standardised silhouette score for each possible cluster count, and selects the first valid `k` that maximises the score.
 
   - `clustering`: Hierarchical clustering object.
   - `dist`: Distance matrix used for clustering.
@@ -446,6 +446,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
+    measure_alg = onc.alg.alg
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
@@ -467,13 +468,10 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
                     k += 1
                 end
             end
-            D_list[j] = if k == 1
+            D_list[j] = if isone(k)
                 zero(eltype(dist))
             else
-                m = Statistics.mean(C_list)
-                s = Statistics.std(C_list; mean = m)
-                s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
-                m / s
+                vec_to_real_measure(measure_alg, C_list)
             end
         end
         W_list[i] = sum(D_list)
@@ -485,22 +483,19 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         c1
     end
 end
-function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
-                                                            <:StandardisedSilhouetteScore},
+function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
                                  clustering::Clustering.Hclust, dist::MatNum)
     N = size(dist, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(floor(Int, sqrt(N)), max_k)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
+    measure_alg = onc.alg.alg
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
         lvl = cluster_lvls[i]
         sl = Clustering.silhouettes(lvl, dist)
-        m = Statistics.mean(sl)
-        s = Statistics.std(sl; mean = m)
-        s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
-        W_list[i] = m / s
+        W_list[i] = vec_to_real_measure(measure_alg, sl)
     end
     return valid_k_clusters(clustering, W_list)
 end

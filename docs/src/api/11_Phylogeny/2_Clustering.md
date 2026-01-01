@@ -4,7 +4,7 @@
 HierarchicalClustering
 clusterise(cle::AbstractClusteringResult, args...; kwargs...)
 SecondOrderDifference
-StandardisedSilhouetteScore
+SilhouetteScore
 OptimalNumberClusters
 HClustAlgorithm
 HierarchicalClusteringEstimator

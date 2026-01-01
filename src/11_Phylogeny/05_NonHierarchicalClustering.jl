@@ -66,19 +66,17 @@ function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMean
                                                                                                  <:SecondOrderDifference}},
                                  X::MatNum)
     N = size(X, 2)
-    iN = inv(N)
     max_k = isnothing(cle.onc.max_k) ? floor(Int, sqrt(N)) : cle.onc.max_k
     c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.kmeans(X, i; weights = cle.alg.w, cle.alg.kwargs...)
                     for i in 1:c1]
+    measure_alg = cle.onc.alg.alg
     W_list = Vector{eltype(X)}(undef, c1)
     W_list[1] = typemin(eltype(X))
     for i in 2:c1
-        lvl = cluster_lvls[i]
-        totalcost = lvl.totalcost
-        s = Statistics.std(lvl.costs)
-        s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
-        W_list[i] = totalcost * iN / s
+        lvl = cluster_lvls[i].costs
+        costs = lvl.costs
+        W_list[i] = vec_to_real_measure(measure_alg, costs)
     end
     k = if c1 > 2
         gaps = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
@@ -90,23 +88,22 @@ function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMean
 end
 function optimal_number_clusters(cle::NonHierarchicalClusteringEstimator{<:KMeansAlgorithm,
                                                                          <:OptimalNumberClusters{<:Any,
-                                                                                                 <:StandardisedSilhouetteScore}},
+                                                                                                 <:SilhouetteScore}},
                                  X::MatNum)
     N = size(X, 2)
     max_k = isnothing(cle.onc.max_k) ? floor(Int, sqrt(N)) : cle.onc.max_k
     c1 = min(floor(Int, sqrt(N)), max_k)
     cluster_lvls = [Clustering.kmeans(X, i; weights = cle.alg.w, cle.alg.kwargs...)
                     for i in 1:c1]
+    measure_alg = cle.onc.alg.alg
     W_list = Vector{eltype(X)}(undef, c1)
     metric = ifelse(isnothing(cle.onc.alg.metric), Distances.SqEuclidean(),
                     cle.onc.alg.metric)
     for i in 2:c1
         lvl = cluster_lvls[i]
-        sl = Clustering.silhouettes(lvl.assignments, X; metric = metric)
-        m = Statistics.mean(sl)
-        s = Statistics.std(sl; mean = m)
-        s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
-        W_list[i] = m / s
+        assignments = lvl.assignments
+        sl = Clustering.silhouettes(assignments, X; metric = metric)
+        W_list[i] = vec_to_real_measure(measure_alg, sl)
     end
     k = all(!isfinite, W_list) ? length(W_list) : argmax(W_list)
     return cluster_lvls[k], k

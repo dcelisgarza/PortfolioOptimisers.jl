@@ -171,15 +171,23 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
 """
-struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
+struct SecondOrderDifference{T1} <: AbstractOptimalNumberClustersAlgorithm
+    alg::T1
+    function SecondOrderDifference(alg::VectorToScalarMeasure)
+        return new{typeof(alg)}(alg)
+    end
+end
+function SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
+    return SecondOrderDifference(alg)
+end
 """
-    struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
+    struct SilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
         metric::T1
     end
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
 
-`StandardisedSilhouetteScore` selects the optimal number of clusters by maximizing the silhouette score, which measures how well each object lies within its cluster compared to other clusters. The score can be computed using different distance metrics.
+`SilhouetteScore` selects the optimal number of clusters by maximizing the silhouette score, which measures how well each object lies within its cluster compared to other clusters. The score can be computed using different distance metrics.
 
 # Fields
 
@@ -187,15 +195,15 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Constructor
 
-    StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
+    SilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
 
 Keyword arguments correspond to the fields above.
 
 # Examples
 
 ```jldoctest
-julia> StandardisedSilhouetteScore()
-StandardisedSilhouetteScore
+julia> SilhouetteScore()
+SilhouetteScore
   metric ┴ nothing
 ```
 
@@ -205,14 +213,17 @@ StandardisedSilhouetteScore
   - [`OptimalNumberClusters`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
-struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
-    metric::T1
-    function StandardisedSilhouetteScore(metric::Option{<:Distances.SemiMetric})
-        return new{typeof(metric)}(metric)
+struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
+    alg::T1
+    metric::T2
+    function SilhouetteScore(alg::VectorToScalarMeasure,
+                             metric::Option{<:Distances.SemiMetric})
+        return new{typeof(alg), typeof(metric)}(alg, metric)
     end
 end
-function StandardisedSilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
-    return StandardisedSilhouetteScore(metric)
+function SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
+                         metric::Option{<:Distances.SemiMetric} = nothing)
+    return SilhouetteScore(alg, metric)
 end
 """
     struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
@@ -400,6 +411,5 @@ function HierarchicalClusteringEstimator(;
     return HierarchicalClusteringEstimator(ce, de, alg, onc)
 end
 
-export HierarchicalClustering, clusterise, SecondOrderDifference,
-       StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
-       HierarchicalClusteringEstimator
+export HierarchicalClustering, clusterise, SecondOrderDifference, SilhouetteScore,
+       OptimalNumberClusters, HClustAlgorithm, HierarchicalClusteringEstimator

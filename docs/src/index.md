@@ -403,12 +403,20 @@ The distance estimators are used together with various distance matrix algorithm
 
 ### Clustering
 
-Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref) and `clusterise(estimator, X; kwargs...)`.
+Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwargs...)`.
 
-  - Hierarchical clustering.
+  - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref)
     
-      + [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl) [`HClustAlgorithm`](@ref)
-      + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
+      + Second order difference [`SecondOrderDifference`](@ref)
+      + Silhouette scores [`SilhouetteScore`](@ref)
+      + Predefined number of clusters.
+
+#### Hierarchical
+
+  - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref).
+    
+        + [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl) [`HClustAlgorithm`](@ref)
+        + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
 
 ### Portfolio Optimisation
 
