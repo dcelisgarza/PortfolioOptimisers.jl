@@ -655,5 +655,4 @@ function centrality_constraints(ccs::Option{<:LinearConstraint}, args...; kwargs
 end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
-       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
-       phylogeny_constraints, centrality_constraints
+       IntegerPhylogeny, CentralityConstraint, phylogeny_constraints, centrality_constraints

@@ -868,7 +868,7 @@ struct StandardisedValue{T1} <: VectorToScalarMeasure
         return new{typeof(corrected)}(corrected)
     end
 end
-function StandardisedValue(; corrected::Bool = false)
+function StandardisedValue(; corrected::Bool = true)
     return StandardisedValue(corrected)
 end
 struct StdValue <: VectorToScalarMeasure end
@@ -947,4 +947,6 @@ function vec_to_real_measure(::ModeValue, val::VecNum)
     return StatsBase.mode(val)
 end
 
-export factory, traverse_concrete_subtypes, concrete_typed_array
+export factory, traverse_concrete_subtypes, concrete_typed_array, MinValue, MeanValue,
+       MedianValue, MaxValue, StandardisedValue, StdValue, VarValue, SumValue, ProdValue,
+       ModeValue

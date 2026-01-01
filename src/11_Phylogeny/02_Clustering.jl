@@ -160,16 +160,38 @@ function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
 """
-    struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
+    struct SecondOrderDifference{T1} <: AbstractOptimalNumberClustersAlgorithm
+        alg::T1
+    end
 
 Algorithm type for estimating the optimal number of clusters using the second-order difference method.
 
 The `SecondOrderDifference` algorithm selects the optimal number of clusters by maximizing the second-order difference of a clustering evaluation metric (such as within-cluster sum of squares or silhouette score) across different cluster counts. This approach helps identify the "elbow" point in the metric curve.
 
+# Fields
+
+  - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
+
+# Constructor
+
+    SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> SecondOrderDifference()
+SecondOrderDifference
+  alg ┼ StandardisedValue
+      │   corrected ┴ Bool: true
+```
+
 # Related
 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
 """
 struct SecondOrderDifference{T1} <: AbstractOptimalNumberClustersAlgorithm
     alg::T1
@@ -181,8 +203,9 @@ function SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue(
     return SecondOrderDifference(alg)
 end
 """
-    struct SilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
-        metric::T1
+    struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
+        alg::T1
+        metric::T2
     end
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
@@ -191,11 +214,13 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Fields
 
+  - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
   - `metric`: The distance metric used for silhouette calculation from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), or `nothing` for the default.
 
 # Constructor
 
-    SilhouetteScore(; metric::Option{<:Distances.SemiMetric} = nothing)
+    SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
+                     metric::Option{<:Distances.SemiMetric} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -204,6 +229,8 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> SilhouetteScore()
 SilhouetteScore
+     alg ┼ StandardisedValue
+         │   corrected ┴ Bool: true
   metric ┴ nothing
 ```
 
@@ -211,6 +238,7 @@ SilhouetteScore
 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
@@ -258,7 +286,9 @@ Keyword arguments correspond to the fields above.
 julia> OptimalNumberClusters(; max_k = 10)
 OptimalNumberClusters
   max_k ┼ Int64: 10
-    alg ┴ SecondOrderDifference()
+    alg ┼ SecondOrderDifference
+        │   alg ┼ StandardisedValue
+        │       │   corrected ┴ Bool: false
 ```
 
 # Related
@@ -380,7 +410,9 @@ HierarchicalClusteringEstimator
       │   linkage ┴ Symbol: :ward
   onc ┼ OptimalNumberClusters
       │   max_k ┼ nothing
-      │     alg ┴ SecondOrderDifference()
+      │     alg ┼ SecondOrderDifference
+      │         │   alg ┼ StandardisedValue
+      │         │       │   corrected ┴ Bool: true
 ```
 
 # Related
