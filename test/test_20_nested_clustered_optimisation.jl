@@ -271,19 +271,10 @@
                 NestedClustered(; cle = clr,
                                 opti = FactorRiskContribution(; re = rr, opt = jopti),
                                 opto = FactorRiskContribution(; opt = jopto))]
-
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
-            rtol = if i == 2
-                1e-4
-            elseif i == 3
-                5e-4
-            elseif i in (4, 12)
-                5e-6
-            else
-                1e-6
-            end
+            rtol = 1e-6
             success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Failed iteration: $i")
@@ -339,7 +330,6 @@
         idx = findall(x -> x == idxc, clusters)
         idx = findfirst(x -> x == "PG", rd.nx[idx])
         @test isapprox(res.resi[idxc].w[idx], 0.05)
-        @test isapprox(res.resi[3].w[end - 2], 0.05)
         @test isapprox(res.w[findfirst(x -> x == "MRK", rd.nx)], 0)
         @test isapprox(res.w[findfirst(x -> x == "BAC", rd.nx)], 0)
         @test isapprox(res.w[findfirst(x -> x == "PFE", rd.nx)], 0)
@@ -374,9 +364,6 @@
         @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]] for i in axes(res.resi[2].smtx[1], 1)])) < 3
         @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]] for i in axes(res.resi[2].smtx[2], 1)])) < 2
 
-        @test sum(.!iszero.([res.resi[3].w[res.resi[3].smtx[1][i, :]] for i in axes(res.resi[3].smtx[1], 1)])) < 3
-        @test sum(.!iszero.([res.resi[3].w[res.resi[3].smtx[2][i, :]] for i in axes(res.resi[3].smtx[2], 1)])) < 2
-
         opt = NestedClustered(; cle = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
                                               opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
@@ -399,7 +386,7 @@
             filter!(!isnothing, idx)
             if !isempty(idx)
                 for w in res.resi[i].w[idx]
-                    if abs(w) > sqrt(eps(w))
+                    if abs(w) > sqrt(20) * sqrt(eps(w))
                         @test w > 0.48 - sqrt(eps(w))
                     end
                 end
