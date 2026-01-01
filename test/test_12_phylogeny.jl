@@ -255,7 +255,7 @@
         w = fill(inv(20), 20)
         @test isapprox(asset_phylogeny(NetworkEstimator(), w, pr), 0.09500000000000008)
         @test isapprox(asset_phylogeny(HierarchicalClusteringEstimator(), w, pr),
-                       0.16000000000000014)
+                       0.4550000000000004)
 
         A1 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = KruskalTree()),
                                                 pr.X)

@@ -389,9 +389,9 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     max_k = onc.max_k
     N = length(clustering.order)
     if isnothing(max_k)
-        max_k = ceil(Int, sqrt(N))
+        max_k = floor(Int, sqrt(N))
     end
-    max_k = min(ceil(Int, sqrt(N)), max_k)
+    max_k = min(floor(Int, sqrt(N)), max_k)
     if k > max_k
         k = max_k
     end
@@ -443,8 +443,8 @@ end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
                                  clustering::Clustering.Hclust, dist::MatNum)
     N = size(dist, 1)
-    max_k = isnothing(onc.max_k) ? ceil(Int, sqrt(N)) : onc.max_k
-    c1 = min(min(ceil(Int, sqrt(N)), max_k) + 2, N)
+    max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
+    c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
@@ -470,7 +470,10 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
             D_list[j] = if k == 1
                 zero(eltype(dist))
             else
-                Statistics.mean(C_list)
+                m = Statistics.mean(C_list)
+                s = Statistics.std(C_list; mean = m)
+                s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
+                m / s
             end
         end
         W_list[i] = sum(D_list)
@@ -486,16 +489,18 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
                                                             <:StandardisedSilhouetteScore},
                                  clustering::Clustering.Hclust, dist::MatNum)
     N = size(dist, 1)
-    max_k = isnothing(onc.max_k) ? ceil(Int, sqrt(N)) : onc.max_k
-    c1 = min(ceil(Int, sqrt(N)), max_k)
+    max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
+    c1 = min(floor(Int, sqrt(N)), max_k)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
         lvl = cluster_lvls[i]
         sl = Clustering.silhouettes(lvl, dist)
-        msl = Statistics.mean(sl)
-        W_list[i] = msl / Statistics.std(sl; mean = msl)
+        m = Statistics.mean(sl)
+        s = Statistics.std(sl; mean = m)
+        s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
+        W_list[i] = m / s
     end
     return valid_k_clusters(clustering, W_list)
 end
