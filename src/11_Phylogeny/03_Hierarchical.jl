@@ -442,11 +442,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
                                  clustering::Clustering.Hclust, dist::MatNum)
-    max_k = onc.max_k
     N = size(dist, 1)
-    if isnothing(max_k)
-        max_k = ceil(Int, sqrt(N))
-    end
+    max_k = isnothing(onc.max_k) ? ceil(Int, sqrt(N)) : onc.max_k
     c1 = min(min(ceil(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
@@ -488,11 +485,8 @@ end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
                                                             <:StandardisedSilhouetteScore},
                                  clustering::Clustering.Hclust, dist::MatNum)
-    max_k = onc.max_k
     N = size(dist, 1)
-    if isnothing(max_k)
-        max_k = ceil(Int, sqrt(N))
-    end
+    max_k = isnothing(onc.max_k) ? ceil(Int, sqrt(N)) : onc.max_k
     c1 = min(ceil(Int, sqrt(N)), max_k)
     cluster_lvls = [Clustering.cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
