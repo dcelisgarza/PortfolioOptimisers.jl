@@ -288,7 +288,7 @@ OptimalNumberClusters
   max_k ┼ Int64: 10
     alg ┼ SecondOrderDifference
         │   alg ┼ StandardisedValue
-        │       │   corrected ┴ Bool: false
+        │       │   corrected ┴ Bool: true
 ```
 
 # Related
