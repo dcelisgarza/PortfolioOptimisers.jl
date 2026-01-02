@@ -1,37 +1,38 @@
 """
-    abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
+    abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 
 Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClusteringEstimator`. This enables a consistent interface for clustering estimators throughout the package.
+All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClustersEstimator`. This enables a consistent interface for clustering estimators throughout the package.
 
 # Related
 
-  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractClustersAlgorithm`](@ref)
   - [`AbstractClusteringResult`](@ref)
 """
-abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
-abstract type AbstractHierarchicalClusteringEstimator <: AbstractClusteringEstimator end
-abstract type AbstractNonHierarchicalClusteringEstimator <: AbstractClusteringEstimator end
+abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 """
-    abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
+    abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
 
 Abstract supertype for all clustering algorithm types in PortfolioOptimisers.jl.
 
-All concrete types implementing specific clustering algorithms should subtype `AbstractClusteringAlgorithm`. This enables flexible extension and dispatch of clustering routines.
+All concrete types implementing specific clustering algorithms should subtype `AbstractClustersAlgorithm`. This enables flexible extension and dispatch of clustering routines.
 
 # Related
 
-  - [`AbstractClusteringEstimator`](@ref)
+  - [`AbstractClustersEstimator`](@ref)
   - [`AbstractClusteringResult`](@ref)
 """
-abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
+abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
+function factory(alg::AbstractClustersAlgorithm, args...)
+    return alg
+end
 """
 """
-abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClusteringAlgorithm end
+abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
 """
-abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClusteringAlgorithm end
+abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
     abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 
@@ -66,22 +67,13 @@ All concrete types representing the result of a clustering estimation should sub
 
 # Related
 
-  - [`AbstractClusteringEstimator`](@ref)
-  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractClustersEstimator`](@ref)
+  - [`AbstractClustersAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 """
-"""
-abstract type AbstractHierarchicalClusteringResult <: AbstractClusteringResult end
-"""
-"""
-abstract type AbstractNonHierarchicalClusteringResult <: AbstractClusteringResult end
-const HClE_HCl = Union{<:AbstractHierarchicalClusteringEstimator,
-                       <:AbstractHierarchicalClusteringResult}
-const ClE_Cl = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
-"""
-    struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
-        clustering::T1
+    struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
+        res::T1
         S::T2
         D::T3
         k::T4
@@ -89,7 +81,7 @@ const ClE_Cl = Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult}
 
 Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
-`HierarchicalClustering` stores the output of a hierarchical clustering algorithm, including the clustering object, similarity and distance matrices, and the number of clusters.
+`Clusters` stores the output of a hierarchical clustering algorithm, including the clustering object, similarity and distance matrices, and the number of clusters.
 
 # Fields
 
@@ -100,7 +92,7 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HierarchicalClustering(; clustering::Clustering.Hclust, S::MatNum,
+    Clusters(; res::Clustering.Hclust, S::MatNum,
                            D::MatNum, k::Integer)
 
 Keyword arguments correspond to the fields above.
@@ -114,26 +106,24 @@ Keyword arguments correspond to the fields above.
 
 # Related
 
-  - [`AbstractHierarchicalClusteringResult`](@ref)
-  - [`HierarchicalClusteringEstimator`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+  - [`ClustersEstimator`](@ref)
 """
-struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
-    clustering::T1
+struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
+    res::T1
     S::T2
     D::T3
     k::T4
-    function HierarchicalClustering(clustering::Clustering.Hclust, S::MatNum, D::MatNum,
-                                    k::Integer)
+    function Clusters(res::Clustering.ClusteringResult, S::MatNum, D::MatNum, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
         @argcheck(size(S) == size(D), DimensionMismatch)
         @argcheck(one(k) <= k, DomainError)
-        return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
+        return new{typeof(res), typeof(S), typeof(D), typeof(k)}(res, S, D, k)
     end
 end
-function HierarchicalClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum,
-                                k::Integer)
-    return HierarchicalClustering(clustering, S, D, k)
+function Clusters(; res::Clustering.ClusteringResult, S::MatNum, D::MatNum, k::Integer)
+    return Clusters(res, S, D, k)
 end
 """
     clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -343,7 +333,7 @@ HClustAlgorithm
 # Related
 
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
-  - [`HierarchicalClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
 """
 struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
     linkage::T1
@@ -355,16 +345,17 @@ function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
 end
 """
-    struct HierarchicalClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
+    struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
         ce::T1
         de::T2
+
         alg::T3
         onc::T4
     end
 
 Estimator type for clustering in PortfolioOptimisers.jl.
 
-`HierarchicalClusteringEstimator` encapsulates all configuration required for clustering, including the covariance estimator, distance estimator, clustering algorithm, and optimal number of clusters estimator.
+`ClustersEstimator` encapsulates all configuration required for clustering, including the covariance estimator, distance estimator, res algorithm, and optimal number of clusters estimator.
 
 # Fields
 
@@ -375,9 +366,9 @@ Estimator type for clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HierarchicalClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+    ClustersEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                        alg::AbstractHierarchicalClusteringAlgorithm = HClustAlgorithm(),
+                        alg::AbstractClustersAlgorithm = HClustAlgorithm(),
                         onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
 
 Keyword arguments correspond to the fields above.
@@ -385,8 +376,8 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> HierarchicalClusteringEstimator()
-HierarchicalClusteringEstimator
+julia> ClustersEstimator()
+ClustersEstimator
    ce ┼ PortfolioOptimisersCovariance
       │   ce ┼ Covariance
       │      │    me ┼ SimpleExpectedReturns
@@ -417,31 +408,39 @@ HierarchicalClusteringEstimator
 
 # Related
 
-  - [`AbstractClusteringEstimator`](@ref)
+  - [`AbstractClustersEstimator`](@ref)
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
-struct HierarchicalClusteringEstimator{T1, T2, T3, T4} <:
-       AbstractHierarchicalClusteringEstimator
+struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
     ce::T1
     de::T2
     alg::T3
     onc::T4
-    function HierarchicalClusteringEstimator(ce::StatsBase.CovarianceEstimator,
-                                             de::AbstractDistanceEstimator,
-                                             alg::AbstractHierarchicalClusteringAlgorithm,
-                                             onc::AbstractOptimalNumberClustersEstimator)
+    function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
+                               de::AbstractDistanceEstimator,
+                               alg::AbstractClustersAlgorithm,
+                               onc::AbstractOptimalNumberClustersEstimator)
         return new{typeof(ce), typeof(de), typeof(alg), typeof(onc)}(ce, de, alg, onc)
     end
 end
-function HierarchicalClusteringEstimator(;
-                                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                         de::AbstractDistanceEstimator = Distance(;
-                                                                                  alg = CanonicalDistance()),
-                                         alg::AbstractHierarchicalClusteringAlgorithm = HClustAlgorithm(),
-                                         onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
-    return HierarchicalClusteringEstimator(ce, de, alg, onc)
+function ClustersEstimator(;
+                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                           de::AbstractDistanceEstimator = Distance(;
+                                                                    alg = CanonicalDistance()),
+                           alg::AbstractClustersAlgorithm = HClustAlgorithm(),
+                           onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+    return ClustersEstimator(ce, de, alg, onc)
 end
+function factory(cle::ClustersEstimator, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return ClustersEstimator(; ce = cle.ce, de = cle.de, alg = factory(cle.alg, w),
+                             onc = cle.onc)
+end
+const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
+                                           <:AbstractHierarchicalClusteringAlgorithm,
+                                           <:Any},
+                       <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
+const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
 
-export HierarchicalClustering, clusterise, SecondOrderDifference, SilhouetteScore,
-       OptimalNumberClusters, HClustAlgorithm, HierarchicalClusteringEstimator
+export Clusters, clusterise, SecondOrderDifference, SilhouetteScore, OptimalNumberClusters,
+       HClustAlgorithm, ClustersEstimator

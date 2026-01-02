@@ -5,7 +5,7 @@ LowOrderPrior
 HighOrderPrior
 prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::AbstractPriorResult, args...; kwargs...)
-clusterise(cle::HierarchicalClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+clusterise(cle::ClustersEstimator, pr::AbstractPriorResult; kwargs...)
 AbstractPriorEstimator
 AbstractLowOrderPriorEstimator
 AbstractLowOrderPriorEstimator_A

@@ -1,20 +1,20 @@
 # Clustering
 
 ```@docs
-HierarchicalClustering
+Clusters
 clusterise(cle::AbstractClusteringResult, args...; kwargs...)
 SecondOrderDifference
 SilhouetteScore
 OptimalNumberClusters
 HClustAlgorithm
-HierarchicalClusteringEstimator
-AbstractClusteringEstimator
-AbstractClusteringAlgorithm
+ClustersEstimator
+AbstractClustersEstimator
+AbstractClustersAlgorithm
 AbstractHierarchicalClusteringAlgorithm
 AbstractNonHierarchicalClusteringAlgorithm
 AbstractOptimalNumberClustersEstimator
 AbstractOptimalNumberClustersAlgorithm
 AbstractClusteringResult
-AbstractHierarchicalClusteringResult
-AbstractNonHierarchicalClusteringResult
+AbstractClusteringResult
+AbstractPhylogenyResult
 ```

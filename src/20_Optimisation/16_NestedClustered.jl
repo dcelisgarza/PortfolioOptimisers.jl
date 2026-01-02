@@ -111,8 +111,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                    typeof(fb)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict, ex, fb)
     end
 end
-function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(),
-                         cle::ClE_Cl = HierarchicalClusteringEstimator(),
+function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = ClustersEstimator(),
                          wb::Option{<:WbE_Wb} = nothing,
                          sets::Option{<:AssetSets} = nothing, opti::OptimisationEstimator,
                          opto::OptimisationEstimator,

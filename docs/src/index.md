@@ -413,7 +413,7 @@ Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwarg
 
 #### Hierarchical
 
-  - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref) and [`HierarchicalClustering`](@ref)
+  - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
     
       + Hierarchical clustering [`HClustAlgorithm`](@ref)
       + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
@@ -422,7 +422,7 @@ Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwarg
 
 [`NestedClustered`](@ref) optimisations don't require relationship information, so non hierarchical clustering algorithms are also compatible.
 
-  - [`NonHierarchicalClusteringEstimator`](@ref) and [`NonHierarchicalClustering`](@ref) take a non hierarchical clustering algorithm.
+  - [`ClustersEstimator`](@ref) and [`Clusters`](@ref) take a non hierarchical clustering algorithm.
     
       + K-means clustering [`KMeansAlgorithm`](@ref)
 

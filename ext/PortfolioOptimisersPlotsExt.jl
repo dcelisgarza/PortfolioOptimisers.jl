@@ -139,29 +139,29 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
     return areaplot(transpose(w); xticks = (1:M, 1:M), label = permutedims(nx), kwargs...,
                     ekwargs...)
 end
-function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractHierarchicalClusteringResult,
-                                             nx::AbstractVector = 1:length(clr.clustering.order);
+function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractClusteringResult,
+                                             nx::AbstractVector = 1:length(clr.res.order);
                                              dend_theme = :Spectral,
                                              dend_kwargs = (; xrotation = 90),
                                              fig_kwargs = (; size = (600, 600)), ekwargs...)
-    N = length(clr.clustering.order)
-    nx = view(nx, clr.clustering.order)
-    idx = cutree(clr.clustering; k = clr.k)
+    N = length(clr.res.order)
+    nx = view(nx, clr.res.order)
+    idx = cutree(clr.res; k = clr.k)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
-    dend1 = plot(clr.clustering; normalize = false, ylim = extrema(clr.clustering.heights),
+    dend1 = plot(clr.res; normalize = false, ylim = extrema(clr.res.heights),
                  xticks = (1:N, nx), dend_kwargs...)
     for (i, cl) in pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
+        a = [findfirst(x -> x == c, clr.res.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c in cl]
+        i1 = [findfirst(x -> x == c, -view(clr.res.merges, :, 1)) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c in cl]
+        i2 = [findfirst(x -> x == c, -view(clr.res.merges, :, 2)) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
-        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
         plot!(dend1,
               [xmin - 0.25, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmin - 0.25,
                xmin - 0.25, xmin - 0.25], [0, 0, 0, h, h, h, h, 0]; color = nothing,
@@ -195,30 +195,29 @@ function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::HClE_HCl,
     end
     clim = color_func(X)
     N = size(X, 1)
-    X = view(X, clr.clustering.order, clr.clustering.order)
-    nx = view(nx, clr.clustering.order)
-    idx = cutree(clr.clustering; k = clr.k)
+    X = view(X, clr.res.order, clr.res.order)
+    nx = view(nx, clr.res.order)
+    idx = cutree(clr.res; k = clr.k)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
     colgrad = cgrad(hmap_theme; hmap_theme_kwargs...)
     hmap = plot(X; st = :heatmap, yticks = (1:N, nx), xticks = (1:N, nx), xrotation = 90,
                 colorbar = false, clim = clim, xlim = (0.5, N + 0.5), ylim = (0.5, N + 0.5),
                 color = colgrad, yflip = true, hmap_kwargs...)
-    dend1 = plot(clr.clustering; xticks = false, ylim = extrema(clr.clustering.heights),
-                 dend1_kwargs...)
-    dend2 = plot(clr.clustering; yticks = false, xrotation = 90, orientation = :horizontal,
-                 yflip = true, xlim = extrema(clr.clustering.heights), dend2_kwargs...)
+    dend1 = plot(clr.res; xticks = false, ylim = extrema(clr.res.heights), dend1_kwargs...)
+    dend2 = plot(clr.res; yticks = false, xrotation = 90, orientation = :horizontal,
+                 yflip = true, xlim = extrema(clr.res.heights), dend2_kwargs...)
     for (i, cl) in pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
+        a = [findfirst(x -> x == c, clr.res.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c in cl]
+        i1 = [findfirst(x -> x == c, -view(clr.res.merges, :, 1)) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c in cl]
+        i2 = [findfirst(x -> x == c, -view(clr.res.merges, :, 2)) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
-        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
         plot!(hmap,
               [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
                xmin - 0.5, xmin - 0.5],

@@ -163,7 +163,7 @@
                                                      "Consumer_Staples"]))
 
     pr = prior(HighOrderPriorEstimator(), rd)
-    clr = clusterise(HierarchicalClusteringEstimator(), pr)
+    clr = clusterise(ClustersEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
     wp = StatsBase.pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
@@ -1474,8 +1474,7 @@
         @test isapprox(JuMP.value.(res.plg.A .* res.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
 
-        plc = SemiDefinitePhylogenyEstimator(; pe = HierarchicalClusteringEstimator(),
-                                             p = 1000)
+        plc = SemiDefinitePhylogenyEstimator(; pe = ClustersEstimator(), p = 1000)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)

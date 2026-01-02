@@ -35,7 +35,7 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     end
 end
 function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
-                               cle::HClE_HCl = HierarchicalClusteringEstimator(),
+                               cle::HClE_HCl = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                fees::Option{<:FeesE_Fees} = nothing,
                                wb::Option{<:WbE_Wb} = WeightBounds(),

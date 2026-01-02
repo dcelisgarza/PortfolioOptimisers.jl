@@ -2,6 +2,4 @@
 
 ```@docs
 KMeansAlgorithm
-NonHierarchicalClusteringEstimator
-NonHierarchicalClustering
 ```

@@ -207,7 +207,7 @@ function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end
 """
-    clusterise(cle::AbstractClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+    clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
 
@@ -225,11 +225,11 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 
 # Related
 
-  - [`HierarchicalClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`clusterise`](@ref)
 """
-function clusterise(cle::AbstractClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+function clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
 """
@@ -242,7 +242,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 
 # Arguments
 
-  - `necle`: Network estimator, clustering estimator, or clustering result.
+  - `necle`: Network estimator, res estimator, or clustering result.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
@@ -253,7 +253,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 # Related
 
   - [`NetworkEstimator`](@ref)
-  - [`HierarchicalClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
@@ -296,7 +296,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 
 # Arguments
 
-  - `ne`: Network estimator, clustering estimator, or clustering result.
+  - `ne`: Network estimator, res estimator, or clustering result.
   - `cent`: Centrality algorithm.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.

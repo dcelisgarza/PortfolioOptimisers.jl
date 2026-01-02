@@ -166,7 +166,7 @@
                                                      "Consumer_Staples"]))
     pr = prior(HighOrderPriorEstimator(), rd)
     rr = regression(DimensionReductionRegression(), rd)
-    clr = clusterise(HierarchicalClusteringEstimator(), pr)
+    clr = clusterise(ClustersEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
         jopti = JuMPOptimiser(; pe = pr, slv = slv)
@@ -332,7 +332,7 @@
                                                        opt = opti),
                                        opto = MeanRisk(; opt = opto)), rd)
 
-        clusters = cutree(clr.clustering; k = clr.k)
+        clusters = cutree(clr.res; k = clr.k)
         idx = findfirst(x -> x == "PG", rd.nx)
         idxc = clusters[idx]
         idx = findall(x -> x == idxc, clusters)
@@ -381,7 +381,7 @@
                                                                   sets = sets)),
                               opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
         res = optimise(opt, rd)
-        clusters = cutree(clr.clustering; k = clr.k)
+        clusters = cutree(clr.res; k = clr.k)
 
         group2 = sets.dict["group2"]
         for i in 1:(clr.k)

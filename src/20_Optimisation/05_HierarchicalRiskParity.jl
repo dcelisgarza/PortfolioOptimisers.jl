@@ -51,7 +51,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(pr.X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(pr.X))
     w = ones(eltype(pr.X), size(pr.X, 2))
-    items = [clr.clustering.order]
+    items = [clr.res.order]
     while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
@@ -150,7 +150,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(pr.X, 2),
                                    strict = hrp.opt.strict, datatype = eltype(pr.X))
     w = ones(eltype(pr.X), size(pr.X, 2))
-    items = [clr.clustering.order]
+    items = [clr.res.order]
     while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))

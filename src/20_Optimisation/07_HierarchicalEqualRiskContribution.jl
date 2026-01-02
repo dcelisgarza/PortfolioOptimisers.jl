@@ -413,10 +413,10 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     pr = prior(hec.opt.pe, rd; dims = dims)
     clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
-    idx = Clustering.cutree(clr.clustering; k = clr.k)
+    idx = Clustering.cutree(clr.res; k = clr.k)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, fees = herc_risk(hec, pr, cls)
-    nd = to_tree(clr.clustering)[2]
+    nd = to_tree(clr.res)[2]
     hs = [i.height for i in nd]
     nd = nd[sortperm(hs; rev = true)]
     # Treat each cluster as its own portfolio and optimise each one individually.

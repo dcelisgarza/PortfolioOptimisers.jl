@@ -990,14 +990,14 @@ This function clusterises the data, cuts the tree into the optimal number of clu
 
 # Related
 
-  - [`HierarchicalClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
 function phylogeny_matrix(cle::HClE_HCl, X::MatNum; branchorder::Symbol = :optimal,
                           dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
-    clusters = Clustering.cutree(res.clustering; k = res.k)
+    clusters = Clustering.cutree(res.res; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
     for i in axes(P, 2)
         idx = clusters .== i

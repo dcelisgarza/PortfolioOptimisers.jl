@@ -1714,71 +1714,16 @@ function J_LoGo(sigma::MatNum, separators::MatNum, cliques::MatNum)
     return jlogo
 end
 """
-    struct DBHTClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
-        clustering::T1
-        S::T2
-        D::T3
-        k::T4
-    end
-
-Result type for Direct Bubble Hierarchical Tree (DBHT) clustering.
-
-`DBHTClustering` encapsulates the output of a DBHT clustering analysis, including the hierarchical clustering result, similarity and distance matrices, and the optimal number of clusters. This struct is returned by [`clusterise`](@ref) when using a DBHT-based clustering estimator.
-
-# Fields
-
-  - `clustering`: Hierarchical clustering result, typically a [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) object.
-  - `S`: Similarity matrix used for DBHT clustering.
-  - `D`: Distance (dissimilarity) matrix used for DBHT clustering.
-  - `k`: Optimal number of clusters, as determined by the estimator's cluster selection method.
-
-# Constructor
-
-    DBHTClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum,
-                   k::Integer)
-
-Keyword arguments correspond to the fields above.
-
-# Validation
-
-  - `!isempty(S)`
-  - `!isempty(D)`
-  - `size(S) == size(D)`
-  - `k >= 1`.
-
-# Related
-
-  - [`DBHT`](@ref)
-  - [`clusterise`](@ref)
-  - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
-"""
-struct DBHTClustering{T1, T2, T3, T4} <: AbstractHierarchicalClusteringResult
-    clustering::T1
-    S::T2
-    D::T3
-    k::T4
-    function DBHTClustering(clustering::Clustering.Hclust, S::MatNum, D::MatNum, k::Integer)
-        @argcheck(!isempty(S), IsEmptyError)
-        @argcheck(!isempty(D), IsEmptyError)
-        @argcheck(size(S) == size(D), DimensionMismatch)
-        @argcheck(one(k) <= k, DomainError)
-        return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
-    end
-end
-function DBHTClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum, k::Integer)
-    return DBHTClustering(clustering, S, D, k)
-end
-"""
-    clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
+    clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
 
-Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `HierarchicalClusteringEstimator` configured with a `DBHT` algorithm.
+Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `ClustersEstimator` configured with a `DBHT` algorithm.
 
-This method computes the similarity and distance matrices from the input data matrix `X` using the estimator's configured estimators and algorithms, applies the DBHT clustering pipeline, and returns a [`DBHTClustering`](@ref) result containing the hierarchical clustering, similarity and distance matrices, and the optimal number of clusters.
+This method computes the similarity and distance matrices from the input data matrix `X` using the estimator's configured estimators and algorithms, applies the DBHT clustering pipeline, and returns a [`Clusters`](@ref) result containing the hierarchical clustering, similarity and distance matrices, and the optimal number of clusters.
 
 # Arguments
 
-  - `cle`: A `HierarchicalClusteringEstimator` whose algorithm is a [`DBHT`](@ref) instance.
+  - `cle`: A `ClustersEstimator` whose algorithm is a [`DBHT`](@ref) instance.
   - `X`: Data matrix (`observations × assets` or `assets × observations` depending on `dims`).
   - `branchorder`: Symbol specifying the dendrogram branch ordering method. Accepts `:optimal` (default), `:barjoseph`, or `:r`.
   - `dims`: Integer specifying the dimension along which to compute statistics (`1` for columns/assets, `2` for rows).
@@ -1790,27 +1735,27 @@ This method computes the similarity and distance matrices from the input data ma
   - Applies the selected similarity transformation via [`dbht_similarity`](@ref).
   - Runs the full DBHT clustering pipeline via [`DBHTs`](@ref), including PMFG construction, clique and bubble hierarchy extraction, and dendrogram construction.
   - Determines the optimal number of clusters using the estimator's cluster selection method.
-  - Returns a [`DBHTClustering`](@ref) result encapsulating all relevant outputs.
+  - Returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
 
 # Returns
 
-  - `clr::DBHTClustering`: DBHT clustering result.
+  - `clr::Clusters`: DBHT clustering result.
 
 # Related
 
   - [`DBHT`](@ref)
-  - [`DBHTClustering`](@ref)
+  - [`Clusters`](@ref)
   - [`DBHTs`](@ref)
   - [`dbht_similarity`](@ref)
-  - [`HierarchicalClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
 """
-function clusterise(cle::HierarchicalClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
-                    X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
+                    branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
-    clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
-    k = optimal_number_clusters(cle.onc, clustering, D)
-    return DBHTClustering(; clustering = clustering, S = S, D = D, k = k)
+    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
+    k = optimal_number_clusters(cle.onc, res, D)
+    return Clusters(; res = res, S = S, D = D, k = k)
 end
 function logo!(::Nothing, args...; kwargs...)
     return nothing
@@ -2032,4 +1977,4 @@ function matrix_processing_algorithm!(je::LoGo, sigma::MatNum, X::MatNum; dims::
 end
 
 export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
-       UniqueRoot, EqualRoot, DBHT, LoGo, DBHTClustering
+       UniqueRoot, EqualRoot, DBHT, LoGo, Clusters

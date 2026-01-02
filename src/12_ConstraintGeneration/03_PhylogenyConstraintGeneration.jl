@@ -3,7 +3,7 @@
 
 Abstract supertype for all phylogeny-based constraint estimators in PortfolioOptimisers.jl.
 
-All concrete types representing phylogeny-based constraint estimators should subtype `AbstractPhylogenyConstraintEstimator`. This enables a consistent, composable interface for generating constraints based on phylogenetic, clustering, or network structures among assets.
+All concrete types representing phylogeny-based constraint estimators should subtype `AbstractPhylogenyConstraintEstimator`. This enables a consistent, composable interface for generating constraints based on phylogenetic, res, or network structures among assets.
 
 # Related
 
@@ -18,7 +18,7 @@ abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimato
 
 Abstract supertype for all phylogeny-based constraint result types in PortfolioOptimisers.jl.
 
-All concrete types representing the results of phylogeny-based constraint generation should subtype `AbstractPhylogenyConstraintResult`. This enables a consistent, composable interface for storing and propagating constraint matrices, vectors, or other outputs derived from phylogenetic, clustering, or network structures among assets.
+All concrete types representing the results of phylogeny-based constraint generation should subtype `AbstractPhylogenyConstraintResult`. This enables a consistent, composable interface for storing and propagating constraint matrices, vectors, or other outputs derived from phylogenetic, res, or network structures among assets.
 
 # Related
 
@@ -211,7 +211,7 @@ function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(pe::HierarchicalClusteringEstimator, B::VecNum)
+    validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
 Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pe`.
@@ -242,8 +242,7 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(pe::HierarchicalClusteringEstimator,
-                                                        B::VecNum)
+function validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
     if !isnothing(pe.onc.max_k)
         @argcheck(length(B) <= pe.onc.max_k,
                   DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
@@ -416,7 +415,7 @@ end
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
 
-`phylogeny_constraints` constructs constraint objects based on phylogenetic, clustering, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
+`phylogeny_constraints` constructs constraint objects based on phylogenetic, res, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
 
 If a vector broadcasts the function over each element, returning a vector of constraint results.
 
