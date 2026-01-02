@@ -4,5 +4,5 @@
 PortfolioOptimisersCovariance
 cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
 cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-find_correlated_indices
+find_uncorrelated_indices
 ```

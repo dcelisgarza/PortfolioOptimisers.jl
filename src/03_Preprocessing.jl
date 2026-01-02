@@ -460,7 +460,7 @@ Int64[]
 
 # Related
 
-  - [`find_correlated_indices`](@ref)
+  - [`find_uncorrelated_indices`](@ref)
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)

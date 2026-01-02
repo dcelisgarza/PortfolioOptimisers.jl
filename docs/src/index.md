@@ -250,6 +250,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
   - Prices to returns [`prices_to_returns`](@ref)
   - Find complete indices [`find_complete_indices`](@ref)
+  - Find uncorrelated indices [`find_uncorrelated_indices`](@ref)
 
 ### Matrix Processing
 
@@ -277,9 +278,9 @@ Overloads `Statistics.mean` as `mean(estimator, X; kwargs...)`.
     
       + Algorithms
         
-          * JamesStein [`JamesStein`](@ref)
-          * BayesStein [`BayesStein`](@ref)
-          * BodnarOkhrinParolya [`BodnarOkhrinParolya`](@ref)
+          * James-Stein [`JamesStein`](@ref)
+          * Bayes-Stein [`BayesStein`](@ref)
+          * Bodnar-Okhrin-Parolya [`BodnarOkhrinParolya`](@ref)
     
       + Targets: all algorithms can have any of the following targets
         
@@ -403,7 +404,7 @@ The distance estimators are used together with various distance matrix algorithm
 
 ### Clustering
 
-Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwargs...)`, most clustering algorithms use [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and `clusterise(estimator, X; kwargs...)`. Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
   - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
     
@@ -413,18 +414,14 @@ Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwarg
 
 #### Hierarchical
 
-  - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
-    
-      + Hierarchical clustering [`HClustAlgorithm`](@ref)
-      + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
+  - Hierarchical clustering [`HClustAlgorithm`](@ref)
+  - Direct Bubble Hierarchical Trees [`DBHT`](@ref)
 
 #### Non hierachical
 
-[`NestedClustered`](@ref) optimisations don't require relationship information, so non hierarchical clustering algorithms are also compatible.
+[`NestedClustered`](@ref) optimisations don't require relationship information only clustering assignments, so non hierarchical clustering algorithms are also compatible.
 
-  - [`ClustersEstimator`](@ref) and [`Clusters`](@ref) take a non hierarchical clustering algorithm.
-    
-      + K-means clustering [`KMeansAlgorithm`](@ref)
+  - K-means clustering [`KMeansAlgorithm`](@ref)
 
 ### Portfolio Optimisation
 

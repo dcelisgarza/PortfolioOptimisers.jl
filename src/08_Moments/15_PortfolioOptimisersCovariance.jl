@@ -145,9 +145,9 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
 end
 """
 """
-function find_correlated_indices(X::MatNum;
-                                 ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                 t::Number = 0.95, absolute::Bool = false)
+function find_uncorrelated_indices(X::MatNum;
+                                   ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                                   t::Number = 0.95, absolute::Bool = false)
     N = size(X, 2)
     rho = !absolute ? Statistics.cor(ce, X) : abs.(Statistics.cor(ce, X))
     mean_rho = Statistics.mean(rho; dims = 1)
