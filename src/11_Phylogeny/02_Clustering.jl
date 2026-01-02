@@ -71,6 +71,7 @@ All concrete types representing the result of a clustering estimation should sub
   - [`AbstractClustersAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
     struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
         res::T1
@@ -114,7 +115,7 @@ struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
     S::T2
     D::T3
     k::T4
-    function Clusters(res::Clustering.ClusteringResult, S::MatNum, D::MatNum, k::Integer)
+    function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
         @argcheck(size(S) == size(D), DimensionMismatch)
@@ -122,7 +123,7 @@ struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
         return new{typeof(res), typeof(S), typeof(D), typeof(k)}(res, S, D, k)
     end
 end
-function Clusters(; res::Clustering.ClusteringResult, S::MatNum, D::MatNum, k::Integer)
+function Clusters(; res::ClTypes, S::MatNum, D::MatNum, k::Integer)
     return Clusters(res, S, D, k)
 end
 """
