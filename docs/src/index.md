@@ -403,9 +403,9 @@ The distance estimators are used together with various distance matrix algorithm
 
 ### Clustering
 
-Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwargs...)`.
+Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwargs...)`, most clustering algorithms use [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
-  - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref)
+  - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
     
       + Second order difference [`SecondOrderDifference`](@ref)
       + Silhouette scores [`SilhouetteScore`](@ref)
@@ -415,7 +415,7 @@ Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwarg
 
   - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref) and [`HierarchicalClustering`](@ref)
     
-      + [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl) [`HClustAlgorithm`](@ref)
+      + Hierarchical clustering [`HClustAlgorithm`](@ref)
       + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
 
 #### Non hierachical
@@ -424,7 +424,7 @@ Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwarg
 
   - [`NonHierarchicalClusteringEstimator`](@ref) and [`NonHierarchicalClustering`](@ref) take a non hierarchical clustering algorithm.
     
-      + K-means clustering is implemented via [`KMeansAlgorithm`](@ref).
+      + K-means clustering [`KMeansAlgorithm`](@ref)
 
 ### Portfolio Optimisation
 
