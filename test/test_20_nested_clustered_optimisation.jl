@@ -278,6 +278,8 @@
                 5e-5
             elseif i == 12
                 5e-6
+            elseif i == 10
+                1.1
             else
                 1e-6
             end
