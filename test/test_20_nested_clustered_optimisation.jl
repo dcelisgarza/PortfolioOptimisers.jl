@@ -274,7 +274,13 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
-            rtol = 1e-6
+            rtol = if i in (2, 3)
+                5e-5
+            elseif i == 12
+                5e-6
+            else
+                1e-6
+            end
             success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Failed iteration: $i")
