@@ -15,6 +15,5 @@ AbstractNonHierarchicalClusteringAlgorithm
 AbstractOptimalNumberClustersEstimator
 AbstractOptimalNumberClustersAlgorithm
 AbstractClusteringResult
-AbstractClusteringResult
 AbstractPhylogenyResult
 ```
