@@ -413,10 +413,18 @@ Hierarchical and non hierarchical clustering via `clusterise(estimator, X; kwarg
 
 #### Hierarchical
 
-  - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref).
+  - Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`HierarchicalClusteringEstimator`](@ref) and [`HierarchicalClustering`](@ref)
     
-        + [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl) [`HClustAlgorithm`](@ref)
-        + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
+      + [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl) [`HClustAlgorithm`](@ref)
+      + Direct Bubble Hierarchical Trees [`DBHT`](@ref)
+
+#### Non hierachical
+
+[`NestedClustered`](@ref) optimisations don't require relationship information, so non hierarchical clustering algorithms are also compatible.
+
+  - [`NonHierarchicalClusteringEstimator`](@ref) and [`NonHierarchicalClustering`](@ref) take a non hierarchical clustering algorithm.
+    
+      + K-means clustering is implemented via [`KMeansAlgorithm`](@ref).
 
 ### Portfolio Optimisation
 

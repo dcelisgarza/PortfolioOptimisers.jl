@@ -493,8 +493,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
     for i in 2:c1
-        lvl = cluster_lvls[i]
-        sl = Clustering.silhouettes(lvl, dist)
+        sl = Clustering.silhouettes(cluster_lvls[i], dist)
         W_list[i] = vec_to_real_measure(measure_alg, sl)
     end
     return valid_k_clusters(clustering, W_list)
