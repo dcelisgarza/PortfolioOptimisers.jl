@@ -725,8 +725,8 @@ All concrete types implementing network-based estimation algorithms should subty
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
-const NwE_Ph_HClE_HCl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:HClE_HCl}
-const NwE_HClE_HCl = Union{<:AbstractNetworkEstimator, <:HClE_HCl}
+const NwE_Ph_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
     struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
         ce::T1
@@ -839,7 +839,7 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 # Constructor
 
     CentralityEstimator(;
-                        ne::NwE_Ph_HClE_HCl = NetworkEstimator(),
+                        ne::NwE_Ph_ClE_Cl = NetworkEstimator(),
                         cent::AbstractCentralityAlgorithm = DegreeCentrality())
 
 Keyword arguments correspond to the fields above.
@@ -886,11 +886,11 @@ CentralityEstimator
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
-    function CentralityEstimator(ne::NwE_Ph_HClE_HCl, cent::AbstractCentralityAlgorithm)
+    function CentralityEstimator(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm)
         return new{typeof(ne), typeof(cent)}(ne, cent)
     end
 end
-function CentralityEstimator(; ne::NwE_Ph_HClE_HCl = NetworkEstimator(),
+function CentralityEstimator(; ne::NwE_Ph_ClE_Cl = NetworkEstimator(),
                              cent::AbstractCentralityAlgorithm = DegreeCentrality())
     return CentralityEstimator(ne, cent)
 end
@@ -968,7 +968,7 @@ function phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1
     return PhylogenyResult(; X = P)
 end
 """
-    phylogeny_matrix(cle::HClE_HCl,
+    phylogeny_matrix(cle::ClE_Cl,
                      X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                      kwargs...)
 
@@ -994,10 +994,10 @@ This function clusterises the data, cuts the tree into the optimal number of clu
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::HClE_HCl, X::MatNum; branchorder::Symbol = :optimal,
+function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal,
                           dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
-    clusters = Clustering.cutree(res.res; k = res.k)
+    clusters = get_clustering_indices(res)
     P = zeros(Int, size(X, 2), res.k)
     for i in axes(P, 2)
         idx = clusters .== i
@@ -1006,7 +1006,7 @@ function phylogeny_matrix(cle::HClE_HCl, X::MatNum; branchorder::Symbol = :optim
     return PhylogenyResult(; X = P * transpose(P) - LinearAlgebra.I)
 end
 """
-    centrality_vector(ne::NwE_HClE_HCl, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
                       X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
@@ -1031,7 +1031,7 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`CentralityEstimator`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::NwE_HClE_HCl, cent::AbstractCentralityAlgorithm, X::MatNum;
+function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm, X::MatNum;
                            dims::Int = 1, kwargs...)
     P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
     return centrality_vector(P, cent; dims = dims, kwargs...)
@@ -1063,7 +1063,7 @@ function centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, k
     return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
 end
 """
-    average_centrality(ne::NwE_Ph_HClE_HCl,
+    average_centrality(ne::NwE_Ph_ClE_Cl,
                        cent::AbstractCentralityAlgorithm, w::VecNum, X::MatNum;
                        dims::Int = 1, kwargs...)
 
@@ -1090,8 +1090,8 @@ This function computes the centrality vector and returns the weighted average us
   - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function average_centrality(ne::NwE_Ph_HClE_HCl, cent::AbstractCentralityAlgorithm,
-                            w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
+function average_centrality(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm, w::VecNum,
+                            X::MatNum; dims::Int = 1, kwargs...)
     return LinearAlgebra.dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
 """
@@ -1178,7 +1178,7 @@ function asset_phylogeny(ph::PhylogenyResult{<:MatNum}, w::VecNum, args...; kwar
     return asset_phylogeny(w, ph.X)
 end
 """
-    asset_phylogeny(cle::NwE_HClE_HCl,
+    asset_phylogeny(cle::NwE_ClE_Cl,
                     w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a set of weights and a network or clustering estimator.
@@ -1202,7 +1202,7 @@ This function computes the phylogeny matrix using the estimator and data, then c
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::NwE_HClE_HCl, w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
+function asset_phylogeny(cle::NwE_ClE_Cl, w::VecNum, X::MatNum; dims::Int = 1, kwargs...)
     return asset_phylogeny(phylogeny_matrix(cle, X; dims = dims, kwargs...), w)
 end
 

@@ -248,7 +248,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ### Preprocessing
 
-  - Prices to returns [`prices_to_returns`](@ref)
+  - Prices to returns [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
   - Find complete indices [`find_complete_indices`](@ref)
   - Find uncorrelated indices [`find_uncorrelated_indices`](@ref)
 
@@ -266,7 +266,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ### Regression Models
 
-Factor models and implied volatility use regression in their estimation. Regressions return a [`Regression`](@ref) via `regression(estimator, X, Y)`.
+Factor models and implied volatility use regression in their estimation. Regressions return a [`Regression`](@ref) via `regression(estimator, X, Y)` [`regression`](@ref).
 
 #### Regression targets
 
@@ -291,7 +291,7 @@ Factor models and implied volatility use regression in their estimation. Regress
           * R-squared [`RSquared`](@ref)
           * Adjusted R-squared criteria [`AdjustedRSquared`](@ref)
 
-  - Dimensional reduction with custom mean and variance estimators [`DimensionalReductionRegression`](@ref)
+  - Dimensional reduction with custom mean and variance estimators [`DimensionReductionRegression`](@ref)
     
       + Dimensional reduction targets
         
@@ -390,11 +390,14 @@ Overloads `Statistics.cov` and `Statistics.cor` as `cov(estimator, X; kwargs...)
   - Detoned covariance with custom covariance estimator [`DetoneCovariance`](@ref)
   - Custom processed covariance with custom covariance estimator [`ProcessedCovariance`](@ref)
   - Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`](@ref)
+    
+      + Premium [`ImpliedVolatilityPremium`](@ref)
+      + Regression [`ImpliedVolatilityRegression`](@ref)
   - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
 
 #### [Coskewness](@id readme-coskewness)
 
-Implements `coskewness(estimator, X; kwargs...)`.
+Implements `coskewness(estimator, X; kwargs...)` [`coskewness`](@ref).
 
   - Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
     
@@ -403,7 +406,7 @@ Implements `coskewness(estimator, X; kwargs...)`.
 
 #### [Cokurtosis](@id readme-cokurtosis)
 
-Implements `cokurtosis(estimator, X; kwargs...)`.
+Implements `cokurtosis(estimator, X; kwargs...)` [`cokurtosis`](@ref).
 
   - Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
     
@@ -412,7 +415,7 @@ Implements `cokurtosis(estimator, X; kwargs...)`.
 
 ### Distance matrices
 
-Implements `distance(estimator, X; kwargs...)`, `distance(distance_estimator, covariance_estimator, X; kwargs...)`, `cor_and_dist(distance_estimator, covariance_estimator, X; kwargs...)`.
+Implements `distance(estimator, X; kwargs...)`, `distance(distance_estimator, covariance_estimator, X; kwargs...)`, `cor_and_dist(distance_estimator, covariance_estimator, X; kwargs...)` [`distance`](@ref) and [`cor_and_dist`](@ref).
 
   - First order distance estimator with custom distance algorithm, and optional exponent [`Distance`](@ref)
   - Second order distance estimator with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent [`DistanceDistance`](@ref)
@@ -436,9 +439,29 @@ The distance estimators are used together with various distance matrix algorithm
       + Predefined number of bins
   - Canonical distance [`CanonicalDistance`](@ref)
 
+### Prior statistics
+
+Many optimisations and constraints use prior statistics implemented via `prior(estimator, returns_data; kwargs...)` [`prior`](@ref).
+
+  - Low order prior [`LowOrderPrior`](@ref)
+    
+      + Empirical [`EmpiricalPrior`](@ref)
+    
+      + Factor model [`FactorPrior`](@ref)
+      + Black-Litterman
+        
+          * Vanilla [`BlackLittermanPrior`](@ref)
+          * Bayesian [`BayesianBlackLittermanPrior`](@ref)
+          * Factor model [`FactorBlackLittermanPrior`](@ref)
+          * Augmented [`AugmentedBlackLittermanPrior`](@ref)
+      + Entropy pooling [`EntropyPoolingPrior`](@ref)
+      + Opinion pooling [`OpinionPoolingPrior`](@ref)
+
+  - High order prior [`HighOrderPriorEstimator`](@ref) and [`HighOrderPrior`](@ref)
+
 ### Clustering
 
-Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and `clusterise(estimator, X; kwargs...)`. Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and `clusterise(estimator, X; kwargs...)` [`clusterise`](@ref). Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
   - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
     
@@ -449,13 +472,27 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 #### Hierarchical
 
   - Hierarchical clustering [`HClustAlgorithm`](@ref)
-  - Direct Bubble Hierarchical Trees [`DBHT`](@ref)
+  - Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`](@ref)
 
 #### Non hierachical
 
 [`NestedClustered`](@ref) optimisations don't require relationship information only clustering assignments, so non hierarchical clustering algorithms are also compatible.
 
   - K-means clustering [`KMeansAlgorithm`](@ref)
+
+### Phylogeny
+
+`PortfolioOptimisers.jl` can make use of asset relationships to define constraints and compute relatedness characteristics of portfolios.
+
+  - Phylogeny matrices.
+    
+      + Network (Minimum Spanning Tree) adjacency.
+      + Clustering adjacency.
+
+  - Centrality vectors and average centrality.
+    
+      + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
+  - Asset phylogeny score.
 
 ### Portfolio Optimisation
 
@@ -539,8 +576,8 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 
 Some risk measures including linear moments may be formulated using ordered weights arrays.
 
-    
   - Gini Mean Difference.
+
   - Conditional Value at Risk.
   - Weighted Conditional Value at Risk.
   - Tail Gini.
@@ -554,67 +591,6 @@ Some risk measures including linear moments may be formulated using ordered weig
       + Normalised Constant Relative Risk Aversion.
       + Minimum Squared Distance.
       + Minimum Sum Squares.
-
-### Phylogeny
-
-These define asset relationships. They can be used to set constraints on and/or compute the relatedness of assets in a portfolio.
-
-  - Clustering.
-    
-      + Optimal number of clusters:
-        
-          * Predefined, Second order difference, Standardised silhouette scores.
-    
-      + Hierarchical clustering.
-      + Direct Bubble Hierarchy Trees.
-        
-          * Local Global sparsification of the inverse covariance/correlation matrix.
-
-  - Phylogeny matrices.
-    
-      + Network (Minimum Spanning Tree) adjacency.
-      + Clustering adjacency.
-  - Centrality vectors and average centrality.
-    
-      + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
-  - Asset phylogeny score.
-
-### Constraint generation
-
-These let users easily manually or programatically define optimisation constraints.
-
-  - Equation parsing.
-
-  - Linear weights.
-  - Risk budget.
-  - Asset set matrices.
-  - Phylogeny.
-    
-      + Phylogeny matrix.
-        
-          * Semi definite.
-          * Mixed integer programming.
-    
-      + Centrality.
-  - Weight bounds.
-  - Buy-in threshold.
-
-### Prior statistics
-
-As previously mentioned, every optimisation but the finite allocation work off of returns data. These returns can be adjusted and summarised using these estimators. Like the moment estimators, these can be mixed in various ways.
-
-  - Empirical.
-
-  - Factor model.
-  - High order moments (coskewness and cokurtosis).
-  - Black-Litterman.
-    
-      + Vanilla.
-      + Bayesian.
-      + Factor model.
-      + Augmented.
-  - Entropy pooling.
-  - Opinion pooling.
 
 ### Uncertainty sets
 

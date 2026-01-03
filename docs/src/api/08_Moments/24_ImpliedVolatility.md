@@ -2,4 +2,6 @@
 
 ```@docs
 ImpliedVolatility
+ImpliedVolatilityRegression
+ImpliedVolatilityPremium
 ```

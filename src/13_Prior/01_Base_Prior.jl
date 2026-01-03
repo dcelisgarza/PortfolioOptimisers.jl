@@ -233,7 +233,7 @@ function clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwa
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-    phylogeny_matrix(necle::NwE_HClE_HCl, pr::AbstractPriorResult;
+    phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult;
                      kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
@@ -257,7 +257,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(necle::NwE_HClE_HCl, pr::AbstractPriorResult; kwargs...)
+function phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 """
@@ -287,7 +287,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(ne::NwE_HClE_HCl, cent::AbstractCentralityAlgorithm,
+    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -312,12 +312,12 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ne::NwE_HClE_HCl, cent::AbstractCentralityAlgorithm,
+function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
                            pr::AbstractPriorResult; kwargs...)
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end
 """
-    average_centrality(ne::NwE_Ph_HClE_HCl,
+    average_centrality(ne::NwE_Ph_ClE_Cl,
                        cent::AbstractCentralityAlgorithm, w::VecNum,
                        pr::AbstractPriorResult; kwargs...)
 
@@ -344,8 +344,8 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(ne::NwE_Ph_HClE_HCl, cent::AbstractCentralityAlgorithm,
-                            w::VecNum, pr::AbstractPriorResult; kwargs...)
+function average_centrality(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm, w::VecNum,
+                            pr::AbstractPriorResult; kwargs...)
     return LinearAlgebra.dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
 """
@@ -378,7 +378,7 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPri
     return average_centrality(cte, w, pr.X; kwargs...)
 end
 """
-    asset_phylogeny(cle::NwE_HClE_HCl,
+    asset_phylogeny(cle::NwE_ClE_Cl,
                     w::VecNum, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
@@ -412,8 +412,8 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::NwE_HClE_HCl, w::VecNum, pr::AbstractPriorResult;
-                         dims::Int = 1, kwargs...)
+function asset_phylogeny(cle::NwE_ClE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
+                         kwargs...)
     return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
 end
 """

@@ -1,4 +1,6 @@
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
+"""
+"""
 struct ImpliedVolatilityRegression{T1, T2,
                                    #    T3 <: AbstractStepwiseRegressionCriterion,
                                    T3} <: ImpliedVolatilityAlgorithm
@@ -18,6 +20,8 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
                                      re::AbstractRegressionTarget = LinearModel())
     return ImpliedVolatilityRegression(ve, ws, re)
 end
+"""
+"""
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 """
 """
@@ -122,4 +126,4 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
-export ImpliedVolatility
+export ImpliedVolatility, ImpliedVolatilityPremium, ImpliedVolatilityRegression

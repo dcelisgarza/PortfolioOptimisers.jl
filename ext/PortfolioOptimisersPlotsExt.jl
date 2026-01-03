@@ -146,7 +146,7 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
                                              fig_kwargs = (; size = (600, 600)), ekwargs...)
     N = length(clr.res.order)
     nx = view(nx, clr.res.order)
-    idx = cutree(clr.res; k = clr.k)
+    idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
     dend1 = plot(clr.res; normalize = false, ylim = extrema(clr.res.heights),
@@ -197,7 +197,7 @@ function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::HClE_HCl,
     N = size(X, 1)
     X = view(X, clr.res.order, clr.res.order)
     nx = view(nx, clr.res.order)
-    idx = cutree(clr.res; k = clr.k)
+    idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
     colgrad = cgrad(hmap_theme; hmap_theme_kwargs...)

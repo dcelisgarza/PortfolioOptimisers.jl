@@ -173,25 +173,27 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::VecNum, riku::MatNum, cl::
 end
 function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::VecNum,
                                  cl::VecInt, ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk = zeros(eltype(X), length(cl), 2)
-    for ri in ris
+    N = length(ris)
+    risk = zeros(eltype(X), length(cl), 1 + N)
+    for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, riku, ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl))
         risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += ri.settings.scale * sca.gamma * view(risk, :, 1)
+        risk[:, 1 + i] = ri.settings.scale * sca.gamma * view(risk, :, 1)
     end
-    return log.(exp.(view(risk, :, 2))) / sca.gamma
+    return LogExpFunctions.logsumexp(view(risk, :, 2:N); dims = 2) / sca.gamma
 end
 function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::MatNum,
                                  cl::VecInt, ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk = zeros(eltype(X), length(cl), 2)
+    N = length(ris)
+    risk = zeros(eltype(X), length(cl), 1 + N)
     for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl, i))
         risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += ri.settings.scale * sca.gamma * view(risk, :, 1)
+        risk[:, 1 + i] += ri.settings.scale * sca.gamma * view(risk, :, 1)
     end
-    return log.(exp.(view(risk, :, 2))) / sca.gamma
+    return LogExpFunctions.logsumexp(view(risk, :, 2:N); dims = 2) / sca.gamma
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
@@ -413,7 +415,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     pr = prior(hec.opt.pe, rd; dims = dims)
     clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
-    idx = Clustering.cutree(clr.res; k = clr.k)
+    idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, fees = herc_risk(hec, pr, cls)
     nd = to_tree(clr.res)[2]

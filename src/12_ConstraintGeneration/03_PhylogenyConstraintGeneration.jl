@@ -52,7 +52,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pe::NwE_HClE_HCl = NetworkEstimator(),
+                                   pe::NwE_ClE_Cl = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -101,12 +101,12 @@ SemiDefinitePhylogenyEstimator
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pe::NwE_HClE_HCl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pe::NwE_ClE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pe), typeof(p)}(pe, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pe::NwE_HClE_HCl = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(),
                                         p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
@@ -273,7 +273,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 # Constructor
 
     IntegerPhylogenyEstimator(;
-                              pe::NwE_HClE_HCl = NetworkEstimator(),
+                              pe::NwE_ClE_Cl = NetworkEstimator(),
                               B::Int_VecInt = 1,
                               scale::Number = 100_000.0)
 
@@ -327,7 +327,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
     pe::T1
     B::T2
     scale::T3
-    function IntegerPhylogenyEstimator(pe::NwE_HClE_HCl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pe::NwE_ClE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pe, B)
@@ -335,8 +335,8 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pe::NwE_HClE_HCl = NetworkEstimator(),
-                                   B::Int_VecInt = 1, scale::Number = 100_000.0)
+function IntegerPhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
+                                   scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
 """

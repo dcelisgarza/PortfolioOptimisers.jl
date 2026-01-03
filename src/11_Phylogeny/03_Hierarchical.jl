@@ -444,7 +444,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     N = size(dist, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
-    cluster_lvls = [Clustering.cutree(res; k = i) for i in 1:c1]
+    cluster_lvls = [Clustering.cutree(res; k = k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
@@ -501,4 +501,5 @@ function get_clustering_indices(clr::Clusters{<:Clustering.Hclust, <:Any, <:Any,
     return Clustering.cutree(clr.res; k = clr.k)
 end
 
-export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters
+export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters,
+       get_clustering_indices
