@@ -127,17 +127,11 @@ function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
 function factory(re::LinearModel, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    kwargs = re.kwargs
-    if !isnothing(w)
-        kwargs = if !haskey(kwargs, :wts)
-            (kwargs..., wts = w)
-        else
-            ks = setdiff(keys(kwargs), (:wts,))
-            NamedTuple{Tuple(union(ks, (:wts,)))}(((getproperty(kwargs, k) for k in ks)...,
-                                                   w))
-        end
+    return if !isnothing(w)
+        LinearModel(; kwargs = (; re.kwargs..., wts = w))
+    else
+        re
     end
-    return LinearModel(; kwargs = kwargs)
 end
 """
     StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
@@ -213,17 +207,11 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
 end
 function factory(re::GeneralisedLinearModel,
                  w::Option{<:StatsBase.AbstractWeights} = nothing)
-    kwargs = re.kwargs
-    if !isnothing(w)
-        kwargs = if !haskey(kwargs, :wts)
-            (kwargs..., wts = w)
-        else
-            ks = setdiff(keys(kwargs), (:wts,))
-            NamedTuple{Tuple(union(ks, (:wts,)))}(((getproperty(kwargs, k) for k in ks)...,
-                                                   w))
-        end
+    return if !isnothing(w)
+        GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., wts = w))
+    else
+        re
     end
-    return GeneralisedLinearModel(; args = re.args, kwargs = kwargs)
 end
 """
     StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)

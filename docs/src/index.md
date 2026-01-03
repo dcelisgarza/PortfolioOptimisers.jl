@@ -264,6 +264,40 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
   - Detoning [`Detone`](@ref), [`detone!`](@ref), [`detone`](@ref)
   - Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing`](@ref), [`DenoiseDetoneAlg`](@ref), [`DenoiseAlgDetone`](@ref), [`DetoneDenoiseAlg`](@ref), [`DetoneAlgDenoise`](@ref), [`AlgDenoiseDetone`](@ref), [`AlgDetoneDenoise`](@ref)
 
+### Regression Models
+
+Factor models and implied volatility use regression in their estimation. Regressions return a [`Regression`](@ref) via `regression(estimator, X, Y)`.
+
+#### Regression targets
+
+  - Linear model [`LinearModel`](@ref)
+  - Generalised linear model [`GeneralisedLinearModel`](@ref)
+
+#### Regression types
+
+  - Stepwise [`StepwiseRegression`](@ref)
+    
+      + Algorithms
+        
+          * Forward [`Forward`](@ref)
+          * Backward [`Backward`](@ref)
+    
+      + Selection criteria
+        
+          * P-value [`PValue`](@ref)
+          * Akaike information criteria [`AIC`](@ref)
+          * Corrected Akaike information criteria [`AICC`](@ref)
+          * Bayesian information criteria [`BIC`](@ref)
+          * R-squared [`RSquared`](@ref)
+          * Adjusted R-squared criteria [`AdjustedRSquared`](@ref)
+
+  - Dimensional reduction with custom mean and variance estimators [`DimensionalReductionRegression`](@ref)
+    
+      + Dimensional reduction targets
+        
+          * Principal component [`PCA`](@ref)
+          * Probabilistic principal component [`PPCA`](@ref)
+
 ### Moment Estimation
 
 #### [Expected Returns](@id readme-expected-returns)
@@ -376,7 +410,7 @@ Implements `cokurtosis(estimator, X; kwargs...)`.
       + Full cokurtosis [`Full`](@ref)
       + Semi (downside) cokurtosis [`Semi`](@ref)
 
-### Distance Matrices
+### Distance matrices
 
 Implements `distance(estimator, X; kwargs...)`, `distance(distance_estimator, covariance_estimator, X; kwargs...)`, `cor_and_dist(distance_estimator, covariance_estimator, X; kwargs...)`.
 
@@ -448,12 +482,12 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 
 ##### Traditional Optimisation Features
 
-  - Objective Functions
+  - Objective functions
     
-      + Minimum Risk
-      + Maximum Utility
-      + Maximum Return Over Risk Ratio
-      + Maximum Return
+      + Minimum risk
+      + Maximum utility
+      + Maximum return over risk ratio
+      + Maximum return
       + Custom
 
   - Fees
@@ -472,10 +506,18 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
     
       + L1
       + L2
-  - Weight Constraints
-  - Budget Constraints
+  - Weight
+  - Budget
+  - Phylogeny
+  - Cardinality
+    
+      + Asset
+      + Asset group
+      + Set
+      + Set group
+  - Buy-in threshold
 
-#### Clustering
+#### [Clustering](@id readme-clustering-opt)
 
   - Hierarchical Risk Parity
   - Hierarchical Equal Risk Parity
@@ -486,132 +528,32 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 
   - Stacking
 
-#### Finite Allocation
+#### Finite allocation
 
   - Discrete
   - Greedy
 
-### Price data
+### Risk measures
 
-Every optimisation but the finite allocation work off of returns data. Some optimisations may use price data in the future.
+#### Ordered weights arrays and linear moments
 
-  - Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
-  - Computing them, validating and cleaning up data.
+Some risk measures including linear moments may be formulated using ordered weights arrays.
 
-### Co-moment matrix processing
-
-Price data is often noisy and follows general macroeconomic trends. Every optimisation model is at risk of overfitting the data. In particular, those which rely on summary statistics (moments) can be overly sensitive to the input data, for example a covariance matrix. It is therefore important to have methods that increase the robustness of their estimation.
-
-  - Positive definite projection.
-
-  - Matrix denoising.
     
-      + Spectral, shrunk, fixed.
-  - Matrix detoning.
-
-### Moment estimation
-
-Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
-
-  - Expected returns.
-    
-      + Arithmetic expected returns.
-    
-      + Shrunk expected returns.
-        
-          * James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
-      + Equilibrium expected returns.
-      + Excess expected returns.
-
-  - Variance.
-  - Covariance/Correlation matrix.
-    
-      + Custom: estimator + processing pipeline.
-    
-      + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
-        
-          * Full.
-          * Semi.
-      + Gerber.
-        
-          * Gerber 0, 1, 2. Standardised and unstandardised.
-      + Smyth-Broby.
-        
-          * Smyth-Broby 0, 1, 2. Standardised and unstandardised.
-          * Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
-      + Distance covariance.
-      + Lower tail dependence.
-      + Kendall.
-      + Spearman.
-      + Mutual information.
-        
-          * Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-      + Denoised.
-      + Detoned.
-      + Custom algorithm.
-      + Coskewness.
-        
-          * Full.
-          * Semi.
-      + Cokurtosis.
-        
-          * Full.
-          * Semi.
-      + Implied volatility.
-
-### Regression Models
-
-Factor models and implied volatility use regression in their estimation.
-
-  - Stepwise.
-    
-      + Forward and Backward.
-        
-          * P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
-
-  - Dimensional reduction.
-    
-      + Principal Component.
-      + Probabilistic Principal Component.
-
-### Ordered weights array and Linear moments
-
-  - Ordered weights arrays.
-    
-      + Gini Mean Difference.
-      + Conditional Value at Risk.
-      + Weighted Conditional Value at Risk.
-      + Tail Gini.
-      + Worst Realisation.
-      + Range.
-      + Conditional Value at Risk Range.
-      + Weighted Conditional Value at Risk Range.
-      + Tail Gini Range.
-
+  - Gini Mean Difference.
+  - Conditional Value at Risk.
+  - Weighted Conditional Value at Risk.
+  - Tail Gini.
+  - Worst Realisation.
+  - Range.
+  - Conditional Value at Risk Range.
+  - Weighted Conditional Value at Risk Range.
+  - Tail Gini Range.
   - Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
     
       + Normalised Constant Relative Risk Aversion.
       + Minimum Squared Distance.
       + Minimum Sum Squares.
-
-### Distance Matrices
-
-Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
-
-  - Distance: these compare pairwise relationships.
-  - Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
-
-Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
-
-  - Simple.
-
-  - Absolute.
-  - Logarithmic.
-  - Correlation.
-  - Variation of Information.
-    
-      + Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-  - Canonical: depends on the covariance/correlation estimator used.
 
 ### Phylogeny
 
