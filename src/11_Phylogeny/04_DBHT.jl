@@ -1938,6 +1938,8 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     posdef!(je.pdm, sigma)
     return nothing
 end
+"""
+"""
 function logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     sigma = copy(sigma)
     logo!(je, sigma, X; dims = dims, kwargs...)

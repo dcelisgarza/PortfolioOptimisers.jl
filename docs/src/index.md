@@ -459,7 +459,11 @@ Many optimisations and constraints use prior statistics implemented via `prior(e
 
   - High order prior [`HighOrderPriorEstimator`](@ref) and [`HighOrderPrior`](@ref)
 
-### Clustering
+### Phylogeny
+
+`PortfolioOptimisers.jl` can make use of asset relationships to perform optimisations, define constraints, and compute relatedness characteristics of portfolios.
+
+#### Clustering
 
 Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and `clusterise(estimator, X; kwargs...)` [`clusterise`](@ref). Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
@@ -469,30 +473,51 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
       + Silhouette scores [`SilhouetteScore`](@ref)
       + Predefined number of clusters.
 
-#### Hierarchical
+##### Hierarchical
 
   - Hierarchical clustering [`HClustAlgorithm`](@ref)
   - Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`](@ref)
 
-#### Non hierachical
+##### Non hierachical
 
-[`NestedClustered`](@ref) optimisations don't require relationship information only clustering assignments, so non hierarchical clustering algorithms are also compatible.
+Non hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`](@ref) optimisations.
 
   - K-means clustering [`KMeansAlgorithm`](@ref)
 
-### Phylogeny
+#### Networks
 
-`PortfolioOptimisers.jl` can make use of asset relationships to define constraints and compute relatedness characteristics of portfolios.
+##### Adjacency matrices
 
-  - Phylogeny matrices.
+Adjacency matrices encode asset relationships either with clustering or graph theory via [`PhylogenyResult`](@ref) `phylogeny_matrix(estimator, X; kwargs...)` [`phylogeny_matrix`](@ref).
+
+  - Network adjacency [`NetworkEstimator`](@ref) with custom tree algorithms, covariance, and distance estimators
     
-      + Network (Minimum Spanning Tree) adjacency.
-      + Clustering adjacency.
-
-  - Centrality vectors and average centrality.
+      + Minimum spanning trees [`KruskalTree`](@ref), [`BoruvkaTree`](@ref), [`PrimTree`](@ref)
     
-      + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
-  - Asset phylogeny score.
+      + Triangulated Maximally Filtered Graph with various similarity matrix estimators
+        
+          * Maximum distance similarity [`MaximumDistanceSimilarity`](@ref)
+          * Exponential similarity [`ExponentialSimilarity`](@ref)
+          * General exponential similarity [`GeneralExponentialSimilarity`](@ref)
+
+  - Clustering adjacency [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
+
+##### Centrality and phylogeny measures
+
+Centrality measures how important each asset is with respect to other assets. The average centrality measures the concentration of a portfolio on central assets. The asset phylogeny measures the degree of phylogenetic structure in the portfolio, unlike average centrality it captures information about the entire relationship structure rather than how centralised a portfolio is. They are implemented as `centrality_vector(network_cluster_estimator, centrality_algorithm, X; kwargs...)`, `centrality_vector(centrality_estimator, X; kwargs...)`, `centrality_vector(network_cluster_estimator, centrality_algorithm, w, X; kwargs...)`, `centrality_vector(centrality_estimator, w, X; kwargs...)`, `asset_phylogeny(w, X)`, `asset_phylogeny(phylogeny_result, w, args...; kwargs...)`, `asset_phylogeny(network_cluster_estimator, w, X; kwargs...)` [`centrality_vector`](@ref) [`average_centrality`](@ref) [`asset_phylogeny`](@ref)
+
+  - Centrality estimator [`CentralityEstimator`](@ref) with custom adjacency matrix estimators (clustering and network) and centrality measures
+    
+      + Centrality measures
+        
+          * Betweenness [`BetweennessCentrality`](@ref)
+          * Closeness [`ClosenessCentrality`](@ref)
+          * Degree [`DegreeCentrality`](@ref)
+          * Eigenvector [`EigenvectorCentrality`](@ref)
+          * Katz [`KatzCentrality`](@ref)
+          * Pagerank [`Pagerank`](@ref)
+          * Radiality [`RadialityCentrality`](@ref)
+          * Stress [`StressCentrality`](@ref)
 
 ### Portfolio Optimisation
 
