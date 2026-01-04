@@ -323,6 +323,9 @@ function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum,
     if isnothing(isigma)
         isigma = sigma \ LinearAlgebra.I
     end
+    if isone(size(mu, 1))
+        mu = vec(mu)
+    end
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
@@ -378,9 +381,13 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    T, N = isone(dims) ? size(X) : reverse(size(X))
+    T, N = size(X)
+    flag = isone(dims)
+    if !flag
+        N, T = T, N
+    end
     b = target_mean(me.alg.tgt, mu, sigma; T = T)
-    if isone(dims)
+    if flag
         b = transpose(b)
     end
     evals = LinearAlgebra.eigvals(sigma)
@@ -393,10 +400,14 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    T, N = isone(dims) ? size(X) : reverse(size(X))
+    T, N = size(X)
+    flag = isone(dims)
+    if !flag
+        N, T = T, N
+    end
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
-    if isone(dims)
+    if flag
         b = transpose(b)
     end
     mb = vec(mu - b)
@@ -407,10 +418,14 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
                          X::MatNum; dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    T, N = isone(dims) ? size(X) : reverse(size(X))
+    T, N = size(X)
+    flag = isone(dims)
+    if !flag
+        N, T = T, N
+    end
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
-    if isone(dims)
+    if flag
         b = transpose(b)
         vm = vec(mu)
         vb = vec(b)
