@@ -1,3 +1,24 @@
+function coskewness_residuals(X::MatNum, w::Option(<:AbstractWeights))
+    N = size(X, 2)
+    N2 = N^2
+    X3 = if isnothing(w)
+        Statistics.mean(X .^ 3; dims = 1)
+    else
+        Statistics.mean(X .^ 3, w; dims = 1)
+    end
+    sk_err = zeros(N, N2)
+    for j in axes(sk_err, 1)
+        for k in axes(sk_err, 1)
+            col = (j - 1) * N + k
+            for i in axes(sk_err, 1)
+                if i == j == k
+                    sk_err[i, col] = X3[i]
+                end
+            end
+        end
+    end
+    return nothing
+end
 struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_F
     pe::T1
