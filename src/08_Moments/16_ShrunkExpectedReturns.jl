@@ -378,10 +378,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    T, N = size(X)
-    if !isone(dims)
-        N, T = T, N
-    end
+    T, N = isone(dims) ? size(X) : reverse(size(X))
     b = target_mean(me.alg.tgt, mu, sigma; T = T)
     if isone(dims)
         b = transpose(b)
@@ -396,10 +393,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    T, N = size(X)
-    if !isone(dims)
-        N, T = T, N
-    end
+    T, N = isone(dims) ? size(X) : reverse(size(X))
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
     if isone(dims)
@@ -413,10 +407,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
                          X::MatNum; dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
-    T, N = size(X)
-    if !isone(dims)
-        N, T = T, N
-    end
+    T, N = isone(dims) ? size(X) : reverse(size(X))
     isigma = sigma \ LinearAlgebra.I
     b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
     if isone(dims)
