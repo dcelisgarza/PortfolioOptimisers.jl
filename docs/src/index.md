@@ -266,7 +266,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
 ### Regression Models
 
-Factor models and implied volatility use regression in their estimation. Regressions return a [`Regression`](@ref) via `regression(estimator, X, Y)` [`regression`](@ref).
+Factor prior models and implied volatility use [`regression`](@ref) in their estimation, which return a [`Regression`](@ref) object.
 
 #### Regression targets
 
@@ -302,7 +302,7 @@ Factor models and implied volatility use regression in their estimation. Regress
 
 #### [Expected Returns](@id readme-expected-returns)
 
-Overloads `Statistics.mean` as `mean(estimator, X; kwargs...)`.
+Overloads `Statistics.mean`.
 
   - Optionally weighted expected returns [`SimpleExpectedReturns`](@ref)
 
@@ -324,13 +324,13 @@ Overloads `Statistics.mean` as `mean(estimator, X; kwargs...)`.
 
 #### [Variance and Standard Deviation](@id readme-variance)
 
-Overloads `Statistics.var` and `Statistics.std` as `var(estimator, X; kwargs...)` and `std(estimator, X; kwargs...)`
+Overloads `Statistics.var` and `Statistics.std`.
 
   - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`](@ref)
 
 #### [Covariance and Correlation](@id readme-covariance-correlation)
 
-Overloads `Statistics.cov` and `Statistics.cor` as `cov(estimator, X; kwargs...)` and `cor(estimator, X; kwargs...)`.
+Overloads `Statistics.cov` and `Statistics.cor`.
 
   - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](@ref)
 
@@ -397,7 +397,7 @@ Overloads `Statistics.cov` and `Statistics.cor` as `cov(estimator, X; kwargs...)
 
 #### [Coskewness](@id readme-coskewness)
 
-Implements `coskewness(estimator, X; kwargs...)` [`coskewness`](@ref).
+Implements [`coskewness`](@ref).
 
   - Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
     
@@ -406,7 +406,7 @@ Implements `coskewness(estimator, X; kwargs...)` [`coskewness`](@ref).
 
 #### [Cokurtosis](@id readme-cokurtosis)
 
-Implements `cokurtosis(estimator, X; kwargs...)` [`cokurtosis`](@ref).
+Implements [`cokurtosis`](@ref).
 
   - Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
     
@@ -415,7 +415,7 @@ Implements `cokurtosis(estimator, X; kwargs...)` [`cokurtosis`](@ref).
 
 ### Distance matrices
 
-Implements `distance(estimator, X; kwargs...)`, `distance(distance_estimator, covariance_estimator, X; kwargs...)`, `cor_and_dist(distance_estimator, covariance_estimator, X; kwargs...)` [`distance`](@ref) and [`cor_and_dist`](@ref).
+Implements [`distance`](@ref) and [`cor_and_dist`](@ref).
 
   - First order distance estimator with custom distance algorithm, and optional exponent [`Distance`](@ref)
   - Second order distance estimator with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent [`DistanceDistance`](@ref)
@@ -441,7 +441,7 @@ The distance estimators are used together with various distance matrix algorithm
 
 ### Prior statistics
 
-Many optimisations and constraints use prior statistics implemented via `prior(estimator, returns_data; kwargs...)` [`prior`](@ref).
+Many optimisations and constraints use prior statistics computed via [`prior`](@ref).
 
   - Low order prior [`LowOrderPrior`](@ref)
     
@@ -465,7 +465,7 @@ Many optimisations and constraints use prior statistics implemented via `prior(e
 
 #### Clustering
 
-Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and `clusterise(estimator, X; kwargs...)` [`clusterise`](@ref). Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and [`clusterise`](@ref). Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
   - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
     
@@ -488,7 +488,7 @@ Non hierarchical clustering algorithms are incompatible with hierarchical cluste
 
 ##### Adjacency matrices
 
-Adjacency matrices encode asset relationships either with clustering or graph theory via [`PhylogenyResult`](@ref) `phylogeny_matrix(estimator, X; kwargs...)` [`phylogeny_matrix`](@ref).
+Adjacency matrices encode asset relationships either with clustering or graph theory via [`phylogeny_matrix`](@ref) and [`PhylogenyResult`](@ref).
 
   - Network adjacency [`NetworkEstimator`](@ref) with custom tree algorithms, covariance, and distance estimators
     
@@ -504,8 +504,6 @@ Adjacency matrices encode asset relationships either with clustering or graph th
 
 ##### Centrality and phylogeny measures
 
-Centrality measures how important each asset is with respect to other assets. The average centrality measures the concentration of a portfolio on central assets. The asset phylogeny measures the degree of phylogenetic structure in the portfolio, unlike average centrality it captures information about the entire relationship structure rather than how centralised a portfolio is. They are implemented as `centrality_vector(network_cluster_estimator, centrality_algorithm, X; kwargs...)`, `centrality_vector(centrality_estimator, X; kwargs...)`, `centrality_vector(network_cluster_estimator, centrality_algorithm, w, X; kwargs...)`, `centrality_vector(centrality_estimator, w, X; kwargs...)`, `asset_phylogeny(w, X)`, `asset_phylogeny(phylogeny_result, w, args...; kwargs...)`, `asset_phylogeny(network_cluster_estimator, w, X; kwargs...)` [`centrality_vector`](@ref) [`average_centrality`](@ref) [`asset_phylogeny`](@ref)
-
   - Centrality estimator [`CentralityEstimator`](@ref) with custom adjacency matrix estimators (clustering and network) and centrality measures
     
       + Centrality measures
@@ -518,6 +516,10 @@ Centrality measures how important each asset is with respect to other assets. Th
           * Pagerank [`Pagerank`](@ref)
           * Radiality [`RadialityCentrality`](@ref)
           * Stress [`StressCentrality`](@ref)
+
+  - Centrality vector [`centrality_vector`](@ref)
+  - Average centrality [`average_centrality`](@ref)
+  - The asset phylogeny score [`asset_phylogeny`](@ref)
 
 ### Portfolio Optimisation
 
