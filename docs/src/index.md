@@ -244,6 +244,10 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
 
 This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
+!!! info
+    
+    This section is under active development.
+
 ## Features
 
 ### Preprocessing
@@ -463,7 +467,24 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
 ### Uncertainty sets
 
-Traditional optimisations can use uncertainty sets to relax expected returns and covariance
+These sets can be used to make some optimisations more robust. Namely, there exist uncertainty sets on expected returns and covariance. They can be used on any optimisation which uses any one of these quantities.
+
+  - Box.
+    
+      + Delta.
+    
+      + Normally distributed returns.
+      + Autoregressive Conditional Heteroskedasticity.
+        
+          * Circular, moving, stationary bootstrap.
+
+  - Ellipse uncertainty sets.
+    
+      + Normally distributed returns.
+    
+      + Autoregressive Conditional Heteroskedasticity.
+        
+          * Circular, moving, stationary bootstrap.
 
 ### Phylogeny
 
@@ -578,6 +599,18 @@ Adjacency matrices encode asset relationships either with clustering or graph th
       + L2
   - Weight
   - Budget
+  - Turnover
+  - Tracking
+    
+      + Returns
+        
+          * L1-error
+          * L2-error
+    
+      + Risk
+        
+          * Independent variable
+          * Dependent variable
   - Phylogeny
   - Cardinality
     
@@ -624,45 +657,6 @@ Some risk measures including linear moments may be formulated using ordered weig
       + Normalised Constant Relative Risk Aversion.
       + Minimum Squared Distance.
       + Minimum Sum Squares.
-
-### Uncertainty sets
-
-These sets can be used to make some optimisations more robust. Namely, there exist uncertainty sets on expected returns and covariance. They can be used on any optimisation which uses any one of these quantities.
-
-  - Box.
-    
-      + Delta.
-    
-      + Normally distributed returns.
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
-
-  - Ellipse uncertainty sets.
-    
-      + Normally distributed returns.
-    
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
-
-### Turnover (Rebalancing)
-
-These penalise moving away from a benchmark vector of weights.
-
-  - Risk measure (experimental).
-  - Constraints.
-  - Fees.
-
-### Fees
-
-These encode various types of fees, which can be used in portfolio optimisation and analysis.
-
-  - Relative long.
-  - Relative short
-  - Fixed long.
-  - Fixed short.
-  - Turnover (rebalance).
 
 ### Tracking
 
@@ -790,39 +784,6 @@ These are used to summarise a portfolio's risk and return characteristics.
     
       + Asset risk contribution.
       + Factor risk contribution.
-
-### Optimisation
-
-There are many different optimisation methods, each with different characteristics and configurable options, including exclusive constraint types and risk measures. Though all of them have an optional fallback method in case the optimisation fails.
-
-  - Clustering.
-    
-      + Hierarchical Risk Parity.
-      + Hierarchical Equal Risk Contribution.
-      + Nested Clustered Optimisation.
-      + Schur Complement Hierarchical Risk Parity.
-
-  - `JuMP`-based.
-    
-      + Mean Risk.
-    
-      + Factor Risk Contribution.
-      + Near Optimal Centering.
-      + Risk Budgeting.
-        
-          * Asset risk budgeting.
-          * Factor risk budgeting.
-      + Relaxed Risk Budgeting.
-  - Stacking.
-  - Naive.
-    
-      + Inverse volatility.
-      + Equal weighted.
-      + Random weighted.
-  - Finite Allocation.
-    
-      + Discrete.
-      + Greedy.
 
 ### Optimisation constraints
 
