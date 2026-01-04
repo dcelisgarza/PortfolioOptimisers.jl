@@ -1,4 +1,4 @@
-# Clustering
+# Clusters
 
 ```@docs
 Clusters

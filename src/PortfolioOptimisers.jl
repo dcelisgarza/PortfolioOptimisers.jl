@@ -39,7 +39,7 @@ end PortfolioOptimisers
 
 #=
 src_files = String[]
-sizehint!(src_files, 142)
+sizehint!(src_files, 144)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files
         if file == "PortfolioOptimisers.jl"
@@ -83,12 +83,14 @@ include("08_Moments/21_Base_Regression.jl")
 include("08_Moments/22_StepwiseRegression.jl")
 include("08_Moments/23_DimensionReductionRegression.jl")
 include("08_Moments/24_ImpliedVolatility.jl")
+include("08_Moments/25_StandardDeviationExpectedReturns.jl")
+include("08_Moments/26_CorrelationCovariance.jl")
 include("09_Distance/01_Base_Distance.jl")
 include("09_Distance/02_Distance.jl")
 include("09_Distance/03_DistanceDistance.jl")
 include("10_JuMPModelOptimisation.jl")
 include("11_Phylogeny/01_Base_Phylogeny.jl")
-include("11_Phylogeny/02_Clustering.jl")
+include("11_Phylogeny/02_Clusters.jl")
 include("11_Phylogeny/03_Hierarchical.jl")
 include("11_Phylogeny/04_DBHT.jl")
 include("11_Phylogeny/05_NonHierarchicalClustering.jl")

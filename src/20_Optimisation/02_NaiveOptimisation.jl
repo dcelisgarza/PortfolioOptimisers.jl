@@ -57,25 +57,26 @@ function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...
     return NaiveOptimisation(typeof(ew), nothing, range(iN, iN; length = N),
                              OptimisationSuccess(nothing), nothing)
 end
-struct RandomWeighted{T1} <: NaiveOptimisationEstimator
+struct RandomWeighted{T1, T2} <: NaiveOptimisationEstimator
     rng::T1
-    function RandomWeighted(rng::Option{<:Random.AbstractRNG})
-        return new{typeof(rng)}(rng)
+    seed::T2
+    function RandomWeighted(rng::Random.AbstractRNG, seed::Option{<:Integer})
+        return new{typeof(rng), typeof(seed)}(rng, seed)
     end
 end
-function RandomWeighted(; rng::Option{<:Random.AbstractRNG} = nothing)
-    return RandomWeighted(rng)
+function RandomWeighted(; rng::Random.AbstractRNG = Random.default_rng(),
+                        seed::Option{<:Integer} = nothing)
+    return RandomWeighted(rng, seed)
 end
 function optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X))
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
-    N = size(rd.X, dims)
-    w = if isnothing(rw.rng)
-        rand(Distributions.Dirichlet(N, 1))
-    else
-        rand(rw.rng, Distributions.Dirichlet(N, 1))
+    dist = Distributions.Dirichlet(size(rd.X, dims), 1)
+    if !isnothing(rw.seed)
+        Random.seed!(rw.rng, rw.seed)
     end
+    w = rand(rw.rng, dist)
     return NaiveOptimisation(typeof(rw), nothing, w, OptimisationSuccess(nothing), nothing)
 end
 

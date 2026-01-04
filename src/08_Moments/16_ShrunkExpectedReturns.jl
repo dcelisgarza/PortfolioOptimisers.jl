@@ -284,7 +284,7 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum;
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum, args...;
                 kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
@@ -314,19 +314,20 @@ Compute the shrinkage target vector for expected returns estimation.
   - [`MeanSquaredError`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
-function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum; kwargs...)
+function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum, args...; kwargs...)
     val = Statistics.mean(mu)
     return range(val, val; length = length(mu))
 end
-function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum; isigma = nothing,
-                     kwargs...)
+function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum,
+                     isigma::Option{<:MatNum} = nothing; kwargs...)
     if isnothing(isigma)
         isigma = sigma \ LinearAlgebra.I
     end
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
-function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum; T::Integer, kwargs...)
+function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum, args...; T::Integer,
+                     kwargs...)
     val = LinearAlgebra.tr(sigma) / T
     return range(val, val; length = length(mu))
 end
@@ -378,10 +379,9 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
-    b = if isone(dims)
-        transpose(target_mean(me.alg.tgt, transpose(mu), sigma; T = T))
-    else
-        target_mean(me.alg.tgt, mu, sigma; T = T)
+    b = target_mean(me.alg.tgt, mu, sigma; T = T)
+    if isone(dims)
+        b = transpose(b)
     end
     evals = LinearAlgebra.eigvals(sigma)
     mb = mu - b
@@ -395,10 +395,9 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
     isigma = sigma \ LinearAlgebra.I
-    b = if isone(dims)
-        transpose(target_mean(me.alg.tgt, transpose(mu), sigma; isigma = isigma, T = T))
-    else
-        target_mean(me.alg.tgt, mu, sigma; isigma = isigma, T = T)
+    b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
+    if isone(dims)
+        b = transpose(b)
     end
     mb = vec(mu - b)
     alpha = (N + 2) / ((N + 2) + T * LinearAlgebra.dot(mb, isigma, mb))
@@ -410,14 +409,18 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
     isigma = sigma \ LinearAlgebra.I
-    b = if isone(dims)
-        transpose(target_mean(me.alg.tgt, transpose(mu), sigma; isigma = isigma, T = T))
+    b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
+    if isone(dims)
+        b = transpose(b)
+        vm = vec(mu)
+        vb = vec(b)
     else
-        target_mean(me.alg.tgt, mu, sigma; isigma = isigma, T = T)
+        vm = mu
+        vb = b
     end
-    u = LinearAlgebra.dot(reshape(mu, :, 1), isigma, reshape(mu, :, 1))
-    v = LinearAlgebra.dot(reshape(b, :, 1), isigma, reshape(b, :, 1))
-    w = LinearAlgebra.dot(reshape(mu, :, 1), isigma, reshape(b, :, 1))
+    u = LinearAlgebra.dot(vm, isigma, vm)
+    v = LinearAlgebra.dot(vb, isigma, vb)
+    w = LinearAlgebra.dot(vm, isigma, vb)
     alpha = (u - N / (T - N)) * v - w^2
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u

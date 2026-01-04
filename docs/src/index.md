@@ -321,6 +321,7 @@ Overloads `Statistics.mean`.
           * Grand Mean [`GrandMean`](@ref)
           * Volatility Weighted [`VolatilityWeighted`](@ref)
           * Mean Squared Error [`MeanSquaredError`](@ref)
+  - Standard deviation expected returns [`StandardDeviationExpectedReturns`](@ref)
 
 #### [Variance and Standard Deviation](@id readme-variance)
 
@@ -394,6 +395,7 @@ Overloads `Statistics.cov` and `Statistics.cor`.
       + Premium [`ImpliedVolatilityPremium`](@ref)
       + Regression [`ImpliedVolatilityRegression`](@ref)
   - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
+  - Correlation covariance [`CorrelationCovariance`](@ref)
 
 #### [Coskewness](@id readme-coskewness)
 
@@ -459,6 +461,10 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
   - High order prior [`HighOrderPriorEstimator`](@ref) and [`HighOrderPrior`](@ref)
 
+### Uncertainty sets
+
+Traditional optimisations can use uncertainty sets to relax expected returns and covariance
+
 ### Phylogeny
 
 `PortfolioOptimisers.jl` can make use of asset relationships to perform optimisations, define constraints, and compute relatedness characteristics of portfolios.
@@ -521,7 +527,7 @@ Adjacency matrices encode asset relationships either with clustering or graph th
   - Average centrality [`average_centrality`](@ref)
   - The asset phylogeny score [`asset_phylogeny`](@ref)
 
-### Portfolio Optimisation
+### Portfolio optimisation
 
 #### Naïve
 
