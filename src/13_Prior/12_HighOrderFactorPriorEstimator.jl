@@ -1,18 +1,12 @@
-function coskewness_residuals(X::MatNum, w::Option{<:StatsBase.AbstractWeights})
+function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     N = size(X, 2)
     N2 = N^2
-    X3 = if isnothing(w)
-        Statistics.mean(X .^ 3; dims = 1)
-    else
-        Statistics.mean(X .^ 3, w; dims = 1)
-    end
-    sk_err = zeros(N, N2)
+    sk_err = SparseArrays.spzeros(N, N2)
     idx = 1:(N2 + N + 1):(N2 * N)
-    for (i, j) in enumerate(idx)
-        sk_err[j] = X3[i]
-    end
+    sk_err[idx] .= vec(Statistics.mean(me, X .^ 3; dims = 1))
     return sk_err
 end
+function cokurtosis_residuals end
 struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_F
     pe::T1
@@ -94,17 +88,26 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             kM = kron(M, M)
         end
         posterior_sk = M * f_sk * transpose(kM)
-        posterior_V = __coskewness(posterior_sk, X, pe.ske.mp)
-        posterior_cV = M * LinearAlgebra.cholesky(f_V).L
     else
-        posterior_sk, posterior_V, posterior_cV = nothing, nothing, nothing
+        posterior_sk, posterior_V = nothing, nothing
     end
     if pe.rsd
         err = X - posterior_X
-        err_sigma = vec(Statistics.var(pe.ve, err; dims = 1))
-        posterior_sigma[1:(N + 1):end] .+= err_sigma
+        err_sigma = diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
+        posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
+        if !isnothing(f_sk)
+            posterior_sk .+= coskewness_residuals(err, pe.ske.me)
+        end
+        if !isnothing(f_kt)
+            err_kt = cokurtosis_residuals()
+            posterior_kt .+= err_kt
+            posterior_ckt = hcat(posterior_ckt, err_kt .^ 0.25)
+        end
         #! Add residuals of higher moments.
+    end
+    if !isnothing(f_sk)
+        posterior_V = __coskewness(posterior_sk, posterior_X, pe.ske.mp)
     end
     pr = LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                        chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
@@ -121,12 +124,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
                               transpose(reshape(posterior_ckt, size(posterior_ckt, 1), :))
                           end,
                           f_sk = f_sk,
-                          f_V = f_V,
-                          V_chol = if isnothing(posterior_cV)
-                              nothing
-                          else
-                              transpose(reshape(posterior_cV, length(posterior_mu), :))
-                          end
+                          f_V = f_V
                           =#
                           )
 end
