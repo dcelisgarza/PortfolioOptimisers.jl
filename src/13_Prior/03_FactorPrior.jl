@@ -156,6 +156,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
         X = transpose(X)
         F = transpose(F)
     end
+    N = size(X, 2)
     f_prior = prior(pe.pe, F)
     f_mu, f_sigma = f_prior.mu, f_prior.sigma
     rr = regression(pe.re, X, F)
@@ -167,14 +168,13 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
     posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
     if pe.rsd
         err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
-        posterior_sigma .+= err_sigma
+        err_sigma = vec(Statistics.var(pe.ve, err; dims = 1))
+        posterior_sigma[1:(N + 1):end] .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, rr = rr, f_mu = f_mu,
-                         f_sigma = f_sigma, f_w = f_prior.w)
+                         chol = transpose(reshape(posterior_csigma, N, :)), w = f_prior.w,
+                         rr = rr, f_mu = f_mu, f_sigma = f_sigma, f_w = f_prior.w)
 end
 
 export FactorPrior
