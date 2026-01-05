@@ -297,7 +297,8 @@ function prior_view(pr::HighOrderPrior, i)
     end
     return HighOrderPrior(; pr = prior_view(pr.pr, i),
                           kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
-                          sk = sk, V = V, skmp = skmp)
+                          sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt, f_sk = pr.f_sk,
+                          f_V = pr.f_V)
 end
 function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     return if sym in propertynames(obj)

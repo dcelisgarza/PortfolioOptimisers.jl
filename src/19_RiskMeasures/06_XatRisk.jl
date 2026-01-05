@@ -129,7 +129,6 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})
     gain = -sorted_x[idx]
     return loss - gain
 end
-#! Turn into a normal risk measure and implement it as value at risk.
 struct DrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2

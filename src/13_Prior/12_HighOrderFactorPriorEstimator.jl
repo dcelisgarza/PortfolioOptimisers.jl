@@ -137,7 +137,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         #! figure out how to add chol
         # posterior_ckt = kM * LinearAlgebra.cholesky(f_kt).L
     else
-        L2, S2, posterior_kt, posterior_ckt = nothing, nothing, nothing, nothing
+        L2, S2, posterior_kt = nothing, nothing, nothing
+        # posterior_ckt = nothing
     end
     f_sk, f_V = coskewness(pe.ske, F; kwargs...)
     if !isnothing(f_sk)

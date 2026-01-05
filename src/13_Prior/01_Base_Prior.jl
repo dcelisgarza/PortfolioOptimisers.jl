@@ -650,11 +650,14 @@ HighOrderPrior
        │   f_sigma ┼ nothing
        │       f_w ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
-    L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
-    S2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    L2 ┼ 3×4 SparseMatrixCSC{Int64, Int64}
+    S2 ┼ 3×4 SparseMatrixCSC{Int64, Int64}
     sk ┼ 2×4 Matrix{Float64}
      V ┼ 2×2 Matrix{Float64}
-  skmp ┴ nothing
+  skmp ┼ nothing
+  f_kt ┼ nothing
+  f_sk ┼ nothing
+   f_V ┴ nothing
 ```
 
 # Related
@@ -664,7 +667,7 @@ HighOrderPrior
   - [`HighOrderPriorEstimator`](@ref)
   - [`prior`](@ref)
 """
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <: AbstractPriorResult
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractPriorResult
     pr::T1
     kt::T2
     L2::T3
@@ -673,14 +676,14 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <: AbstractP
     V::T6
     skmp::T7
     f_kt::T8
-    chol_kt::T9
-    f_sk::T10
-    f_V::T11
+    # chol_kt::T9
+    f_sk::T9
+    f_V::T10
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             L2::Option{<:MatNum}, S2::Option{<:MatNum},
                             sk::Option{<:MatNum}, V::Option{<:MatNum},
                             skmp::Option{<:AbstractMatrixProcessingEstimator},
-                            f_kt::Option{<:MatNum}, chol_kt::Option{<:MatNum},
+                            f_kt::Option{<:MatNum}, #chol_kt::Option{<:MatNum},
                             f_sk::Option{<:MatNum}, f_V::Option{<:MatNum})
         N = length(pr.mu)
         kt_flag = isa(kt, MatNum)
@@ -711,33 +714,26 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <: AbstractP
         if f_kt_flag || f_sk_flag
             rr = pr.rr
             @argcheck(!isnothing(rr))
-            Nfa, Nfb = size(rr.M)
+            Nf = size(rr.M, 2)
             if f_kt_flag
                 @argcheck(!isempty(f_kt))
                 # @argcheck(!isempty(chol_kt))
                 assert_matrix_issquare(f_kt, :f_kt)
-                @argcheck(Nfb^2 == size(f_kt, 1))
+                @argcheck(Nf^2 == size(f_kt, 1))
                 # @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
             end
             if f_sk_flag
                 @argcheck(!isempty(f_sk))
                 @argcheck(!isempty(f_V))
-                @argcheck(size(f_sk) == (Nfb, Nfb^2))
-                @argcheck(size(f_V) == (Nfb, Nfb))
+                @argcheck(size(f_sk) == (Nf, Nf^2))
+                @argcheck(size(f_V) == (Nf, Nf))
             end
         end
         return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
-                   typeof(skmp), typeof(f_kt), typeof(chol_kt), typeof(f_sk), typeof(f_V)}(pr,
-                                                                                           kt,
-                                                                                           L2,
-                                                                                           S2,
-                                                                                           sk,
-                                                                                           V,
-                                                                                           skmp,
-                                                                                           f_kt,
-                                                                                           chol_kt,
-                                                                                           f_sk,
-                                                                                           f_V)
+                   typeof(skmp), typeof(f_kt), #typeof(chol_kt), 
+                   typeof(f_sk), typeof(f_V)}(pr, kt, L2, S2, sk, V, skmp, f_kt,
+                                              #  chol_kt,
+                                              f_sk, f_V)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
@@ -745,9 +741,10 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
                         sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
                         skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
                         f_kt::Option{<:MatNum} = nothing,
-                        chol_kt::Option{<:MatNum} = nothing,
+                        # chol_kt::Option{<:MatNum} = nothing,
                         f_sk::Option{<:MatNum} = nothing, f_V::Option{<:MatNum} = nothing)
-    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, chol_kt, f_sk, f_V)
+    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt, 
+                          f_sk, f_V)
 end
 
 export prior, LowOrderPrior, HighOrderPrior
