@@ -93,7 +93,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     end
     if pe.rsd
         err = X - posterior_X
-        err_sigma = diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
+        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
         if !isnothing(f_sk)
@@ -104,7 +104,6 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             posterior_kt .+= err_kt
             posterior_ckt = hcat(posterior_ckt, err_kt .^ 0.25)
         end
-        #! Add residuals of higher moments.
     end
     if !isnothing(f_sk)
         posterior_V = __coskewness(posterior_sk, posterior_X, pe.ske.mp)
@@ -121,7 +120,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
                           kt_chol = if isnothing(posterior_ckt)
                               nothing
                           else
-                              transpose(reshape(posterior_ckt, size(posterior_ckt, 1), :))
+                              transpose(reshape(posterior_ckt, size(posterior_kt, 1), :))
                           end,
                           f_sk = f_sk,
                           f_V = f_V
