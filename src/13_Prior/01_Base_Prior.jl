@@ -664,7 +664,7 @@ HighOrderPrior
   - [`HighOrderPriorEstimator`](@ref)
   - [`prior`](@ref)
 """
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <: AbstractPriorResult
     pr::T1
     kt::T2
     L2::T3
@@ -672,10 +672,16 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     sk::T5
     V::T6
     skmp::T7
+    f_kt::T8
+    chol_kt::T9
+    f_sk::T10
+    f_V::T11
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             L2::Option{<:MatNum}, S2::Option{<:MatNum},
                             sk::Option{<:MatNum}, V::Option{<:MatNum},
-                            skmp::Option{<:AbstractMatrixProcessingEstimator})
+                            skmp::Option{<:AbstractMatrixProcessingEstimator},
+                            f_kt::Option{<:MatNum}, chol_kt::Option{<:MatNum},
+                            f_sk::Option{<:MatNum}, f_V::Option{<:MatNum})
         N = length(pr.mu)
         kt_flag = isa(kt, MatNum)
         L2_flag = isa(L2, MatNum)
@@ -700,15 +706,48 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
             @argcheck(size(V) == (N, N))
             @argcheck(size(sk) == (N, N^2))
         end
+        f_kt_flag = !isnothing(f_kt)
+        f_sk_flag = !isnothing(f_sk)
+        if f_kt_flag || f_sk_flag
+            rr = pr.rr
+            @argcheck(!isnothing(rr))
+            Nfa, Nfb = size(rr.M)
+            if f_kt_flag
+                @argcheck(!isempty(f_kt))
+                @argcheck(!isempty(chol_kt))
+                assert_matrix_issquare(f_kt, :f_kt)
+                @argcheck(Nfb^2 == size(f_kt, 1))
+                @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
+            end
+            if f_sk_flag
+                @argcheck(!isempty(f_sk))
+                @argcheck(!isempty(f_V))
+                @argcheck(size(f_sk) == (Nfb, Nfb^2))
+                @argcheck(size(f_V) == (Nfb, Nfb))
+            end
+        end
         return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
-                   typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
+                   typeof(skmp), typeof(f_kt), typeof(chol_kt), typeof(f_sk), typeof(f_V)}(pr,
+                                                                                           kt,
+                                                                                           L2,
+                                                                                           S2,
+                                                                                           sk,
+                                                                                           V,
+                                                                                           skmp,
+                                                                                           f_kt,
+                                                                                           chol_kt,
+                                                                                           f_sk,
+                                                                                           f_V)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
                         L2::Option{<:MatNum} = nothing, S2::Option{<:MatNum} = nothing,
                         sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
-                        skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing)
-    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
+                        skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
+                        f_kt::Option{<:MatNum} = nothing,
+                        chol_kt::Option{<:MatNum} = nothing,
+                        f_sk::Option{<:MatNum} = nothing, f_V::Option{<:MatNum} = nothing)
+    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, chol_kt, f_sk, f_V)
 end
 
 export prior, LowOrderPrior, HighOrderPrior

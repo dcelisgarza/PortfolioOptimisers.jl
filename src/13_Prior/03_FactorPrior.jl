@@ -172,8 +172,9 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)), w = f_prior.w,
-                         rr = rr, f_mu = f_mu, f_sigma = f_sigma, f_w = f_prior.w)
+                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
+                                                  :)), w = f_prior.w, rr = rr, f_mu = f_mu,
+                         f_sigma = f_sigma, f_w = f_prior.w)
 end
 
 export FactorPrior
