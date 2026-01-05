@@ -1,4 +1,4 @@
-function coskewness_residuals(X::MatNum, w::Option(<:AbstractWeights))
+function coskewness_residuals(X::MatNum, w::Option{<:StatsBase.AbstractWeights})
     N = size(X, 2)
     N2 = N^2
     X3 = if isnothing(w)
@@ -7,17 +7,11 @@ function coskewness_residuals(X::MatNum, w::Option(<:AbstractWeights))
         Statistics.mean(X .^ 3, w; dims = 1)
     end
     sk_err = zeros(N, N2)
-    for j in axes(sk_err, 1)
-        for k in axes(sk_err, 1)
-            col = (j - 1) * N + k
-            for i in axes(sk_err, 1)
-                if i == j == k
-                    sk_err[i, col] = X3[i]
-                end
-            end
-        end
+    idx = 1:(N2 + N + 1):(N2 * N)
+    for (i, j) in enumerate(idx)
+        sk_err[j] = X3[i]
     end
-    return nothing
+    return sk_err
 end
 struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_F
@@ -73,6 +67,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         X = transpose(X)
         F = transpose(F)
     end
+    N = size(X, 2)
     f_prior = prior(pe.pe, F)
     f_mu, f_sigma = f_prior.mu, f_prior.sigma
     rr = regression(pe.re, X, F)
@@ -106,8 +101,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     end
     if pe.rsd
         err = X - posterior_X
-        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
-        posterior_sigma .+= err_sigma
+        err_sigma = vec(Statistics.var(pe.ve, err; dims = 1))
+        posterior_sigma[1:(N + 1):end] .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
         #! Add residuals of higher moments.
     end
