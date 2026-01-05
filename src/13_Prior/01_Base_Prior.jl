@@ -650,8 +650,8 @@ HighOrderPrior
        │   f_sigma ┼ nothing
        │       f_w ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
-    L2 ┼ 3×4 SparseMatrixCSC{Int64, Int64}
-    S2 ┼ 3×4 SparseMatrixCSC{Int64, Int64}
+    L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    S2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
     sk ┼ 2×4 Matrix{Float64}
      V ┼ 2×2 Matrix{Float64}
   skmp ┼ nothing
