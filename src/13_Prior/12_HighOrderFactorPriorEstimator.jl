@@ -134,6 +134,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))[2:3]
         posterior_kt = kM * f_kt * transpose(kM)
         matrix_processing!(pe.kte.mp, posterior_kt, posterior_X; kwargs...)
+        #! figure out how to add chol
         posterior_ckt = kM * LinearAlgebra.cholesky(f_kt).L
     else
         L2, S2, posterior_kt, posterior_ckt = nothing, nothing, nothing, nothing

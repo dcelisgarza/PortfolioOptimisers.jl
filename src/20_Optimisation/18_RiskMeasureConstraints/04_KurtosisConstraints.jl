@@ -1,5 +1,15 @@
 function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :Gkt)
+        #=
+        #! figure u=out how to add chol
+        G = if isnothing(pr.chol_kt)
+            LinearAlgebra.cholesky(pr.S2 * pr.kt * transpose(pr.S2)).U
+        else
+            N1, N2 = size(pr.chol_kt)
+            vcat(pr.S2 * view(pr.chol_kt, 1:N2, 1:N2) * transpose(pr.S2),
+                 view(pr.chol_kt, (N2 + 1):N1, :) * transpose(pr.S2))
+        end
+        =#
         G = LinearAlgebra.cholesky(pr.S2 * pr.kt * transpose(pr.S2)).U
         JuMP.@expression(model, Gkt, G)
     end

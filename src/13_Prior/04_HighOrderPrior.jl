@@ -305,7 +305,7 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     elseif sym in propertynames(obj.pr)
         getproperty(obj.pr, sym)
     else
-        getproperty(obj, sym)
+        getfield(obj, sym)
     end
 end
 """

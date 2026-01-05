@@ -94,6 +94,7 @@ struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
     w::T2
     mu::T3
     kt::T4
+    #! add chol
     N::T5
     alg1::T6
     alg2::T7

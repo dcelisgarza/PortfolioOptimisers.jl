@@ -230,6 +230,7 @@ julia> r(w)
 struct Variance{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     sigma::T2
+    #! add chol
     rc::T3
     alg::T4
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
@@ -376,6 +377,7 @@ julia> r(w)
 struct StandardDeviation{T1, T2} <: RiskMeasure
     settings::T1
     sigma::T2
+    #! add chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
@@ -605,6 +607,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
+    #! add chol
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)
