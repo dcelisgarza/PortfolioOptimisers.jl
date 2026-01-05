@@ -135,7 +135,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         posterior_kt = kM * f_kt * transpose(kM)
         matrix_processing!(pe.kte.mp, posterior_kt, posterior_X; kwargs...)
         #! figure out how to add chol
-        posterior_ckt = kM * LinearAlgebra.cholesky(f_kt).L
+        # posterior_ckt = kM * LinearAlgebra.cholesky(f_kt).L
     else
         L2, S2, posterior_kt, posterior_ckt = nothing, nothing, nothing, nothing
     end
@@ -159,7 +159,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         if !isnothing(f_kt)
             err_kt = cokurtosis_residuals(M, f_sigma, err, pe.kte.me)
             posterior_kt .+= err_kt
-            posterior_ckt = hcat(posterior_ckt, sqrt.(err_kt))
+            # posterior_ckt = hcat(posterior_ckt, sqrt.(err_kt))
         end
     end
     if !isnothing(f_sk)
@@ -171,12 +171,14 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
                        f_w = f_prior.w)
     return HighOrderPrior(; pr = pr, kt = posterior_kt, L2 = L2, S2 = S2, sk = posterior_sk,
                           V = posterior_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp,
-                          f_kt = f_kt,
-                          chol_kt = if isnothing(f_kt)
-                              nothing
-                          else
-                              transpose(reshape(posterior_ckt, size(posterior_kt, 1), :))
-                          end, f_sk = f_sk, f_V = f_V)
+                          f_kt = f_kt
+                          #   chol_kt = if isnothing(f_kt)
+                          #       nothing
+                          #   else
+                          #       transpose(reshape(posterior_ckt, size(posterior_kt, 1), :))
+                          #   end
+
+                          , f_sk = f_sk, f_V = f_V)
 end
 
 export HighOrderFactorPriorEstimator

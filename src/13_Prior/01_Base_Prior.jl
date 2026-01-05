@@ -714,10 +714,10 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <: AbstractP
             Nfa, Nfb = size(rr.M)
             if f_kt_flag
                 @argcheck(!isempty(f_kt))
-                @argcheck(!isempty(chol_kt))
+                # @argcheck(!isempty(chol_kt))
                 assert_matrix_issquare(f_kt, :f_kt)
                 @argcheck(Nfb^2 == size(f_kt, 1))
-                @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
+                # @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
             end
             if f_sk_flag
                 @argcheck(!isempty(f_sk))
