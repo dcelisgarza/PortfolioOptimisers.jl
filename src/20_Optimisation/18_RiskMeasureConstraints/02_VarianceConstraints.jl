@@ -44,10 +44,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, key)
     return sd_risk
 end
-function sdp_rc_variance_flag!(::JuMP.Model, ::RkJuMPOpt, ::Nothing)
+function sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::Nothing)
     return false
 end
-function sdp_rc_variance_flag!(::JuMP.Model, ::RkJuMPOpt, ::LinearConstraint)
+function sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::LinearConstraint)
     return true
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, plg::Option{<:PhC_VecPhC})
@@ -149,7 +149,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
     end
     return nothing
 end
-function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
+function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
                    pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC}, args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
@@ -160,7 +160,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
     rc_variance_constraints!(model, i, rc, variance_risk)
     return variance_risk, sdp_flag
 end
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::RkJuMPOpt,
+function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
                                pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC}, args...;
                                kwargs...)
     if !haskey(model, :variance_flag)

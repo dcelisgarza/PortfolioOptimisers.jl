@@ -1,4 +1,4 @@
-const RkJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
+const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
 function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     if !haskey(model, :risk_vec)
         return nothing
@@ -69,7 +69,7 @@ end
 #        check_sol = (; allow_local = true, allow_almost = true),
 #        settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
 # https://discourse.julialang.org/t/solver-attributes-and-set-optimizer-with-parametricoptinterface-jl-and-jump-jl/129935/8?u=dcelisgarza
-function set_risk_upper_bound!(model::JuMP.Model, ::RkJuMPOpt,
+function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Front_NumVec, key)
     bound_key = Symbol(key, :_ub)
     if !haskey(model, :risk_frontier)
@@ -84,7 +84,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::RkJuMPOpt,
     end
     return nothing
 end
-function set_risk_upper_bound!(model::JuMP.Model, ::RkJuMPOpt,
+function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Number, key)
     k = model[:k]
     sc = model[:sc]

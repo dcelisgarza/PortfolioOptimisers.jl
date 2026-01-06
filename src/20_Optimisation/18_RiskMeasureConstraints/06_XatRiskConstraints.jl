@@ -138,7 +138,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    G = chol_sigma_selector(model, pr, r)
+    G = chol_sigma_selector(model, pr, r.alg)
     w = model[:w]
     sc = model[:sc]
     z = compute_value_at_risk_z(r.alg.dist, r.alpha)
@@ -158,7 +158,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    G = chol_sigma_selector(model, pr, r)
+    G = chol_sigma_selector(model, pr, r.alg)
     w = model[:w]
     sc = model[:sc]
     dist = r.alg.dist

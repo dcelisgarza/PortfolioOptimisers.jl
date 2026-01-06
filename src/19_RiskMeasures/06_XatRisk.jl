@@ -273,10 +273,7 @@ function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kw
     return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 
-const CholRM = Union{<:Variance, <:StandardDeviation,
-                     <:ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
-                     <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                        <:DistributionValueatRisk}}
+const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
 
 export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,
        DrawdownatRisk, RelativeDrawdownatRisk

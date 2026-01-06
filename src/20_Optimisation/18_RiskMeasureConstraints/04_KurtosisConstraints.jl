@@ -153,7 +153,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                      JuMP.SecondOrderCone())
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, key, i)
 end
-function set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis, ::RkJuMPOpt,
-                               pr::LowOrderPrior, args...; kwargs...)
+function set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis,
+                               ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
+                               kwargs...)
     throw(ArgumentError("Kurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
 end
