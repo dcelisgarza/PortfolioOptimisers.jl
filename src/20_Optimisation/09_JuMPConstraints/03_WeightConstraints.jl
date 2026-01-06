@@ -1,3 +1,21 @@
+function w_neg_flag(::Nothing)
+    return false
+end
+function w_neg_flag(wb::Number)
+    return wb < zero(wb)
+end
+function w_neg_flag(wb::VecNum)
+    return any(x -> x < zero(x), wb)
+end
+function w_finite_flag(::Nothing)
+    return false
+end
+function w_finite_flag(wb::Number)
+    return isfinite(wb)
+end
+function w_finite_flag(wb::VecNum)
+    return any(isfinite, wb)
+end
 function set_weight_constraints!(args...)
     return nothing
 end
@@ -12,10 +30,10 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     N = length(w)
     k = model[:k]
     sc = model[:sc]
-    if !isnothing(lb) && w_finite_flag(lb)
+    if w_finite_flag(lb)
         JuMP.@constraint(model, w_lb, sc * (w - k * lb) >= 0)
     end
-    if !isnothing(ub) && w_finite_flag(ub)
+    if w_finite_flag(ub)
         JuMP.@constraint(model, w_ub, sc * (w - k * ub) <= 0)
     end
     set_budget_constraints!(model, bgt, w)

@@ -18,21 +18,6 @@ struct SquareRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquareAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 abstract type WeightFinaliser <: AbstractAlgorithm end
-function w_neg_flag(::Nothing)
-    return false
-end
-function w_neg_flag(wb::Number)
-    return wb < zero(wb)
-end
-function w_neg_flag(wb::VecNum)
-    return any(x -> x < zero(x), wb)
-end
-function w_finite_flag(wb::Number)
-    return isfinite(wb)
-end
-function w_finite_flag(wb::VecNum)
-    return any(isfinite, wb)
-end
 struct IterativeWeightFinaliser{T1} <: WeightFinaliser
     iter::T1
     function IterativeWeightFinaliser(iter::Integer)
