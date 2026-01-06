@@ -139,7 +139,7 @@ struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     N::T1
     factor::T2
     flag::T3
-    function Frontier(N::Integer, factor::Number, flag::Bool)
+    function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)
         @argcheck(N > zero(N))
         @argcheck(isfinite(factor))
         @argcheck(factor > zero(factor))

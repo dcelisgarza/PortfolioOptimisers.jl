@@ -355,24 +355,24 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSl
     x = range(mir, mar; length = points)
     mad = LowOrderMoment(; w = rw, alg = MeanAbsoluteDeviation())(w, X, fees)
     gmd = OrderedWeightsArray()(copy(ret))
-    risks = (mu, mu - sigma, mu - mad, mu - gmd,
+    risks = [mu, mu - sigma, mu - mad, mu - gmd,
              -ValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
              -ConditionalValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
              -OrderedWeightsArray(; w = owa_tg(length(ret)))(copy(ret)),
              -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(copy(ret)),
              -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(copy(ret)),
-             mir)
+             mir]
     conf = round((1 - alpha) * 100; digits = 2)
-    risk_labels = ("Mean: $(round(risks[1], digits=2))%",
-                   "Mean - Std. Dev. ($(round(sigma, digits=2))%): $(round(risks[2], digits=2))%",
-                   "Mean - MAD ($(round(mad,digits=2))%): $(round(risks[3], digits=2))%",
-                   "Mean - GMD ($(round(gmd,digits=2))%): $(round(risks[4], digits=2))%",
-                   "$(conf)% Confidence VaR: $(round(risks[5], digits=2))%",
-                   "$(conf)% Confidence CVaR: $(round(risks[6], digits=2))%",
-                   "$(conf)% Confidence Tail Gini: $(round(risks[7], digits=2))%",
-                   "$(conf)% Confidence EVaR: $(round(risks[8], digits=2))%",
-                   "$(conf)% Confidence RLVaR ($(round(kappa, digits=2))): $(round(risks[9], digits=2))%",
-                   "Worst Realisation: $(round(risks[10], digits=2))%")
+    risk_labels = ("Mean: $(round(100*risks[1], digits=2))%",
+                   "Mean - Std. Dev. ($(round(100*sigma, digits=2))%): $(round(100*risks[2], digits=2))%",
+                   "Mean - MAD ($(round(100*mad,digits=2))%): $(round(100*risks[3], digits=2))%",
+                   "Mean - GMD ($(round(100*gmd,digits=2))%): $(round(100*risks[4], digits=2))%",
+                   "$(conf)% Confidence VaR: $(round(100*risks[5], digits=2))%",
+                   "$(conf)% Confidence CVaR: $(round(100*risks[6], digits=2))%",
+                   "$(conf)% Confidence Tail Gini: $(round(100*risks[7], digits=2))%",
+                   "$(conf)% Confidence EVaR: $(round(100*risks[8], digits=2))%",
+                   "$(conf)% Confidence RLVaR ($(round(kappa, digits=2))): $(round(100*risks[9], digits=2))%",
+                   "Worst Realisation: $(round(100*risks[10], digits=2))%")
     colours = palette(theme, length(risk_labels) + 2)
     plt = histogram(ret; normalize = :pdf, label = "", color = colours[1], h_kwargs...)
     for (i, (risk, label)) in enumerate(zip(risks, risk_labels)) #! Do not change this enumerate to pairs.
