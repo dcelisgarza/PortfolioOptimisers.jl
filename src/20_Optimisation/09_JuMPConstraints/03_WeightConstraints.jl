@@ -1,18 +1,3 @@
-function w_neg_flag(::Nothing)
-    return false
-end
-function w_neg_flag(wb::Number)
-    return wb < zero(wb)
-end
-function w_neg_flag(wb::VecNum)
-    return any(x -> x < zero(x), wb)
-end
-function w_finite_flag(wb::Number)
-    return isfinite(wb)
-end
-function w_finite_flag(wb::VecNum)
-    return any(isfinite, wb)
-end
 function set_weight_constraints!(args...)
     return nothing
 end

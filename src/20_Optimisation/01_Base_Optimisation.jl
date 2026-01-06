@@ -18,6 +18,21 @@ struct SquareRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquareAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 abstract type WeightFinaliser <: AbstractAlgorithm end
+function w_neg_flag(::Nothing)
+    return false
+end
+function w_neg_flag(wb::Number)
+    return wb < zero(wb)
+end
+function w_neg_flag(wb::VecNum)
+    return any(x -> x < zero(x), wb)
+end
+function w_finite_flag(wb::Number)
+    return isfinite(wb)
+end
+function w_finite_flag(wb::VecNum)
+    return any(isfinite, wb)
+end
 struct IterativeWeightFinaliser{T1} <: WeightFinaliser
     iter::T1
     function IterativeWeightFinaliser(iter::Integer)
@@ -98,13 +113,8 @@ end
 function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum)
     lb = wb.lb
     ub = wb.ub
-    if isnothing(lb)
-        lb = typemin(eltype(wi))
-    end
-    if isnothing(ub)
-        ub = typemax(eltype(wi))
-    end
-    if !(any(map((x, y) -> x < y, ub, wi)) || any(map((x, y) -> x > y, lb, wi)))
+    if !(!isnothing(lb) && any(map((x, y) -> x > y, lb, wi)) ||
+         !isnothing(ub) && any(map((x, y) -> x < y, ub, wi)))
         return wi
     end
     model = JuMP.Model()
@@ -112,11 +122,11 @@ function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum
     JuMP.@expression(model, so, wf.so)
     JuMP.@variable(model, w[1:length(wi)])
     JuMP.@constraint(model, sc * (sum(w) - sum(wi)) == 0)
-    if !isfinite(lb)
-        JuMP.@constraint(model, sc * (w - lb) >= 0)
+    if !isnothing(lb)
+        JuMP.@constraint(model, sc * (w ⊖ lb) >= 0)
     end
-    if !isfinite(ub)
-        JuMP.@constraint(model, sc * (w - ub) <= 0)
+    if !isnothing(ub)
+        JuMP.@constraint(model, sc * (w ⊖ ub) <= 0)
     end
     set_clustering_weight_finaliser_alg!(model, wf.alg, wi)
     return if optimise_JuMP_model!(model, wf.slv).success
@@ -129,19 +139,15 @@ end
 function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum)
     lb = wb.lb
     ub = wb.ub
-    if isnothing(lb)
-        lb = typemin(eltype(w))
-    end
-    if isnothing(ub)
-        ub = typemax(eltype(w))
-    end
-    if !(any(map((x, y) -> x < y, ub, w)) || any(map((x, y) -> x > y, lb, w)))
+    if !(!isnothing(lb) && any(map((x, y) -> x > y, lb, w)) ||
+         !isnothing(ub) && any(map((x, y) -> x < y, ub, w)))
         return w
     end
     iter = wf.iter
     s1 = sum(w)
     for _ in 1:iter
-        if !(any(map((x, y) -> x < y, ub, w)) || any(map((x, y) -> x > y, lb, w)))
+        if !(!isnothing(lb) && any(map((x, y) -> x > y, lb, w)) ||
+             !isnothing(ub) && any(map((x, y) -> x < y, ub, w)))
             break
         end
         old_w = copy(w)
