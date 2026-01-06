@@ -262,7 +262,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
                                    strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_complement_weights(pr, items, wb, sh.params)
-    retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
+    retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
     return SchurComplementHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma,
                                                              retcode, w, nothing)
 end
@@ -281,7 +281,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
         w .+= ps.r.settings.scale * wi
         gammas[i] = gamma
     end
-    retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w / sum(w))
+    retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
     return SchurComplementHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr,
                                                              gammas, retcode, w, nothing)
 end

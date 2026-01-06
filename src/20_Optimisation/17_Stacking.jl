@@ -22,13 +22,13 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     opti::T4
     opto::T5
     cv::T6
-    cwf::T7
+    wf::T7
     strict::T8
     ex::T9
     fb::T10
     function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                       opti::VecOptE_Opt, opto::OptimisationEstimator,
-                      cv::Option{<:CrossValidationEstimator}, cwf::WeightFinaliser,
+                      cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
                       strict::Bool, ex::FLoops.Transducers.Executor,
                       fb::Option{<:OptimisationEstimator})
         assert_external_optimiser(opto)
@@ -36,23 +36,23 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                   typeof(cv), typeof(cwf), typeof(strict), typeof(ex), typeof(fb)}(pe, wb,
-                                                                                    sets,
-                                                                                    opti,
-                                                                                    opto,
-                                                                                    cv, cwf,
-                                                                                    strict,
-                                                                                    ex, fb)
+                   typeof(cv), typeof(wf), typeof(strict), typeof(ex), typeof(fb)}(pe, wb,
+                                                                                   sets,
+                                                                                   opti,
+                                                                                   opto, cv,
+                                                                                   wf,
+                                                                                   strict,
+                                                                                   ex, fb)
     end
 end
 function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   sets::Option{<:AssetSets} = nothing, opti::VecOptE_Opt,
                   opto::OptimisationEstimator,
                   cv::Option{<:CrossValidationEstimator} = nothing,
-                  cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
+                  wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::Option{<:OptimisationEstimator} = nothing)
-    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, ex, fb)
+    return Stacking(pe, wb, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -77,7 +77,7 @@ function opt_view(st::Stacking, i, X::MatNum)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
-    return Stacking(; pe = pe, wb = wb, opti = opti, opto = opto, cv = st.cv, cwf = st.cwf,
+    return Stacking(; pe = pe, wb = wb, opti = opti, opto = opto, cv = st.cv, wf = st.wf,
                     sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
 function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -99,7 +99,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     rdo = predict_outer_estimator_returns(st, rd, pr, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
+    wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
                                                  reso, wi * reso.w; datatype = eltype(pr.X))
     return StackingOptimisation(typeof(st), pr, wb, resi, reso, st.cv, retcode, w, nothing)
 end

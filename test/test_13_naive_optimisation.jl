@@ -25,6 +25,9 @@
     pr = prior(EmpiricalPrior(), rd)
     N = size(pr.X, 2)
 
+    sets = AssetSets(; dict = Dict("nx" => rd.nx))
+    wb = WeightBoundsEstimator(; lb = "AAPL" => 0.07)
+
     res = optimise(InverseVolatility(; pe = pr), rd)
     w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     w /= sum(w)
@@ -36,6 +39,22 @@
     res = optimise(RandomWeighted(; rng = StableRNG(123456789)), rd)
     @test isapprox(sum(res.w), 1)
 
-    res = optimise(RandomWeighted(;), rd)
+    res = optimise(RandomWeighted(), rd)
+    @test isapprox(sum(res.w), 1)
+
+    res = optimise(InverseVolatility(; wb = wb, sets = sets, pe = pr), rd)
+    w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
+    @test isapprox(res.w[1], 0.07)
+
+    res = optimise(EqualWeighted(; wb = wb, sets = sets), rd)
+    @test isapprox(res.w[1], 0.07)
+    @test all(isapprox.(res.w[2:end], (1 - 0.07) / 19))
+
+    res = optimise(RandomWeighted(; wb = wb, sets = sets, rng = StableRNG(123456789)), rd)
+    @test isapprox(res.w[1], 0.07)
+    @test isapprox(sum(res.w), 1)
+
+    res = optimise(RandomWeighted(; wb = wb, sets = sets), rd)
+    @test isapprox(res.w[1], 0.07)
     @test isapprox(sum(res.w), 1)
 end

@@ -558,9 +558,11 @@ Adjacency matrices encode asset relationships either with clustering or graph th
 
 ### Portfolio optimisation
 
+There are many optimisation types
+
 #### Naïve
 
-  - Equal Weighted
+  - Equal Weighted [`EqualWeighted`](@ref)
   - Inverse Volatility
   - Random (Dirichlet)
 
