@@ -124,15 +124,19 @@ end
 function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::VecNum)
     lb = wb.lb
     ub = wb.ub
-    if !(!isnothing(lb) && any(map((x, y) -> x > y, lb, w)) ||
-         !isnothing(ub) && any(map((x, y) -> x < y, ub, w)))
+    if isnothing(lb)
+        lb = typemin(eltype(w))
+    end
+    if isnothing(ub)
+        ub = typemax(eltype(w))
+    end
+    if !(any(map((x, y) -> x > y, lb, w)) || any(map((x, y) -> x < y, ub, w)))
         return w
     end
     iter = wf.iter
     s1 = sum(w)
     for _ in 1:iter
-        if !(!isnothing(lb) && any(map((x, y) -> x > y, lb, w)) ||
-             !isnothing(ub) && any(map((x, y) -> x < y, ub, w)))
+        if !(any(map((x, y) -> x > y, lb, w)) || any(map((x, y) -> x < y, ub, w)))
             break
         end
         old_w = copy(w)
