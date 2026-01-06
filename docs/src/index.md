@@ -573,7 +573,7 @@ These return a [`NaiveOptimisation`](@ref) object containing the results.
   - Mean-Risk [`MeanRisk`](@ref)
 
   - Factor Risk Contribution [`FactorRiskContribution`](@ref)
-  - Near Optimal Centering [`NearOptimalCenterig`](@ref)
+  - Near Optimal Centering [`NearOptimalCentering`](@ref)
   - Asset and factor risk budgeting [`AssetRiskBudgeting`](@ref), [`FactorRiskBudgeting`](@ref)
     
       + Risk Budgeting [`RiskBudgeting`](@ref)
