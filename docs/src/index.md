@@ -471,9 +471,9 @@ In order to make optimisations more robust to noise and measurement error, it is
 
 `PortfolioOptimisers.jl` implements two types of uncertainty sets.
 
-  - [`BoxUncertaintySets`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
+  - [`BoxUncertaintySet`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
 
-  - [`EllipsoidalUncertaintySets`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) with various algorithms for computing the scaling parameter via [`k_ucs`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) with various algorithms for computing the scaling parameter via [`k_ucs`](@ref)
     
       + [`NormalKUncertaintyAlgorithm`](@ref)
       + [`GeneralKUncertaintyAlgorithm`](@ref)
