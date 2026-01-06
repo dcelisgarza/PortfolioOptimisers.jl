@@ -209,6 +209,7 @@ Variance
            │      ub ┼ nothing
            │     rke ┴ Bool: true
      sigma ┼ 3×3 Matrix{Float64}
+      chol ┼ nothing
         rc ┼ nothing
        alg ┴ SquaredSOCRiskExpr()
 
@@ -374,7 +375,8 @@ StandardDeviation
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-     sigma ┴ 3×3 Matrix{Float64}
+     sigma ┼  3×3 Matrix{Float64}
+      chol ┴ nothing
 
 julia> r(w)
 1.1585208588621345
