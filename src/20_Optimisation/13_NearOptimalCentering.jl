@@ -1,6 +1,8 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
+"""
+"""
 struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        OptimisationResult
     oe::T1
@@ -29,6 +31,8 @@ function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
         getproperty(r.pa, sym)
     end
 end
+"""
+"""
 struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
        RiskJuMPOptimisationEstimator
     opt::T1

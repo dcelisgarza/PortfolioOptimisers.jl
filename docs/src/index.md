@@ -558,28 +558,26 @@ Adjacency matrices encode asset relationships either with clustering or graph th
 
 ### Portfolio optimisation
 
-There are many optimisation types
+Optimisations are implemented via [`optimise`](@ref).
 
 #### Naïve
 
+These return a [`NaiveOptimisation`](@ref) object containing the results.
+
+  - Inverse Volatility [`InverseVolatility`](@ref)
   - Equal Weighted [`EqualWeighted`](@ref)
-  - Inverse Volatility
-  - Random (Dirichlet)
+  - Random (Dirichlet) [`RandomWeighted`](@ref)
 
 #### Traditional
 
-  - Mean-Risk
+  - Mean-Risk [`MeanRisk`](@ref)
 
-  - Factor Risk Contribution
-  - Near Optimal Centering
-  - Risk Budgeting
+  - Factor Risk Contribution [`FactorRiskContribution`](@ref)
+  - Near Optimal Centering [`NearOptimalCenterig`](@ref)
+  - Asset and factor risk budgeting [`AssetRiskBudgeting`](@ref), [`FactorRiskBudgeting`](@ref)
     
-      + Asset Risk Budgeting
-      + Factor Risk Budgeting
-  - Relaxed Risk Budgeting
-    
-      + Asset Relaxed Risk Budgeting
-      + Factor Relaxed Risk Budgeting
+      + Risk Budgeting [`RiskBudgeting`](@ref)
+      + Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref)
 
 ##### Traditional Optimisation Features
 
@@ -629,6 +627,10 @@ There are many optimisation types
       + Set
       + Set group
   - Buy-in threshold
+  - N-dimensional Pareto fronts [`Frontier`](@ref)
+    
+      + Return based
+      + Risk based
 
 #### [Clustering](@id readme-clustering-opt)
 

@@ -38,6 +38,8 @@ end
 function factory(res::JuMPOptimisation, fb)
     return JuMPOptimisation(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
+"""
+"""
 struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
