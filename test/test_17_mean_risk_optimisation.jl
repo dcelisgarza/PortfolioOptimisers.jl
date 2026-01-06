@@ -173,7 +173,7 @@
                                           alg = BoxUncertaintySetAlgorithm()), rd.X)
     ucs2 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
                                           rng = StableRNG(987654321),
-                                          alg = EllipseUncertaintySetAlgorithm()), rd.X)
+                                          alg = EllipsoidalUncertaintySetAlgorithm()), rd.X)
     rf = 4.2 / 100 / 252
     rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                       timestamp = :Date)[(end - 50):end])
@@ -812,7 +812,8 @@
         ucs1 = mu_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                            alg = BoxUncertaintySetAlgorithm()), pr.X)
         ucs2 = mu_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
-                                           alg = EllipseUncertaintySetAlgorithm()), pr.X)
+                                           alg = EllipsoidalUncertaintySetAlgorithm()),
+                      pr.X)
         ucss = [ucs1, ucs2]
         objs = [MinimumRisk(), MaximumRatio(; rf = rf), MaximumReturn()]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskUncertainty.csv.gz"), DataFrame)

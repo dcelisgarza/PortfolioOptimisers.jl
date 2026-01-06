@@ -517,7 +517,7 @@ Where:
       + Else it is equal to 1.
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
 
-## Ellipse uncertainty set
+## Ellipsoidal uncertainty set
 
 ```math
 \\begin{align}

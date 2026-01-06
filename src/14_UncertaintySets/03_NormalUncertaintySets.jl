@@ -8,12 +8,12 @@
         seed::T6
     end
 
-Estimator for box or ellipse uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
+Estimator for box or ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
 
 # Fields
 
   - `pe`: Prior estimator used to compute mean and covariance statistics.
-  - `alg`: Uncertainty set algorithm (box or ellipse).
+  - `alg`: Uncertainty set algorithm (box or ellipsoidal).
   - `n_sim`: Number of simulations for uncertainty set estimation.
   - `q`: Quantile or confidence level for uncertainty set bounds.
   - `rng`: Random number generator for simulation.
@@ -45,7 +45,7 @@ NormalUncertaintySet
         │           │      │    me ┼ SimpleExpectedReturns
         │           │      │       │   w ┴ nothing
         │           │      │    ce ┼ GeneralCovariance
-        │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true) 
+        │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
         │           │      │       │    w ┴ nothing
         │           │      │   alg ┴ Full()
         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -69,10 +69,10 @@ NormalUncertaintySet
 # Related
 
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`BoxUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 """
 struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6} <: AbstractUncertaintySetEstimator
     pe::T1
@@ -122,27 +122,27 @@ Constructs the commutation matrix for a given matrix.
 ```jldoctest
 julia> PortfolioOptimisers.commutation_matrix(rand(2, 2))
 4×4 SparseArrays.SparseMatrixCSC{Float64, Int64} with 4 stored entries:
- 1.0   ⋅    ⋅    ⋅ 
-  ⋅    ⋅   1.0   ⋅ 
-  ⋅   1.0   ⋅    ⋅ 
+ 1.0   ⋅    ⋅    ⋅
+  ⋅    ⋅   1.0   ⋅
+  ⋅   1.0   ⋅    ⋅
   ⋅    ⋅    ⋅   1.0
 
 julia> PortfolioOptimisers.commutation_matrix(rand(2, 3))
 6×6 SparseArrays.SparseMatrixCSC{Float64, Int64} with 6 stored entries:
- 1.0   ⋅    ⋅    ⋅    ⋅    ⋅ 
-  ⋅    ⋅   1.0   ⋅    ⋅    ⋅ 
-  ⋅    ⋅    ⋅    ⋅   1.0   ⋅ 
-  ⋅   1.0   ⋅    ⋅    ⋅    ⋅ 
-  ⋅    ⋅    ⋅   1.0   ⋅    ⋅ 
+ 1.0   ⋅    ⋅    ⋅    ⋅    ⋅
+  ⋅    ⋅   1.0   ⋅    ⋅    ⋅
+  ⋅    ⋅    ⋅    ⋅   1.0   ⋅
+  ⋅   1.0   ⋅    ⋅    ⋅    ⋅
+  ⋅    ⋅    ⋅   1.0   ⋅    ⋅
   ⋅    ⋅    ⋅    ⋅    ⋅   1.0
 
 julia> PortfolioOptimisers.commutation_matrix(rand(3, 2))
 6×6 SparseArrays.SparseMatrixCSC{Float64, Int64} with 6 stored entries:
- 1.0   ⋅    ⋅    ⋅    ⋅    ⋅ 
-  ⋅    ⋅    ⋅   1.0   ⋅    ⋅ 
-  ⋅   1.0   ⋅    ⋅    ⋅    ⋅ 
-  ⋅    ⋅    ⋅    ⋅   1.0   ⋅ 
-  ⋅    ⋅   1.0   ⋅    ⋅    ⋅ 
+ 1.0   ⋅    ⋅    ⋅    ⋅    ⋅
+  ⋅    ⋅    ⋅   1.0   ⋅    ⋅
+  ⋅   1.0   ⋅    ⋅    ⋅    ⋅
+  ⋅    ⋅    ⋅    ⋅   1.0   ⋅
+  ⋅    ⋅   1.0   ⋅    ⋅    ⋅
   ⋅    ⋅    ⋅    ⋅    ⋅   1.0
 ```
 """
@@ -330,12 +330,12 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any,
-                                 <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
+                                 <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
                                  <:Any, <:Any, <:Any},
         X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs ellipse uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
+Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
 
 # Arguments
 
@@ -347,31 +347,31 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
-  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty sets.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Simulates mean and covariance using multivariate normal and Wishart distributions.
   - Constructs commutation matrix for covariance vectorization.
-  - Computes scaling parameters for mean and covariance using the specified ellipse algorithm.
+  - Computes scaling parameters for mean and covariance using the specified ellipsoidal algorithm.
   - Returns both sets as a tuple.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function ucs(ue::NormalUncertaintySet{<:Any,
-                                      <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
-                                                                       <:Any}, <:Any, <:Any,
-                                      <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
-             dims::Int = 1, kwargs...)
+                                      <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                           <:Any}, <:Any,
+                                      <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, mu, sigma) = pr
     T, N = size(X)
@@ -396,19 +396,19 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet()),
-           EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet()),
+           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 """
     ucs(ue::NormalUncertaintySet{<:Any,
-                                 <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
+                                 <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
                                  <:Any, <:Any, <:Any},
         X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs ellipse uncertainty sets for expected returns and covariance statistics using the chi-squared scaling algorithm under the assumption of normally distributed returns.
+Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using the chi-squared scaling algorithm under the assumption of normally distributed returns.
 
 # Arguments
 
@@ -420,8 +420,8 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
-  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty sets.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 
@@ -434,18 +434,18 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function ucs(ue::NormalUncertaintySet{<:Any,
-                                      <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
-                                                                       <:Any}, <:Any, <:Any,
-                                      <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
-             dims::Int = 1, kwargs...)
+                                      <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                           <:Any}, <:Any,
+                                      <:Any, <:Any}, X::MatNum,
+             F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
@@ -460,17 +460,17 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     end
     k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet()),
-           EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet()),
+           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 """
-    ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
+    ucs(ue::NormalUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                  <:Any, <:Any, <:Any}, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs ellipse uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic ellipse algorithm.
+Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
 
 # Arguments
 
@@ -482,27 +482,28 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
-  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty sets.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty sets.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Constructs commutation matrix for covariance vectorization.
-  - Computes scaling parameters for mean and covariance using the provided ellipse algorithm.
+  - Computes scaling parameters for mean and covariance using the provided ellipsoidal algorithm.
   - Applies diagonal processing if specified in the algorithm.
   - Returns both sets as a tuple.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
-function ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
+function ucs(ue::NormalUncertaintySet{<:Any,
+                                      <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                       <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
@@ -519,19 +520,19 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:
     end
     k_mu = k_ucs(ue.alg.method, ue.q)
     k_sigma = k_ucs(ue.alg.method, ue.q)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet()),
-           EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet()),
+           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
+                                    <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
                                     <:Any, <:Any, <:Any},
            X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
+Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a normal scaling algorithm.
 
 # Arguments
 
@@ -543,27 +544,27 @@ Constructs an ellipse uncertainty set for expected returns under the assumption 
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Simulates mean vectors using the multivariate normal distribution.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Computes the scaling parameter for the ellipse using the normal scaling algorithm.
-  - Returns an ellipse uncertainty set for the mean.
+  - Computes the scaling parameter for the ellipsoidal using the normal scaling algorithm.
+  - Returns an ellipsoidal uncertainty set for the mean.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                         <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
-                                                                          <:Any}, <:Any,
+                                         <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                              <:Any}, <:Any,
                                          <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
@@ -579,17 +580,17 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
+                                    <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
                                     <:Any, <:Any, <:Any},
            X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
+Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
 
 # Arguments
 
@@ -601,28 +602,28 @@ Constructs an ellipse uncertainty set for expected returns under the assumption 
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Computes the scaling parameter for the ellipse using the chi-squared scaling algorithm.
-  - Returns an ellipse uncertainty set for the mean.
+  - Computes the scaling parameter for the ellipsoidal using the chi-squared scaling algorithm.
+  - Returns an ellipsoidal uncertainty set for the mean.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                         <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
-                                                                          <:Any}, <:Any,
+                                         <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                              <:Any}, <:Any,
                                          <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
@@ -634,17 +635,17 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet())
 end
 """
     mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                    <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
+                                    <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
                                     <:Any, <:Any, <:Any},
            X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
+Constructs an ellipsoidal uncertainty set for expected returns under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
 
 # Arguments
 
@@ -656,27 +657,27 @@ Constructs an ellipse uncertainty set for expected returns under the assumption 
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Expected returns uncertainty set.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Expected returns uncertainty set.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Computes the scaling parameter for the ellipse using the chi-squared scaling algorithm.
-  - Returns an ellipse uncertainty set for the mean.
+  - Computes the scaling parameter for the ellipsoidal using the chi-squared scaling algorithm.
+  - Returns an ellipsoidal uncertainty set for the mean.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
   - [`sigma_ucs`](@ref)
 """
 function mu_ucs(ue::NormalUncertaintySet{<:Any,
-                                         <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
+                                         <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                          <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
@@ -688,17 +689,17 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                       <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
+                                       <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm, <:Any},
                                        <:Any, <:Any, <:Any},
               X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
+Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a normal scaling algorithm.
 
 # Arguments
 
@@ -710,29 +711,29 @@ Constructs an ellipse uncertainty set for covariance under the assumption of nor
 
 # Returns
 
-  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty set.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty set.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Simulates covariance matrices using the Wishart distribution.
   - Constructs commutation matrix for covariance vectorization.
-  - Computes the scaling parameter for the ellipse using the normal scaling algorithm.
+  - Computes the scaling parameter for the ellipsoidal using the normal scaling algorithm.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Returns an ellipse uncertainty set for covariance.
+  - Returns an ellipsoidal uncertainty set for covariance.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
 function sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                            <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
-                                                                             <:Any}, <:Any,
-                                            <:Any, <:Any}, X::MatNum,
+                                            <:EllipsoidalUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
+                                                                                 <:Any},
+                                            <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
@@ -755,17 +756,17 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                       <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
+                                       <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm, <:Any},
                                        <:Any, <:Any, <:Any},
               X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for covariance under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
+Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a chi-squared scaling algorithm.
 
 # Arguments
 
@@ -777,30 +778,30 @@ Constructs an ellipse uncertainty set for covariance under the assumption of nor
 
 # Returns
 
-  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty set.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty set.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Constructs commutation matrix for covariance vectorization.
-  - Computes the scaling parameter for the ellipse using the chi-squared scaling algorithm.
+  - Computes the scaling parameter for the ellipsoidal using the chi-squared scaling algorithm.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Returns an ellipse uncertainty set for covariance.
+  - Returns an ellipsoidal uncertainty set for covariance.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
 function sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                            <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
-                                                                             <:Any}, <:Any,
-                                            <:Any, <:Any}, X::MatNum,
+                                            <:EllipsoidalUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
+                                                                                 <:Any},
+                                            <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
@@ -814,16 +815,16 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
-    return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 """
     sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                       <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
+                                       <:EllipsoidalUncertaintySetAlgorithm{<:Any, <:Any},
                                        <:Any, <:Any, <:Any}, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for covariance under the assumption of normally distributed returns, using a generic ellipse algorithm.
+Constructs an ellipsoidal uncertainty set for covariance under the assumption of normally distributed returns, using a generic ellipsoidal algorithm.
 
 # Arguments
 
@@ -835,27 +836,28 @@ Constructs an ellipse uncertainty set for covariance under the assumption of nor
 
 # Returns
 
-  - `sigma_ucs::EllipseUncertaintySet`: Covariance uncertainty set.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Covariance uncertainty set.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Processes the covariance matrix for positive definiteness.
   - Constructs commutation matrix for covariance vectorization.
-  - Computes the scaling parameter for the ellipse using the provided ellipse algorithm.
+  - Computes the scaling parameter for the ellipsoidal using the provided ellipsoidal algorithm.
   - Applies diagonal processing to the covariance if specified in the algorithm.
-  - Returns an ellipse uncertainty set for covariance.
+  - Returns an ellipsoidal uncertainty set for covariance.
 
 # Related
 
   - [`NormalUncertaintySet`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
   - [`mu_ucs`](@ref)
 """
 function sigma_ucs(ue::NormalUncertaintySet{<:Any,
-                                            <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
+                                            <:EllipsoidalUncertaintySetAlgorithm{<:Any,
+                                                                                 <:Any},
                                             <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
@@ -870,8 +872,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q)
-    return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 
 export NormalUncertaintySet

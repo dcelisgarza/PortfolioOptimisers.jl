@@ -3,13 +3,13 @@
 ```@docs
 BoxUncertaintySet
 BoxUncertaintySetAlgorithm
-MuEllipseUncertaintySet
-SigmaEllipseUncertaintySet
+MuEllipsoidalUncertaintySet
+SigmaEllipsoidalUncertaintySet
 NormalKUncertaintyAlgorithm
 GeneralKUncertaintyAlgorithm
 ChiSqKUncertaintyAlgorithm
-EllipseUncertaintySet
-EllipseUncertaintySetAlgorithm
+EllipsoidalUncertaintySet
+EllipsoidalUncertaintySetAlgorithm
 ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                        <:Option{<:AbstractUncertaintySetResult}}}, args...;
              kwargs...)
@@ -21,7 +21,7 @@ AbstractUncertaintySetEstimator
 AbstractUncertaintySetAlgorithm
 AbstractUncertaintySetResult
 AbstractUncertaintyKAlgorithm
-AbstractEllipseUncertaintySetResultClass
+AbstractEllipsoidalUncertaintySetResultClass
 ucs_selector
 k_ucs
 ```

@@ -216,7 +216,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
                                                       LinearAlgebra.tr(Al * lb))
     return ucs_variance_risk, key
 end
-function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
+function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
                                 sigma::MatNum)
     sc = model[:sc]
     if !haskey(model, :E)

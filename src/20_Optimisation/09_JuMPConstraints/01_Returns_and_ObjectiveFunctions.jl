@@ -6,9 +6,10 @@ struct ArithmeticReturn{T1, T2, T3} <: JuMPReturnsEstimator
     mu::T3
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
                               mu::Option{<:Num_VecNum})
-        if isa(ucs, EllipseUncertaintySet)
+        if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
-                          EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
+                          EllipsoidalUncertaintySet{<:Any, <:Any,
+                                                    <:MuEllipsoidalUncertaintySet}))
         end
         if isa(lb, Number)
             @argcheck(isfinite(lb))
@@ -322,7 +323,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
     add_market_impact_cost!(model, ret)
     return nothing
 end
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet,
                                      mu::Num_VecNum)
     sc = model[:sc]
     w = model[:w]

@@ -12,7 +12,7 @@
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-## Welcome to PortfolioOptimisers.jl!
+## Welcome to PortfolioOptimisers.jl
 
 [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
@@ -21,8 +21,8 @@
 
 Portfolio optimisation is the science of either:
 
-- Minimising risk whilst keeping returns to acceptable levels.
-- Maximising returns whilst keeping risk to acceptable levels.
+  - Minimising risk whilst keeping returns to acceptable levels.
+  - Maximising returns whilst keeping risk to acceptable levels.
 
 To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
 
@@ -34,17 +34,18 @@ For more information on the package's *vast* feature list, please check out the 
 
 ## Caveat emptor
 
-- `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
-- The documentation is still under construction.
-- Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
-- Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
+  - `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
+  - The documentation is still under construction.
+  - Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
+  - Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
 
 ## Installation
 
 `PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
 
 ```julia
-julia> ]add PortfolioOptimisers
+julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
+using Pkg
 ```
 
 ## Quickstart
@@ -138,8 +139,8 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 # Discrete finite allocation.
 da = DiscreteAllocation(; slv = mip_slv)
 
-# Perform the finite discrete allocation, uses the final asset 
-# prices, and an available cash amount. This is for us mortals 
+# Perform the finite discrete allocation, uses the final asset
+# prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
 mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
 
@@ -421,7 +422,7 @@ These sets can be used to make some optimisations more robust. Namely, there exi
         
           * Circular, moving, stationary bootstrap.
 
-  - Ellipse uncertainty sets.
+  - Ellipsoidal uncertainty sets.
     
       + Normally distributed returns.
     

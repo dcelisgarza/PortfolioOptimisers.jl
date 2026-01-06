@@ -467,24 +467,32 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
 ### Uncertainty sets
 
-These sets can be used to make some optimisations more robust. Namely, there exist uncertainty sets on expected returns and covariance. They can be used on any optimisation which uses any one of these quantities.
+In order to make optimisations more robust to noise and measurement error, it is possible to define uncertainty sets on the expected returns and covariance. These can be used in optimisations which use either of these two quantities. These are implemented via [`ucs`](@ref), [`mu_ucs`](@ref), [`sigma_ucs`](@ref).
 
-  - Box.
-    
-      + Delta.
-    
-      + Normally distributed returns.
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
+`PortfolioOptimisers.jl` implements two types of uncertainty sets.
 
-  - Ellipse uncertainty sets.
+  - [`BoxUncertaintySets`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
+
+  - [`EllipsoidalUncertaintySets`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) with various algorithms for computing the scaling parameter via [`k_ucs`](@ref)
     
-      + Normally distributed returns.
+      + [`NormalKUncertaintyAlgorithm`](@ref)
+      + [`GeneralKUncertaintyAlgorithm`](@ref)
+      + [`ChiSqKUncertaintyAlgorithm`](@ref)
+      + Predefined scaling parameter
+
+It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets.
+
+  - Normally distributed returns [`NormalUncertaintySet`](@ref)
+
+  - Bootstrapping via Autoregressive Conditional Heteroskedasticity [`ARCHUncertaintySet`](@ref) via [`arch`](https://arch.readthedocs.io/en/latest/bootstrap/timeseries-bootstraps.html)
     
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
+      + Circular [`CircularBootstrap`](@ref)
+      + Moving [`MovingBootstrap`](@ref)
+      + Stationary [`StationaryBootstrap`](@ref)
+
+The following estimator can only generate box sets.
+
+  - [`DeltaUncertaintySet`](@ref)
 
 ### Phylogeny
 
@@ -636,9 +644,7 @@ Adjacency matrices encode asset relationships either with clustering or graph th
   - Discrete
   - Greedy
 
-### Risk measures
-
-#### Ordered weights arrays and linear moments
+### Ordered weights arrays and linear moments
 
 Some risk measures including linear moments may be formulated using ordered weights arrays.
 
