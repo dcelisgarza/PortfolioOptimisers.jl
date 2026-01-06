@@ -57,7 +57,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
                                                       JuMP.SecondOrderCone())
     return set_negative_skewness_risk!(model, r, opt, nskew_risk, key, V)
 end
-function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness, ::RkJuMPOpt,
-                               pr::LowOrderPrior, args...; kwargs...)
+function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
+                               ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
+                               kwargs...)
     throw(ArgumentError("NegativeSkewness requires a HighOrderPrior, not a $(typeof(pr))."))
 end
