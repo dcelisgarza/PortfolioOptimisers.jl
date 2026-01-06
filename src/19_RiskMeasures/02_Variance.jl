@@ -227,26 +227,34 @@ julia> r(w)
   - [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct Variance{T1, T2, T3, T4} <: RiskMeasure
+struct Variance{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     sigma::T2
-    #! add chol
-    rc::T3
-    alg::T4
+    chol::T3
+    rc::T4
+    alg::T5
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
-                      rc::Option{<:LcE_Lc}, alg::VarianceFormulation)
+                      chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
+                      alg::VarianceFormulation)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(settings), typeof(sigma), typeof(rc), typeof(alg)}(settings,
-                                                                             sigma, rc, alg)
+        if isa(chol, MatNum)
+            @argcheck(!isempty(chol))
+        end
+        return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg)}(settings,
+                                                                                           sigma,
+                                                                                           chol,
+                                                                                           rc,
+                                                                                           alg)
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:MatNum} = nothing, rc::Option{<:LcE_Lc} = nothing,
+                  sigma::Option{<:MatNum} = nothing, chol::Option{<:MatNum} = nothing,
+                  rc::Option{<:LcE_Lc} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
-    return Variance(settings, sigma, rc, alg)
+    return Variance(settings, sigma, chol, rc, alg)
 end
 function (r::Variance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
@@ -279,13 +287,17 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
 """
 function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
+    chol = nothing_scalar_array_selector(r.chol, pr.chol)
+    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
+                    alg = r.alg)
 end
 function risk_measure_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
+    chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
-    return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
+    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
+                    alg = r.alg)
 end
 """
     struct StandardDeviation{T1, T2} <: RiskMeasure
@@ -374,21 +386,26 @@ julia> r(w)
   - [`factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct StandardDeviation{T1, T2} <: RiskMeasure
+struct StandardDeviation{T1, T2, T3} <: RiskMeasure
     settings::T1
     sigma::T2
-    #! add chol
-    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum})
+    chol::T3
+    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
+                               chol::Option{<:MatNum})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(settings), typeof(sigma)}(settings, sigma)
+        if isa(chol, MatNum)
+            @argcheck(!isempty(chol))
+        end
+        return new{typeof(settings), typeof(sigma), typeof(chol)}(settings, sigma, chol)
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Option{<:MatNum} = nothing)
-    return StandardDeviation(settings, sigma)
+                           sigma::Option{<:MatNum} = nothing,
+                           chol::Option{<:MatNum} = nothing)
+    return StandardDeviation(settings, sigma, chol)
 end
 function (r::StandardDeviation)(w::VecNum)
     return sqrt(LinearAlgebra.dot(w, r.sigma, w))
@@ -421,11 +438,13 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
 """
 function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return StandardDeviation(; settings = r.settings, sigma = sigma)
+    chol = nothing_scalar_array_selector(r.chol, pr.chol)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 function risk_measure_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    return StandardDeviation(; settings = r.settings, sigma = sigma)
+    chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 """
     struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
@@ -607,7 +626,6 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
-    #! add chol
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)

@@ -5,6 +5,15 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     end
     return model[:G]
 end
+function chol_sigma_selector(model::JuMP.Model, pr::AbstractPriorResult, r::CholRM)
+    return if isnothing(r.sigma) && isnothing(r.chol)
+        get_chol_or_sigma_pm(model, pr)
+    elseif isnothing(r.chol)
+        LinearAlgebra.cholesky(r.sigma).U
+    else
+        r.chol
+    end
+end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::RiskJuMPOptimisationEstimator,
                                                   r_expr_ub::JuMP.AbstractJuMPScalar,
@@ -21,11 +30,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
     key = Symbol(:sd_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    G = if isnothing(r.sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        LinearAlgebra.cholesky(r.sigma).U
-    end
+    G = chol_sigma_selector(model, pr, r)
     sd_risk = model[key] = JuMP.@variable(model)
     model[Symbol(:csd_risk_soc_, i)] = JuMP.@constraint(model,
                                                         [sc * sd_risk; sc * G * w] in
@@ -75,11 +80,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
-    G = if isnothing(r.sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        LinearAlgebra.cholesky(r.sigma).U
-    end
+    G = chol_sigma_selector(model, pr, r)
     key_dev = Symbol(:dev_, i)
     dev = model[key_dev] = JuMP.@variable(model)
     model[Symbol(key_dev, :_soc)] = JuMP.@constraint(model,
@@ -93,11 +94,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     w = model[:w]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
-    G = if isnothing(r.sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        LinearAlgebra.cholesky(r.sigma).U
-    end
+    G = chol_sigma_selector(model, pr, r)
     dev = model[Symbol(:dev_, i)] = JuMP.@variable(model)
     model[Symbol(:cdev_soc_, i)] = JuMP.@constraint(model,
                                                     [sc * dev; sc * G * w] in

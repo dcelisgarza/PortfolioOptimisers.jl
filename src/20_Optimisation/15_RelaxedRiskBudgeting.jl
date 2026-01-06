@@ -47,19 +47,21 @@ function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::MatNum)
+                                                     sigma::MatNum,
+                                                     chol::Option{<:MatNum} = nothing)
     sc = model[:sc]
     psi = model[:psi]
-    G = LinearAlgebra.cholesky(sigma).U
+    G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
     return nothing
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::MatNum)
+                                                     sigma::MatNum,
+                                                     chol::Option{<:MatNum} = nothing)
     sc = model[:sc]
     psi = model[:psi]
-    G = LinearAlgebra.cholesky(sigma).U
+    G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
                       begin
@@ -73,10 +75,11 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
 end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
-                                                     sigma::MatNum)
+                                                     sigma::MatNum,
+                                                     chol::Option{<:MatNum} = nothing)
     sc = model[:sc]
     psi = model[:psi]
-    G = LinearAlgebra.cholesky(sigma).U
+    G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma)))
     p = alg.p
     JuMP.@variable(model, rho >= 0)
@@ -94,7 +97,8 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
 end
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   rrb::RelaxedRiskBudgeting,
-                                                  w::VecJuMPScalar, sigma::MatNum)
+                                                  w::VecJuMPScalar, sigma::MatNum,
+                                                  chol::Option{<:MatNum} = nothing)
     N = length(w)
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
@@ -114,7 +118,7 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                            sc * (2 * gamma * sqrt(rb[i]))
                            sc * (w[i] - zeta[i])] in JuMP.SecondOrderCone()
                       end)
-    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma)
+    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma, chol)
     return rkb
 end
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
@@ -140,7 +144,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  args...)
     set_w!(model, pr.X, rrb.wi)
     set_weight_constraints!(model, wb, rrb.opt.bgt, nothing, true)
-    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w], pr.sigma)
+    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w], pr.sigma, pr.chol)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();

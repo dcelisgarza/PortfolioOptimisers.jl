@@ -1,4 +1,10 @@
 abstract type ValueatRiskFormulation <: AbstractAlgorithm end
+function factory(alg::ValueatRiskFormulation, args...; kwargs...)
+    return alg
+end
+function valueat_risk_formulation_view(r::ValueatRiskFormulation, args...)
+    return r
+end
 struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
     b::T1
     s::T2
@@ -20,25 +26,45 @@ end
 function MIPValueatRisk(; b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
     return MIPValueatRisk(b, s)
 end
-struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
+struct DistributionValueatRisk{T1, T2, T3, T4} <: ValueatRiskFormulation
     mu::T1
     sigma::T2
-    dist::T3
+    chol::T3
+    dist::T4
     function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
+                                     chol::Option{<:MatNum},
                                      dist::Distributions.Distribution)
         if !isnothing(mu)
             @argcheck(!isempty(mu))
         end
         if !isnothing(sigma)
             @argcheck(!isempty(sigma))
+            assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(mu), typeof(sigma), typeof(dist)}(mu, sigma, dist)
+        if !isnothing(chol)
+            @argcheck(!isempty(chol))
+        end
+        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(dist)}(mu, sigma, chol,
+                                                                          dist)
     end
 end
 function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  sigma::Option{<:MatNum} = nothing,
+                                 chol::Option{<:MatNum} = nothing,
                                  dist::Distributions.Distribution = Distributions.Normal())
-    return DistributionValueatRisk(mu, sigma, dist)
+    return DistributionValueatRisk(mu, sigma, chol, dist)
+end
+function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    mu = nothing_scalar_array_selector(alg.mu, pr.mu)
+    sigma = nothing_scalar_array_selector(alg.sigma, pr.sigma)
+    chol = nothing_scalar_array_selector(alg.chol, pr.chol)
+    return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
+end
+function valueat_risk_formulation_view(alg::DistributionValueatRisk, i)
+    mu = nothing_scalar_array_view(alg.mu, i)
+    sigma = nothing_scalar_array_view(alg.sigma, i)
+    chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
+    return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
 end
 struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
@@ -60,6 +86,10 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Number = 0.05, w::Option{<:StatsBase.AbstractWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
+end
+function risk_measure_view(r::ValueatRisk, i)
+    alg = valueat_risk_formulation_view(r.alg, i)
+    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w, alg = alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
@@ -102,8 +132,14 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
 end
 function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
+    alg = factory(r.alg, pr, args...; kwargs...)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
-                            alg = r.alg)
+                            alg = alg)
+end
+function risk_measure_view(r::ValueatRiskRange, i)
+    alg = valueat_risk_formulation_view(r.alg, i)
+    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
+                            w = r.w, alg = alg)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     x = copy(x)
@@ -154,7 +190,8 @@ for r in (ValueatRisk, DrawdownatRisk)
     eval(quote
              function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
                  w = nothing_scalar_array_selector(r.w, pr.w)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
+                 alg = factory(r.alg, pr, args...; kwargs...)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
              end
          end)
 end
@@ -235,6 +272,11 @@ function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kw
     w = nothing_scalar_array_selector(r.w, pr.w)
     return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
+
+const CholRM = Union{<:Variance, <:StandardDeviation,
+                     <:ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk},
+                     <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                        <:DistributionValueatRisk}}
 
 export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,
        DrawdownatRisk, RelativeDrawdownatRisk
