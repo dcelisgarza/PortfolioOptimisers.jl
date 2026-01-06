@@ -375,7 +375,7 @@ StandardDeviation
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-     sigma ┼  3×3 Matrix{Float64}
+     sigma ┼ 3×3 Matrix{Float64}
       chol ┴ nothing
 
 julia> r(w)
