@@ -307,10 +307,10 @@ This function fits a regression model (as specified by `retgt`) to the response 
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
-    mean_y = if !haskey(re.retgt.kwargs, :wts)
+    mean_y = if !haskey(re.retgt.kwargs, :weights)
         Statistics.mean(y)
     else
-        Statistics.mean(y, re.retgt.kwargs.wts)
+        Statistics.mean(y, re.retgt.kwargs.weights)
     end
     fit_result = StatsAPI.fit(re.retgt, x1, y)
     beta_pc = StatsAPI.coef(fit_result)[2:end]

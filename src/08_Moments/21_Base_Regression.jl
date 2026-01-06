@@ -128,7 +128,7 @@ function LinearModel(; kwargs::NamedTuple = (;))
 end
 function factory(re::LinearModel, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return if !isnothing(w)
-        LinearModel(; kwargs = (; re.kwargs..., wts = w))
+        LinearModel(; kwargs = (; re.kwargs..., weights = w))
     else
         re
     end
@@ -208,7 +208,7 @@ end
 function factory(re::GeneralisedLinearModel,
                  w::Option{<:StatsBase.AbstractWeights} = nothing)
     return if !isnothing(w)
-        GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., wts = w))
+        GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
     else
         re
     end

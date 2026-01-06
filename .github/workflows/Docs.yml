@@ -31,12 +31,12 @@ jobs:
         uses: julia-actions/cache@v2
       - name: Instantiate environment with development version of the package
         run: |
-          julia --project=docs -e '
+          julia --color=yes --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
       - name: Generate and deploy documentation
-        run: julia --project=docs docs/make.jl
+        run: julia --color=yes --project=docs docs/make.jl
         env:
           JULIA_PKG_SERVER: ""
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,13 +54,13 @@ jobs:
         uses: julia-actions/cache@v2
       - name: Instantiate environment with development version of the package
         run: |
-          julia --project=docs -e '
+          julia --color=yes --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
       - name: Run doctest
         run: |
-          julia --project=docs -e '
+          julia --color=yes --project=docs -e '
             using Documenter: DocMeta, doctest
             using PortfolioOptimisers
             DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers); recursive=true)

@@ -7,6 +7,7 @@ struct KMeansAlgorithm{T1, T2, T3} <: AbstractNonHierarchicalClusteringAlgorithm
     function KMeansAlgorithm(rng::Random.AbstractRNG, seed::Option{<:Integer},
                              kwargs::NamedTuple)
         if haskey(kwargs, :weights)
+            @argcheck(isa(kwargs.weights, StatsBase.AbstractWeights), TypeError)
             @argcheck(!isempty(kwargs.weights), IsEmptyError)
         end
         return new{typeof(rng), typeof(seed), typeof(kwargs)}(rng, seed, kwargs)
