@@ -409,6 +409,7 @@ RatioRiskMeasure
      │            │      ub ┼ nothing
      │            │     rke ┴ Bool: true
      │      sigma ┼ nothing
+     │       chol ┼ nothing
      │         rc ┼ nothing
      │        alg ┴ SquaredSOCRiskExpr()
   rf ┴ Float64: 0.0
