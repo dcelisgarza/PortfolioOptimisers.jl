@@ -76,7 +76,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
     return model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
-                            r::Variance{<:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
+                            r::Variance{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -89,7 +89,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     return model[key] = JuMP.@expression(model, dev^2)
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
-                            r::Variance{<:Any, <:Any, <:Any, <:QuadRiskExpr},
+                            r::Variance{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
