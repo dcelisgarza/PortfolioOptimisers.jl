@@ -16,8 +16,8 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     X4 = X2 .^ 2
     e2 = vec(mean(me, X2; dims = 1))
     e4 = vec(mean(me, X4; dims = 1))
-
     kt_res = Matrix{promote_type(eltype(e4), eltype(sigma))}(undef, N2, N2)
+    
     @inbounds FLoops.@floop ex for j in 1:N, l in 1:N
         col = (j - 1) * N + l
         for i in 1:N, k in 1:N
