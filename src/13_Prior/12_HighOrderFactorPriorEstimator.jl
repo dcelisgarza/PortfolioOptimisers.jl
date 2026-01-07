@@ -63,6 +63,8 @@ function cokurtosis_residuals(M::MatNum, f_sigma::MatNum, X::MatNum,
     end
     return kt_res
 end
+"""
+"""
 struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_F
     pe::T1

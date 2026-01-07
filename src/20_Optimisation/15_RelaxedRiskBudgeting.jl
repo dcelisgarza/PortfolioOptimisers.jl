@@ -11,6 +11,8 @@ end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
+"""
+"""
 struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
     rba::T2
