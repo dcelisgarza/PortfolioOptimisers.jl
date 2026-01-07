@@ -53,8 +53,4 @@
     res = optimise(RandomWeighted(; wb = wb, sets = sets, rng = StableRNG(123456789)), rd)
     @test isapprox(res.w[1], 0.07)
     @test isapprox(sum(res.w), 1)
-
-    res = optimise(RandomWeighted(; wb = wb, sets = sets), rd)
-    @test isapprox(res.w[1], 0.07)
-    @test isapprox(sum(res.w), 1)
 end

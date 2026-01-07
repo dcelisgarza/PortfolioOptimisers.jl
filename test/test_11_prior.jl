@@ -159,6 +159,31 @@
                             coskewness(Coskewness(; alg = Full()), pr2.X;
                                        mean = transpose(pr2.mu))))
     end
+    @testset "High Order Factor Prior" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/HighOrderFactorPrior.csv.gz"), DataFrame)
+        pr0 = prior(FactorPrior(), rd)
+        pr = prior(HighOrderFactorPriorEstimator(), rd)
+        @test isapprox(pr.X, pr0.X)
+        @test isapprox(pr.mu, pr0.mu)
+        @test isapprox(pr.sigma, pr0.sigma)
+        @test isapprox(pr.chol, pr0.chol)
+        @test isapprox(pr.f_mu, pr0.f_mu)
+        @test isapprox(pr.f_sigma, pr0.f_sigma)
+        N2 = length(pr.V)
+        N3 = length(pr.sk)
+        N4 = length(pr.kt)
+        Nf2 = length(pr.f_V)
+        Nf3 = length(pr.f_sk)
+        Nf4 = length(pr.f_kt)
+        @test isapprox(df[1:N4, 1], vec(pr.kt))
+        @test isapprox(df[(N4 + 1):(N4 + N3), 1], vec(pr.sk))
+        @test isapprox(df[(N4 + N3 + 1):(N4 + N3 + N2), 1], vec(pr.V))
+        @test isapprox(df[(N4 + N3 + N2 + 1):(N4 + N3 + N2 + Nf4), 1], vec(pr.f_kt))
+        @test isapprox(df[(N4 + N3 + N2 + Nf4 + 1):(N4 + N3 + N2 + Nf4 + Nf3), 1],
+                       vec(pr.f_sk))
+        @test isapprox(df[(N4 + N3 + N2 + Nf4 + Nf3 + 1):(N4 + N3 + N2 + Nf4 + Nf3 + Nf2),
+                          1], vec(pr.f_V))
+    end
     @testset "Vanilla and Bayesian Black Litterman" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/BlackLitterman.csv.gz"), DataFrame)
         pes = [BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),

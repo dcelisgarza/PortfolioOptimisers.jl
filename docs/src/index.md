@@ -462,7 +462,9 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
           * Augmented [`AugmentedBlackLittermanPrior`](@ref)
       + Entropy pooling [`EntropyPoolingPrior`](@ref)
       + Opinion pooling [`OpinionPoolingPrior`](@ref)
+
   - High order prior [`HighOrderPrior`](@ref)
+    
       + High order [`HighOrderPriorEstimator`](@ref)
       + High order factor model
 

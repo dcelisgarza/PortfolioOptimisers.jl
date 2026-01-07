@@ -169,6 +169,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
         err = X - posterior_X
         err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma
+        posdef!(pe.mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,

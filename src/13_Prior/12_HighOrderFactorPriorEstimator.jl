@@ -71,7 +71,7 @@ struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5} <:
     ske::T3
     ex::T4
     rsd::T5
-    function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F,
+    function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},
                                            ske::Option{<:CoskewnessEstimator},
                                            ex::FLoops.Transducers.Executor, rsd::Bool)
@@ -81,7 +81,7 @@ struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5} <:
     end
 end
 function HighOrderFactorPriorEstimator(;
-                                       pe::AbstractLowOrderPriorEstimator_F = FactorPrior(),
+                                       pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(),
                                        kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                        alg = Full()),
                                        ske::Option{<:CoskewnessEstimator} = Coskewness(;
@@ -137,13 +137,16 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             posterior_sk .+= coskewness_residuals(err, pe.ske.me)
         end
         if !isnothing(f_kt)
-            sigma = if isnothing(pr.chol)
-                pr.sigma
+            if isnothing(pr.chol)
+                sigma = pr.sigma
             else
-                pr.sigma - LinearAlgebra.diagm(vec(Statistics.var(pe.pe.ve, err; dims = 1)))
+                sigma = pr.sigma -
+                        LinearAlgebra.diagm(vec(Statistics.var(pe.pe.ve, err; dims = 1)))
+                posdef!(pe.pe.mp.pdm, sigma)
             end
             err_kt = cokurtosis_residuals(sigma, err, pe.kte.me, pe.ex)
             posterior_kt .+= err_kt
+            posdef!(pe.kte.mp.pdm, posterior_kt)
         end
     end
     if !isnothing(f_sk)
