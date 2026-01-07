@@ -137,6 +137,7 @@ Abstract supertype for high order prior estimators.
   - [`prior`](@ref)
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
 """
     abstract type AbstractPriorResult <: AbstractResult end
 
