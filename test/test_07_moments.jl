@@ -29,6 +29,7 @@
     ew = eweights(1:252, inv(252); scale = true)
     fw = fweights(rand(rng, 252))
     rf = 4.34 / 100 / 252
+
     @testset "Expected ReturnsResult" begin
         mes = [ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; tgt = VolatilityWeighted())),

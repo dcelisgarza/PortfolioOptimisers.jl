@@ -111,13 +111,16 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         X = transpose(X)
         F = transpose(F)
     end
+    kM = nothing
+    L2 = nothing
+    S2 = nothing
+    posterior_kt = nothing
+    posterior_sk = nothing
+    posterior_V = nothing
     pr = prior(pe.pe, X, F; dims = 1, kwargs...)
     posterior_X = pr.X
     M = pr.rr.M
     f_kt = cokurtosis(pe.kte, F; kwargs...)
-    kM = nothing
-    L2, S2, posterior_kt = nothing, nothing, nothing
-    posterior_sk, posterior_V = nothing, nothing
     if !isnothing(f_kt)
         kM = kron(M, M)
         L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))[2:3]
@@ -140,8 +143,13 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             if isnothing(pr.chol)
                 sigma = pr.sigma
             else
-                sigma = pr.sigma -
-                        LinearAlgebra.diagm(vec(Statistics.var(pe.pe.ve, err; dims = 1)))
+                err_sigma = vec(Statistics.var(pe.pe.ve, err; dims = 1))
+                sigma = if any(map((x, y) -> x > y, err_sigma, diag(pr.sigma)))
+                    @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
+                    pr.sigma
+                else
+                    pr.sigma - LinearAlgebra.diagm(err_sigma)
+                end
                 posdef!(pe.pe.mp.pdm, sigma)
             end
             err_kt = cokurtosis_residuals(sigma, err, pe.kte.me, pe.ex)
@@ -150,7 +158,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         end
     end
     if !isnothing(f_sk)
-        posterior_V = __coskewness(posterior_sk, posterior_X, pe.ske.mp)
+        posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X, pe.ske.mp)
     end
     return HighOrderPrior(; pr = pr, kt = posterior_kt, L2 = L2, S2 = S2, sk = posterior_sk,
                           V = posterior_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp,

@@ -53,7 +53,7 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum,
     sk = r.sk
     idx = fourth_moment_index_generator(size(sk, 1), i)
     sk = view(r.sk, i, idx)
-    V = __coskewness(sk, view(X, :, i), r.mp)
+    V = negative_spectral_coskewness(sk, view(X, :, i), r.mp)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 

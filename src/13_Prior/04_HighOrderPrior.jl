@@ -291,7 +291,7 @@ function prior_view(pr::HighOrderPrior, i)
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
     if !isnothing(sk)
-        V = __coskewness(sk, view(pr.X, :, i), skmp)
+        V = negative_spectral_coskewness(sk, view(pr.X, :, i), skmp)
     else
         V = nothing
     end

@@ -79,12 +79,12 @@ function factory(ce::Coskewness, w::Option{<:StatsBase.AbstractWeights} = nothin
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """
-    __coskewness(cskew::MatNum, X::MatNum,
+    negative_spectral_coskewness(cskew::MatNum, X::MatNum,
                  mp::AbstractMatrixProcessingEstimator)
 
 Internal helper for coskewness matrix processing.
 
-`__coskewness` processes the coskewness tensor by applying the matrix processing estimator to each block, then projects the result using eigenvalue decomposition and clamps negative values. Used internally for robust coskewness estimation.
+`negative_spectral_coskewness` processes the coskewness tensor by applying the matrix processing estimator to each block, then projects the result using eigenvalue decomposition and clamps negative values. Used internally for robust coskewness estimation.
 
 # Arguments
 
@@ -103,7 +103,8 @@ Internal helper for coskewness matrix processing.
   - [`matrix_processing!`](@ref)
   - [`coskewness`](@ref)
 """
-function __coskewness(cskew::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
+function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
+                                      mp::AbstractMatrixProcessingEstimator)
     N = size(cskew, 1)
     V = zeros(eltype(cskew), N, N)
     for i in 1:N
@@ -144,14 +145,14 @@ Internal helper for coskewness computation.
 # Related
 
   - [`Coskewness`](@ref)
-  - [`__coskewness`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
   - [`coskewness`](@ref)
 """
 function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
     o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
     z = kron(o, Y) ⊙ kron(Y, o)
     cskew = transpose(Y) * z / size(Y, 1)
-    V = __coskewness(cskew, X, mp)
+    V = negative_spectral_coskewness(cskew, X, mp)
     return cskew, V
 end
 """
@@ -210,7 +211,7 @@ julia> V
 
   - [`Coskewness`](@ref)
   - [`_coskewness`](@ref)
-  - [`__coskewness`](@ref)
+  - [`negative_spectral_coskewness`](@ref)
 """
 function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
