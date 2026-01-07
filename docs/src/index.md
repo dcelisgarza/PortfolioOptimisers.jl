@@ -559,6 +559,18 @@ Adjacency matrices encode asset relationships either with clustering or graph th
   - Average centrality [`average_centrality`](@ref)
   - The asset phylogeny score [`asset_phylogeny`](@ref)
 
+### Fees
+
+Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naïve ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
+
+  - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
+    
+      + Proportional long
+      + Proportional short
+      + Fixed long
+      + Fixed short
+      + Turnover [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
+
 ### Portfolio optimisation
 
 Optimisations are implemented via [`optimise`](@ref).
@@ -596,18 +608,6 @@ These return a [`NaiveOptimisation`](@ref) object containing the results.
     
       + Arithmetic returns [`ArithmeticReturn`](@ref)
       + Logarithmic returns [`LogarithmicReturn`](@ref)
-  - Fees
-    
-      + Proportional
-        
-          * Long
-          * Short
-    
-      + Fixed
-        
-          * Long
-          * Short
-      + Turnover
   - Regularisation
     
       + L1
