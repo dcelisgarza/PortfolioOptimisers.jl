@@ -2,5 +2,9 @@
 
 ```@docs
 ArithmeticReturn
-KellyReturn
+LogarithmicReturn
+MinimumRisk
+MaximumUtility
+MaximumRatio
+MaximumReturn
 ```

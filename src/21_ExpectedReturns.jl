@@ -1,7 +1,7 @@
 """
     expected_return(ret::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
-    expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult;
+    expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
     expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
@@ -29,7 +29,7 @@ Compute the expected portfolio return using the specified return estimator.
 # Related
 
   - [`ArithmeticReturn`](@ref)
-  - [`KellyReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`VecNum`](@ref)
@@ -47,7 +47,7 @@ function expected_return(::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
     mu = pr.mu
     return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
 end
-function expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult,
+function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     rw = ret.w
     X = pr.X

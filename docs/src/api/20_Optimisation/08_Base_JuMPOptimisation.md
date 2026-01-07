@@ -1,9 +1,7 @@
 # Base JuMP Optimisation
 
-## Public
-
 ```@docs
 JuMPReturnsEstimator
+CustomJuMPConstraint
+CustomJuMPObjective
 ```
-
-## Private

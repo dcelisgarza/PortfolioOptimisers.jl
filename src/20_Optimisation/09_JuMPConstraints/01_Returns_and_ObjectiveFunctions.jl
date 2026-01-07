@@ -41,10 +41,11 @@ function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
 end
 """
 """
-struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
+struct LogarithmicReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
-    function KellyReturn(w::Option{<:StatsBase.AbstractWeights}, lb::Option{<:RkRtBounds})
+    function LogarithmicReturn(w::Option{<:StatsBase.AbstractWeights},
+                               lb::Option{<:RkRtBounds})
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
@@ -57,12 +58,12 @@ struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
         return new{typeof(w), typeof(lb)}(w, lb)
     end
 end
-function KellyReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                     lb::Option{<:RkRtBounds} = nothing)
-    return KellyReturn(w, lb)
+function LogarithmicReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing,
+                           lb::Option{<:RkRtBounds} = nothing)
+    return LogarithmicReturn(w, lb)
 end
-function no_bounds_returns_estimator(r::KellyReturn, args...)
-    return KellyReturn(; w = r.w)
+function no_bounds_returns_estimator(r::LogarithmicReturn, args...)
+    return LogarithmicReturn(; w = r.w)
 end
 #=
 mutable struct AKelly <: RetType
@@ -204,10 +205,14 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
 end
 """
 """
-function factory(r::KellyReturn, pr::AbstractPriorResult, args...; kwargs...)
-    return KellyReturn(; w = nothing_scalar_array_selector(r.w, pr.w), lb = r.lb)
+function factory(r::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs...)
+    return LogarithmicReturn(; w = nothing_scalar_array_selector(r.w, pr.w), lb = r.lb)
 end
+"""
+"""
 struct MinimumRisk <: ObjectiveFunction end
+"""
+"""
 struct MaximumUtility{T1} <: ObjectiveFunction
     l::T1
     function MaximumUtility(l::Number)
@@ -218,6 +223,8 @@ end
 function MaximumUtility(; l::Number = 2)
     return MaximumUtility(l)
 end
+"""
+"""
 struct MaximumRatio{T1, T2} <: ObjectiveFunction
     rf::T1
     ohf::T2
@@ -231,6 +238,8 @@ end
 function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
     return MaximumRatio(rf, ohf)
 end
+"""
+"""
 struct MaximumReturn <: ObjectiveFunction end
 function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
                                              obj::MaximumRatio)
@@ -359,7 +368,7 @@ function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, ::MaximumRat
     risk = model[:risk]
     JuMP.@constraint(model, sr_ekelly_risk, sc * (risk - ohf) <= 0)
 end
-function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
+function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
     k = model[:k]
     sc = model[:sc]
@@ -429,7 +438,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           pret::KellyReturn,
+                                           pret::LogarithmicReturn,
                                            cobj::Option{<:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
@@ -480,5 +489,5 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn
     return nothing
 end
 
-export ArithmeticReturn, KellyReturn, MinimumRisk, MaximumUtility, MaximumRatio,
+export ArithmeticReturn, LogarithmicReturn, MinimumRisk, MaximumUtility, MaximumRatio,
        MaximumReturn, bounds_returns_estimator

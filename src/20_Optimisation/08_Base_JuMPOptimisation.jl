@@ -14,7 +14,11 @@ function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
+"""
+"""
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
+"""
+"""
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
 function custom_constraint_view(::Nothing, args...; kwargs...)
     return nothing

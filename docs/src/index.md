@@ -584,14 +584,18 @@ These return a [`NaiveOptimisation`](@ref) object containing the results.
 
 ##### Traditional Optimisation Features
 
-  - Objective functions
+  - Objective functions for non risk budgeting optimisations
     
-      + Minimum risk
-      + Maximum utility
-      + Maximum return over risk ratio
-      + Maximum return
-      + Custom
+      + Minimum risk [`MinimumRisk`](@ref)
+      + Maximum utility [`MaximumUtility`](@ref)
+      + Maximum return over risk ratio [`MaximumRatio`](@ref)
+      + Maximum return [`MaximumReturn`](@ref)
+      + Custom objective penalty [`CustomJuMPObjective`](@ref)
 
+  - Portfolio returns
+    
+      + Arithmetic returns [`ArithmeticReturn`](@ref)
+      + Logarithmic returns [`LogarithmicReturn`](@ref)
   - Fees
     
       + Proportional

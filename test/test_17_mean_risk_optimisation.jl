@@ -180,7 +180,7 @@
     pr2 = prior(EmpiricalPrior(), rd2)
     @testset "Mean Risk" begin
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
-        rets = [ArithmeticReturn(), KellyReturn()]
+        rets = [ArithmeticReturn(), LogarithmicReturn()]
         rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
               UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
               LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
