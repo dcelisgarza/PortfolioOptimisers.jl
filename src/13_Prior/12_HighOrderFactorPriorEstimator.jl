@@ -66,7 +66,7 @@ end
 """
 """
 struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractLowOrderPriorEstimator_F
+       AbstractHighOrderPriorEstimator_F
     pe::T1
     mp::T2
     kte::T3
