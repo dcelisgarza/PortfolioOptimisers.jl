@@ -1,5 +1,5 @@
 @safetestset "Phylogeny tests" begin
-    using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries
+    using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries, StableRNGs
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -100,6 +100,7 @@
         @test isapprox(clr.res.heights, clr_t.heights)
         @test clr.res.labels == clr_t.labels
         @test clr.res.linkage == clr_t.linkage
+
         @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
                                                                                      alg = SecondOrderDifference(),
                                                                                      max_k = nothing),
@@ -112,20 +113,6 @@
                                                                                      alg = SecondOrderDifference(),
                                                                                      max_k = 100),
                                                                clr.res, clr.D)
-
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SilhouetteScore(),
-                                                                                     max_k = nothing),
-                                                               clr.res, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SilhouetteScore(),
-                                                                                     max_k = 1),
-                                                               clr.res, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SilhouetteScore(),
-                                                                                     max_k = 100),
-                                                               clr.res, clr.D)
-
         @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
                                                                                      alg = SilhouetteScore(),
                                                                                      max_k = nothing),
@@ -179,6 +166,66 @@
                                                       root = EqualRoot()),
                                            onc = OptimalNumberClusters(; alg = 2)), pr.X)
         @test clr.k == 2
+
+        alg = KMeansAlgorithm(; rng = StableRNG(42), kwargs = (; init = :kmcen))
+        clr = clusterise(ClustersEstimator(; ce = PortfolioOptimisersCovariance(),
+                                           de = Distance(; alg = CanonicalDistance()),
+                                           alg = alg,
+                                           onc = OptimalNumberClusters(;
+                                                                       alg = SilhouetteScore())),
+                         pr.X)
+        @test clr.res.assignments ==
+              [3, 3, 3, 3, 1, 3, 3, 2, 3, 2, 2, 2, 3, 2, 2, 2, 1, 2, 1, 1]
+        @test isapprox(clr.res.costs,
+                       [0.17766245474431486, 0.19080736561118172, 0.22868094113151827,
+                        0.27672765546618017, 0.15862426791009376, 0.24968616703931623,
+                        0.2588799728188551, 0.1786262195742978, 0.22722331843868737,
+                        0.22990129758696654, 0.2567847522783442, 0.2704494266876818,
+                        0.18382368006096605, 0.21331389368901732, 0.274581606177021,
+                        0.22265814453145616, 0.22658135714037542, 0.22219845380251435,
+                        0.5342043271374468, 0.16001795714648281])
+        @test clr.k == 3
+
+        @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference(),
+                                                                                     max_k = nothing),
+                                                               alg, clr.D)[2]
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference(),
+                                                                                     max_k = 1),
+                                                               alg, clr.D)[2]
+        @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference(),
+                                                                                     max_k = 100),
+                                                               alg, clr.D)[2]
+        @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SilhouetteScore(),
+                                                                                     max_k = nothing),
+                                                               alg, clr.D)[2]
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SilhouetteScore(),
+                                                                                     max_k = 1),
+                                                               alg, clr.D)[2]
+        @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SilhouetteScore(),
+                                                                                     max_k = 100),
+                                                               alg, clr.D)[2]
+        @test 4 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 10,
+                                                                                max_k = nothing),
+                                                          alg, clr.D)[2]
+        @test 1 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 1,
+                                                                                max_k = 5),
+                                                          alg, clr.D)[2]
+        @test 2 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 2,
+                                                                                max_k = 5),
+                                                          alg, clr.D)[2]
+        @test 2 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 3,
+                                                                                max_k = 2),
+                                                          alg, clr.D)[2]
     end
     @testset "Centrality tests" begin
         ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),

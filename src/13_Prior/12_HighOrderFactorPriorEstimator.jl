@@ -17,7 +17,7 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     e2 = vec(mean(me, X2; dims = 1))
     e4 = vec(mean(me, X4; dims = 1))
     kt_res = Matrix{promote_type(eltype(e4), eltype(sigma))}(undef, N2, N2)
-    
+
     @inbounds FLoops.@floop ex for j in 1:N, l in 1:N
         col = (j - 1) * N + l
         for i in 1:N, k in 1:N
@@ -144,7 +144,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
                 sigma = pr.sigma
             else
                 err_sigma = vec(Statistics.var(pe.pe.ve, err; dims = 1))
-                sigma = if any(map((x, y) -> x > y, err_sigma, LinearAlgebra.diag(pr.sigma)))
+                sigma = if any(map((x, y) -> x > y, err_sigma,
+                                   LinearAlgebra.diag(pr.sigma)))
                     @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
                     pr.sigma
                 else

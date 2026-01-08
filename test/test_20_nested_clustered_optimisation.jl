@@ -270,7 +270,20 @@
                                                               opt = hopto)),
                 NestedClustered(; cle = clr,
                                 opti = FactorRiskContribution(; re = rr, opt = jopti),
-                                opto = FactorRiskContribution(; opt = jopto))]
+                                opto = FactorRiskContribution(; opt = jopto)),
+                NestedClustered(;
+                                cle = ClustersEstimator(;
+                                                        ce = PortfolioOptimisersCovariance(),
+                                                        de = Distance(;
+                                                                      alg = CanonicalDistance()),
+                                                        alg = KMeansAlgorithm(;
+                                                                              rng = StableRNG(42),
+                                                                              kwargs = (;
+                                                                                        init = :kmcen)),
+                                                        onc = OptimalNumberClusters(;
+                                                                                    alg = SecondOrderDifference())),
+                                opti = RiskBudgeting(; opt = jopti),
+                                opto = MeanRisk(; opt = jopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
