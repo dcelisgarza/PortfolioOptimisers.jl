@@ -298,6 +298,14 @@
 
         @test A1 == A2
         @test A1 == A3
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix4.csv.gz"), DataFrame)
+        A = phylogeny_matrix(ClustersEstimator(;
+                                               alg = KMeansAlgorithm(; rng = StableRNG(420),
+                                                                     kwargs = (;
+                                                                               init = :kmcen))),
+                             pr).X
+        @test isapprox(vec(A), df[!, 1])
     end
     #=
     @testset "DBHT Clustering tests" begin
