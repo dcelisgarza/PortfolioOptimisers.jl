@@ -390,7 +390,7 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 6
 ```
 """
-⊖(A::ArrNum, B::ArrNum) = A - B
+⊖(A::ArrNum, B::ArrNum) = A .- B
 ⊖(A::ArrNum, B) = A .- B
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
@@ -815,7 +815,21 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MeanValue <: VectorToScalarMeasure end
+struct MeanValue{T1} <: VectorToScalarMeasure
+    w::T1
+    function MeanValue(w::Option{<:StatsBase.AbstractWeights})
+        if !isnothing(w)
+            @argcheck(!isempty(w), IsEmptyError)
+        end
+        return new{typeof(w)}(w)
+    end
+end
+function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return MeanValue(w)
+end
+function factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return isnothing(w) ? mv : MeanValue(; w = w)
+end
 """
     struct MedianValue <: VectorToScalarMeasure end
 
@@ -838,7 +852,21 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MedianValue <: VectorToScalarMeasure end
+struct MedianValue{T1} <: VectorToScalarMeasure
+    w::T1
+    function MedianValue(w::Option{<:StatsBase.AbstractWeights})
+        if !isnothing(w)
+            @argcheck(!isempty(w), IsEmptyError)
+        end
+        return new{typeof(w)}(w)
+    end
+end
+function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return MedianValue(w)
+end
+function factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return isnothing(w) ? mdv : MedianValue(; w = w)
+end
 """
     struct MaxValue <: VectorToScalarMeasure end
 
@@ -862,20 +890,62 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 struct MaxValue <: VectorToScalarMeasure end
-struct StandardisedValue{T1} <: VectorToScalarMeasure
-    corrected::T1
-    function StandardisedValue(corrected::Bool)
-        return new{typeof(corrected)}(corrected)
+struct StdValue{T1, T2} <: VectorToScalarMeasure
+    w::T1
+    corrected::T2
+    function StdValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
+        if !isnothing(w)
+            @argcheck(!isempty(w), IsEmptyError)
+        end
+        return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function StandardisedValue(; corrected::Bool = true)
-    return StandardisedValue(corrected)
+function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
+                  corrected::Bool = true)
+    return StdValue(w, corrected)
 end
-struct StdValue <: VectorToScalarMeasure end
-struct VarValue <: VectorToScalarMeasure end
+function factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return isnothing(w) ? sv : StdValue(; w = w, corrected = sv.corrected)
+end
+struct VarValue{T1, T2} <: VectorToScalarMeasure
+    w::T1
+    corrected::T2
+    function VarValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
+        if !isnothing(w)
+            @argcheck(!isempty(w), IsEmptyError)
+        end
+        return new{typeof(w), typeof(corrected)}(w, corrected)
+    end
+end
+function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
+                  corrected::Bool = true)
+    return VarValue(w, corrected)
+end
+function factory(sv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return isnothing(w) ? sv : VarValue(; w = w, corrected = sv.corrected)
+end
 struct SumValue <: VectorToScalarMeasure end
 struct ProdValue <: VectorToScalarMeasure end
 struct ModeValue <: VectorToScalarMeasure end
+struct StandardisedValue{T1, T2} <: VectorToScalarMeasure
+    mv::T1
+    sv::T2
+    function StandardisedValue(mv::MeanValue, sv::StdValue)
+        return new{typeof(mv), typeof(sv)}(mv, sv)
+    end
+end
+function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
+    return StandardisedValue(mv, sv)
+end
+function factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return if isnothing(w)
+        msv
+    else
+        mv = factory(msv.mv, w)
+        sv = factory(msv.sv, w)
+        StandardisedValue(mv, sv)
+    end
+end
 """
     vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
 
@@ -910,40 +980,48 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
   - [`MedianValue`](@ref)
   - [`MaxValue`](@ref)
 """
-function vec_to_real_measure(::MinValue, val::VecNum)
+function vec_to_real_measure(::MinValue, val::VecNum; kwargs...)
     return minimum(val)
 end
-function vec_to_real_measure(::MeanValue, val::VecNum)
-    return Statistics.mean(val)
+function vec_to_real_measure(mv::MeanValue, val::VecNum; kwargs...)
+    return isnothing(mv.w) ? Statistics.mean(val) : Statistics.mean(val, mv.w)
 end
-function vec_to_real_measure(::MedianValue, val::VecNum)
-    return Statistics.median(val)
+function vec_to_real_measure(mdv::MedianValue, val::VecNum; kwargs...)
+    return isnothing(mdv.w) ? Statistics.median(val) : Statistics.median(val, mdv.w)
 end
-function vec_to_real_measure(::MaxValue, val::VecNum)
+function vec_to_real_measure(::MaxValue, val::VecNum; kwargs...)
     return maximum(val)
 end
-function vec_to_real_measure(val::Number, ::VecNum)
+function vec_to_real_measure(val::Number, ::VecNum; kwargs...)
     return val
 end
-function vec_to_real_measure(::StandardisedValue, val::VecNum)
-    m = Statistics.mean(val)
-    s = Statistics.std(val; mean = m)
+function vec_to_real_measure(sv::StdValue, val::VecNum; kwargs...)
+    return if isnothing(sv.w)
+        Statistics.std(val; corrected = sv.corrected, kwargs...)
+    else
+        Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
+    end
+end
+function vec_to_real_measure(vv::VarValue, val::VecNum; kwargs...)
+    return if isnothing(vv.w)
+        Statistics.var(val; corrected = vv.corrected)
+    else
+        Statistics.var(val, vv.w; corrected = vv.corrected)
+    end
+end
+function vec_to_real_measure(msv::StandardisedValue, val::VecNum; kwargs...)
+    m = vec_to_real_measure(msv.mv, val)
+    s = vec_to_real_measure(msv.sv, val; mean = m)
     s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
     return m / s
 end
-function vec_to_real_measure(::StdValue, val::VecNum)
-    return Statistics.std(val)
-end
-function vec_to_real_measure(::VarValue, val::VecNum)
-    return Statistics.var(val)
-end
-function vec_to_real_measure(::SumValue, val::VecNum)
+function vec_to_real_measure(::SumValue, val::VecNum; kwargs...)
     return sum(val)
 end
-function vec_to_real_measure(::ProdValue, val::VecNum)
+function vec_to_real_measure(::ProdValue, val::VecNum; kwargs...)
     return prod(val)
 end
-function vec_to_real_measure(::ModeValue, val::VecNum)
+function vec_to_real_measure(::ModeValue, val::VecNum; kwargs...)
     return StatsBase.mode(val)
 end
 

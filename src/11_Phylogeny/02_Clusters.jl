@@ -175,7 +175,11 @@ Keyword arguments correspond to the fields above.
 julia> SecondOrderDifference()
 SecondOrderDifference
   alg ┼ StandardisedValue
-      │   corrected ┴ Bool: true
+      │   mv ┼ MeanValue
+      │      │   w ┴ nothing
+      │   sv ┼ StdValue
+      │      │           w ┼ nothing
+      │      │   corrected ┴ Bool: true
 ```
 
 # Related
@@ -221,7 +225,11 @@ Keyword arguments correspond to the fields above.
 julia> SilhouetteScore()
 SilhouetteScore
      alg ┼ StandardisedValue
-         │   corrected ┴ Bool: true
+         │   mv ┼ MeanValue
+         │      │   w ┴ nothing
+         │   sv ┼ StdValue
+         │      │           w ┼ nothing
+         │      │   corrected ┴ Bool: true
   metric ┴ nothing
 ```
 
@@ -279,7 +287,11 @@ OptimalNumberClusters
   max_k ┼ Int64: 10
     alg ┼ SecondOrderDifference
         │   alg ┼ StandardisedValue
-        │       │   corrected ┴ Bool: true
+        │       │   mv ┼ MeanValue
+        │       │      │   w ┴ nothing
+        │       │   sv ┼ StdValue
+        │       │      │           w ┼ nothing
+        │       │      │   corrected ┴ Bool: true
 ```
 
 # Related
@@ -384,7 +396,7 @@ ClustersEstimator
       │      │    me ┼ SimpleExpectedReturns
       │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │   ce ┼ SimpleCovariance: SimpleCovariance(true)
       │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -404,7 +416,11 @@ ClustersEstimator
       │   max_k ┼ nothing
       │     alg ┼ SecondOrderDifference
       │         │   alg ┼ StandardisedValue
-      │         │       │   corrected ┴ Bool: true
+      │         │       │   mv ┼ MeanValue
+      │         │       │      │   w ┴ nothing
+      │         │       │   sv ┼ StdValue
+      │         │       │      │           w ┼ nothing
+      │         │       │      │   corrected ┴ Bool: true
 ```
 
 # Related
