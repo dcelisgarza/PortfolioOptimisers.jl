@@ -466,7 +466,7 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
   - High order prior [`HighOrderPrior`](@ref)
     
       + High order [`HighOrderPriorEstimator`](@ref)
-      + High order factor model
+      + High order factor model [`HighOrderFactorPriorEstimator`](@ref)
 
 ### Uncertainty sets
 

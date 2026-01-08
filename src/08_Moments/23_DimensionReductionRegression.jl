@@ -216,6 +216,10 @@ struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimat
                                           ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
+        if haskey(retgt.kwargs, :weights)
+            @argcheck(isa(retgt.kwargs.weights, StatsBase.AbstractWeights), TypeError)
+            @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+        end
         return new{typeof(me), typeof(ve), typeof(drtgt), typeof(retgt)}(me, ve, drtgt,
                                                                          retgt)
     end
