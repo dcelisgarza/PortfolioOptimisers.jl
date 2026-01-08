@@ -2,4 +2,7 @@
 
 ```@docs
 RelaxedRiskBudgeting
+BasicRelaxedRiskBudgeting
+RegularisedRelaxedRiskBudgeting
+RegularisedPenalisedRelaxedRiskBudgeting
 ```

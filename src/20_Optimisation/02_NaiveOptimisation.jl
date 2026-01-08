@@ -7,7 +7,7 @@ function assert_external_optimiser(::NaiveOptimisationEstimator)
 end
 """
 """
-struct NaiveOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+struct NaiveOptimisationResult{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T4
@@ -15,8 +15,8 @@ struct NaiveOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     w::T3
     fb::T6
 end
-function factory(res::NaiveOptimisation, fb)
-    return NaiveOptimisation(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
+function factory(res::NaiveOptimisationResult, fb)
+    return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 """
 """
@@ -68,7 +68,7 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                                    N = size(pr.X, ifelse(isone(dims), 2, 1)),
                                    strict = iv.strict, datatype = eltype(pr.X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
-    return NaiveOptimisation(typeof(iv), pr, wb, retcode, w, nothing)
+    return NaiveOptimisationResult(typeof(iv), pr, wb, retcode, w, nothing)
 end
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
@@ -116,7 +116,7 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
-    return NaiveOptimisation(typeof(ew), nothing, wb, retcode, w, nothing)
+    return NaiveOptimisationResult(typeof(ew), nothing, wb, retcode, w, nothing)
 end
 function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
@@ -169,11 +169,11 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
-    return NaiveOptimisation(typeof(rw), nothing, wb, retcode, w, nothing)
+    return NaiveOptimisationResult(typeof(rw), nothing, wb, retcode, w, nothing)
 end
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
 
-export NaiveOptimisation, InverseVolatility, EqualWeighted, RandomWeighted
+export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeighted

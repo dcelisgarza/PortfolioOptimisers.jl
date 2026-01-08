@@ -4,4 +4,5 @@
 AssetRiskBudgeting
 FactorRiskBudgeting
 RiskBudgeting
+RiskBudgetingResult
 ```

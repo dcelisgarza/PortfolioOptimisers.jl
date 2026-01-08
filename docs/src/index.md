@@ -573,11 +573,11 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
 
 ### Portfolio optimisation
 
-Optimisations are implemented via [`optimise`](@ref).
+Optimisations are implemented via [`optimise`](@ref). Optimisations consume an estimator and return a result.
 
 #### Naïve
 
-These return a [`NaiveOptimisation`](@ref) object containing the results.
+These return a [`NaiveOptimisationResult`](@ref).
 
   - Inverse Volatility [`InverseVolatility`](@ref)
   - Equal Weighted [`EqualWeighted`](@ref)
@@ -589,12 +589,17 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
   - Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)
 
-  - Factor Risk Contribution [`FactorRiskContribution`](@ref)
-  - Near Optimal Centering [`NearOptimalCentering`](@ref)
+  - Factor Risk Contribution [`FactorRiskContribution`](@ref) returns a [`FactorRiskContributionResult`](@ref)
+  - Near Optimal Centering [`NearOptimalCentering`](@ref) returns a [`NearOptimalCenteringResult`](@ref)
   - Asset and factor risk budgeting [`AssetRiskBudgeting`](@ref), [`FactorRiskBudgeting`](@ref)
     
-      + Risk Budgeting [`RiskBudgeting`](@ref)
-      + Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref)
+      + Risk Budgeting [`RiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+    
+      + Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+        
+          * Basic [`BasicRelaxedRiskBudgeting`](@ref)
+          * Regularised [`RegularisedRelaxedRiskBudgeting`](@ref)
+          * Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
 
 ##### Traditional Optimisation Features
 

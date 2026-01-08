@@ -4,5 +4,5 @@
 InverseVolatility
 EqualWeighted
 RandomWeighted
-NaiveOptimisation
+NaiveOptimisationResult
 ```

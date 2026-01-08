@@ -1,6 +1,12 @@
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
+"""
+"""
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
+"""
+"""
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
+"""
+"""
 struct RegularisedPenalisedRelaxedRiskBudgeting{T1} <: RelaxedRiskBudgetingAlgorithm
     p::T1
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
