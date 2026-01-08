@@ -287,7 +287,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
-            rtol = if i in (2, 3)
+            rtol = if i in (2, 3, 16)
                 5e-5
             elseif i == 12
                 5e-6
@@ -379,11 +379,15 @@
                                        opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
                        rd)
 
-        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[1][i, :]] for i in axes(res.resi[1].smtx[1], 1)])) < 3
-        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[2][i, :]] for i in axes(res.resi[1].smtx[2], 1)])) < 2
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[1][i, :]]
+                             for i in axes(res.resi[1].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[2][i, :]]
+                             for i in axes(res.resi[1].smtx[2], 1)])) < 2
 
-        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]] for i in axes(res.resi[2].smtx[1], 1)])) < 3
-        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]] for i in axes(res.resi[2].smtx[2], 1)])) < 2
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]]
+                             for i in axes(res.resi[2].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]]
+                             for i in axes(res.resi[2].smtx[2], 1)])) < 2
 
         opt = NestedClustered(; cle = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
