@@ -29,7 +29,6 @@
     ew = eweights(1:252, inv(252); scale = true)
     fw = fweights(rand(rng, 252))
     rf = 4.34 / 100 / 252
-
     @testset "Expected ReturnsResult" begin
         mes = [ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; tgt = VolatilityWeighted())),
@@ -60,6 +59,13 @@
             end
             @test success
         end
+        me0 = StandardDeviationExpectedReturns()
+        @test isapprox(mean(me0, rd.X), std(me0.ce, rd.X))
+        @test isapprox(mean(me0, rd.X), sqrt.(var(me0.ce, rd.X)))
+        me = PortfolioOptimisers.factory(StandardDeviationExpectedReturns(), ew)
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+
         me0 = ShrunkExpectedReturns(;
                                     ce = PortfolioOptimisersCovariance(;
                                                                        ce = Covariance(;
@@ -171,6 +177,13 @@
             end
             @test success
         end
+
+        ce0 = PortfolioOptimisersCovariance(; ce = CorrelationCovariance())
+        @test isapprox(cov(ce0, rd.X), cor(PortfolioOptimisersCovariance(), rd.X))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.ce.ce.w === ew
+        @test ce.ce.ce.me.w === ew
+
         @test isapprox(df[!, 40],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;

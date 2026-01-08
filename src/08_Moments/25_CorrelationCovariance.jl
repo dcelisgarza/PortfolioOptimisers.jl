@@ -6,8 +6,7 @@ struct CorrelationCovariance{T1} <: AbstractCovarianceEstimator
         return new{typeof(ce)}(ce)
     end
 end
-function CorrelationCovariance(;
-                               ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())
+function CorrelationCovariance(; ce::StatsBase.CovarianceEstimator = Covariance())
     return CorrelationCovariance(ce)
 end
 function factory(ce::CorrelationCovariance,

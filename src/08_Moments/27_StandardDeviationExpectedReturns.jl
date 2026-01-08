@@ -16,11 +16,7 @@ function factory(ce::StandardDeviationExpectedReturns,
 end
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
                          dims::Int = 1, kwargs...)
-    mu = sqrt.(LinearAlgebra.diag(Statistics.cov(me.ce, X; dims = dims, kwargs...)))
-    if isone(dims)
-        mu = reshape(mu, 1, :)
-    end
-    return mu
+    return Statistics.std(me.ce, X; dims = dims, kwargs...)
 end
 
 export StandardDeviationExpectedReturns
