@@ -75,7 +75,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
+    return HierarchicalResult(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
 function hrp_scalarised_risk(::SumScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
                              lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
@@ -167,7 +167,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
+    return HierarchicalResult(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

@@ -1,3 +1,36 @@
+struct RiskBudgetingResult{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
+    oe::T1
+    pa::T2
+    prb::T3
+    retcode::T4
+    sol::T5
+    model::T6
+    fb::T7
+end
+function factory(res::RiskBudgetingResult, fb)
+    return RiskBudgetingResult(res.oe, res.pa, res.prb, res.retcode, res.sol, res.model, fb)
+end
+function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
+    return if sym == :w
+        r.sol.w
+    elseif sym in propertynames(r)
+        getfield(r, sym)
+    elseif sym in propertynames(r.prb)
+        getproperty(r.prb, sym)
+    elseif sym in propertynames(r.pa)
+        getproperty(r.pa, sym)
+    else
+        getfield(r, sym)
+    end
+end
+struct ProcessedFactorRiskBudgetingAttributes{T1, T2, T3} <: AbstractResult
+    rkb::T1
+    b1::T2
+    rr::T3
+end
+struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
+    rkb::T1
+end
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
 """
 """
@@ -133,15 +166,12 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
-    return JuMPOptimisationRiskBudgeting(typeof(rb),
-                                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
-                                                                          lcs, cent, gcard,
-                                                                          sgcard, smtx,
-                                                                          sgmtx, slt, sst,
-                                                                          sglt, sgst, plg,
-                                                                          tn, fees, ret),
-                                         prb, retcode, sol, ifelse(save, model, nothing),
-                                         nothing)
+    return RiskBudgetingResult(typeof(rb),
+                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
+                                                                gcard, sgcard, smtx, sgmtx,
+                                                                slt, sst, sglt, sgst, plg,
+                                                                tn, fees, ret), prb,
+                               retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -149,4 +179,4 @@ function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
     return _optimise(rb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
-export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting
+export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting, RiskBudgetingResult

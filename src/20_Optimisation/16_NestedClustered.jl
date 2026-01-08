@@ -1,5 +1,4 @@
-struct NestedClusteredOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       OptimisationResult
+struct NestedClusteredResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -11,9 +10,9 @@ struct NestedClusteredOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     w::T9
     fb::T10
 end
-function factory(res::NestedClusteredOptimisation, fb)
-    return NestedClusteredOptimisation(res.oe, res.pr, res.wb, res.clr, res.resi, res.reso,
-                                       res.cv, res.retcode, res.w, fb)
+function factory(res::NestedClusteredResult, fb)
+    return NestedClusteredResult(res.oe, res.pr, res.wb, res.clr, res.resi, res.reso,
+                                 res.cv, res.retcode, res.w, fb)
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
@@ -207,8 +206,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult = ReturnsResult(); di
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.wf, nco.strict, resi,
                                                  reso, wi * reso.w; datatype = eltype(pr.X))
-    return NestedClusteredOptimisation(typeof(nco), pr, wb, clr, resi, reso, nco.cv,
-                                       retcode, w, nothing)
+    return NestedClusteredResult(typeof(nco), pr, wb, clr, resi, reso, nco.cv, retcode, w,
+                                 nothing)
 end
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, Nothing},
@@ -219,4 +218,4 @@ function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                      save = save, kwargs...)
 end
 
-export NestedClusteredOptimisation, NestedClustered
+export NestedClusteredResult, NestedClustered

@@ -1,5 +1,29 @@
 """
 """
+struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+    oe::T1
+    pa::T2
+    retcode::T3
+    sol::T4
+    model::T5
+    fb::T6
+end
+function factory(res::MeanRiskResult, fb)
+    return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
+end
+function Base.getproperty(r::MeanRiskResult, sym::Symbol)
+    return if sym == :w
+        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
+    elseif sym in propertynames(r)
+        getfield(r, sym)
+    elseif sym in propertynames(r.pa)
+        getproperty(r.pa, sym)
+    else
+        getfield(r, sym)
+    end
+end
+"""
+"""
 struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2
@@ -237,12 +261,11 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
-    return JuMPOptimisation(typeof(mr),
-                            ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
-                                                             gcard, sgcard, smtx, sgmtx,
-                                                             slt, sst, sglt, sgst, plg, tn,
-                                                             fees, ret), retcode, sol,
-                            ifelse(save, model, nothing), nothing)
+    return MeanRiskResult(typeof(mr),
+                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard,
+                                                           sgcard, smtx, sgmtx, slt, sst,
+                                                           sglt, sgst, plg, tn, fees, ret),
+                          retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -250,4 +273,4 @@ function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
     return _optimise(mr, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
-export MeanRisk
+export MeanRisk, MeanRiskResult

@@ -1,5 +1,5 @@
 const Sd_Var = Union{<:StandardDeviation, <:Variance}
-struct SchurComplementHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <:
+struct SchurComplementHierarchicalRiskParityResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
     pr::T2
@@ -263,8 +263,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                                    strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_complement_weights(pr, items, wb, sh.params)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
-    return SchurComplementHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma,
-                                                             retcode, w, nothing)
+    return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gamma,
+                                                       retcode, w, nothing)
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
@@ -282,14 +282,14 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
         gammas[i] = gamma
     end
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
-    return SchurComplementHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr,
-                                                             gammas, retcode, w, nothing)
+    return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gammas,
+                                                       retcode, w, nothing)
 end
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(sh, rd; dims = dims, kwargs...)
 end
 
-export SchurComplementHierarchicalRiskParityOptimisation, SchurComplementParams,
+export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,
        SchurComplementHierarchicalRiskParity, NonMonotonicSchurComplement,
        MonotonicSchurComplement

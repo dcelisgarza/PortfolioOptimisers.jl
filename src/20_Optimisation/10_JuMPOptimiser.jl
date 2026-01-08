@@ -19,92 +19,6 @@ struct ProcessedJuMPOptimiserAttributes{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,
     fees::T17
     ret::T18
 end
-struct ProcessedFactorRiskBudgetingAttributes{T1, T2, T3} <: AbstractResult
-    rkb::T1
-    b1::T2
-    rr::T3
-end
-struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
-    rkb::T1
-end
-struct JuMPOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
-    oe::T1
-    pa::T2
-    retcode::T3
-    sol::T4
-    model::T5
-    fb::T6
-end
-function factory(res::JuMPOptimisation, fb)
-    return JuMPOptimisation(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
-end
-"""
-"""
-struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
-       OptimisationResult
-    oe::T1
-    pa::T2
-    rr::T3
-    frc_plg::T4
-    retcode::T5
-    sol::T6
-    model::T7
-    fb::T8
-end
-function factory(res::JuMPOptimisationFactorRiskContribution, fb)
-    return JuMPOptimisationFactorRiskContribution(res.oe, res.pa, res.rr, res.frc_plg,
-                                                  res.retcode, res.sol, res.model, fb)
-end
-struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
-    oe::T1
-    pa::T2
-    prb::T3
-    retcode::T4
-    sol::T5
-    model::T6
-    fb::T7
-end
-function factory(res::JuMPOptimisationRiskBudgeting, fb)
-    return JuMPOptimisationRiskBudgeting(res.oe, res.pa, res.prb, res.retcode, res.sol,
-                                         res.model, fb)
-end
-function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
-    return if sym == :w
-        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in propertynames(r)
-        getfield(r, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
-    else
-        getfield(r, sym)
-    end
-end
-function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
-    return if sym == :w
-        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in propertynames(r)
-        getfield(r, sym)
-    elseif sym in propertynames(r.rr)
-        getproperty(r.rr, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
-    else
-        getfield(r, sym)
-    end
-end
-function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
-    return if sym == :w
-        r.sol.w
-    elseif sym in propertynames(r)
-        getfield(r, sym)
-    elseif sym in propertynames(r.prb)
-        getproperty(r.prb, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
-    else
-        getfield(r, sym)
-    end
-end
 function assert_finite_nonnegative_real_or_vec(val::Number)
     @argcheck(isfinite(val))
     @argcheck(val > zero(val))
@@ -470,5 +384,4 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          l2 = opt.l2, strict = opt.strict)
 end
 
-export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimisationRiskBudgeting,
-       JuMPOptimisationFactorRiskContribution, JuMPOptimiser
+export ProcessedJuMPOptimiserAttributes, JuMPOptimiser

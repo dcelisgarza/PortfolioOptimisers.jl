@@ -1,4 +1,4 @@
-struct HierarchicalOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
+struct HierarchicalResult{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
     oe::T1
     pr::T2
     fees::T3
@@ -8,9 +8,9 @@ struct HierarchicalOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationR
     w::T7
     fb::T8
 end
-function factory(res::HierarchicalOptimisation, fb)
-    return HierarchicalOptimisation(res.oe, res.pr, res.fees, res.wb, res.clr, res.retcode,
-                                    res.w, fb)
+function factory(res::HierarchicalResult, fb)
+    return HierarchicalResult(res.oe, res.pr, res.fees, res.wb, res.clr, res.retcode, res.w,
+                              fb)
 end
 struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
        BaseClusteringOptimisationEstimator
@@ -74,4 +74,4 @@ function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeas
     return nothing
 end
 
-export HierarchicalOptimisation, HierarchicalOptimiser
+export HierarchicalResult, HierarchicalOptimiser

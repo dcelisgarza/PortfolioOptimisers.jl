@@ -176,15 +176,12 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
-    return JuMPOptimisationRiskBudgeting(typeof(rrb),
-                                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
-                                                                          lcs, cent, gcard,
-                                                                          sgcard, smtx,
-                                                                          sgmtx, slt, sst,
-                                                                          sglt, sgst, plg,
-                                                                          tn, fees, ret),
-                                         prb, retcode, sol, ifelse(save, model, nothing),
-                                         nothing)
+    return RiskBudgetingResult(typeof(rrb),
+                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
+                                                                gcard, sgcard, smtx, sgmtx,
+                                                                slt, sst, sglt, sgst, plg,
+                                                                tn, fees, ret), prb,
+                               retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

@@ -1,5 +1,34 @@
 """
 """
+struct FactorRiskContributionResult{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
+    oe::T1
+    pa::T2
+    rr::T3
+    frc_plg::T4
+    retcode::T5
+    sol::T6
+    model::T7
+    fb::T8
+end
+function factory(res::FactorRiskContributionResult, fb)
+    return FactorRiskContributionResult(res.oe, res.pa, res.rr, res.frc_plg, res.retcode,
+                                        res.sol, res.model, fb)
+end
+function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
+    return if sym == :w
+        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
+    elseif sym in propertynames(r)
+        getfield(r, sym)
+    elseif sym in propertynames(r.rr)
+        getproperty(r.rr, sym)
+    elseif sym in propertynames(r.pa)
+        getproperty(r.pa, sym)
+    else
+        getfield(r, sym)
+    end
+end
+"""
+"""
 struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
        RiskJuMPOptimisationEstimator
     opt::T1
@@ -98,23 +127,15 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     add_custom_constraint!(model, frc.opt.ccnt, frc, pr)
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
-    return JuMPOptimisationFactorRiskContribution(typeof(frc),
-                                                  ProcessedJuMPOptimiserAttributes(pr, wb,
-                                                                                   lt, st,
-                                                                                   lcs,
-                                                                                   cent,
-                                                                                   gcard,
-                                                                                   sgcard,
-                                                                                   smtx,
-                                                                                   sgmtx,
-                                                                                   slt, sst,
-                                                                                   sglt,
-                                                                                   sgst,
-                                                                                   plg, tn,
-                                                                                   fees,
-                                                                                   ret), rr,
-                                                  frc_plg, retcode, sol,
-                                                  ifelse(save, model, nothing), nothing)
+    return FactorRiskContributionResult(typeof(frc),
+                                        ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
+                                                                         lcs, cent, gcard,
+                                                                         sgcard, smtx,
+                                                                         sgmtx, slt, sst,
+                                                                         sglt, sgst, plg,
+                                                                         tn, fees, ret), rr,
+                                        frc_plg, retcode, sol, ifelse(save, model, nothing),
+                                        nothing)
 end
 function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing},
@@ -123,4 +144,4 @@ function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
     return _optimise(frc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
-export FactorRiskContribution
+export FactorRiskContribution, FactorRiskContributionResult

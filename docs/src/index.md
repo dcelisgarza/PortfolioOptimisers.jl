@@ -585,7 +585,9 @@ These return a [`NaiveOptimisation`](@ref) object containing the results.
 
 #### Traditional
 
-  - Mean-Risk [`MeanRisk`](@ref)
+These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`](@ref), which encodes all supported constraints.
+
+  - Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)
 
   - Factor Risk Contribution [`FactorRiskContribution`](@ref)
   - Near Optimal Centering [`NearOptimalCentering`](@ref)

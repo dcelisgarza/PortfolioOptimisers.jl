@@ -2,5 +2,5 @@
 
 ```@docs
 FactorRiskContribution
-JuMPOptimisationFactorRiskContribution
+FactorRiskContributionResult
 ```

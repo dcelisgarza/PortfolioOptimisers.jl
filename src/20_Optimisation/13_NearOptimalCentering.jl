@@ -3,7 +3,7 @@ struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 """
 """
-struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
+struct NearOptimalCenteringResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        OptimisationResult
     oe::T1
     pa::T2
@@ -16,13 +16,12 @@ struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10}
     model::T9
     fb::T10
 end
-function factory(res::NearOptimalCenteringOptimisation, fb)
-    return NearOptimalCenteringOptimisation(res.oe, res.pa, res.w_min_retcode,
-                                            res.w_opt_retcode, res.w_max_retcode,
-                                            res.noc_retcode, res.retcode, res.sol,
-                                            res.model, fb)
+function factory(res::NearOptimalCenteringResult, fb)
+    return NearOptimalCenteringResult(res.oe, res.pa, res.w_min_retcode, res.w_opt_retcode,
+                                      res.w_max_retcode, res.noc_retcode, res.retcode,
+                                      res.sol, res.model, fb)
 end
-function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
+function Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
     elseif sym in propertynames(r)
@@ -532,26 +531,20 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringOptimisation(typeof(noc),
-                                            ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
-                                                                             opt.lt, opt.st,
-                                                                             opt.lcs,
-                                                                             opt.cent,
-                                                                             opt.gcard,
-                                                                             opt.sgcard,
-                                                                             opt.smtx,
-                                                                             opt.sgmtx,
-                                                                             opt.slt,
-                                                                             opt.sst,
-                                                                             opt.sglt,
-                                                                             opt.sgst,
-                                                                             opt.plg,
-                                                                             opt.tn,
-                                                                             opt.fees,
-                                                                             opt.ret),
-                                            w_min_retcode, w_opt_retcode, w_max_retcode,
-                                            noc_retcode, retcode, sol,
-                                            ifelse(save, model, nothing), nothing)
+    return NearOptimalCenteringResult(typeof(noc),
+                                      ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
+                                                                       opt.lt, opt.st,
+                                                                       opt.lcs, opt.cent,
+                                                                       opt.gcard,
+                                                                       opt.sgcard, opt.smtx,
+                                                                       opt.sgmtx, opt.slt,
+                                                                       opt.sst, opt.sglt,
+                                                                       opt.sgst, opt.plg,
+                                                                       opt.tn, opt.fees,
+                                                                       opt.ret),
+                                      w_min_retcode, w_opt_retcode, w_max_retcode,
+                                      noc_retcode, retcode, sol,
+                                      ifelse(save, model, nothing), nothing)
 end
 function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -588,26 +581,20 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringOptimisation(typeof(noc),
-                                            ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
-                                                                             opt.lt, opt.st,
-                                                                             opt.lcs,
-                                                                             opt.cent,
-                                                                             opt.gcard,
-                                                                             opt.sgcard,
-                                                                             opt.smtx,
-                                                                             opt.sgmtx,
-                                                                             opt.slt,
-                                                                             opt.sst,
-                                                                             opt.sglt,
-                                                                             opt.sgst,
-                                                                             opt.plg,
-                                                                             opt.tn,
-                                                                             opt.fees,
-                                                                             opt.ret),
-                                            w_min_retcode, w_opt_retcode, w_max_retcode,
-                                            noc_retcode, retcode, sol,
-                                            ifelse(save, model, nothing), nothing)
+    return NearOptimalCenteringResult(typeof(noc),
+                                      ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
+                                                                       opt.lt, opt.st,
+                                                                       opt.lcs, opt.cent,
+                                                                       opt.gcard,
+                                                                       opt.sgcard, opt.smtx,
+                                                                       opt.sgmtx, opt.slt,
+                                                                       opt.sst, opt.sglt,
+                                                                       opt.sgst, opt.plg,
+                                                                       opt.tn, opt.fees,
+                                                                       opt.ret),
+                                      w_min_retcode, w_opt_retcode, w_max_retcode,
+                                      noc_retcode, retcode, sol,
+                                      ifelse(save, model, nothing), nothing)
 end
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
@@ -617,4 +604,4 @@ function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <
 end
 
 export NearOptimalCentering, UnconstrainedNearOptimalCentering,
-       ConstrainedNearOptimalCentering, NearOptimalCenteringOptimisation
+       ConstrainedNearOptimalCentering, NearOptimalCenteringResult
