@@ -403,8 +403,12 @@ Alias for a union of a dictionary with string keys and numeric values, or a vect
   - [`EstValType`](@ref)
 """
 const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+abstract type AbstractConstraintAlgorithm <: AbstractAlgorithm end
+function nothing_scalar_array_view(x::AbstractConstraintAlgorithm, ::Any)
+    return x
+end
 """
-    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType}
+    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType, <:AbstractConstraintAlgorithm}
 
 Alias for a union of numeric, vector of numeric, string-number pair, or multi-estimator value types.
 
@@ -414,7 +418,8 @@ Alias for a union of numeric, vector of numeric, string-number pair, or multi-es
   - [`PairStrNum`](@ref)
   - [`MultiEstValType`](@ref)
 """
-const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType}
+const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                         <:AbstractConstraintAlgorithm}
 """
     const Str_Expr = Union{<:AbstractString, Expr}
 

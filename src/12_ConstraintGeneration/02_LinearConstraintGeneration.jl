@@ -1445,7 +1445,7 @@ struct RiskBudgetResult{T1} <: AbstractConstraintResult
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetResult(; val::VecNum)
+function RiskBudgetResult(; val::Num_VecNum)
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)

@@ -98,37 +98,7 @@ function weight_bounds_view(wb::WeightBounds, i)
     return WeightBounds(; lb = lb, ub = ub)
 end
 """
-    abstract type CustomWeightBoundsAlgorithm <: AbstractConstraintAlgorithm end
-
-Abstract supertype for custom portfolio weight bounds constraints.
-
-`CustomWeightBoundsAlgorithm` provides an interface for implementing user-defined or algorithmic portfolio weight bounds. Subtypes can encode advanced or non-standard weight constraints, such as scaled, grouped, or dynamically computed bounds, for use in portfolio optimisation workflows.
-
-# Related
-
-  - [`WeightBoundsEstimator`](@ref)
-  - [`WeightBounds`](@ref)
-  - [`UniformlyDistributedBounds`](@ref)
-"""
-abstract type CustomWeightBoundsAlgorithm <: AbstractConstraintAlgorithm end
-"""
-    const EstValType_CustWb = Union{<:EstValType, <:CustomWeightBoundsAlgorithm}
-
-Union type for custom weight bounds estimator values.
-
-`EstValType_CustWb` is a union type that allows either standard estimator values (`EstValType`) or custom weight bounds algorithms (`CustomWeightBoundsAlgorithm`) to be used for specifying portfolio weight bounds. This enables flexible assignment of bounds, supporting both conventional numeric types and advanced, user-defined constraint algorithms in portfolio optimisation workflows.
-
-# Related Types
-
-  - [`EstValType`](@ref)
-  - [`CustomWeightBoundsAlgorithm`](@ref)
-"""
-const EstValType_CustWb = Union{<:EstValType, <:CustomWeightBoundsAlgorithm}
-function nothing_scalar_array_view(x::CustomWeightBoundsAlgorithm, ::Any)
-    return x
-end
-"""
-    struct UniformlyDistributedBounds <: CustomWeightBoundsAlgorithm end
+    struct UniformValues <: AbstractConstraintAlgorithm end
 
 Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
 
@@ -137,21 +107,23 @@ Custom weight bounds constraint for uniformly distributing asset weights, `1/N` 
 ```jldoctest
 julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
 
-julia> PortfolioOptimisers.estimator_to_val(UniformlyDistributedBounds(), sets)
-0.3333333333333333
+julia> PortfolioOptimisers.estimator_to_val(UniformValues(), sets)
+StepRangeLen(0.3333333333333333, 0.0, 3)
 ```
 
 # Related
 
-  - [`CustomWeightBoundsAlgorithm`](@ref)
+  - [`AbstractConstraintAlgorithm`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
 """
-struct UniformlyDistributedBounds <: CustomWeightBoundsAlgorithm end
-function estimator_to_val(::UniformlyDistributedBounds, sets::AssetSets, ::Any = nothing,
+struct UniformValues <: AbstractConstraintAlgorithm end
+function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, kwargs...)
-    return datatype(inv(length(sets.dict[ifelse(isnothing(key), sets.key, key)])))
+    N = length(sets.dict[ifelse(isnothing(key), sets.key, key)])
+    iN = datatype(inv(N))
+    return range(; start = iN, stop = iN, length = N)
 end
 """
     struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
@@ -175,8 +147,8 @@ Estimator for portfolio weight bounds constraints.
 # Constructor
 
     WeightBoundsEstimator(;
-                          lb::Option{<:EstValType_CustWb} = nothing,
-                          ub::Option{<:EstValType_CustWb} = nothing)
+                          lb::Option{<:EstValType} = nothing,
+                          ub::Option{<:EstValType} = nothing)
 
 ## Validation
 
@@ -198,9 +170,9 @@ WeightBoundsEstimator
   dlb ┼ nothing
   dub ┴ nothing
 
-julia> WeightBoundsEstimator(; lb = UniformlyDistributedBounds(), ub = nothing)
+julia> WeightBoundsEstimator(; lb = UniformValues(), ub = nothing)
 WeightBoundsEstimator
-   lb ┼ UniformlyDistributedBounds()
+   lb ┼ UniformValues()
    ub ┼ nothing
   dlb ┼ nothing
   dub ┴ nothing
@@ -209,8 +181,8 @@ WeightBoundsEstimator
 # Related
 
   - [`WeightBounds`](@ref)
-  - [`CustomWeightBoundsAlgorithm`](@ref)
-  - [`UniformlyDistributedBounds`](@ref)
+  - [`AbstractConstraintAlgorithm`](@ref)
+  - [`UniformValues`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
 struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
@@ -218,8 +190,7 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
     ub::T2
     dlb::T3
     dub::T4
-    function WeightBoundsEstimator(lb::Option{<:EstValType_CustWb},
-                                   ub::Option{<:EstValType_CustWb},
+    function WeightBoundsEstimator(lb::Option{<:EstValType}, ub::Option{<:EstValType},
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)
         if isa(lb, Dict_Vec)
@@ -234,8 +205,8 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end
 end
-function WeightBoundsEstimator(; lb::Option{<:EstValType_CustWb} = nothing,
-                               ub::Option{<:EstValType_CustWb} = nothing,
+function WeightBoundsEstimator(; lb::Option{<:EstValType} = nothing,
+                               ub::Option{<:EstValType} = nothing,
                                dlb::Option{<:Number} = nothing,
                                dub::Option{<:Number} = nothing)
     return WeightBoundsEstimator(lb, ub, dlb, dub)
@@ -546,5 +517,4 @@ function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0, kwargs.
     return WeightBounds(; lb = fill(-Inf, N), ub = fill(Inf, N))
 end
 
-export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints,
-       UniformlyDistributedBounds
+export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints, UniformValues

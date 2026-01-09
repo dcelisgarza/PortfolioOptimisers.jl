@@ -169,7 +169,7 @@
     clr = clusterise(ClustersEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
-        jopti = JuMPOptimiser(; pe = pr, slv = slv)
+        jopti = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
         jopto = JuMPOptimiser(; slv = slv)
         hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
         hopto = HierarchicalOptimiser(; slv = slv)
@@ -177,7 +177,12 @@
                                 opto = MeanRisk(; opt = jopto)),
                 NestedClustered(; cle = clr, opti = NearOptimalCentering(; opt = jopti),
                                 opto = NearOptimalCentering(; opt = jopto)),
-                NestedClustered(; cle = clr, opti = RiskBudgeting(; opt = jopti),
+                NestedClustered(; cle = clr,
+                                opti = RiskBudgeting(;
+                                                     rba = AssetRiskBudgeting(;
+                                                                              rkb = RiskBudgetEstimator(;
+                                                                                                        val = UniformValues())),
+                                                     opt = jopti),
                                 opto = RiskBudgeting(; opt = jopto)),
                 NestedClustered(; cle = clr, opti = RelaxedRiskBudgeting(; opt = jopti),
                                 opto = RelaxedRiskBudgeting(; opt = jopto)),
@@ -282,11 +287,47 @@
                                                                                         init = :kmcen)),
                                                         onc = OptimalNumberClusters(;
                                                                                     alg = SecondOrderDifference())),
-                                opti = RiskBudgeting(; opt = jopti),
-                                opto = MeanRisk(; opt = jopto))]
+                                opti = RiskBudgeting(;
+                                                     rba = AssetRiskBudgeting(;
+                                                                              rkb = RiskBudgetResult(;
+                                                                                                     val = fill(inv(size(pr.X,
+                                                                                                                         2)),
+                                                                                                                size(pr.X,
+                                                                                                                     2)))),
+                                                     opt = jopti),
+                                opto = MeanRisk(; opt = jopto)),
+                NestedClustered(; pe = pr, cle = clr,
+                                opti = NestedClustered(; pe = pr,
+                                                       opti = NestedClustered(; pe = pr,
+                                                                              opti = MeanRisk(;
+                                                                                              opt = jopti),
+                                                                              opto = MeanRisk(;
+                                                                                              opt = jopto)),
+                                                       opto = NestedClustered(;
+                                                                              opti = MeanRisk(;
+                                                                                              opt = jopto),
+                                                                              opto = MeanRisk(;
+                                                                                              opt = jopto))),
+                                opto = NestedClustered(;
+                                                       opti = NestedClustered(;
+                                                                              opti = MeanRisk(;
+                                                                                              opt = jopto),
+                                                                              opto = MeanRisk(;
+                                                                                              opt = jopto)),
+                                                       opto = NestedClustered(;
+                                                                              opti = MeanRisk(;
+                                                                                              opt = jopto),
+                                                                              opto = MeanRisk(;
+                                                                                              opt = jopto))))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
+            if i == 3
+                @test isapprox(optimise(NestedClustered(; cle = clr,
+                                                        opti = RiskBudgeting(; opt = jopti),
+                                                        opto = RiskBudgeting(; opt = jopto)),
+                                        rd).w, res.w)
+            end
             rtol = if i in (2, 3, 16)
                 5e-5
             elseif i == 12
@@ -303,32 +344,6 @@
             end
             @test success
         end
-        #=
-        opt = NestedClustered(; pe = pr, cle = clr,
-                               opti = NestedClustered(; pe = pr,
-                                                       opti = NestedClustered(; pe = pr,
-                                                                               opti = MeanRisk(;
-                                                                                               opt = jopti),
-                                                                               opto = MeanRisk(;
-                                                                                               opt = jopto)),
-                                                       opto = NestedClustered(;
-                                                                               opti = MeanRisk(;
-                                                                                               opt = jopto),
-                                                                               opto = MeanRisk(;
-                                                                                               opt = jopto))),
-                               opto = NestedClustered(;
-                                                       opti = NestedClustered(;
-                                                                               opti = MeanRisk(;
-                                                                                               opt = jopto),
-                                                                               opto = MeanRisk(;
-                                                                                               opt = jopto)),
-                                                       opto = NestedClustered(;
-                                                                               opti = MeanRisk(;
-                                                                                               opt = jopto),
-                                                                               opto = MeanRisk(;
-                                                                                               opt = jopto))))
-        res = optimise(opt, rd)
-        =#
     end
     @testset "Fees" begin
         fees = FeesEstimator(;

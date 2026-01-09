@@ -1103,7 +1103,10 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv,
-                                                    sglt = [BuyInThreshold(0.015)],
+                                                    sglt = [BuyInThresholdEstimator(;
+                                                                                    val = fill(0.015,
+                                                                                               7),
+                                                                                    key = "ux_industries")],
                                                     sgcard = [LinearConstraintEstimator(;
                                                                                         key = "ux_industries",
                                                                                         val = [:(ux_industries >=
