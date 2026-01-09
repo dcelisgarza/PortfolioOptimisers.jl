@@ -347,7 +347,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 """
 function average_centrality(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm, w::VecNum,
                             pr::AbstractPriorResult; kwargs...)
-    return LinearAlgebra.dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
+    return LinearAlgebra.dot(centrality_vector(ne, cent, pr; kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
