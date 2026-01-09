@@ -197,6 +197,14 @@ end
 function SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
     return SecondOrderDifference(alg)
 end
+function factory(alg::SecondOrderDifference,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return if isnothing(w)
+        alg
+    else
+        SecondOrderDifference(; alg = factory(alg.alg, w))
+    end
+end
 """
     struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
         alg::T1
@@ -251,6 +259,13 @@ end
 function SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
                          metric::Option{<:Distances.SemiMetric} = nothing)
     return SilhouetteScore(alg, metric)
+end
+function factory(alg::SilhouetteScore, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return if isnothing(w)
+        alg
+    else
+        SilhouetteScore(; alg = factory(alg.alg, w), metric = alg.metric)
+    end
 end
 """
     struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
@@ -316,6 +331,14 @@ function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
                                alg::Int_ONC = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)
 end
+function factory(onc::OptimalNumberClusters,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return if isnothing(w)
+        onc
+    else
+        OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
+    end
+end
 """
     struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
         linkage::T1
@@ -361,7 +384,6 @@ end
     struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
         ce::T1
         de::T2
-
         alg::T3
         onc::T4
     end
@@ -450,8 +472,12 @@ function ClustersEstimator(;
     return ClustersEstimator(ce, de, alg, onc)
 end
 function factory(cle::ClustersEstimator, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return ClustersEstimator(; ce = cle.ce, de = cle.de, alg = factory(cle.alg, w),
-                             onc = cle.onc)
+    return if isnothing(w)
+        cle
+    else
+        ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
+                          onc = cle.onc)
+    end
 end
 const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
                                            <:AbstractHierarchicalClusteringAlgorithm,

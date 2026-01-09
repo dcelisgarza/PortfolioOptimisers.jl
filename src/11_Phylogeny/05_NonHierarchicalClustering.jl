@@ -18,11 +18,11 @@ function KMeansAlgorithm(; rng::Random.AbstractRNG = Random.default_rng(),
     return KMeansAlgorithm(rng, seed, kwargs)
 end
 function factory(alg::KMeansAlgorithm, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if !isnothing(w)
+    return if isnothing(w)
+        alg
+    else
         KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
                         kwargs = (; alg.kwargs..., weights = w))
-    else
-        alg
     end
 end
 function _get_k_clusters_from_alg(alg::KMeansAlgorithm, dist::MatNum, k::Integer)

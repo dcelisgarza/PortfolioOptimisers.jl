@@ -19,6 +19,8 @@
     @test PortfolioOptimisers.vec_to_real_measure(MedianValue(), A) == median(A)
     @test PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), A) ==
           mean(A) / std(A)
+    msv = StandardisedValue()
+    @test factory(msv) === msv
     msv = factory(StandardisedValue(), W)
     @test msv.mv.w === W
     @test msv.sv.w === W

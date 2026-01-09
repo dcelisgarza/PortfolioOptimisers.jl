@@ -119,8 +119,8 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `coef >= 0`.
-  - `power >= 0`.
+  - `coef > 0`.
+  - `power > 0`.
 
 # Examples
 
@@ -142,8 +142,8 @@ struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
     function GeneralExponentialSimilarity(coef::Number, power::Number)
-        @argcheck(zero(coef) <= coef, DomainError)
-        @argcheck(zero(power) <= power, DomainError)
+        @argcheck(zero(coef) < coef, DomainError)
+        @argcheck(zero(power) < power, DomainError)
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
