@@ -171,7 +171,7 @@ Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
 
 All error types specific to `PortfolioOptimisers.jl` should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
 
-# Related Types
+# Related
 
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
@@ -305,7 +305,7 @@ end
 
 Alias for an abstract vector of numeric types or JuMP scalar types.
 
-# Related Types
+# Related
 
   - [`VecInt`](@ref)
   - [`MatNum`](@ref)
@@ -317,7 +317,7 @@ const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScala
 
 Alias for an abstract vector of integer types.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
@@ -329,7 +329,7 @@ const VecInt = Union{<:AbstractVector{<:Integer}}
 
 Alias for an abstract matrix of numeric types or JuMP scalar types.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`ArrNum`](@ref)
@@ -341,7 +341,7 @@ const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScala
 
 Alias for an abstract array of numeric types or JuMP scalar types.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
@@ -352,7 +352,7 @@ const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar
 
 Alias for a union of a numeric type or an abstract vector of numeric types.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`ArrNum`](@ref)
@@ -363,7 +363,7 @@ const Num_VecNum = Union{<:Number, <:VecNum}
 
 Alias for a union of a numeric type or an abstract array of numeric types.
 
-# Related Types
+# Related
 
   - [`ArrNum`](@ref)
   - [`VecNum`](@ref)
@@ -374,7 +374,7 @@ const Num_ArrNum = Union{<:Number, <:ArrNum}
 
 Alias for a pair consisting of an abstract string and a numeric type.
 
-# Related Types
+# Related
 
   - [`DictStrNum`](@ref)
   - [`MultiEstValType`](@ref)
@@ -385,7 +385,7 @@ const PairStrNum = Pair{<:AbstractString, <:Number}
 
 Alias for an abstract dictionary with string keys and numeric values.
 
-# Related Types
+# Related
 
   - [`PairStrNum`](@ref)
   - [`MultiEstValType`](@ref)
@@ -396,36 +396,48 @@ const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 
 Alias for a union of a dictionary with string keys and numeric values, or a vector of string-number pairs.
 
-# Related Types
+# Related
 
   - [`DictStrNum`](@ref)
   - [`PairStrNum`](@ref)
   - [`EstValType`](@ref)
 """
 const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
-abstract type AbstractConstraintAlgorithm <: AbstractAlgorithm end
-function nothing_scalar_array_view(x::AbstractConstraintAlgorithm, ::Any)
+"""
+    abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for all estimator value algorithm types in `PortfolioOptimisers.jl`.
+
+Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint estimator values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
+
+# Related
+
+  - [`EstValType`](@ref)
+"""
+abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
+function nothing_scalar_array_view(x::AbstractEstimatorValueAlgorithm, ::Any)
     return x
 end
 """
-    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType, <:AbstractConstraintAlgorithm}
+    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType, <:AbstractEstimatorValueAlgorithm}
 
 Alias for a union of numeric, vector of numeric, string-number pair, or multi-estimator value types.
 
-# Related Types
+# Related
 
   - [`Num_VecNum`](@ref)
   - [`PairStrNum`](@ref)
   - [`MultiEstValType`](@ref)
+  - [`AbstractEstimatorValueAlgorithm`](@ref)
 """
 const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
-                         <:AbstractConstraintAlgorithm}
+                         <:AbstractEstimatorValueAlgorithm}
 """
     const Str_Expr = Union{<:AbstractString, Expr}
 
 Alias for a union of abstract string or Julia expression.
 
-# Related Types
+# Related
 
   - [`VecStr_Expr`](@ref)
   - [`EqnType`](@ref)
@@ -436,7 +448,7 @@ const Str_Expr = Union{<:AbstractString, Expr}
 
 Alias for an abstract vector of strings or Julia expressions.
 
-# Related Types
+# Related
 
   - [`Str_Expr`](@ref)
   - [`EqnType`](@ref)
@@ -447,7 +459,7 @@ const VecStr_Expr = AbstractVector{<:Str_Expr}
 
 Alias for a union of string, Julia expression, or vector of strings/expressions.
 
-# Related Types
+# Related
 
   - [`Str_Expr`](@ref)
   - [`VecStr_Expr`](@ref)
@@ -458,7 +470,7 @@ const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
 
 Alias for an abstract vector of numeric vectors.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`VecMatNum`](@ref)
@@ -469,7 +481,7 @@ const VecVecNum = AbstractVector{<:VecNum}
 
 Alias for an abstract vector of integer vectors.
 
-# Related Types
+# Related
 
   - [`VecInt`](@ref)
 """
@@ -479,7 +491,7 @@ const VecVecInt = AbstractVector{<:VecInt}
 
 Alias for an abstract vector of numeric matrices.
 
-# Related Types
+# Related
 
   - [`MatNum`](@ref)
   - [`VecNum`](@ref)
@@ -490,7 +502,7 @@ const VecMatNum = AbstractVector{<:MatNum}
 
 Alias for an abstract vector of strings.
 
-# Related Types
+# Related
 
   - [`Str_Expr`](@ref)
   - [`VecStr_Expr`](@ref)
@@ -501,7 +513,7 @@ const VecStr = Union{<:AbstractVector{<:AbstractString}}
 
 Alias for an abstract vector of pairs.
 
-# Related Types
+# Related
 
   - [`PairStrNum`](@ref)
 """
@@ -511,7 +523,7 @@ const VecPair = AbstractVector{<:Pair}
 
 Alias for an abstract vector of JuMP scalar types.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
 """
@@ -521,7 +533,7 @@ const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
 
 Alias for an optional value of type `T`, which may be `nothing`.
 
-# Related Types
+# Related
 
   - [`EstValType`](@ref)
 """
@@ -531,7 +543,7 @@ const Option{T} = Union{Nothing, T}
 
 Alias for a union of a numeric matrix or a vector of numeric matrices.
 
-# Related Types
+# Related
 
   - [`MatNum`](@ref)
   - [`VecMatNum`](@ref)
@@ -542,7 +554,7 @@ const MatNum_VecMatNum = Union{<:MatNum, <:VecMatNum}
 
 Alias for a union of an integer or a vector of integers.
 
-# Related Types
+# Related
 
   - [`VecInt`](@ref)
 """
@@ -552,7 +564,7 @@ const Int_VecInt = Union{<:Integer, <:VecInt}
 
 Alias for a union of a numeric vector or a vector of numeric vectors.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`VecVecNum`](@ref)
@@ -563,7 +575,7 @@ const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
 
 Alias for an abstract vector of date or time types.
 
-# Related Types
+# Related
 
   - [`VecNum`](@ref)
   - [`VecStr`](@ref)
@@ -574,7 +586,7 @@ const VecDate = AbstractVector{<:Dates.AbstractTime}
 
 Alias for a union of an abstract dictionary or an abstract vector.
 
-# Related Types
+# Related
 
   - [`DictStrNum`](@ref)
   - [`VecNum`](@ref)
@@ -585,7 +597,7 @@ const Dict_Vec = Union{<:AbstractDict, <:AbstractVector}
 
 Alias for a union of a symbol or an abstract string.
 
-# Related Types
+# Related
 
   - [`VecStr`](@ref)
 """
@@ -595,7 +607,7 @@ const Sym_Str = Union{Symbol, <:AbstractString}
 
 Alias for a union of an abstract string or an abstract vector.
 
-# Related Types
+# Related
 
   - [`VecStr`](@ref)
   - [`Str_Expr`](@ref)
@@ -658,7 +670,7 @@ end
 
 Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar` result.
 
-# Related Types
+# Related
 
   - [`Num_VecNum`](@ref)
   - [`VecScalar`](@ref)
@@ -669,7 +681,7 @@ const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
 
 Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
 
-# Related Types
+# Related
 
   - [`Num_ArrNum`](@ref)
   - [`VecScalar`](@ref)

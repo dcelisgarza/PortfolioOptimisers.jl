@@ -98,7 +98,7 @@ function weight_bounds_view(wb::WeightBounds, i)
     return WeightBounds(; lb = lb, ub = ub)
 end
 """
-    struct UniformValues <: AbstractConstraintAlgorithm end
+    struct UniformValues <: AbstractEstimatorValueAlgorithm end
 
 Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
 
@@ -113,11 +113,11 @@ StepRangeLen(0.3333333333333333, 0.0, 3)
 
 # Related
 
-  - [`AbstractConstraintAlgorithm`](@ref)
+  - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`WeightBounds`](@ref)
 """
-struct UniformValues <: AbstractConstraintAlgorithm end
+struct UniformValues <: AbstractEstimatorValueAlgorithm end
 function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, kwargs...)
@@ -181,7 +181,7 @@ WeightBoundsEstimator
 # Related
 
   - [`WeightBounds`](@ref)
-  - [`AbstractConstraintAlgorithm`](@ref)
+  - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`UniformValues`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
