@@ -180,6 +180,7 @@
 
         ce0 = PortfolioOptimisersCovariance(; ce = CorrelationCovariance())
         @test isapprox(cov(ce0, rd.X), cor(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(cor(ce0, rd.X), cor(PortfolioOptimisersCovariance(), rd.X))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test ce.ce.ce.ce.w === ew
         @test ce.ce.ce.me.w === ew

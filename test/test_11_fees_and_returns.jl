@@ -42,6 +42,7 @@
     fes = [fees_constraints(fest, sets),
            Fees(; tn = Turnover(; val = 0.001, w = w), l = 0.002, s = 0.003, fl = 0.005,
                 fs = 0.007)]
+    @test factory(fes[2], 2.5 * w).tn.w == 2.5 * w
     T, N = size(pr.X)
     res = optimise(MeanRisk(;
                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),

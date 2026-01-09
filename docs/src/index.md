@@ -615,7 +615,7 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
     
       + Arithmetic returns [`ArithmeticReturn`](@ref)
       + Logarithmic returns [`LogarithmicReturn`](@ref)
-  - Regularisation
+  - Regularisation penalty
     
       + L1
       + L2
