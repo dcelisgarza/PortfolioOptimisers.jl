@@ -1833,7 +1833,11 @@ function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any;
     return smtx
 end
 function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)
-    return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
+    val = [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
+    if isabstracttype(eltype(val))
+        val = concrete_typed_array(val)
+    end
+    return val
 end
 
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,

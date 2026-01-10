@@ -572,8 +572,7 @@ julia> tn1 = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
 julia> tn2 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
                                dval = 0.0);
 
-julia> concrete_typed_array(PortfolioOptimisers.turnover_view(concrete_typed_array([tn1, tn2]),
-                                                              1:2))
+julia> PortfolioOptimisers.turnover_view(concrete_typed_array([tn1, tn2]), 1:2)
 2-element Vector{Union{Turnover{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}}, TurnoverEstimator{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Dict{String, Float64}, Float64}}}:
  Turnover
     w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
@@ -595,7 +594,9 @@ julia> concrete_typed_array(PortfolioOptimisers.turnover_view(concrete_typed_arr
   - [`concrete_typed_array`](@ref)
 """
 function turnover_view(tn::VecTnE_Tn, i)
-    return [turnover_view(tni, i) for tni in tn]
+    val = [turnover_view(tni, i) for tni in tn]
+    isconcretetype(eltype(val)) ? nothing : (val = concrete_typed_array(val))
+    return val
 end
 
 export TurnoverEstimator, Turnover, turnover_constraints

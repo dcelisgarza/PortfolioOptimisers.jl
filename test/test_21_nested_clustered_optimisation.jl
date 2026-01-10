@@ -386,10 +386,11 @@
                                                        opt = JuMPOptimiser(; pe = pr,
                                                                            slv = mip_slv,
                                                                            scard = [2, 1],
-                                                                           smtx = [AssetSetsMatrixEstimator(;
-                                                                                                            val = "nx_clusters1"),
-                                                                                   AssetSetsMatrixEstimator(;
-                                                                                                            val = "nx_clusters2")],
+                                                                           smtx = concrete_typed_array([AssetSetsMatrixEstimator(;
+                                                                                                                                 val = "nx_clusters1"),
+                                                                                                        asset_sets_matrix(AssetSetsMatrixEstimator(;
+                                                                                                                                                   val = "nx_clusters2"),
+                                                                                                                          sets)]),
                                                                            sets = sets)),
                                        opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
                        rd)

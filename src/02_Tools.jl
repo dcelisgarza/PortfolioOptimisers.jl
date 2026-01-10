@@ -779,7 +779,7 @@ This type is used to allow functions and fields to accept both plain numbers and
 
 # Related
 
-  - [`VectorToScalarMeasure`](08_Moments/01_Base_Moments.jl)
+  - [`VectorToScalarMeasure`](@ref)
 """
 const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
 """
