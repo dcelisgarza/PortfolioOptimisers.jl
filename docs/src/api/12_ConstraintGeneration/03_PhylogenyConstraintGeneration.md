@@ -6,16 +6,11 @@ SemiDefinitePhylogeny
 IntegerPhylogenyEstimator
 IntegerPhylogeny
 phylogeny_constraints
-MinValue
-MeanValue
-MedianValue
-MaxValue
 CentralityConstraint
 centrality_constraints
 AbstractPhylogenyConstraintEstimator
 AbstractPhylogenyConstraintResult
 _validate_length_integer_phylogeny_constraint_B
 validate_length_integer_phylogeny_constraint_B
-VectorToScalarMeasure
 vec_to_real_measure
 ```

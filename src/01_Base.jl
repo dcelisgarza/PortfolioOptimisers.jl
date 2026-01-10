@@ -408,16 +408,13 @@ const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 
 Abstract supertype for all estimator value algorithm types in `PortfolioOptimisers.jl`.
 
-Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint estimator values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
+Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint result values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
 
 # Related
 
   - [`EstValType`](@ref)
 """
 abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
-function nothing_scalar_array_view(x::AbstractEstimatorValueAlgorithm, ::Any)
-    return x
-end
 """
     const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType, <:AbstractEstimatorValueAlgorithm}
 

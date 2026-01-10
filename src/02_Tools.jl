@@ -436,7 +436,8 @@ function dot_scalar(a::VecNum, b::VecNum)
     return LinearAlgebra.dot(a, b)
 end
 """
-    nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any)
+    nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
+                                       AbstractEstimatorValueAlgorithm}, ::Any)
     nothing_scalar_array_view(x::AbstractVector, i)
     nothing_scalar_array_view(x::VecScalar, i)
     nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
@@ -478,8 +479,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
  fill(3)
 ```
 """
-function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict},
-                                   ::Any)
+function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
+                                            <:AbstractEstimatorValueAlgorithm}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
@@ -769,6 +770,17 @@ Abstract supertype for algorithms mapping a vector of real values to a single re
   - [`vec_to_real_measure`](@ref)
 """
 abstract type VectorToScalarMeasure <: AbstractAlgorithm end
+"""
+    const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
+
+Union type representing either a numeric value or a `VectorToScalarMeasure`.
+
+This type is used to allow functions and fields to accept both plain numbers and objects that implement the `VectorToScalarMeasure` interface, providing flexibility in handling scalar and vector-to-scalar computations.
+
+# Related
+
+  - [`VectorToScalarMeasure`](08_Moments/01_Base_Moments.jl)
+"""
 const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
 """
     struct MinValue <: VectorToScalarMeasure end
@@ -794,11 +806,29 @@ julia> PortfolioOptimisers.vec_to_real_measure(MinValue(), [1.2, 3.4, 0.7])
 """
 struct MinValue <: VectorToScalarMeasure end
 """
-    struct MeanValue <: VectorToScalarMeasure end
+    struct MeanValue{T1} <: VectorToScalarMeasure
+        w::T1
+    end
 
 Algorithm for reducing a vector of real values to its mean.
 
 `MeanValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean (average) value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mean.
+
+# Fields
+
+  - `w`: Optional weights to use for the mean calculation.
+
+# Constructors
+
+```julia
+MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `w` is not `nothing`, `!isempty(w)`.
 
 # Examples
 

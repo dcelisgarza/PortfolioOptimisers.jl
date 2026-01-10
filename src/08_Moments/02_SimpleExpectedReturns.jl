@@ -115,7 +115,7 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionall
 # Details
 
   - Returns a new estimator, preserving the type and updating weights as specified.
-  - If `w` is not provided, the weights from `me` are used.
+  - If `w` is not `nothing`, the weights from `me` are used.
   - Validates that weights are non-empty and finite.
 
 # Related

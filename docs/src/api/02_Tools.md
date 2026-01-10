@@ -47,3 +47,16 @@ nothing_scalar_array_getindex
 nothing_scalar_array_getindex_odd_order
 fourth_moment_index_generator
 ```
+
+## Summary statistics
+
+Some estimators and constraints are based on summary statistics of vectors. These types are used to dispatch the appropriate functions and encapsulate auxiliary data such as weights.
+
+```@docs
+VectorToScalarMeasure
+Num_VecToScaM
+MinValue
+MeanValue
+MedianValue
+MaxValue
+```
