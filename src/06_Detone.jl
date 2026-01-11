@@ -93,7 +93,7 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Validation
 
-  - `1 <= dt.n <= size(X, 2)`.
+  - `0 < dt.n <= size(X, 2)`.
 
 # Examples
 

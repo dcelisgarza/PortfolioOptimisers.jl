@@ -1,6 +1,6 @@
-# Mean
+# Simple expected returns
 
-## Public
+The most basic moment is the simple expected return. These types and functions implement it.
 
 ```@docs
 SimpleExpectedReturns

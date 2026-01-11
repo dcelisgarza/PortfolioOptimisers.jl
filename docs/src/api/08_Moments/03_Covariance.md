@@ -1,4 +1,6 @@
-# Covariance
+# [Covariance](@id api-covariance)
+
+The classic Markowitz portfolio minimises the portfolio variance. This is computed from the covariance matrix and portfolio weights. Here we define the most basic covariance/correlation estimator.
 
 ```@docs
 GeneralCovariance
