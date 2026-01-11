@@ -857,15 +857,58 @@ end
 function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanValue(w)
 end
+"""
+    factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+
+Construct a `MeanValue` instance with optional weights, or return the input if weights are unchanged.
+
+# Arguments
+
+  - `mv`: A `MeanValue` instance to update or return.
+  - `w`: Optional weights to use for the mean calculation. If `nothing`, returns `mv` unchanged.
+
+# Returns
+
+  - `mv::MeanValue`: A new `MeanValue` with the specified weights, or the original if `w` is `nothing`.
+
+# Details
+
+  - Returns a new `MeanValue` if `w` is provided.
+  - Returns the original `mv` if `w` is `nothing`.
+  - Ensures consistent construction and updating of `MeanValue` instances.
+
+# Related
+
+  - [`MeanValue`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return isnothing(w) ? mv : MeanValue(; w = w)
 end
 """
-    struct MedianValue <: VectorToScalarMeasure end
+    struct MedianValue{T1} <: VectorToScalarMeasure
+        w::T1
+    end
 
 Algorithm for reducing a vector of real values to its median.
 
 `MedianValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the median value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their median.
+
+# Fields
+
+  - `w`: Optional weights to use for the median calculation.
+
+# Constructors
+
+```julia
+MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `w` is not `nothing`, `!isempty(w)`.
 
 # Examples
 
@@ -894,6 +937,31 @@ end
 function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MedianValue(w)
 end
+"""
+    factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+
+Constructs a `MedianValue` instance with optional weights, or returns the input if weights are unchanged.
+
+# Arguments
+
+  - `mdv`: A `MedianValue` instance to update or return.
+  - `w`: Optional weights to use for the median calculation. If `nothing`, returns `mdv` unchanged.
+
+# Returns
+
+  - `mdv::MedianValue`: A new `MedianValue` with the specified weights, or the original if `w` is `nothing`.
+
+# Details
+
+  - Returns a new `MedianValue` if `w` is provided.
+  - Returns the original `mdv` if `w` is `nothing`.
+  - Ensures consistent construction and updating of `MedianValue` instances.
+
+# Related
+
+  - [`MedianValue`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return isnothing(w) ? mdv : MedianValue(; w = w)
 end
@@ -920,6 +988,48 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 struct MaxValue <: VectorToScalarMeasure end
+"""
+    struct StdValue{T1, T2} <: VectorToScalarMeasure
+        w::T1
+        corrected::T2
+    end
+
+Algorithm for reducing a vector of real values to its standard deviation.
+
+`StdValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the standard deviation of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their standard deviation.
+
+# Fields
+
+  - `w`: Optional weights to use for the standard deviation calculation.
+  - `corrected`: Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population).
+
+# Constructors
+
+```julia
+StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
+1.4364307617610164
+```
+
+# Related
+
+  - [`VectorToScalarMeasure`](@ref)
+  - [`MeanValue`](@ref)
+  - [`VarValue`](@ref)
+  - [`StandardisedValue`](@ref)
+  - [`vec_to_real_measure`](@ref)
+"""
 struct StdValue{T1, T2} <: VectorToScalarMeasure
     w::T1
     corrected::T2
@@ -934,9 +1044,76 @@ function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
                   corrected::Bool = true)
     return StdValue(w, corrected)
 end
+"""
+    factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+
+Constructs a `StdValue` instance with optional weights, or returns the input if weights are unchanged.
+
+# Arguments
+
+  - `sv`: A `StdValue` instance to update or return.
+  - `w`: Optional weights to use for the standard deviation calculation. If `nothing`, returns `sv` unchanged.
+
+# Returns
+
+  - `sv::StdValue`: A new `StdValue` with the specified weights, or the original if `w` is `nothing`.
+
+# Details
+
+  - Returns a new `StdValue` if `w` is provided.
+  - Returns the original `sv` if `w` is `nothing`.
+  - Ensures consistent construction and updating of `StdValue` instances.
+
+# Related
+
+  - [`StdValue`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return isnothing(w) ? sv : StdValue(; w = w, corrected = sv.corrected)
 end
+"""
+    struct VarValue{T1, T2} <: VectorToScalarMeasure
+        w::T1
+        corrected::T2
+    end
+
+Algorithm for reducing a vector of real values to its variance.
+
+`VarValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the variance of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their variance.
+
+# Fields
+
+  - `w`: Optional weights to use for the variance calculation.
+  - `corrected`: Indicates whether to use Bessel's correction (`true` for sample variance, `false` for population).
+
+# Constructors
+
+```julia
+VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `w` is not `nothing`, `!isempty(w)`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
+2.0633333333333335
+```
+
+# Related
+
+  - [`VectorToScalarMeasure`](@ref)
+  - [`MeanValue`](@ref)
+  - [`StdValue`](@ref)
+  - [`StandardisedValue`](@ref)
+  - [`vec_to_real_measure`](@ref)
+"""
 struct VarValue{T1, T2} <: VectorToScalarMeasure
     w::T1
     corrected::T2
@@ -951,12 +1128,138 @@ function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
                   corrected::Bool = true)
     return VarValue(w, corrected)
 end
-function factory(sv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? sv : VarValue(; w = w, corrected = sv.corrected)
+"""
+    factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+
+Constructs a `VarValue` instance with optional weights, or returns the input if weights are unchanged.
+
+# Arguments
+
+  - `vv`: A `VarValue` instance to update or return.
+  - `w`: Optional weights to use for the variance calculation. If `nothing`, returns `vv` unchanged.
+
+# Returns
+
+  - `VarValue`: A new `VarValue` with the specified weights, or the original if `w` is `nothing`.
+
+# Details
+
+  - Returns a new `VarValue` if `w` is provided.
+  - Returns the original `vv` if `w` is `nothing`.
+  - Ensures consistent construction and updating of `VarValue` instances.
+
+# Related
+
+  - [`VarValue`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return isnothing(w) ? vv : VarValue(; w = w, corrected = vv.corrected)
 end
+"""
+    SumValue <: VectorToScalarMeasure
+
+Algorithm for reducing a vector of real values to its sum.
+
+`SumValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the sum of all elements in a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their sum.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.vec_to_real_measure(SumValue(), [1.2, 3.4, 0.7])
+5.3
+```
+
+# Related
+
+  - [`VectorToScalarMeasure`](@ref)
+  - [`ProdValue`](@ref)
+  - [`ModeValue`](@ref)
+  - [`vec_to_real_measure`](@ref)
+"""
 struct SumValue <: VectorToScalarMeasure end
+"""
+    ProdValue <: VectorToScalarMeasure
+
+Algorithm for reducing a vector of real values to its product.
+
+`ProdValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the product of all elements in a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their product.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.vec_to_real_measure(ProdValue(), [1.2, 3.4, 0.7])
+2.856
+```
+
+# Related
+
+  - [`VectorToScalarMeasure`](@ref)
+  - [`SumValue`](@ref)
+  - [`ModeValue`](@ref)
+  - [`vec_to_real_measure`](@ref)
+"""
 struct ProdValue <: VectorToScalarMeasure end
+"""
+    ModeValue <: VectorToScalarMeasure
+
+Algorithm for reducing a vector of real values to its mode.
+
+`ModeValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mode (most frequent value) of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mode.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.vec_to_real_measure(ModeValue(), [1.2, 3.4, 0.7, 1.2])
+1.2
+```
+
+# Related
+
+  - [`VectorToScalarMeasure`](@ref)
+  - [`SumValue`](@ref)
+  - [`ProdValue`](@ref)
+  - [`vec_to_real_measure`](@ref)
+"""
 struct ModeValue <: VectorToScalarMeasure end
+"""
+    struct StandardisedValue{T1, T2} <: VectorToScalarMeasure
+        mv::T1
+        sv::T2
+    end
+
+Algorithm for reducing a vector of real values to its mean divided by its standard deviation.
+
+`StandardisedValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean of a vector divided by its standard deviation (i.e., a standardised score). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their standardised value.
+
+# Fields
+
+  - `mv`: The mean value measure used for the numerator.
+  - `sv`: The standard deviation measure used for the denominator.
+
+# Constructors
+
+```julia
+StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
+```
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0.7])
+1.229837387624884
+```
+
+# Related
+
+  - [`VectorToScalarMeasure`](@ref)
+  - [`MeanValue`](@ref)
+  - [`StdValue`](@ref)
+  - [`VarValue`](@ref)
+  - [`vec_to_real_measure`](@ref)
+"""
 struct StandardisedValue{T1, T2} <: VectorToScalarMeasure
     mv::T1
     sv::T2
@@ -967,13 +1270,39 @@ end
 function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
     return StandardisedValue(mv, sv)
 end
+"""
+    factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+
+Construct a `StandardisedValue` instance with optional weights, or return the input if weights are unchanged.
+
+# Arguments
+
+  - `msv`: A `StandardisedValue` instance to update or return.
+  - `w`: Optional weights to use for both the mean and standard deviation measures. If `nothing`, returns `msv` unchanged.
+
+# Returns
+
+  - `msv::StandardisedValue`: A new `StandardisedValue` with the specified weights applied to both `mv` and `sv`, or the original if `w` is `nothing`.
+
+# Details
+
+  - Returns a new `StandardisedValue` if `w` is provided.
+  - Returns the original `msv` if `w` is `nothing`.
+  - Applies the weights to both the mean (`mv`) and standard deviation (`sv`) fields using their respective `factory` methods.
+  - Ensures consistent construction and updating of `StandardisedValue` instances.
+
+# Related
+
+  - [`StandardisedValue`](@ref)
+  - [`MeanValue`](@ref)
+  - [`StdValue`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return if isnothing(w)
         msv
     else
-        mv = factory(msv.mv, w)
-        sv = factory(msv.sv, w)
-        StandardisedValue(mv, sv)
+        StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
     end
 end
 """
@@ -1034,9 +1363,9 @@ function vec_to_real_measure(sv::StdValue, val::VecNum; kwargs...)
 end
 function vec_to_real_measure(vv::VarValue, val::VecNum; kwargs...)
     return if isnothing(vv.w)
-        Statistics.var(val; corrected = vv.corrected)
+        Statistics.var(val; corrected = vv.corrected, kwargs...)
     else
-        Statistics.var(val, vv.w; corrected = vv.corrected)
+        Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
     end
 end
 function vec_to_real_measure(msv::StandardisedValue, val::VecNum; kwargs...)

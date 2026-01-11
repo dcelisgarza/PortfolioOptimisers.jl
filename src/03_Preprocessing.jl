@@ -241,9 +241,9 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 
 # Arguments
 
-  - `X`: Asset price data (timestamps × assets).
-  - `F`: Optional Factor price data (timestamps × factors).
-  - `B`: Optional Benchmark price data (timestamps × assets) or (timestamps × 1).
+  - `X`: Asset price data (observations × assets).
+  - `F`: Optional Factor price data (observations × factors).
+  - `B`: Optional Benchmark price data (observations × assets) or (observations × 1).
   - `iv`: Optional Implied volatility data.
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
@@ -272,9 +272,12 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 # Details
 
   - Joins asset, factor, and benchmark data as specified.
+
   - Optionally applies a mapping function and/or collapses the time series.
   - Handles missing values by filtering, imputation, and dropping as configured.
   - Computes returns using the specified method.
+
+      + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
   - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples

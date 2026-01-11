@@ -1,5 +1,5 @@
 ---
-mode: ask
+agent: ask
 description: Check API docs completeness.
 ---
 
@@ -9,11 +9,11 @@ Check API documentation completeness for PortfolioOptimisers.jl:
     
       + Verify that a Julia docstring is present for the symbol in the source code.
       + Verify that the docsstring is complete, accurate, and up to date.
-      + Also verify the corresponding markdown file in `docs/src/api/` references the symbol.
+      + Also verify the corresponding markdown file in `./docs/src/api/` references the symbol.
 
  2. For each symbol with a docstring:
     
-      + Check that the symbol is documented in the corresponding markdown file in `docs/src/api/` (e.g., `src/SomeFeature.jl` has corresponding `docs/src/api/SomeFeature.md`, `src/SomeFolder/AnotherFeature.jl` has corresponding `docs/src/api/SomeFolder/AnotherFeature.md`).
+      + Check that the symbol is documented in the corresponding markdown file in `./docs/src/api/` (e.g., `./src/SomeFeature.jl` has corresponding `./docs/src/api/SomeFeature.md`, `./src/SomeFolder/AnotherFeature.jl` has corresponding `./docs/src/api/SomeFolder/AnotherFeature.md`).
       + Confirm that the docstring content (or a summary of it) is included in the markdown file.
  3. Report:
     

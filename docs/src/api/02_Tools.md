@@ -57,6 +57,17 @@ VectorToScalarMeasure
 Num_VecToScaM
 MinValue
 MeanValue
+factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
 MedianValue
+factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
 MaxValue
+StdValue
+factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+VarValue
+factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+SumValue
+ProdValue
+ModeValue
+StandardisedValue
+factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
 ```
