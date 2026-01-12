@@ -798,7 +798,7 @@ These are used to summarise a portfolio's risk and return characteristics.
   - Expected returns.
     
       + Arithmetic.
-      + Kelly (Logarithmic).
+      + Logarithmic.
 
   - Risk-adjusted return ratio.
     

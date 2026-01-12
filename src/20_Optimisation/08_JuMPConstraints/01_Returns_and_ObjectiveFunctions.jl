@@ -101,8 +101,8 @@ function set_objective_function(port, ::Sharpe, ::Union{AKelly, EKelly}, custom_
     JuMP.@objective(model, Max, scale_obj * obj_func)
     return nothing
 end
-function return_constraints(port, type, ::Any, kelly::AKelly, mu, sigma, returns,
-                            kelly_approx_idx)
+function return_constraints(port, type, ::Any, log_ret::AKelly, mu, sigma, returns,
+                            log_ret_approx_idx)
     if isempty(mu)
         return nothing
     end
@@ -111,14 +111,14 @@ function return_constraints(port, type, ::Any, kelly::AKelly, mu, sigma, returns
     get_fees(model)
     w = model[:w]
     fees = model[:fees]
-    if isnothing(kelly_approx_idx) ||
-       isempty(kelly_approx_idx) ||
-       iszero(kelly_approx_idx[1])
+    if isnothing(log_ret_approx_idx) ||
+       isempty(log_ret_approx_idx) ||
+       iszero(log_ret_approx_idx[1])
         if !haskey(model, :variance_risk)
-            a_rc = kelly.a_rc
-            b_rc = kelly.b_rc
+            a_rc = log_ret.a_rc
+            b_rc = log_ret.b_rc
             sdp_rc_variance(model, type, a_rc, b_rc)
-            calc_variance_risk(get_ntwk_clust_type(port, a_rc, b_rc), kelly.formulation,
+            calc_variance_risk(get_ntwk_clust_type(port, a_rc, b_rc), log_ret.formulation,
                                model, mu, sigma, returns)
         end
         variance_risk = model[:variance_risk]
@@ -126,26 +126,26 @@ function return_constraints(port, type, ::Any, kelly::AKelly, mu, sigma, returns
     else
         variance_risk = model[:variance_risk]
         JuMP.@expression(model, ret,
-                    LinearAlgebra.dot(mu, w) - fees - 0.5 * variance_risk[kelly_approx_idx[1]])
+                    LinearAlgebra.dot(mu, w) - fees - 0.5 * variance_risk[log_ret_approx_idx[1]])
     end
 
     return_bounds(port)
 
     return nothing
 end
-function return_constraints(port, type, obj::Sharpe, kelly::AKelly, mu, sigma, returns,
-                            kelly_approx_idx)
-    a_rc = kelly.a_rc
-    b_rc = kelly.b_rc
+function return_constraints(port, type, obj::Sharpe, log_ret::AKelly, mu, sigma, returns,
+                            log_ret_approx_idx)
+    a_rc = log_ret.a_rc
+    b_rc = log_ret.b_rc
     sdp_rc_variance(port.model, type, a_rc, b_rc)
-    return_sharpe_akelly_constraints(port, type, obj, kelly,
+    return_sharpe_alog_ret_constraints(port, type, obj, log_ret,
                                      get_ntwk_clust_type(port, a_rc, b_rc), mu, sigma,
-                                     returns, kelly_approx_idx)
+                                     returns, log_ret_approx_idx)
     return nothing
 end
-function return_sharpe_akelly_constraints(port, type, obj::Sharpe, kelly::AKelly,
+function return_sharpe_alog_ret_constraints(port, type, obj::Sharpe, log_ret::AKelly,
                                           adjacency_constraint::Union{NoAdj, IP}, mu, sigma,
-                                          returns, kelly_approx_idx)
+                                          returns, log_ret_approx_idx)
     if isempty(mu)
         return nothing
     end
@@ -159,33 +159,33 @@ function return_sharpe_akelly_constraints(port, type, obj::Sharpe, kelly::AKelly
     ohf = model[:ohf]
     risk = model[:risk]
     rf = obj.rf
-    JuMP.@variable(model, tapprox_kelly)
-    JuMP.@constraint(model, constr_sr_akelly_risk, scale_constr * risk <= scale_constr * ohf)
-    JuMP.@expression(model, ret, LinearAlgebra.dot(mu, w) - fees - 0.5 * tapprox_kelly - k * rf)
-    if isnothing(kelly_approx_idx) ||
-       isempty(kelly_approx_idx) ||
-       iszero(kelly_approx_idx[1])
+    JuMP.@variable(model, tapprox_log_ret)
+    JuMP.@constraint(model, constr_sr_alog_ret_risk, scale_constr * risk <= scale_constr * ohf)
+    JuMP.@expression(model, ret, LinearAlgebra.dot(mu, w) - fees - 0.5 * tapprox_log_ret - k * rf)
+    if isnothing(log_ret_approx_idx) ||
+       isempty(log_ret_approx_idx) ||
+       iszero(log_ret_approx_idx[1])
         if !haskey(model, :variance_risk)
-            calc_variance_risk(adjacency_constraint, kelly.formulation, model, mu, sigma,
+            calc_variance_risk(adjacency_constraint, log_ret.formulation, model, mu, sigma,
                                returns)
         end
         dev = model[:dev]
-        JuMP.@constraint(model, constr_sr_akelly_ret,
-                    [scale_constr * (k + tapprox_kelly)
+        JuMP.@constraint(model, constr_sr_alog_ret_ret,
+                    [scale_constr * (k + tapprox_log_ret)
                      scale_constr * 2 * dev
-                     scale_constr * (k - tapprox_kelly)] ∈ JuMP.SecondOrderCone())
+                     scale_constr * (k - tapprox_log_ret)] ∈ JuMP.SecondOrderCone())
     else
         dev = model[:dev]
-        JuMP.@constraint(model, constr_sr_akelly_ret,
-                    [scale_constr * (k + tapprox_kelly)
-                     scale_constr * 2 * dev[kelly_approx_idx[1]]
-                     scale_constr * (k - tapprox_kelly)] ∈ JuMP.SecondOrderCone())
+        JuMP.@constraint(model, constr_sr_alog_ret_ret,
+                    [scale_constr * (k + tapprox_log_ret)
+                     scale_constr * 2 * dev[log_ret_approx_idx[1]]
+                     scale_constr * (k - tapprox_log_ret)] ∈ JuMP.SecondOrderCone())
     end
     return_bounds(port)
 
     return nothing
 end
-function return_sharpe_akelly_constraints(port, type, obj::Sharpe, ::AKelly, ::SDP, ::Any,
+function return_sharpe_alog_ret_constraints(port, type, obj::Sharpe, ::AKelly, ::SDP, ::Any,
                                           ::Any, returns, ::Any)
     return_constraints(port, type, obj, EKelly(), nothing, nothing, returns, nothing)
     return nothing
@@ -359,14 +359,14 @@ function set_return_constraints!(model::JuMP.Model,
     set_return_bounds!(model, lb)
     return nothing
 end
-function set_max_ratio_kelly_return_constraints!(args...)
+function set_max_ratio_log_return_constraints!(args...)
     return nothing
 end
-function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, ::MaximumRatio)
+function set_max_ratio_log_return_constraints!(model::JuMP.Model, ::MaximumRatio)
     sc = model[:sc]
     ohf = model[:ohf]
     risk = model[:risk]
-    JuMP.@constraint(model, sr_ekelly_risk, sc * (risk - ohf) <= 0)
+    JuMP.@constraint(model, sr_elog_ret_risk, sc * (risk - ohf) <= 0)
 end
 function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
@@ -376,19 +376,20 @@ function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
     X = pr.X
     X = set_portfolio_returns!(model, X)
     T = length(X)
-    JuMP.@variable(model, t_ekelly[1:T])
+    JuMP.@variable(model, t_elog_ret[1:T])
     wi = nothing_scalar_array_selector(pret.w, pr.w)
     if isnothing(wi)
-        JuMP.@expression(model, ret, Statistics.mean(t_ekelly))
+        JuMP.@expression(model, ret, Statistics.mean(t_elog_ret))
     else
-        JuMP.@expression(model, ret, Statistics.mean(t_ekelly, wi))
+        JuMP.@expression(model, ret, Statistics.mean(t_elog_ret, wi))
     end
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
-    set_max_ratio_kelly_return_constraints!(model, obj)
+    set_max_ratio_log_return_constraints!(model, obj)
     JuMP.@expression(model, kret, k .+ X)
-    JuMP.@constraint(model, ekelly_ret[i = 1:T],
-                     [sc * t_ekelly[i], sc * k, sc * kret[i]] in JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model, elog_ret_ret[i = 1:T],
+                     [sc * t_elog_ret[i], sc * k, sc * kret[i]] in
+                     JuMP.MOI.ExponentialCone())
     set_return_bounds!(model, lb)
     return nothing
 end
