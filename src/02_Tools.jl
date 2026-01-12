@@ -1249,7 +1249,7 @@ Keyword arguments correspond to the fields above.
 
 ```jldoctest
 julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0.7])
-1.229837387624884
+1.2299003291330186
 ```
 
 # Related

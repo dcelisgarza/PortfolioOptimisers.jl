@@ -1,4 +1,4 @@
-# Gerber Covariance
+# Gerber covariance
 
 ```@docs
 Gerber0
