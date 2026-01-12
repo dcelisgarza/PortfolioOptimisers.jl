@@ -8,7 +8,7 @@
 
 Compute the expected portfolio return using the specified return estimator.
 
-`expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. Supports arithmetic, Kelly, and JuMP-based return estimators. For Kelly returns, computes the mean log-growth rate. For JuMP-based estimators, returns a vector of expected returns for each portfolio.
+`expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. Supports arithmetic, logarithmic, and JuMP-based return estimators. For logarithmic returns, computes the mean log-growth rate. For JuMP-based estimators, returns a vector of expected returns for each portfolio.
 
 # Arguments
 
