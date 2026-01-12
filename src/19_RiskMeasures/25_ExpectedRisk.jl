@@ -66,7 +66,7 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
 function number_effective_assets(w::VecNum)
-    return inv(dot(w, w))
+    return inv(LinearAlgebra.dot(w, w))
 end
 function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
@@ -101,9 +101,9 @@ function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatN
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
     rr = regression(re, rd.X, rd.F)
     Bt = transpose(rr.L)
-    b2t = transpose(pinv(transpose(nullspace(Bt))))
-    b3t = transpose(pinv(b2t))
-    rc_f = (Bt * w) .* (transpose(pinv(Bt)) * mr)
+    b2t = transpose(LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt))))
+    b3t = transpose(LinearAlgebra.pinv(b2t))
+    rc_f = (Bt * w) .* (transpose(LinearAlgebra.pinv(Bt)) * mr)
     rc_of = sum((b2t * w) .* (b3t * mr))
     rc_f = [rc_f; rc_of]
     return rc_f

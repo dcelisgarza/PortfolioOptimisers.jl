@@ -1,11 +1,11 @@
 #=
-@setup_workload begin
+PrecompileTools.@setup_workload begin
     rng = Xoshiro(42)
     X = randn(rng, 252, 15) * 0.01
     F = randn(rng, 252, 5) * 0.01
     ew = eweights(1:(252), inv(252))
     rf = 4.2 / 100 / 252
-    @compile_workload begin
+    PrecompileTools.@compile_workload begin
         rd = ReturnsResult(; nx = ["_$i" for i in 1:15], X = X, nf = ["_$i" for i in 1:5],
                            F = F)
         sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["_$i" for i in 1:3:15]))
@@ -32,7 +32,7 @@
                                                                                                                            detone = Detone(),
                                                                                                                            alg = LoGo())),
                                                            horizon = 252)),
-               FactorPrior(; re = StepwiseRegression(; crit = PValue(; threshold = 0.8)),
+               FactorPrior(; re = StepwiseRegression(; crit = PValue(; t =  0.8)),
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   ce = GerberCovariance(;
@@ -49,11 +49,11 @@
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns(;
                                                                                                                                                        alg = BayesStein(;
-                                                                                                                                                                        target = VolatilityWeighted())))),
+                                                                                                                                                                        tgt = VolatilityWeighted())))),
                                                                                   mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                                denoise = Denoise(;
                                                                                                                                  alg = FixedDenoise())))),
-                           re = StepwiseRegression(; target = GeneralisedLinearModel(),
+                           re = StepwiseRegression(; tgt = GeneralisedLinearModel(),
                                                    crit = AIC(), alg = Backward()),
                            mp = DenoiseDetoneAlgMatrixProcessing()),
                FactorPrior(;
@@ -64,7 +64,7 @@
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns(;
                                                                                                                                                        alg = BodnarOkhrinParolya(;
-                                                                                                                                                                                 target = MeanSquaredError())))))),
+                                                                                                                                                                                 tgt = MeanSquaredError())))))),
                            re = StepwiseRegression(; crit = AICC()), rsd = false),
                FactorPrior(;
                            pe = EmpiricalPrior(;

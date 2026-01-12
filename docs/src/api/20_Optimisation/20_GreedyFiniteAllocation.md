@@ -1,0 +1,5 @@
+# Greedy allocation
+
+```@docs
+GreedyAllocation
+```

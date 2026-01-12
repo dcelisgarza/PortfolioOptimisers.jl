@@ -47,11 +47,12 @@ function ExcessExpectedReturns(;
                                rf::Number = 0.0)
     return ExcessExpectedReturns(me, rf)
 end
-function factory(me::ExcessExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(me::ExcessExpectedReturns,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """
-    mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute excess expected returns by subtracting the risk-free rate.
 
@@ -73,7 +74,7 @@ This method applies the mean estimator to the data and subtracts the risk-free r
   - [`ExcessExpectedReturns`](@ref)
 """
 function Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    return mean(me.me, X; dims = dims, kwargs...) .- me.rf
+    return Statistics.mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end
 
 export ExcessExpectedReturns

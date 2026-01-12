@@ -126,29 +126,23 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::Option{<:AbstractWeights} = nothing)
-    kwargs = re.kwargs
-    if !isnothing(w)
-        kwargs = if !haskey(kwargs, :wts)
-            (kwargs..., wts = w)
-        else
-            ks = setdiff(keys(kwargs), (:wts,))
-            NamedTuple{Tuple(union(ks, (:wts,)))}(((getproperty(kwargs, k) for k in ks)...,
-                                                   w))
-        end
+function factory(re::LinearModel, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return if !isnothing(w)
+        LinearModel(; kwargs = (; re.kwargs..., weights = w))
+    else
+        re
     end
-    return LinearModel(; kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::LinearModel, X::MatNum, y::VecNum)
+    StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
-This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `target.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the PortfolioOptimisers.jl regression estimation framework.
+This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the PortfolioOptimisers.jl regression estimation framework.
 
 # Arguments
 
-  - `target`: Regression target specifying model options.
+  - `tgt`: Regression target specifying model options.
   - `X`: The design matrix (observations × features).
   - `y`: The response vector.
 
@@ -161,8 +155,8 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`LinearModel`](@ref)
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
-function StatsAPI.fit(target::LinearModel, X::MatNum, y::VecNum)
-    return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
+function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
+    return StatsAPI.fit(GLM.LinearModel, X, y; tgt.kwargs...)
 end
 """
     struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
@@ -207,32 +201,28 @@ struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
+                                kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::Option{<:AbstractWeights} = nothing)
-    kwargs = re.kwargs
-    if !isnothing(w)
-        kwargs = if !haskey(kwargs, :wts)
-            (kwargs..., wts = w)
-        else
-            ks = setdiff(keys(kwargs), (:wts,))
-            NamedTuple{Tuple(union(ks, (:wts,)))}(((getproperty(kwargs, k) for k in ks)...,
-                                                   w))
-        end
+function factory(re::GeneralisedLinearModel,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return if !isnothing(w)
+        GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
+    else
+        re
     end
-    return GeneralisedLinearModel(; args = re.args, kwargs = kwargs)
 end
 """
-    StatsAPI.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
+    StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
 
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
-This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` type, passing the design matrix `X`, response vector `y`, any positional arguments in `target.args`, and any keyword arguments in `target.kwargs`. This enables flexible configuration of the underlying GLM fitting routine within the PortfolioOptimisers.jl regression estimation framework.
+This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` type, passing the design matrix `X`, response vector `y`, any positional arguments in `tgt.args`, and any keyword arguments in `tgt.kwargs`. This enables flexible configuration of the underlying GLM fitting routine within the PortfolioOptimisers.jl regression estimation framework.
 
 # Arguments
 
-  - `target`: A [`GeneralisedLinearModel`](@ref) regression target specifying model options.
+  - `tgt`: A [`GeneralisedLinearModel`](@ref) regression target specifying model options.
   - `X`: The design matrix (observations × features).
   - `y`: The response vector.
 
@@ -245,8 +235,8 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GeneralisedLinearModel`](@ref)
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
-function StatsAPI.fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
-    return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
+function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
+    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; tgt.kwargs...)
 end
 """
     abstract type AbstractMinMaxValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end

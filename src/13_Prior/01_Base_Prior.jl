@@ -137,6 +137,7 @@ Abstract supertype for high order prior estimators.
   - [`prior`](@ref)
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
 """
     abstract type AbstractPriorResult <: AbstractResult end
 
@@ -207,7 +208,7 @@ function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end
 """
-    clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+    clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
 
@@ -225,11 +226,11 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 
 # Related
 
-  - [`ClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`clusterise`](@ref)
 """
-function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
+function clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
 """
@@ -242,7 +243,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 
 # Arguments
 
-  - `necle`: Network estimator, clustering estimator, or clustering result.
+  - `necle`: Network estimator, res estimator, or clustering result.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
@@ -253,7 +254,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 # Related
 
   - [`NetworkEstimator`](@ref)
-  - [`ClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
@@ -296,7 +297,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 
 # Arguments
 
-  - `ne`: Network estimator, clustering estimator, or clustering result.
+  - `ne`: Network estimator, res estimator, or clustering result.
   - `cent`: Centrality algorithm.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
@@ -317,7 +318,7 @@ function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
     return centrality_vector(ne, cent, pr.X; kwargs...)
 end
 """
-    average_centrality(ne::PhE_Ph,
+    average_centrality(ne::NwE_Ph_ClE_Cl,
                        cent::AbstractCentralityAlgorithm, w::VecNum,
                        pr::AbstractPriorResult; kwargs...)
 
@@ -344,9 +345,9 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(ne::PhE_Ph, cent::AbstractCentralityAlgorithm, w::VecNum,
+function average_centrality(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm, w::VecNum,
                             pr::AbstractPriorResult; kwargs...)
-    return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
+    return LinearAlgebra.dot(centrality_vector(ne, cent, pr; kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
@@ -378,7 +379,7 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPri
     return average_centrality(cte, w, pr.X; kwargs...)
 end
 """
-    asset_phylogeny(cle::PhE_Cl,
+    asset_phylogeny(cle::NwE_ClE_Cl,
                     w::VecNum, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
@@ -412,7 +413,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::PhE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
+function asset_phylogeny(cle::NwE_ClE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
                          kwargs...)
     return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
 end
@@ -456,7 +457,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
 
     LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                   chol::Option{<:MatNum} = nothing,
-                  w::Option{<:AbstractWeights} = nothing,
+                  w::Option{<:StatsBase.AbstractWeights} = nothing,
                   ens::Option{<:Number} = nothing,
                   kld::Option{<:Num_VecNum} = nothing,
                   ow::Option{<:VecNum} = nothing,
@@ -472,13 +473,13 @@ Keyword arguments correspond to the fields above.
   - `X`, `mu`, and `sigma` must be non-empty.
   - `size(sigma, 1) == size(sigma, 2)`.
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
-  - If `w` is provided, `!isempty(w)` and `length(w) == size(X, 1)`.
+  - If `w` is not `nothing`, `!isempty(w)` and `length(w) == size(X, 1)`.
   - If `kld` is an `AbstractVector`, `!isempty(kld)`.
-  - If `ow` is provided, `!isempty(ow)`.
+  - If `ow` is not `nothing`, `!isempty(ow)`.
   - If any of `rr`, `f_mu`, or `f_sigma` are provided, all must be provided and non-empty, `size(rr.M, 2) == length(f_mu) == size(f_sigma, 1)`, and `size(rr.M, 1) == length(mu)`.
-  - If `f_sigma` is provided, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
-  - If `chol` is provided, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
-  - If `f_w` is provided, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
+  - If `f_sigma` is not `nothing`, it must be square and `size(f_sigma, 1) == size(rr.M, 2)`.
+  - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
+  - If `f_w` is not `nothing`, `!isempty(f_w)` and `length(f_w) == size(X, 1)`.
 
 # Examples
 
@@ -521,7 +522,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_sigma::T11
     f_w::T12
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
-                           w::Option{<:AbstractWeights}, ens::Option{<:Number},
+                           w::Option{<:StatsBase.AbstractWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
                            f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
@@ -569,7 +570,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
 end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        chol::Option{<:MatNum} = nothing,
-                       w::Option{<:AbstractWeights} = nothing,
+                       w::Option{<:StatsBase.AbstractWeights} = nothing,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,
@@ -654,7 +655,10 @@ HighOrderPrior
     S2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
     sk ┼ 2×4 Matrix{Float64}
      V ┼ 2×2 Matrix{Float64}
-  skmp ┴ nothing
+  skmp ┼ nothing
+  f_kt ┼ nothing
+  f_sk ┼ nothing
+   f_V ┴ nothing
 ```
 
 # Related
@@ -664,7 +668,7 @@ HighOrderPrior
   - [`HighOrderPriorEstimator`](@ref)
   - [`prior`](@ref)
 """
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractPriorResult
     pr::T1
     kt::T2
     L2::T3
@@ -672,10 +676,16 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     sk::T5
     V::T6
     skmp::T7
+    f_kt::T8
+    # chol_kt::T9
+    f_sk::T9
+    f_V::T10
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             L2::Option{<:MatNum}, S2::Option{<:MatNum},
                             sk::Option{<:MatNum}, V::Option{<:MatNum},
-                            skmp::Option{<:AbstractMatrixProcessingEstimator})
+                            skmp::Option{<:AbstractMatrixProcessingEstimator},
+                            f_kt::Option{<:MatNum}, #chol_kt::Option{<:MatNum},
+                            f_sk::Option{<:MatNum}, f_V::Option{<:MatNum})
         N = length(pr.mu)
         kt_flag = isa(kt, MatNum)
         L2_flag = isa(L2, MatNum)
@@ -700,15 +710,42 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
             @argcheck(size(V) == (N, N))
             @argcheck(size(sk) == (N, N^2))
         end
+        f_kt_flag = !isnothing(f_kt)
+        f_sk_flag = !isnothing(f_sk)
+        if f_kt_flag || f_sk_flag
+            rr = pr.rr
+            @argcheck(!isnothing(rr))
+            Nf = size(rr.M, 2)
+            if f_kt_flag
+                @argcheck(!isempty(f_kt))
+                # @argcheck(!isempty(chol_kt))
+                assert_matrix_issquare(f_kt, :f_kt)
+                @argcheck(Nf^2 == size(f_kt, 1))
+                # @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
+            end
+            if f_sk_flag
+                @argcheck(!isempty(f_sk))
+                @argcheck(!isempty(f_V))
+                @argcheck(size(f_sk) == (Nf, Nf^2))
+                @argcheck(size(f_V) == (Nf, Nf))
+            end
+        end
         return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
-                   typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
+                   typeof(skmp), typeof(f_kt), #typeof(chol_kt), 
+                   typeof(f_sk), typeof(f_V)}(pr, kt, L2, S2, sk, V, skmp, f_kt,
+                                              #  chol_kt,
+                                              f_sk, f_V)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
                         L2::Option{<:MatNum} = nothing, S2::Option{<:MatNum} = nothing,
                         sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
-                        skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing)
-    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
+                        skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
+                        f_kt::Option{<:MatNum} = nothing,
+                        # chol_kt::Option{<:MatNum} = nothing,
+                        f_sk::Option{<:MatNum} = nothing, f_V::Option{<:MatNum} = nothing)
+    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt, 
+                          f_sk, f_V)
 end
 
 export prior, LowOrderPrior, HighOrderPrior

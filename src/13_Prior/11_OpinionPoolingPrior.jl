@@ -62,7 +62,7 @@ struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
         p::T4
         w::T5
         alg::T6
-        executor::T7
+        ex::T7
     end
 
 Opinion pooling prior estimator for asset returns.
@@ -77,23 +77,23 @@ Opinion pooling prior estimator for asset returns.
   - `p`: Penalty parameter for penalising opinions which deviate from the consensus.
   - `w`: Vector of opinion probabilities.
   - `alg`: Opinion pooling algorithm.
-  - `executor`: Parallel execution strategy.
+  - `ex`: Parallel execution strategy.
 
 # Constructor
 
-    OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, executor)
+    OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, ex)
 
 Keyword arguments correspond to the fields above. All arguments are validated for type and value consistency.
 
 ## Validation
 
   - `pes` must be a non-empty vector of prior estimators.
-  - If `w` is provided, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
-  - If `p` is provided, `p > 0`.
+  - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
+  - If `p` is not `nothing`, `p > 0`.
 
 # Details
 
-  - If `w` is provided, and `sum(w) < 1`, the remaining weight is assigned to the uniform prior. Otherwise, all opinions are assumed to be equally weighted.
+  - If `w` is not `nothing`, and `sum(w) < 1`, the remaining weight is assigned to the uniform prior. Otherwise, all opinions are assumed to be equally weighted.
   - If `p` is `nothing`, the the opinion probabilities are used as given. Else they are adjusted according to their Kullback-Leibler divergence from the consensus.
 
 # Examples
@@ -111,124 +111,124 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-       pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
-           │            pe ┼ EmpiricalPrior
-           │               │        ce ┼ PortfolioOptimisersCovariance
-           │               │           │   ce ┼ Covariance
-           │               │           │      │    me ┼ SimpleExpectedReturns
-           │               │           │      │       │   w ┴ nothing
-           │               │           │      │    ce ┼ GeneralCovariance
-           │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │               │           │      │       │    w ┴ nothing
-           │               │           │      │   alg ┴ Full()
-           │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-           │               │           │      │       pdm ┼ Posdef
-           │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()        
-           │               │           │      │   denoise ┼ nothing
-           │               │           │      │    detone ┼ nothing
-           │               │           │      │       alg ┼ nothing
-           │               │           │      │     order ┴ DenoiseDetoneAlg()
-           │               │        me ┼ SimpleExpectedReturns
-           │               │           │   w ┴ nothing
-           │               │   horizon ┴ nothing
-           │      mu_views ┼ LinearConstraintEstimator
-           │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
-           │               │   key ┴ nothing
-           │     var_views ┼ nothing
-           │    cvar_views ┼ nothing
-           │   sigma_views ┼ nothing
-           │      sk_views ┼ nothing
-           │      kt_views ┼ nothing
-           │     rho_views ┼ nothing
-           │     var_alpha ┼ nothing
-           │    cvar_alpha ┼ nothing
-           │          sets ┼ AssetSets
-           │               │    key ┼ String: "nx"
-           │               │   ukey ┼ String: "ux"
-           │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-           │        ds_opt ┼ nothing
-           │        dm_opt ┼ nothing
-           │           opt ┼ OptimEntropyPooling
-           │               │     args ┼ Tuple{}: ()
-           │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
-           │               │      sc1 ┼ Int64: 1
-           │               │      sc2 ┼ Float64: 1000.0
-           │               │      alg ┴ ExpEntropyPooling()
-           │             w ┼ nothing
-           │           alg ┴ H1_EntropyPooling()
-           │ , EntropyPoolingPrior
-           │            pe ┼ EmpiricalPrior
-           │               │        ce ┼ PortfolioOptimisersCovariance
-           │               │           │   ce ┼ Covariance
-           │               │           │      │    me ┼ SimpleExpectedReturns
-           │               │           │      │       │   w ┴ nothing
-           │               │           │      │    ce ┼ GeneralCovariance
-           │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │               │           │      │       │    w ┴ nothing
-           │               │           │      │   alg ┴ Full()
-           │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-           │               │           │      │       pdm ┼ Posdef
-           │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()        
-           │               │           │      │   denoise ┼ nothing
-           │               │           │      │    detone ┼ nothing
-           │               │           │      │       alg ┼ nothing
-           │               │           │      │     order ┴ DenoiseDetoneAlg()
-           │               │        me ┼ SimpleExpectedReturns
-           │               │           │   w ┴ nothing
-           │               │   horizon ┴ nothing
-           │      mu_views ┼ LinearConstraintEstimator
-           │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
-           │               │   key ┴ nothing
-           │     var_views ┼ nothing
-           │    cvar_views ┼ nothing
-           │   sigma_views ┼ nothing
-           │      sk_views ┼ nothing
-           │      kt_views ┼ nothing
-           │     rho_views ┼ nothing
-           │     var_alpha ┼ nothing
-           │    cvar_alpha ┼ nothing
-           │          sets ┼ AssetSets
-           │               │    key ┼ String: "nx"
-           │               │   ukey ┼ String: "ux"
-           │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-           │        ds_opt ┼ nothing
-           │        dm_opt ┼ nothing
-           │           opt ┼ OptimEntropyPooling
-           │               │     args ┼ Tuple{}: ()
-           │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
-           │               │      sc1 ┼ Int64: 1
-           │               │      sc2 ┼ Float64: 1000.0
-           │               │      alg ┴ ExpEntropyPooling()
-           │             w ┼ nothing
-           │           alg ┴ H1_EntropyPooling()
-           │ ]
-       pe1 ┼ nothing
-       pe2 ┼ EmpiricalPrior
-           │        ce ┼ PortfolioOptimisersCovariance
-           │           │   ce ┼ Covariance
-           │           │      │    me ┼ SimpleExpectedReturns
-           │           │      │       │   w ┴ nothing
-           │           │      │    ce ┼ GeneralCovariance
-           │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │           │      │       │    w ┴ nothing
-           │           │      │   alg ┴ Full()
-           │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-           │           │      │       pdm ┼ Posdef
-           │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-           │           │      │   denoise ┼ nothing
-           │           │      │    detone ┼ nothing
-           │           │      │       alg ┼ nothing
-           │           │      │     order ┴ DenoiseDetoneAlg()
-           │        me ┼ SimpleExpectedReturns
-           │           │   w ┴ nothing
-           │   horizon ┴ nothing
-         p ┼ nothing
-         w ┼ nothing
-       alg ┼ LinearOpinionPooling()
-  executor ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+      │            pe ┼ EmpiricalPrior
+      │               │        ce ┼ PortfolioOptimisersCovariance
+      │               │           │   ce ┼ Covariance
+      │               │           │      │    me ┼ SimpleExpectedReturns
+      │               │           │      │       │   w ┴ nothing
+      │               │           │      │    ce ┼ GeneralCovariance
+      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │               │           │      │       │    w ┴ nothing
+      │               │           │      │   alg ┴ Full()
+      │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │               │           │      │       pdm ┼ Posdef
+      │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │               │           │      │   denoise ┼ nothing
+      │               │           │      │    detone ┼ nothing
+      │               │           │      │       alg ┼ nothing
+      │               │           │      │     order ┴ DenoiseDetoneAlg()
+      │               │        me ┼ SimpleExpectedReturns
+      │               │           │   w ┴ nothing
+      │               │   horizon ┴ nothing
+      │      mu_views ┼ LinearConstraintEstimator
+      │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
+      │               │   key ┴ nothing
+      │     var_views ┼ nothing
+      │    cvar_views ┼ nothing
+      │   sigma_views ┼ nothing
+      │      sk_views ┼ nothing
+      │      kt_views ┼ nothing
+      │     rho_views ┼ nothing
+      │     var_alpha ┼ nothing
+      │    cvar_alpha ┼ nothing
+      │          sets ┼ AssetSets
+      │               │    key ┼ String: "nx"
+      │               │   ukey ┼ String: "ux"
+      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+      │        ds_opt ┼ nothing
+      │        dm_opt ┼ nothing
+      │           opt ┼ OptimEntropyPooling
+      │               │     args ┼ Tuple{}: ()
+      │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
+      │               │      sc1 ┼ Int64: 1
+      │               │      sc2 ┼ Float64: 1000.0
+      │               │      alg ┴ ExpEntropyPooling()
+      │             w ┼ nothing
+      │           alg ┴ H1_EntropyPooling()
+      │ , EntropyPoolingPrior
+      │            pe ┼ EmpiricalPrior
+      │               │        ce ┼ PortfolioOptimisersCovariance
+      │               │           │   ce ┼ Covariance
+      │               │           │      │    me ┼ SimpleExpectedReturns
+      │               │           │      │       │   w ┴ nothing
+      │               │           │      │    ce ┼ GeneralCovariance
+      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │               │           │      │       │    w ┴ nothing
+      │               │           │      │   alg ┴ Full()
+      │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │               │           │      │       pdm ┼ Posdef
+      │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │               │           │      │   denoise ┼ nothing
+      │               │           │      │    detone ┼ nothing
+      │               │           │      │       alg ┼ nothing
+      │               │           │      │     order ┴ DenoiseDetoneAlg()
+      │               │        me ┼ SimpleExpectedReturns
+      │               │           │   w ┴ nothing
+      │               │   horizon ┴ nothing
+      │      mu_views ┼ LinearConstraintEstimator
+      │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
+      │               │   key ┴ nothing
+      │     var_views ┼ nothing
+      │    cvar_views ┼ nothing
+      │   sigma_views ┼ nothing
+      │      sk_views ┼ nothing
+      │      kt_views ┼ nothing
+      │     rho_views ┼ nothing
+      │     var_alpha ┼ nothing
+      │    cvar_alpha ┼ nothing
+      │          sets ┼ AssetSets
+      │               │    key ┼ String: "nx"
+      │               │   ukey ┼ String: "ux"
+      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+      │        ds_opt ┼ nothing
+      │        dm_opt ┼ nothing
+      │           opt ┼ OptimEntropyPooling
+      │               │     args ┼ Tuple{}: ()
+      │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
+      │               │      sc1 ┼ Int64: 1
+      │               │      sc2 ┼ Float64: 1000.0
+      │               │      alg ┴ ExpEntropyPooling()
+      │             w ┼ nothing
+      │           alg ┴ H1_EntropyPooling()
+      │ ]
+  pe1 ┼ nothing
+  pe2 ┼ EmpiricalPrior
+      │        ce ┼ PortfolioOptimisersCovariance
+      │           │   ce ┼ Covariance
+      │           │      │    me ┼ SimpleExpectedReturns
+      │           │      │       │   w ┴ nothing
+      │           │      │    ce ┼ GeneralCovariance
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
+      │           │      │   alg ┴ Full()
+      │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │           │      │       pdm ┼ Posdef
+      │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │      │   denoise ┼ nothing
+      │           │      │    detone ┼ nothing
+      │           │      │       alg ┼ nothing
+      │           │      │     order ┴ DenoiseDetoneAlg()
+      │        me ┼ SimpleExpectedReturns
+      │           │   w ┴ nothing
+      │   horizon ┴ nothing
+    p ┼ nothing
+    w ┼ nothing
+  alg ┼ LinearOpinionPooling()
+   ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -245,13 +245,13 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
     p::T4
     w::T5
     alg::T6
-    executor::T7
+    ex::T7
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
                                  p::Option{<:Number}, w::Option{<:VecNum},
                                  alg::OpinionPoolingAlgorithm,
-                                 executor::FLoops.Transducers.Executor)
+                                 ex::FLoops.Transducers.Executor)
         @argcheck(!isempty(pes))
         if !isnothing(p)
             @argcheck(p > zero(p))
@@ -263,7 +263,7 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorE
             @argcheck(sum(w) <= one(eltype(w)))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
-                   typeof(executor)}(pes, pe1, pe2, p, w, alg, executor)
+                   typeof(ex)}(pes, pe1, pe2, p, w, alg, ex)
     end
 end
 function OpinionPoolingPrior(; pes::VecEP,
@@ -271,8 +271,8 @@ function OpinionPoolingPrior(; pes::VecEP,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
-                             executor::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
-    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, executor)
+                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
+    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex)
 end
 """
     robust_probabilities(ow::VecNum, args...)
@@ -280,7 +280,7 @@ end
 
 Compute robust opinion probabilities for consensus formation in opinion pooling.
 
-`robust_probabilities` adjusts the vector of opinion probabilities (`ow`) used in opinion pooling algorithms to account for robustness against outlier or extreme opinions. If a penalty parameter `p` is provided, the method penalises opinions that diverge from the consensus by down-weighting them according to their Kullback-Leibler divergence from the pooled distribution. If no penalty parameter is set, the original opinion probabilities are returned unchanged.
+`robust_probabilities` adjusts the vector of opinion probabilities (`ow`) used in opinion pooling algorithms to account for robustness against outlier or extreme opinions. If a penalty parameter `p` is not `nothing`, the method penalises opinions that diverge from the consensus by down-weighting them according to their Kullback-Leibler divergence from the pooled distribution. If no penalty parameter is set, the original opinion probabilities are returned unchanged.
 
 # Arguments
 
@@ -295,7 +295,7 @@ Compute robust opinion probabilities for consensus formation in opinion pooling.
 # Details
 
   - If `p` is `nothing`, i.e. the method with `args...`, returns the original opinion probabilities.
-  - If `p` is provided, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
+  - If `p` is not `nothing`, computes the consensus distribution, computes the Kullback-Leibler divergence for each opinion, and applies an exponential penalty to each probability. The adjusted probabilities are normalised to sum to 1.
   - Used internally by [`OpinionPoolingPrior`](@ref) to ensure robust aggregation of opinions.
 
 # Related
@@ -307,7 +307,7 @@ function robust_probabilities(ow::VecNum, args...)
 end
 function robust_probabilities(ow::VecNum, pw::MatNum, p::Number)
     c = pw * ow
-    kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
+    kldivs = [sum(StatsBase.kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
     ow /= sum(ow)
     return ow
@@ -328,12 +328,12 @@ Compute the consensus posterior return distribution from individual prior distri
 
 # Returns
 
-  - `w::ProbabilityWeights`: Consensus posterior probability weights.
+  - `w::StatsBase.ProbabilityWeights`: Consensus posterior probability weights.
 
 # Details
 
   - For `LinearOpinionPooling`, computes the weighted arithmetic mean of the individual prior weights: `w = pw * ow`.
-  - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - logsumexp(log.(pw) * ow))`.
+  - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - LogExpFunctions.logsumexp(log.(pw) * ow))`.
   - Used internally by [`OpinionPoolingPrior`](@ref) to form the consensus prior distribution.
 
 # Related
@@ -343,12 +343,12 @@ Compute the consensus posterior return distribution from individual prior distri
   - [`LogarithmicOpinionPooling`](@ref)
 """
 function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
-    return pweights(pw * ow)
+    return StatsBase.pweights(pw * ow)
 end
 function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     u = log.(pw) * ow
-    lse = logsumexp(u)
-    return pweights(vec(exp.(u .- lse)))
+    lse = LogExpFunctions.logsumexp(u)
+    return StatsBase.pweights(vec(exp.(u .- lse)))
 end
 """
     prior(pe::OpinionPoolingPrior, X::MatNum;
@@ -381,7 +381,7 @@ Compute opinion pooling prior moments for asset returns.
   - Optional pre-processing estimator `pe.pe1` is applied to asset returns before pooling, else the original returns are used.
   - Each prior estimator in `pe.pes` is applied to the asset returns, producing individual prior weights.
   - Opinion probabilities `ow` are initialised from `pe.w` or set uniformly if it is `nothing`; if their sum is less than 1, the remainder is assigned to a uniform prior.
-  - Robust opinion probabilities are computed using [`robust_probabilities`](@ref) if a penalty parameter `pe.p` is provided.
+  - Robust opinion probabilities are computed using [`robust_probabilities`](@ref) if a penalty parameter `pe.p` is not `nothing`.
   - Consensus posterior weights are computed using [`compute_pooling`](@ref) according to the specified pooling algorithm `pe.alg`.
   - Post-processing estimator `pe.pe2` is applied using the consensus weights.
   - The result includes the effective number of scenarios, Kullback-Leibler divergence to each opinion, robust opinion probabilities, and optional factor moments.
@@ -417,7 +417,7 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
         pw = Matrix{eltype(X)}(undef, T, M)
     end
     let X = X, F = F, pw = pw
-        @floop pe.executor for (i, pe) in enumerate(pe.pes)
+        FLoops.@floop pe.ex for (i, pe) in enumerate(pe.pes)
             pr = prior(pe, X, F; strict = strict, kwargs...)
             pw[:, i] = pr.w
         end
@@ -426,8 +426,8 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     w = compute_pooling(pe.alg, ow, pw)
     pe2 = factory(pe.pe2, w)
     (; X, mu, sigma, chol, rr, f_mu, f_sigma) = prior(pe2, X, F; strict = strict, kwargs...)
-    ens = exp(entropy(w))
-    kld = [kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
+    ens = exp(StatsBase.entropy(w))
+    kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w, ens = ens,
                          kld = kld, ow = ow, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = ifelse(!isnothing(rr), w, nothing))

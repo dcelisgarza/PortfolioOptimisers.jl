@@ -3,7 +3,7 @@
 
 Abstract supertype for all phylogeny-based constraint estimators in PortfolioOptimisers.jl.
 
-All concrete types representing phylogeny-based constraint estimators should subtype `AbstractPhylogenyConstraintEstimator`. This enables a consistent, composable interface for generating constraints based on phylogenetic, clustering, or network structures among assets.
+All concrete types representing phylogeny-based constraint estimators should subtype `AbstractPhylogenyConstraintEstimator`. This enables a consistent, composable interface for generating constraints based on phylogenetic, res, or network structures among assets.
 
 # Related
 
@@ -18,7 +18,7 @@ abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimato
 
 Abstract supertype for all phylogeny-based constraint result types in PortfolioOptimisers.jl.
 
-All concrete types representing the results of phylogeny-based constraint generation should subtype `AbstractPhylogenyConstraintResult`. This enables a consistent, composable interface for storing and propagating constraint matrices, vectors, or other outputs derived from phylogenetic, clustering, or network structures among assets.
+All concrete types representing the results of phylogeny-based constraint generation should subtype `AbstractPhylogenyConstraintResult`. This enables a consistent, composable interface for storing and propagating constraint matrices, vectors, or other outputs derived from phylogenetic, res, or network structures among assets.
 
 # Related
 
@@ -52,7 +52,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pe::PhE_Cl = NetworkEstimator(),
+                                   pe::NwE_ClE_Cl = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -70,7 +70,7 @@ SemiDefinitePhylogenyEstimator
      │       │      │    me ┼ SimpleExpectedReturns
      │       │      │       │   w ┴ nothing
      │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)        
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │      │       │    w ┴ nothing
      │       │      │   alg ┴ Full()
      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -101,12 +101,13 @@ SemiDefinitePhylogenyEstimator
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pe::PhE_Cl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pe::NwE_ClE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pe), typeof(p)}(pe, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pe::PhE_Cl = NetworkEstimator(), p::Number = 0.05)
+function SemiDefinitePhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(),
+                                        p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
 const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
@@ -132,7 +133,7 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 
 ## Validation
 
-  - `issymmetric(A)` and `all(iszero, diag(A))`.
+  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`.
   - `p >= 0`.
 
 # Examples
@@ -154,8 +155,8 @@ struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
     function SemiDefinitePhylogeny(A::MatNum, p::Number)
-        @argcheck(all(iszero, diag(A)))
-        @argcheck(issymmetric(A))
+        @argcheck(all(iszero, LinearAlgebra.diag(A)))
+        @argcheck(LinearAlgebra.issymmetric(A))
         @argcheck(p >= zero(p))
         return new{typeof(A), typeof(p)}(A, p)
     end
@@ -210,7 +211,7 @@ function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator, B::VecNum)
+    validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
 Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pe`.
@@ -241,7 +242,7 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator, B::VecNum)
+function validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
     if !isnothing(pe.onc.max_k)
         @argcheck(length(B) <= pe.onc.max_k,
                   DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
@@ -272,7 +273,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 # Constructor
 
     IntegerPhylogenyEstimator(;
-                              pe::PhE_Cl = NetworkEstimator(),
+                              pe::NwE_ClE_Cl = NetworkEstimator(),
                               B::Int_VecInt = 1,
                               scale::Number = 100_000.0)
 
@@ -293,7 +294,7 @@ IntegerPhylogenyEstimator
         │       │      │    me ┼ SimpleExpectedReturns
         │       │      │       │   w ┴ nothing
         │       │      │    ce ┼ GeneralCovariance
-        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)     
+        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
         │       │      │       │    w ┴ nothing
         │       │      │   alg ┴ Full()
         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -326,7 +327,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
     pe::T1
     B::T2
     scale::T3
-    function IntegerPhylogenyEstimator(pe::PhE_Cl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pe::NwE_ClE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pe, B)
@@ -334,7 +335,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
         return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pe::PhE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
+function IntegerPhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
                                    scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
@@ -364,11 +365,11 @@ Container for the result of integer phylogeny-based constraint generation.
 
 ## Validation
 
-  - `issymmetric(A)` and `all(iszero, diag(A))`.
+  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`.
 
   - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
-      + `AbstractVector`: `size(unique(A + I; dims = 1), 1) == length(B)`.
+      + `AbstractVector`: `size(unique(A + LinearAlgebra.I; dims = 1), 1) == length(B)`.
 
 # Examples
 
@@ -391,9 +392,9 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     B::T2
     scale::T3
     function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
-        @argcheck(all(iszero, diag(A)))
-        @argcheck(issymmetric(A))
-        A = unique(A + I; dims = 1)
+        @argcheck(all(iszero, LinearAlgebra.diag(A)))
+        @argcheck(LinearAlgebra.issymmetric(A))
+        A = unique(A + LinearAlgebra.I; dims = 1)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             @argcheck(size(A, 1) == length(B))
@@ -414,7 +415,7 @@ end
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
 
-`phylogeny_constraints` constructs constraint objects based on phylogenetic, clustering, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
+`phylogeny_constraints` constructs constraint objects based on phylogenetic, res, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
 
 If a vector broadcasts the function over each element, returning a vector of constraint results.
 
@@ -460,165 +461,6 @@ end
 function phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
-"""
-    abstract type VectorToScalarMeasure <: AbstractAlgorithm end
-
-Abstract supertype for algorithms mapping a vector of real values to a single real value.
-
-`VectorToScalarMeasure` provides a unified interface for algorithms that reduce a vector of real numbers to a scalar, such as minimum, mean, median, or maximum. These are used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
-
-# Related
-
-  - [`MinValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`MaxValue`](@ref)
-  - [`CentralityConstraint`](@ref)
-  - [`vec_to_real_measure`](@ref)
-"""
-abstract type VectorToScalarMeasure <: AbstractAlgorithm end
-const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
-"""
-    struct MinValue <: VectorToScalarMeasure end
-
-Algorithm for reducing a vector of real values to its minimum.
-
-`MinValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the minimum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their minimum.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.vec_to_real_measure(MinValue(), [1.2, 3.4, 0.7])
-0.7
-```
-
-# Related
-
-  - [`VectorToScalarMeasure`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`MaxValue`](@ref)
-  - [`vec_to_real_measure`](@ref)
-"""
-struct MinValue <: VectorToScalarMeasure end
-"""
-    struct MeanValue <: VectorToScalarMeasure end
-
-Algorithm for reducing a vector of real values to its mean.
-
-`MeanValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean (average) value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mean.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
-1.7666666666666666
-```
-
-# Related
-
-  - [`VectorToScalarMeasure`](@ref)
-  - [`MinValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`MaxValue`](@ref)
-  - [`vec_to_real_measure`](@ref)
-"""
-struct MeanValue <: VectorToScalarMeasure end
-"""
-    struct MedianValue <: VectorToScalarMeasure end
-
-Algorithm for reducing a vector of real values to its median.
-
-`MedianValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the median value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their median.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
-1.2
-```
-
-# Related
-
-  - [`VectorToScalarMeasure`](@ref)
-  - [`MinValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MaxValue`](@ref)
-  - [`vec_to_real_measure`](@ref)
-"""
-struct MedianValue <: VectorToScalarMeasure end
-"""
-    struct MaxValue <: VectorToScalarMeasure end
-
-Algorithm for reducing a vector of real values to its maximum.
-
-`MaxValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the maximum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their maximum.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
-3.4
-```
-
-# Related
-
-  - [`VectorToScalarMeasure`](@ref)
-  - [`MinValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`vec_to_real_measure`](@ref)
-"""
-struct MaxValue <: VectorToScalarMeasure end
-"""
-    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
-
-Reduce a vector of real values to a single real value using a specified measure.
-
-`vec_to_real_measure` applies a reduction algorithm (such as minimum, mean, median, or maximum) to a vector of real numbers, as specified by the concrete subtype of [`VectorToScalarMeasure`](@ref). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
-
-# Arguments
-
-  - `measure`: An instance of a concrete subtype of [`VectorToScalarMeasure`](@ref), or the predefined value to return.
-  - `val`: A vector of real values to be reduced (ignored if `measure` is a `Number`).
-
-# Returns
-
-  - `score::Number`: Computed value according to `measure`.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
-3.4
-
-julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
-0.9
-```
-
-# Related
-
-  - [`VectorToScalarMeasure`](@ref)
-  - [`MinValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`MaxValue`](@ref)
-"""
-function vec_to_real_measure(::MinValue, val::VecNum)
-    return minimum(val)
-end
-function vec_to_real_measure(::MeanValue, val::VecNum)
-    return mean(val)
-end
-function vec_to_real_measure(::MedianValue, val::VecNum)
-    return median(val)
-end
-function vec_to_real_measure(::MaxValue, val::VecNum)
-    return maximum(val)
-end
-function vec_to_real_measure(val::Number, ::VecNum)
-    return val
-end
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
     struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
@@ -660,7 +502,7 @@ CentralityConstraint
        │        │       │      │   alg ┴ Full()
        │        │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
        │        │       │      │       pdm ┼ Posdef
-       │        │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton        
+       │        │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
        │        │       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
        │        │       │      │   denoise ┼ nothing
        │        │       │      │    detone ┼ nothing
@@ -710,7 +552,7 @@ const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
 
-`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or threshold, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
+`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or t, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
 
 # Arguments
 
@@ -812,5 +654,4 @@ function centrality_constraints(ccs::Option{<:LinearConstraint}, args...; kwargs
 end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
-       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
-       phylogeny_constraints, centrality_constraints
+       IntegerPhylogeny, CentralityConstraint, phylogeny_constraints, centrality_constraints

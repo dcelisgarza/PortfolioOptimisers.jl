@@ -2,9 +2,9 @@
 
 ```@docs
 LinearModel
-fit(target::LinearModel, X::MatNum, y::VecNum)
+fit(tgt::LinearModel, X::MatNum, y::VecNum)
 GeneralisedLinearModel
-fit(target::GeneralisedLinearModel, X::MatNum, y::VecNum)
+fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
 AIC
 AICC
 BIC

@@ -103,7 +103,7 @@ julia> X
  1.0  1.0
  1.0  1.0
 
-julia> isposdef(X)
+julia> LinearAlgebra.isposdef(X)
 true
 ```
 
@@ -117,18 +117,18 @@ function posdef!(::Nothing, args...)
     return nothing
 end
 function posdef!(pdm::Posdef, X::MatNum)
-    if isposdef(X)
+    if LinearAlgebra.isposdef(X)
         return nothing
     end
     assert_matrix_issquare(X, :X)
-    s = diag(X)
+    s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.cov2cor!(X, s)
+        StatsBase.StatsBase.cov2cor!(X, s)
     end
-    nearest_cor!(X, pdm.alg; pdm.kwargs...)
-    if !isposdef(X)
+    NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)
+    if !LinearAlgebra.isposdef(X)
         @warn("Matrix could not be made positive definite.")
     end
     if iscov

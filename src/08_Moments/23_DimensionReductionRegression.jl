@@ -83,7 +83,7 @@ This method applies PCA as a dimension reduction technique for regression-based 
   - [`DimensionReductionRegression`](@ref)
 """
 function StatsAPI.fit(drtgt::PCA, X::MatNum)
-    return MultivariateStats.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
+    return StatsAPI.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
 """
     struct PPCA{T1} <: DimensionReductionTarget
@@ -150,7 +150,7 @@ This method applies PPCA as a dimension reduction technique for regression-based
   - [`DimensionReductionRegression`](@ref)
 """
 function StatsAPI.fit(drtgt::PPCA, X::MatNum)
-    return MultivariateStats.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
+    return StatsAPI.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
 """
     struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
@@ -216,6 +216,10 @@ struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimat
                                           ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
+        if haskey(retgt.kwargs, :weights)
+            @argcheck(isa(retgt.kwargs.weights, StatsBase.AbstractWeights), TypeError)
+            @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+        end
         return new{typeof(me), typeof(ve), typeof(drtgt), typeof(retgt)}(me, ve, drtgt,
                                                                          retgt)
     end
@@ -227,7 +231,8 @@ function DimensionReductionRegression(;
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression, w::Option{<:AbstractWeights} = nothing)
+function factory(re::DimensionReductionRegression,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
@@ -265,9 +270,9 @@ This helper function standardizes the feature matrix `X` (using Z-score normaliz
 function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
     N = size(X, 1)
     X_std = StatsBase.standardize(StatsBase.ZScoreTransform, transpose(X); dims = 2)
-    model = fit(drtgt, X_std)
-    Xp = transpose(predict(model, X_std))
-    Vp = projection(model)
+    model = StatsAPI.fit(drtgt, X_std)
+    Xp = transpose(StatsAPI.predict(model, X_std))
+    Vp = MultivariateStats.projection(model)
     x1 = [ones(eltype(X), N) Xp]
     return x1, Vp
 end
@@ -306,11 +311,15 @@ This function fits a regression model (as specified by `retgt`) to the response 
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
-    mean_y = !haskey(re.retgt.kwargs, :wts) ? mean(y) : mean(y, re.retgt.kwargs.wts)
-    fit_result = fit(re.retgt, x1, y)
-    beta_pc = coef(fit_result)[2:end]
+    mean_y = if !haskey(re.retgt.kwargs, :weights)
+        Statistics.mean(y)
+    else
+        Statistics.mean(y, re.retgt.kwargs.weights)
+    end
+    fit_result = StatsAPI.fit(re.retgt, x1, y)
+    beta_pc = StatsAPI.coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
-    beta0 = mean_y - dot(beta, mu)
+    beta0 = mean_y - LinearAlgebra.dot(beta, mu)
     pushfirst!(beta, beta0)
     return beta
 end
@@ -352,15 +361,15 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
-    mu = mean(re.me, F; dims = 1)
-    sigma = vec(std(re.ve, F; dims = 1))
+    mu = Statistics.mean(re.me, F; dims = 1)
+    sigma = vec(Statistics.std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)
         rr[i, :] = _regression(re, view(X, :, i), mu, sigma, f1, Vp)
     end
     b = view(rr, :, 1)
     M = view(rr, :, 2:cols)
-    L = transpose(pinv(Vp) * transpose(M .* transpose(sigma)))
+    L = transpose(LinearAlgebra.pinv(Vp) * transpose(M .* transpose(sigma)))
     return Regression(; b = b, M = M, L = L)
 end
 

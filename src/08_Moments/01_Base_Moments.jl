@@ -89,7 +89,7 @@ struct Full <: AbstractMomentAlgorithm end
 """
 struct Semi <: AbstractMomentAlgorithm end
 """
-    robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::AbstractWeights];
+    robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::StatsBase.AbstractWeights];
                dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
@@ -118,35 +118,35 @@ This function attempts to compute the weighted covariance matrix using the provi
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
-        cov(ce, X; dims = dims, mean = mean, kwargs...)
+        Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
     catch
-        cov(ce, X; dims = dims, mean = mean)
+        Statistics.cov(ce, X; dims = dims, mean = mean)
     end
     #=
     return if hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
-        cov(ce, X; dims = dims, mean = mean, kwargs...)
+        Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
     elseif hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean))
-        cov(ce, X; dims = dims, mean = mean)
+        Statistics.cov(ce, X; dims = dims, mean = mean)
     end
     =#
 end
-function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWeights;
-                    dims::Int = 1, mean = nothing, kwargs...)
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
     catch
-        cov(ce, X, w; dims = dims, mean = mean)
+        Statistics.cov(ce, X, w; dims = dims, mean = mean)
     end
     #=
     return if hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
-        cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
     elseif hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean))
-        cov(ce, X, w; dims = dims, mean = mean)
+        Statistics.cov(ce, X, w; dims = dims, mean = mean)
     end
     =#
 end
 """
-    robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::AbstractWeights];
+    robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::StatsBase.AbstractWeights];
                dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
@@ -176,67 +176,67 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
         try
-            cor(ce, X; dims = dims, mean = mean, kwargs...)
+            Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
         catch
-            cor(ce, X; dims = dims, mean = mean)
+            Statistics.cor(ce, X; dims = dims, mean = mean)
         end
     catch
         sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
     #=
     return if hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
-        cor(ce, X; dims = dims, mean = mean, kwargs...)
+        Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
     elseif hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean))
-        cor(ce, X; dims = dims, mean = mean)
+        Statistics.cor(ce, X; dims = dims, mean = mean)
     else
         sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
     =#
 end
-function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, w::AbstractWeights;
-                    dims::Int = 1, mean = nothing, kwargs...)
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
+                    w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
         try
-            cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
         catch
-            cor(ce, X, w; dims = dims, mean = mean)
+            Statistics.cor(ce, X, w; dims = dims, mean = mean)
         end
     catch
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
     #=
     return if hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
-        cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+        Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
     elseif hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean))
-        cor(ce, X, w; dims = dims, mean = mean)
+        Statistics.cor(ce, X, w; dims = dims, mean = mean)
     else
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
+            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
     =#
 end
 
-export Full, Semi, mean, cov, cor, std, var
+export Full, Semi

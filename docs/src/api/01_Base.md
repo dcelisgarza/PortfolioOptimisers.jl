@@ -40,6 +40,7 @@ Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following 
 
 ```@docs
 VecScalar
+AbstractEstimatorValueAlgorithm
 ```
 
 ## Base type aliases

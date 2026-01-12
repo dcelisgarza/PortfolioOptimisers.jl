@@ -46,7 +46,7 @@ Factor Black-Litterman prior estimator for asset returns.
                               views::Lc_BLV,
                               sets::Option{<:AssetSets} = nothing,
                               views_conf::Option{<:Num_VecNum} = nothing,
-                              w::Option{<:AbstractWeights} = nothing, rf::Number = 0.0,
+                              w::Option{<:StatsBase.AbstractWeights} = nothing, rf::Number = 0.0,
                               l::Option{<:Number} = nothing,
                               tau::Option{<:Number} = nothing, rsd::Bool = true)
 
@@ -57,7 +57,7 @@ Keyword arguments correspond to the fields above.
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
-  - If `w` is provided, `length(w) == size(X, 2)`.
+  - If `w` is not `nothing`, `length(w) == size(X, 2)`.
 
 # Examples
 
@@ -80,7 +80,7 @@ FactorBlackLittermanPrior
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
@@ -106,11 +106,11 @@ FactorBlackLittermanPrior
              │       alg ┼ nothing
              │     order ┴ DenoiseDetoneAlg()
           re ┼ StepwiseRegression
-             │     crit ┼ PValue
-             │          │   threshold ┴ Float64: 0.05
-             │      alg ┼ Forward()
-             │   target ┼ LinearModel
-             │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │   crit ┼ PValue
+             │        │   t ┴ Float64: 0.05
+             │    alg ┼ Forward()
+             │    tgt ┼ LinearModel
+             │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
           ve ┼ SimpleVariance
              │          me ┼ SimpleExpectedReturns
              │             │   w ┴ nothing
@@ -191,7 +191,8 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::FactorBlackLittermanPrior,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,
@@ -232,7 +233,7 @@ Compute factor Black-Litterman prior moments for asset returns.
 
   - `dims in (1, 2)`.
   - `length(pe.sets.dict[pe.sets.key]) == size(F, 2)`.
-  - If `pe.w` is provided, `length(pe.w) == size(X, 2)`.
+  - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
 
@@ -295,11 +296,12 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     posterior_mu = M * f_posterior_mu + b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * cholesky(f_posterior_sigma).L
+    posterior_csigma = M * LinearAlgebra.cholesky(f_posterior_sigma).L
     if pe.rsd
         err = X - posterior_X
-        err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
+        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma
+        posdef!(pe.mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,

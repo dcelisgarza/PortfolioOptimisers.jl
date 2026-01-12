@@ -12,24 +12,45 @@
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-## Welcome to PortfolioOptimisers.jl!
+## Welcome to PortfolioOptimisers.jl
 
 [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
 > [!CAUTION]
 > Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
-Portfolio optimisation is the science of reducing investment risk by being clever about how you distribute your money. Ironically, some of the most robust ways to ensure risk is minimised is to distribute your money equally among a portfolio of proven assets. There exist however, a rather large number of methods, risk measures, constraints, prior statistics estimators, etc. Which give a huge number of combinations.
+Portfolio optimisation is the science of either:
 
-`PortfolioOptimisers.jl` is an attempt at providing as many as possible, and to make it possible to add more by leveraging Julia's type system.
+  - Minimising risk whilst keeping returns to acceptable levels.
+  - Maximising returns whilst keeping risk to acceptable levels.
 
-The feature list is *quite large* and under *active development*. New features will be added over time. Check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) documentation for details.
+To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
 
-Please feel free to file issues and/or start discussions if you have any issues using the library, or if I haven't got to writing docs/examples for something you need. That way I know what to prioritise.
+There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore a vast landscape of "optimal" portfolios.
+
+`PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
+
+For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs.
+
+## Caveat emptor
+
+  - `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
+  - The documentation is still under construction.
+  - Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
+  - Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
+
+## Installation
+
+`PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
+
+```julia
+julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
+using Pkg
+```
 
 ## Quickstart
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) contains toy examples of the many, many features.
+The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) contains toy examples of the many, many features.
 
 ```julia
 # Import module and plotting extension.
@@ -118,8 +139,8 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 # Discrete finite allocation.
 da = DiscreteAllocation(; slv = mip_slv)
 
-# Perform the finite discrete allocation, uses the final asset 
-# prices, and an available cash amount. This is for us mortals 
+# Perform the finite discrete allocation, uses the final asset
+# prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
 mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
 
@@ -401,7 +422,7 @@ These sets can be used to make some optimisations more robust. Namely, there exi
         
           * Circular, moving, stationary bootstrap.
 
-  - Ellipse uncertainty sets.
+  - Ellipsoidal uncertainty sets.
     
       + Normally distributed returns.
     
@@ -543,7 +564,7 @@ These are used to summarise a portfolio's risk and return characteristics.
   - Expected returns.
     
       + Arithmetic.
-      + Kelly (Logarithmic).
+      + Logarithmic.
 
   - Risk-adjusted return ratio.
     

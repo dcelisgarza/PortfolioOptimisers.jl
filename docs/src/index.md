@@ -34,7 +34,7 @@ authors:
 CurrentModule = PortfolioOptimisers
 ```
 
-# Welcome to PortfolioOptimisers.jl!
+# Welcome to PortfolioOptimisers.jl
 
 [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
@@ -42,25 +42,55 @@ CurrentModule = PortfolioOptimisers
     
     Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
-Portfolio optimisation is the science of reducing investment risk by being clever about how you distribute your money. Ironically, some of the most robust ways to ensure risk is minimised is to distribute your money equally among a portfolio of proven assets. There exist however, a rather large number of methods, risk measures, constraints, prior statistics estimators, etc. Which give a huge number of combinations.
+Portfolio optimisation is the science of either:
 
-`PortfolioOptimisers.jl` is an attempt at providing as many as possible, and to make it possible to add more by leveraging Julia's type system.
+  - Minimising risk whilst keeping returns to acceptable levels.
+  - Maximising returns whilst keeping risk to acceptable levels.
 
-The feature list is *quite large* and under *active development*. New features will be added over time. Check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) documentation for details.
+To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
 
-Please feel free to file issues and/or start discussions if you have any issues using the library, or if I haven't got to writing docs/examples for something you need. That way I know what to prioritise.
+There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore a vast landscape of "optimal" portfolios.
+
+`PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
+
+For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs.
+
+## Caveat emptor
+
+  - `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
+  - The documentation is still under construction.
+  - Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
+  - Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
+
+## Installation
+
+`PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
+
+```julia
+julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
+using Pkg
+```
 
 ## Quickstart
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/1_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_Introduction) contains toy examples of the many, many features.
+The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs contain toy examples of the many, many features.
 
-````@example 0_index
+First we import the packages we will need for the example.
+
+  - `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
+  - `Clarabel` and `HiGHS` are the optimisers we will use.
+  - `YFinance` and `TimeSeries` for downloading and preprocessing price data.
+  - `PrettyTables` and `DataFrames` for displaying the results.
+
+```@example 0_index
 # Import module and plotting extension.
 using PortfolioOptimisers, StatsPlots, GraphRecipes
 # Import optimisers.
 using Clarabel, HiGHS
-# Download data and pretty printing
-using YFinance, PrettyTables, TimeSeries, DataFrames
+# Download data.
+using YFinance, TimeSeries
+# Pretty printing.
+using PrettyTables, DataFrames
 
 # Format for pretty tables.
 fmt1 = (v, i, j) -> begin
@@ -78,11 +108,11 @@ fmt2 = (v, i, j) -> begin
     end
 end;
 nothing # hide
-````
+```
 
-We will now download the prices.
+For illustration purposes, we will use a set of popular meme stocks. We need to download and set the price data in a format `PortfolioOptimisers.jl` can consume.
 
-````@example 0_index
+```@example 0_index
 # Function to convert prices to time array.
 function stock_price_to_time_array(x)
     # Only get the keys that are not ticker or datetime.
@@ -109,29 +139,53 @@ cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
 prices = prices[cidx]
 TimeSeries.rename!(prices, Symbol.(assets))
 pretty_table(prices[(end - 5):end]; formatters = [fmt1])
-````
+```
 
-We now have all we need to perform a basic optimisation.
+Now we can compute our returns by calling [`prices_to_returns`](@ref).
 
-````@example 0_index
+```@example 0_index
 # Compute the returns.
 rd = prices_to_returns(prices)
+```
 
+`PortfolioOptimisers.jl` uses `JuMP` for handling the optimisation problems, which means it is solver agnostic and therefore does not ship with any pre-installed solver. [`Solver`](@ref) lets us define the optimiser factory, its solver-specific settings, and `JuMP`'s solution acceptance criteria.
+
+```@example 0_index
 # Define the continuous solver.
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false, "max_step_fraction" => 0.9),
-             check_sol = (; allow_local = true, allow_almost = true))
+             check_sol = (; allow_local = true, allow_almost = true));
+nothing # hide
+```
 
+`PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`](@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
+
+```@example 0_index
+opt = JuMPOptimiser(; slv = slv);
+nothing # hide
+```
+
+Here we will use the traditional Mean-Risk [`MeanRisk`](@ref) optimsation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
+
+```@example 0_index
 # Vanilla (Markowitz) mean risk optimisation.
-mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+mr = MeanRisk(; opt = opt)
+```
 
+As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction). For now, we will perform the optimisation via [`optimise`](@ref).
+
+```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
 res = optimise(mr, rd)
-````
+```
 
-`PortfolioOptimisers.jl` also has the capability to perform finite allocations for those of us without infinite money.
+The solution lives in the `sol` field, but the weights can be accessed via the `w` property.
 
-````@example 0_index
+`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do so, a greedy algorithm [`GreedyAllocation`](@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`](@ref) which uses mixed-integer programming (MIP) and requires a capable solver.
+
+Here we will use the latter.
+
+```@example 0_index
 # Define the MIP solver for finite discrete allocation.
 mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false),
@@ -139,284 +193,494 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 
 # Discrete finite allocation.
 da = DiscreteAllocation(; slv = mip_slv)
+```
 
-# Perform the finite discrete allocation, uses the final asset 
-# prices, and an available cash amount. This is for us mortals 
+The discrete allocation minimises the absolute or relative L1- or L2-norm (configurable) between the ideal allocation to the one you can afford plus the leftover cash. As such, it needs to know a few extra things, namely the optimal weights `res.w`, a vector of latest prices `vec(values(prices[end]))`, and available cash which we define to be `4206.90`.
+
+```@example 0_index
+# Perform the finite discrete allocation, uses the final asset
+# prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
 mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
+```
 
+We can display the results in a table.
+
+```@example 0_index
 # View the results.
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                :opt_weights => res.w, :mip_weights => mip_res.w)
 pretty_table(df; formatters = [fmt2])
-````
+```
 
-Finally, let's plot some results.
+We can also visualise the portfolio using various plotting functions. For example we can plot the portfolio's cumulative returns, in this case compound returns.
 
-````@example 0_index
+```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
-````
+```
 
-````@example 0_index
+We can plot the histogram of portfolio returns.
+
+```@example 0_index
+# Plot histogram of returns.
+plot_histogram(mip_res.w, rd.X, slv)
+```
+
+We can plot the portfolio drawdowns, in this case compound drawdowns.
+
+```@example 0_index
+# Plot compounded drawdowns.
+plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
+```
+
+We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.
+
+```@example 0_index
 # Plot the risk contribution per asset.
 plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
-````
+```
 
-````@example 0_index
-# Plot histogram of returns.
-plot_histogram(mip_res.w, rd.X, slv)
-````
+This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
-````@example 0_index
-# Plot compounded drawdowns.
-plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
-````
-
-## Caveats
-
-### Documentation
-
-  - Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
-  - Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
-  - Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
-
-### API
-
-  - Unstable: there will likely be breaking changes as I figure out better, more general ways to do things, or better naming conventions.
-
-### Internals
-
-  - Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
+!!! info
+    
+    This section is under active development.
 
 ## Features
 
-The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There are also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
+### Preprocessing
 
-Without further ado, here is a summary of the features in this package.
+  - Prices to returns [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
+  - Find complete indices [`find_complete_indices`](@ref)
+  - Find uncorrelated indices [`find_uncorrelated_indices`](@ref)
 
-### Price data
+### Matrix Processing
 
-Every optimisation but the finite allocation work off of returns data. Some optimisations may use price data in the future.
+  - Positive definite projection [`Posdef`](@ref), [`posdef!`](@ref), [`posdef`](@ref)
 
-  - Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
-  - Computing them, validating and cleaning up data.
-
-### Co-moment matrix processing
-
-Price data is often noisy and follows general macroeconomic trends. Every optimisation model is at risk of overfitting the data. In particular, those which rely on summary statistics (moments) can be overly sensitive to the input data, for example a covariance matrix. It is therefore important to have methods that increase the robustness of their estimation.
-
-  - Positive definite projection.
-
-  - Matrix denoising.
+  - Denoising [`Denoise`](@ref), [`denoise!`](@ref), [`denoise`](@ref)
     
-      + Spectral, shrunk, fixed.
-  - Matrix detoning.
-
-### Moment estimation
-
-Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
-
-  - Expected returns.
-    
-      + Arithmetic expected returns.
-    
-      + Shrunk expected returns.
-        
-          * James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
-      + Equilibrium expected returns.
-      + Excess expected returns.
-
-  - Variance.
-  - Covariance/Correlation matrix.
-    
-      + Custom: estimator + processing pipeline.
-    
-      + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
-        
-          * Full.
-          * Semi.
-      + Gerber.
-        
-          * Gerber 0, 1, 2. Standardised and unstandardised.
-      + Smyth-Broby.
-        
-          * Smyth-Broby 0, 1, 2. Standardised and unstandardised.
-          * Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
-      + Distance covariance.
-      + Lower tail dependence.
-      + Kendall.
-      + Spearman.
-      + Mutual information.
-        
-          * Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-      + Denoised.
-      + Detoned.
-      + Custom algorithm.
-      + Coskewness.
-        
-          * Full.
-          * Semi.
-      + Cokurtosis.
-        
-          * Full.
-          * Semi.
-      + Implied volatility.
+      + Spectral [`SpectralDenoise`](@ref)
+      + Fixed [`FixedDenoise`](@ref)
+      + Shrunk [`ShrunkDenoise`](@ref)
+  - Detoning [`Detone`](@ref), [`detone!`](@ref), [`detone`](@ref)
+  - Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing`](@ref), [`DenoiseDetoneAlg`](@ref), [`DenoiseAlgDetone`](@ref), [`DetoneDenoiseAlg`](@ref), [`DetoneAlgDenoise`](@ref), [`AlgDenoiseDetone`](@ref), [`AlgDetoneDenoise`](@ref)
 
 ### Regression Models
 
-Factor models and implied volatility use regression in their estimation.
+Factor prior models and implied volatility use [`regression`](@ref) in their estimation, which return a [`Regression`](@ref) object.
 
-  - Stepwise.
+#### Regression targets
+
+  - Linear model [`LinearModel`](@ref)
+  - Generalised linear model [`GeneralisedLinearModel`](@ref)
+
+#### Regression types
+
+  - Stepwise [`StepwiseRegression`](@ref)
     
-      + Forward and Backward.
+      + Algorithms
         
-          * P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
-
-  - Dimensional reduction.
+          * Forward [`Forward`](@ref)
+          * Backward [`Backward`](@ref)
     
-      + Principal Component.
-      + Probabilistic Principal Component.
+      + Selection criteria
+        
+          * P-value [`PValue`](@ref)
+          * Akaike information criteria [`AIC`](@ref)
+          * Corrected Akaike information criteria [`AICC`](@ref)
+          * Bayesian information criteria [`BIC`](@ref)
+          * R-squared [`RSquared`](@ref)
+          * Adjusted R-squared criteria [`AdjustedRSquared`](@ref)
 
-### Ordered weights array and Linear moments
-
-  - Ordered weights arrays.
+  - Dimensional reduction with custom mean and variance estimators [`DimensionReductionRegression`](@ref)
     
-      + Gini Mean Difference.
-      + Conditional Value at Risk.
-      + Weighted Conditional Value at Risk.
-      + Tail Gini.
-      + Worst Realisation.
-      + Range.
-      + Conditional Value at Risk Range.
-      + Weighted Conditional Value at Risk Range.
-      + Tail Gini Range.
+      + Dimensional reduction targets
+        
+          * Principal component [`PCA`](@ref)
+          * Probabilistic principal component [`PPCA`](@ref)
 
+### Moment Estimation
+
+#### [Expected Returns](@id readme-expected-returns)
+
+Overloads `Statistics.mean`.
+
+  - Optionally weighted expected returns [`SimpleExpectedReturns`](@ref)
+
+  - Equilibrium expected returns with custom covariance [`EquilibriumExpectedReturns`](@ref)
+  - Excess expected returns with custom expected returns estimator [`ExcessExpectedReturns`](@ref)
+  - Shrunk expected returns with custom expected returns and custom covariance estimators [`ShrunkExpectedReturns`](@ref)
+    
+      + Algorithms
+        
+          * James-Stein [`JamesStein`](@ref)
+          * Bayes-Stein [`BayesStein`](@ref)
+          * Bodnar-Okhrin-Parolya [`BodnarOkhrinParolya`](@ref)
+    
+      + Targets: all algorithms can have any of the following targets
+        
+          * Grand Mean [`GrandMean`](@ref)
+          * Volatility Weighted [`VolatilityWeighted`](@ref)
+          * Mean Squared Error [`MeanSquaredError`](@ref)
+  - Standard deviation expected returns [`StandardDeviationExpectedReturns`](@ref)
+
+#### [Variance and Standard Deviation](@id readme-variance)
+
+Overloads `Statistics.var` and `Statistics.std`.
+
+  - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`](@ref)
+
+#### [Covariance and Correlation](@id readme-covariance-correlation)
+
+Overloads `Statistics.cov` and `Statistics.cor`.
+
+  - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](@ref)
+
+  - Covariance with custom covariance estimator [`Covariance`](@ref)
+    
+      + Full covariance [`Full`](@ref)
+      + Semi (downside) covariance [`Semi`](@ref)
+  - Gerber covariances with custom variance estimator [`GerberCovariance`](@ref)
+    
+      + Unstandardised algorithms
+        
+          * Gerber 0 [`Gerber0`](@ref)
+          * Gerber 1 [`Gerber1`](@ref)
+          * Gerber 2 [`Gerber2`](@ref)
+    
+      + Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimator
+        
+          * Gerber 0 [`StandardisedGerber0`](@ref)
+          * Gerber 1 [`StandardisedGerber1`](@ref)
+          * Gerber 2 [`StandardisedGerber2`](@ref)
+  - Smyth-Broby extension of Gerber covariances with custom expected returns and variance estimators [`SmythBrobyCovariance`](@ref)
+    
+      + Unstandardised algorithms
+        
+          * Smyth-Broby 0 [`SmythBroby0`](@ref)
+          * Smyth-Broby 1 [`SmythBroby1`](@ref)
+          * Smyth-Broby 2 [`SmythBroby2`](@ref)
+          * Smyth-Broby-Gerber 0 [`SmythBrobyGerber0`](@ref)
+          * Smyth-Broby-Gerber 1 [`SmythBrobyGerber1`](@ref)
+          * Smyth-Broby-Gerber 2 [`SmythBrobyGerber2`](@ref)
+    
+      + Standardised algorithms (Z-transforms the data beforehand)
+        
+          * Smyth-Broby 0 [`StandardisedSmythBroby0`](@ref)
+          * Smyth-Broby 1 [`StandardisedSmythBroby1`](@ref)
+          * Smyth-Broby 2 [`StandardisedSmythBroby2`](@ref)
+          * Smyth-Broby-Gerber 0 [`StandardisedSmythBrobyGerber0`](@ref)
+          * Smyth-Broby-Gerber 1 [`StandardisedSmythBrobyGerber1`](@ref)
+          * Smyth-Broby-Gerber 2 [`StandardisedSmythBrobyGerber2`](@ref)
+  - Distance covariance with custom distance estimator via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
+  - Lower Tail Dependence covariance [`LowerTailDependenceCovariance`](@ref)
+  - Rank covariances
+    
+      + Kendall covariance [`KendallCovariance`](@ref)
+      + Spearman covariance [`SpearmanCovariance`](@ref)
+  - Mutual information covariance with custom variance estimator and various binning algorithms [`MutualInfoCovariance`](@ref)
+    
+      + [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
+        
+          * Knuth's optimal bin width [`Knuth`](@ref)
+          * Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
+          * Scott's bin width [`Scott`](@ref)
+    
+      + Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
+      + Predefined number of bins
+  - Denoised covariance with custom covariance estimator [`DenoiseCovariance`](@ref)
+  - Detoned covariance with custom covariance estimator [`DetoneCovariance`](@ref)
+  - Custom processed covariance with custom covariance estimator [`ProcessedCovariance`](@ref)
+  - Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`](@ref)
+    
+      + Premium [`ImpliedVolatilityPremium`](@ref)
+      + Regression [`ImpliedVolatilityRegression`](@ref)
+  - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
+  - Correlation covariance [`CorrelationCovariance`](@ref)
+
+#### [Coskewness](@id readme-coskewness)
+
+Implements [`coskewness`](@ref).
+
+  - Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
+    
+      + Full coskewness [`Full`](@ref)
+      + Semi (downside) coskewness [`Semi`](@ref)
+
+#### [Cokurtosis](@id readme-cokurtosis)
+
+Implements [`cokurtosis`](@ref).
+
+  - Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
+    
+      + Full cokurtosis [`Full`](@ref)
+      + Semi (downside) cokurtosis [`Semi`](@ref)
+
+### Distance matrices
+
+Implements [`distance`](@ref) and [`cor_and_dist`](@ref).
+
+  - First order distance estimator with custom distance algorithm, and optional exponent [`Distance`](@ref)
+  - Second order distance estimator with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent [`DistanceDistance`](@ref)
+
+The distance estimators are used together with various distance matrix algorithms.
+
+  - Simple distance [`SimpleDistance`](@ref)
+
+  - Simple absolute distance [`SimpleAbsoluteDistance`](@ref)
+  - Logarithmic distance [`LogDistance`](@ref)
+  - Correlation distance [`CorrelationDistance`](@ref)
+  - Variation of Information distance with various binning algorithms [`VariationInfoDistance`](@ref)
+    
+      + [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
+        
+          * Knuth's optimal bin width [`Knuth`](@ref)
+          * Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
+          * Scott's bin width [`Scott`](@ref)
+    
+      + Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
+      + Predefined number of bins
+  - Canonical distance [`CanonicalDistance`](@ref)
+
+### Prior statistics
+
+Many optimisations and constraints use prior statistics computed via [`prior`](@ref).
+
+  - Low order prior [`LowOrderPrior`](@ref)
+    
+      + Empirical [`EmpiricalPrior`](@ref)
+    
+      + Factor model [`FactorPrior`](@ref)
+      + Black-Litterman
+        
+          * Vanilla [`BlackLittermanPrior`](@ref)
+          * Bayesian [`BayesianBlackLittermanPrior`](@ref)
+          * Factor model [`FactorBlackLittermanPrior`](@ref)
+          * Augmented [`AugmentedBlackLittermanPrior`](@ref)
+      + Entropy pooling [`EntropyPoolingPrior`](@ref)
+      + Opinion pooling [`OpinionPoolingPrior`](@ref)
+
+  - High order prior [`HighOrderPrior`](@ref)
+    
+      + High order [`HighOrderPriorEstimator`](@ref)
+      + High order factor model [`HighOrderFactorPriorEstimator`](@ref)
+
+### Uncertainty sets
+
+In order to make optimisations more robust to noise and measurement error, it is possible to define uncertainty sets on the expected returns and covariance. These can be used in optimisations which use either of these two quantities. These are implemented via [`ucs`](@ref), [`mu_ucs`](@ref), [`sigma_ucs`](@ref).
+
+`PortfolioOptimisers.jl` implements two types of uncertainty sets.
+
+  - [`BoxUncertaintySet`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
+
+  - [`EllipsoidalUncertaintySet`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) with various algorithms for computing the scaling parameter via [`k_ucs`](@ref)
+    
+      + [`NormalKUncertaintyAlgorithm`](@ref)
+      + [`GeneralKUncertaintyAlgorithm`](@ref)
+      + [`ChiSqKUncertaintyAlgorithm`](@ref)
+      + Predefined scaling parameter
+
+It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets.
+
+  - Normally distributed returns [`NormalUncertaintySet`](@ref)
+
+  - Bootstrapping via Autoregressive Conditional Heteroskedasticity [`ARCHUncertaintySet`](@ref) via [`arch`](https://arch.readthedocs.io/en/latest/bootstrap/timeseries-bootstraps.html)
+    
+      + Circular [`CircularBootstrap`](@ref)
+      + Moving [`MovingBootstrap`](@ref)
+      + Stationary [`StationaryBootstrap`](@ref)
+
+The following estimator can only generate box sets.
+
+  - [`DeltaUncertaintySet`](@ref)
+
+### Phylogeny
+
+`PortfolioOptimisers.jl` can make use of asset relationships to perform optimisations, define constraints, and compute relatedness characteristics of portfolios.
+
+#### Clustering
+
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and [`clusterise`](@ref). Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
+
+  - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
+    
+      + Second order difference [`SecondOrderDifference`](@ref)
+      + Silhouette scores [`SilhouetteScore`](@ref)
+      + Predefined number of clusters.
+
+##### Hierarchical
+
+  - Hierarchical clustering [`HClustAlgorithm`](@ref)
+  - Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`](@ref)
+
+##### Non hierachical
+
+Non hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`](@ref) optimisations.
+
+  - K-means clustering [`KMeansAlgorithm`](@ref)
+
+#### Networks
+
+##### Adjacency matrices
+
+Adjacency matrices encode asset relationships either with clustering or graph theory via [`phylogeny_matrix`](@ref) and [`PhylogenyResult`](@ref).
+
+  - Network adjacency [`NetworkEstimator`](@ref) with custom tree algorithms, covariance, and distance estimators
+    
+      + Minimum spanning trees [`KruskalTree`](@ref), [`BoruvkaTree`](@ref), [`PrimTree`](@ref)
+    
+      + Triangulated Maximally Filtered Graph with various similarity matrix estimators
+        
+          * Maximum distance similarity [`MaximumDistanceSimilarity`](@ref)
+          * Exponential similarity [`ExponentialSimilarity`](@ref)
+          * General exponential similarity [`GeneralExponentialSimilarity`](@ref)
+
+  - Clustering adjacency [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
+
+##### Centrality and phylogeny measures
+
+  - Centrality estimator [`CentralityEstimator`](@ref) with custom adjacency matrix estimators (clustering and network) and centrality measures
+    
+      + Centrality measures
+        
+          * Betweenness [`BetweennessCentrality`](@ref)
+          * Closeness [`ClosenessCentrality`](@ref)
+          * Degree [`DegreeCentrality`](@ref)
+          * Eigenvector [`EigenvectorCentrality`](@ref)
+          * Katz [`KatzCentrality`](@ref)
+          * Pagerank [`Pagerank`](@ref)
+          * Radiality [`RadialityCentrality`](@ref)
+          * Stress [`StressCentrality`](@ref)
+
+  - Centrality vector [`centrality_vector`](@ref)
+  - Average centrality [`average_centrality`](@ref)
+  - The asset phylogeny score [`asset_phylogeny`](@ref)
+
+### Fees
+
+Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naïve ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
+
+  - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
+    
+      + Proportional long
+      + Proportional short
+      + Fixed long
+      + Fixed short
+      + Turnover [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
+
+### Portfolio optimisation
+
+Optimisations are implemented via [`optimise`](@ref). Optimisations consume an estimator and return a result.
+
+#### Naïve
+
+These return a [`NaiveOptimisationResult`](@ref).
+
+  - Inverse Volatility [`InverseVolatility`](@ref)
+  - Equal Weighted [`EqualWeighted`](@ref)
+  - Random (Dirichlet) [`RandomWeighted`](@ref)
+
+#### Traditional
+
+These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`](@ref), which encodes all supported constraints.
+
+  - Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)
+
+  - Factor Risk Contribution [`FactorRiskContribution`](@ref) returns a [`FactorRiskContributionResult`](@ref)
+  - Near Optimal Centering [`NearOptimalCentering`](@ref) returns a [`NearOptimalCenteringResult`](@ref)
+  - Asset and factor risk budgeting [`AssetRiskBudgeting`](@ref), [`FactorRiskBudgeting`](@ref)
+    
+      + Risk Budgeting [`RiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+    
+      + Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+        
+          * Basic [`BasicRelaxedRiskBudgeting`](@ref)
+          * Regularised [`RegularisedRelaxedRiskBudgeting`](@ref)
+          * Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+
+##### Traditional Optimisation Features
+
+  - Objective functions for non risk budgeting optimisations
+    
+      + Minimum risk [`MinimumRisk`](@ref)
+      + Maximum utility [`MaximumUtility`](@ref)
+      + Maximum return over risk ratio [`MaximumRatio`](@ref)
+      + Maximum return [`MaximumReturn`](@ref)
+      + Custom objective penalty [`CustomJuMPObjective`](@ref)
+
+  - Portfolio returns
+    
+      + Arithmetic returns [`ArithmeticReturn`](@ref)
+      + Logarithmic returns [`LogarithmicReturn`](@ref)
+  - Regularisation penalty
+    
+      + L1
+      + L2
+  - Weight
+  - Budget
+  - Turnover
+  - Tracking
+    
+      + Returns
+        
+          * L1-error
+          * L2-error
+    
+      + Risk
+        
+          * Independent variable
+          * Dependent variable
+  - Phylogeny
+  - Cardinality
+    
+      + Asset
+      + Asset group
+      + Set
+      + Set group
+  - Buy-in threshold
+  - N-dimensional Pareto fronts [`Frontier`](@ref)
+    
+      + Return based
+      + Risk based
+
+#### [Clustering](@id readme-clustering-opt)
+
+  - Hierarchical Risk Parity
+  - Hierarchical Equal Risk Parity
+  - Schur Complementary Hierarchical Risk Parity
+  - Nested Clustered
+
+#### Ensemble
+
+  - Stacking
+
+#### Finite allocation
+
+  - Discrete
+  - Greedy
+
+### Ordered weights arrays and linear moments
+
+Some risk measures including linear moments may be formulated using ordered weights arrays.
+
+  - Gini Mean Difference.
+
+  - Conditional Value at Risk.
+  - Weighted Conditional Value at Risk.
+  - Tail Gini.
+  - Worst Realisation.
+  - Range.
+  - Conditional Value at Risk Range.
+  - Weighted Conditional Value at Risk Range.
+  - Tail Gini Range.
   - Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
     
       + Normalised Constant Relative Risk Aversion.
       + Minimum Squared Distance.
       + Minimum Sum Squares.
-
-### Distance Matrices
-
-Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
-
-  - Distance: these compare pairwise relationships.
-  - Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
-
-Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
-
-  - Simple.
-
-  - Absolute.
-  - Logarithmic.
-  - Correlation.
-  - Variation of Information.
-    
-      + Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-  - Canonical: depends on the covariance/correlation estimator used.
-
-### Phylogeny
-
-These define asset relationships. They can be used to set constraints on and/or compute the relatedness of assets in a portfolio.
-
-  - Clustering.
-    
-      + Optimal number of clusters:
-        
-          * Predefined, Second order difference, Standardised silhouette scores.
-    
-      + Hierarchical clustering.
-      + Direct Bubble Hierarchy Trees.
-        
-          * Local Global sparsification of the inverse covariance/correlation matrix.
-
-  - Phylogeny matrices.
-    
-      + Network (Minimum Spanning Tree) adjacency.
-      + Clustering adjacency.
-  - Centrality vectors and average centrality.
-    
-      + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
-  - Asset phylogeny score.
-
-### Constraint generation
-
-These let users easily manually or programatically define optimisation constraints.
-
-  - Equation parsing.
-
-  - Linear weights.
-  - Risk budget.
-  - Asset set matrices.
-  - Phylogeny.
-    
-      + Phylogeny matrix.
-        
-          * Semi definite.
-          * Mixed integer programming.
-    
-      + Centrality.
-  - Weight bounds.
-  - Buy-in threshold.
-
-### Prior statistics
-
-As previously mentioned, every optimisation but the finite allocation work off of returns data. These returns can be adjusted and summarised using these estimators. Like the moment estimators, these can be mixed in various ways.
-
-  - Empirical.
-
-  - Factor model.
-  - High order moments (coskewness and cokurtosis).
-  - Black-Litterman.
-    
-      + Vanilla.
-      + Bayesian.
-      + Factor model.
-      + Augmented.
-  - Entropy pooling.
-  - Opinion pooling.
-
-### Uncertainty sets
-
-These sets can be used to make some optimisations more robust. Namely, there exist uncertainty sets on expected returns and covariance. They can be used on any optimisation which uses any one of these quantities.
-
-  - Box.
-    
-      + Delta.
-    
-      + Normally distributed returns.
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
-
-  - Ellipse uncertainty sets.
-    
-      + Normally distributed returns.
-    
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
-
-### Turnover (Rebalancing)
-
-These penalise moving away from a benchmark vector of weights.
-
-  - Risk measure (experimental).
-  - Constraints.
-  - Fees.
-
-### Fees
-
-These encode various types of fees, which can be used in portfolio optimisation and analysis.
-
-  - Relative long.
-  - Relative short
-  - Fixed long.
-  - Fixed short.
-  - Turnover (rebalance).
 
 ### Tracking
 
@@ -534,7 +798,7 @@ These are used to summarise a portfolio's risk and return characteristics.
   - Expected returns.
     
       + Arithmetic.
-      + Kelly (Logarithmic).
+      + Logarithmic.
 
   - Risk-adjusted return ratio.
     
@@ -544,39 +808,6 @@ These are used to summarise a portfolio's risk and return characteristics.
     
       + Asset risk contribution.
       + Factor risk contribution.
-
-### Optimisation
-
-There are many different optimisation methods, each with different characteristics and configurable options, including exclusive constraint types and risk measures. Though all of them have an optional fallback method in case the optimisation fails.
-
-  - Clustering.
-    
-      + Hierarchical Risk Parity.
-      + Hierarchical Equal Risk Contribution.
-      + Nested Clustered Optimisation.
-      + Schur Complement Hierarchical Risk Parity.
-
-  - `JuMP`-based.
-    
-      + Mean Risk.
-    
-      + Factor Risk Contribution.
-      + Near Optimal Centering.
-      + Risk Budgeting.
-        
-          * Asset risk budgeting.
-          * Factor risk budgeting.
-      + Relaxed Risk Budgeting.
-  - Stacking.
-  - Naive.
-    
-      + Inverse volatility.
-      + Equal weighted.
-      + Random weighted.
-  - Finite Allocation.
-    
-      + Discrete.
-      + Greedy.
 
 ### Optimisation constraints
 

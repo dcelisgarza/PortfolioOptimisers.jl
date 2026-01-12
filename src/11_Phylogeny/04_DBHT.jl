@@ -119,8 +119,8 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `coef >= 0`.
-  - `power >= 0`.
+  - `coef > 0`.
+  - `power > 0`.
 
 # Examples
 
@@ -142,8 +142,8 @@ struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
     function GeneralExponentialSimilarity(coef::Number, power::Number)
-        @argcheck(zero(coef) <= coef, DomainError)
-        @argcheck(zero(power) <= power, DomainError)
+        @argcheck(zero(coef) < coef, DomainError)
+        @argcheck(zero(power) < power, DomainError)
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
@@ -191,7 +191,7 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::MatNum, kwargs...)
     return exp.(-coef * D .^ power)
 end
 """
-    struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
+    struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
         sim::T1
         root::T2
     end
@@ -223,7 +223,7 @@ DBHT
 
 # Related
 
-  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
@@ -232,7 +232,7 @@ DBHT
   - [`UniqueRoot`](@ref)
   - [`EqualRoot`](@ref)
 """
-struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
+struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
     sim::T1
     root::T2
     function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
@@ -286,13 +286,13 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     @argcheck(9 <= N, DimensionMismatch("9 <= size(W, 1) must hold. Got\nsize(W, 1) => $N"))
     @argcheck(all(x -> zero(x) <= x, W),
               DomainError("all(x -> x >= 0, W) must hold. Got\nall(x -> x >= 0, W) => $(all(x -> zero(x) <= x, W))."))
-    A = spzeros(Int, N, N)  # Initialize adjacency matrix
+    A = SparseArrays.spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
     clique3 = zeros(Int, N - 4, 3)   # Initialize list of 3-cliques (non-face triangles)
 
     # Find 3 vertices with largest strength
-    s = sum(W ⊙ (W .> mean(W)); dims = 2)
+    s = sum(W ⊙ (W .> Statistics.mean(W)); dims = 2)
     j = sortperm(vec(s); rev = true)
 
     in_v[1:4] = j[1:4]
@@ -358,7 +358,7 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
         kk += 2
     end
 
-    A = sparse(W ⊙ ((A + A') .== 1))
+    A = SparseArrays.sparse(W ⊙ ((A + A') .== 1))
 
     cliques = nothing
     cliqueTree = nothing
@@ -369,7 +369,7 @@ function PMFG_T2s(W::MatNum, nargout::Integer = 3)
 
     if nargout > 4
         M = size(cliques, 1)
-        cliqueTree = spzeros(Int, M, M)
+        cliqueTree = SparseArrays.spzeros(Int, M, M)
         ss = zeros(Int, M)
         for i in axes(cliques, 1)
             ss .= 0
@@ -424,7 +424,7 @@ This function computes the distance matrix containing the lengths of the shortes
 function distance_wei(L::MatNum)
     N = size(L, 1)
     D = fill(typemax(eltype(L)), N, N)
-    D[diagind(D)] .= 0  # Distance matrix
+    D[LinearAlgebra.diagind(D)] .= 0  # Distance matrix
     B = zeros(Int, N, N)     # Number of edges matrix
 
     for u in axes(L, 1)
@@ -434,9 +434,9 @@ function distance_wei(L::MatNum)
         while true
             S[V] .= false   # Distance u -> V is now permanent
             L1[:, V] .= 0   # No inside edges as already shortest
-            dropzeros!(L1)
+            SparseArrays.dropzeros!(L1)
             for v in V
-                T = findnz(L1[v, :])[1] # neighbours of shortest nodes
+                T = SparseArrays.findnz(L1[v, :])[1] # neighbours of shortest nodes
                 d, wi = findmin(vcat(vcat(transpose(D[u, T]),
                                           transpose(D[u, v] .+ L1[v, T]))); dims = 1)
                 wi = vec(getindex.(wi, 2))
@@ -490,12 +490,12 @@ This function identifies all 3-cliques (triangles) in the adjacency matrix `A` o
   - [`DBHT`](@ref)
 """
 function clique3(A::MatNum)
-    A = A - Diagonal(A)
+    A = A - LinearAlgebra.Diagonal(A)
     A = A .!= 0
     A2 = A * A
     P = (A2 .!= 0) ⊙ (A .!= 0)
-    P = sparse(UpperTriangular(P))
-    r, c = findnz(P .!= 0)[1:2]
+    P = SparseArrays.sparse(LinearAlgebra.UpperTriangular(P))
+    r, c = SparseArrays.findnz(P .!= 0)[1:2]
     E = hcat(r, c)
 
     lr = length(r)
@@ -505,7 +505,7 @@ function clique3(A::MatNum)
         i = r[n]
         j = c[n]
         a = A[i, :] ⊙ A[j, :]
-        idx = findnz(a .!= 0)[1]
+        idx = SparseArrays.findnz(a .!= 0)[1]
         K3[n] = idx
         N3[n] = length(idx)
     end
@@ -589,7 +589,7 @@ function breadth(CIJ::MatNum, source::Integer)
     # Keep going until the entire graph is explored
     while !isempty(Q)
         u = Q[1]
-        ns = findnz(CIJ[u, :])[1]
+        ns = SparseArrays.findnz(CIJ[u, :])[1]
         for v in ns
             # This allows the `source` distance to itself to be recorded
             if all(x -> x == zero(x), distance[v])
@@ -652,7 +652,7 @@ function FindDisjoint(Adj::MatNum, Cliq::VecNum)
                       IndxTotal .!= Cliq[3])
     Temp[Cliq, :] .= 0
     Temp[:, Cliq] .= 0
-    dropzeros!(Temp)
+    SparseArrays.dropzeros!(Temp)
     d = breadth(Temp, IndxNot[1])[1]
     d[isinf.(d)] .= -1
     d[IndxNot[1]] = 0
@@ -694,9 +694,9 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
 function BuildHierarchy(M::MatNum)
     N = size(M, 2)
     Pred = zeros(Int, N)
-    dropzeros!(M)
+    SparseArrays.dropzeros!(M)
     for n in axes(M, 2)
-        Children = findnz(M[:, n] .== 1)[1]
+        Children = SparseArrays.findnz(M[:, n] .== 1)[1]
         ChildrenSum = vec(sum(M[Children, :]; dims = 1))
         Parents = findall(ChildrenSum .== length(Children))
         Parents = Parents[Parents .!= n]
@@ -743,7 +743,7 @@ This function computes the adjacency matrix among root candidate 3-cliques, iden
 function AdjCliq(A::MatNum, CliqList::MatNum, CliqRoot::VecNum)
     Nc = size(CliqList, 1)
     N = size(A, 1)
-    Adj = spzeros(Int, Nc, Nc)
+    Adj = SparseArrays.spzeros(Int, Nc, Nc)
     Indicator = zeros(Int, N)
     for n in eachindex(CliqRoot)
         Indicator[CliqList[CliqRoot[n], :]] .= 1
@@ -819,7 +819,7 @@ function BubbleHierarchy(Pred::VecNum, Sb::VecNum)
         Root = sort!(unique(NxtRoot))
     end
     Nb = size(Mb, 2)
-    H = spzeros(Int, Nb, Nb)
+    H = SparseArrays.spzeros(Int, Nb, Nb)
 
     for n in axes(Mb, 2)
         Indx = Mb[:, n] .== 1
@@ -829,7 +829,7 @@ function BubbleHierarchy(Pred::VecNum, Sb::VecNum)
     end
 
     H = H + transpose(H)
-    H = H - Diagonal(H)
+    H = H - LinearAlgebra.Diagonal(H)
     return H, Mb
 end
 """
@@ -870,7 +870,7 @@ function CliqueRoot(::UniqueRoot, Root::VecNum, Pred::VecNum, Nc::Integer, args.
         Pred[Root] .= length(Pred)
     end
 
-    H = spzeros(Int, Nc + 1, Nc + 1)
+    H = SparseArrays.spzeros(Int, Nc + 1, Nc + 1)
     for n in eachindex(Pred)
         if Pred[n] != 0
             H[n, Pred[n]] = 1
@@ -918,7 +918,7 @@ function CliqueRoot(::EqualRoot, Root::VecNum, Pred::VecNum, Nc::Integer, A::Mat
         Adj = AdjCliq(A, CliqList, Root)
     end
 
-    H = spzeros(Int, Nc, Nc)
+    H = SparseArrays.spzeros(Int, Nc, Nc)
     for n in eachindex(Pred)
         if Pred[n] != 0
             H[n, Pred[n]] = 1
@@ -929,7 +929,7 @@ function CliqueRoot(::EqualRoot, Root::VecNum, Pred::VecNum, Nc::Integer, A::Mat
         H .+= transpose(H)
         H .+= Adj
     else
-        H = spzeros(Int, 0, 0)
+        H = SparseArrays.spzeros(Int, 0, 0)
     end
 end
 """
@@ -973,7 +973,7 @@ function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
     K3, E, clique = clique3(A)
 
     Nc = size(clique, 1)
-    M = spzeros(Int, N, Nc)
+    M = SparseArrays.spzeros(Int, N, Nc)
     CliqList = copy(clique)
     Sb = zeros(Int, Nc)
 
@@ -1001,8 +1001,8 @@ function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
         H2 = H2 .!= 0
         Mb = Mb[1:size(CliqList, 1), :]
     else
-        H2 = spzeros(Int, 0, 0)
-        Mb = spzeros(Int, 0, 0)
+        H2 = SparseArrays.spzeros(Int, 0, 0)
+        Mb = SparseArrays.spzeros(Int, 0, 0)
     end
 
     return H, H2, Mb, CliqList, Sb
@@ -1044,7 +1044,8 @@ This function assigns directions to each separating 3-clique in the undirected b
 """
 function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::MatNum)
     Hb = Hb .!= 0
-    r, c, _ = findnz(sparse(UpperTriangular(Hb) .!= 0))
+    r, c, _ = SparseArrays.findnz(SparseArrays.sparse(LinearAlgebra.UpperTriangular(Hb) .!=
+                                                      0))
     CliqEdge = Matrix{Int}(undef, 0, 3)
     for n in eachindex(r)
         data = findall(Mb[:, r[n]] .!= 0 .&& Mb[:, c[n]] .!= 0)
@@ -1054,14 +1055,14 @@ function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::Mat
 
     kb = vec(sum(Hb; dims = 1))
     sMv = size(Mv, 2)
-    Hc = spzeros(sMv, sMv)
+    Hc = SparseArrays.spzeros(sMv, sMv)
 
     sCE = size(CliqEdge, 1)
     for n in axes(CliqEdge, 1)
         Temp = copy(Hb)
         Temp[CliqEdge[n, 1], CliqEdge[n, 2]] = 0
         Temp[CliqEdge[n, 2], CliqEdge[n, 1]] = 0
-        dropzeros!(Temp)
+        SparseArrays.dropzeros!(Temp)
         d, _ = breadth(Temp, 1)
         d[isinf.(d)] .= -1
         d[1] = 0
@@ -1132,12 +1133,12 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
 
     N = size(Rpm, 1)    # Number of vertices in the PMFG
     indx = findall(Sep .== 1)   # Look for the converging bubbles
-    Adjv = spzeros(Int, 0, 0)
+    Adjv = SparseArrays.spzeros(Int, 0, 0)
 
-    dropzeros!(Hc)
+    SparseArrays.dropzeros!(Hc)
     lidx = length(indx)
     if lidx > 1
-        Adjv = spzeros(Int, size(Mv, 1), lidx)   # Set the non-discrete cluster membership matrix 'Adjv' at default
+        Adjv = SparseArrays.spzeros(Int, size(Mv, 1), lidx)   # Set the non-discrete cluster membership matrix 'Adjv' at default
 
         # Identify the non-discrete cluster membership of vertices by each converging bubble
         for n in eachindex(indx)
@@ -1152,7 +1153,7 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
         Bubv = Mv[:, indx]  # Gather the list of vertices in the converging bubbles
         cv = findall(vec(sum(Bubv; dims = 2) .== 1))    # Identify vertices which belong to single converging bubbles
         uv = findall(vec(sum(Bubv; dims = 2) .> 1)) # Identify vertices which belong to more than one converging bubbles
-        Mdjv = spzeros(N, lidx) # Set the cluster membership matrix for vertices in the converging bubbles at default
+        Mdjv = SparseArrays.spzeros(N, lidx) # Set the cluster membership matrix for vertices in the converging bubbles at default
         Mdjv[cv, :] = Bubv[cv, :]   # Assign vertices which belong to single converging bubbles to the rightful clusters
 
         # Assign converging bubble membership of vertices in `uv'
@@ -1164,11 +1165,11 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
         end
 
         # Assign discrete cluster membership of vertices in the converging bubbles
-        v, ci, _ = findnz(Mdjv)
+        v, ci, _ = SparseArrays.findnz(Mdjv)
         Tc[v] .= ci
 
         # Compute the distance between a vertex and the converging bubbles
-        Udjv = Dpm * Mdjv * diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
+        Udjv = Dpm * Mdjv * LinearAlgebra.diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
         Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 
         imn = vec(getindex.(argmin(Udjv[vec(sum(Mdjv; dims = 2)) .== 0, :]; dims = 2), 2))  # Look for the closest converging bubble
@@ -1220,7 +1221,7 @@ function BubbleMember(Rpm::MatNum, Mv::MatNum, Mc::MatNum)
     for n in eachindex(vu)
         bub = findall(Mc[vu[n], :] .!= 0)
         vu_bub = vec(sum(Rpm[:, vu[n]] ⊙ Mv[:, bub]; dims = 1))
-        all_bub = diag(transpose(Mv[:, bub]) * Rpm * Mv[:, bub]) / 2
+        all_bub = LinearAlgebra.diag(transpose(Mv[:, bub]) * Rpm * Mv[:, bub]) / 2
         frac = vu_bub ⊘ all_bub
         imx = vec(argmax(frac; dims = 1))
         Mvv[vu[n], bub[imx]] .= 1
@@ -1410,7 +1411,7 @@ function HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum, Tc::VecNum, Mv::MatNum)
     N = size(Dpm, 1)
     kvec = sort!(unique(Tc))
     LabelVec1 = collect(1:N)
-    E = sparse(LabelVec1, Tc, ones(Int, N), N, maximum(Tc))
+    E = SparseArrays.sparse(LabelVec1, Tc, ones(Int, N), N, maximum(Tc))
     Z = Matrix{Float64}(undef, 0, 3)
 
     # Intra-cluster hierarchy construction
@@ -1540,8 +1541,8 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
 
 # Validation
 
-  - `!isempty(D) && issymmetric(D)`.
-  - `!isempty(S) && issymmetric(S)`.
+  - `!isempty(D) && LinearAlgebra.issymmetric(D)`.
+  - `!isempty(S) && LinearAlgebra.issymmetric(S)`.
   - `size(D) == size(S)`.
 
 # Details
@@ -1588,11 +1589,11 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
     Mb = Mb[1:size(CliqList, 1), :]
 
     sRpm = size(Rpm, 1)
-    Mv = spzeros(Int, sRpm, 0)
+    Mv = SparseArrays.spzeros(Int, sRpm, 0)
 
     nMb = size(Mb, 2)
     for n in axes(Mb, 2)
-        vc = spzeros(Int, sRpm)
+        vc = SparseArrays.spzeros(Int, sRpm)
         vc[sort!(unique(CliqList[Mb[:, n] .!= 0, :]))] .= 1
         Mv = hcat(Mv, vc)
     end
@@ -1614,7 +1615,7 @@ function DBHTs(D::MatNum, S::MatNum; branchorder::Symbol = :optimal,
         Clustering.orderbranches_r!(hmer)
     end
 
-    Z_hclust = Hclust(hmer, :DBHT)
+    Z_hclust = Clustering.Hclust(hmer, :DBHT)
 
     return T8, Rpm, Adjv, Dpm, Mv, Z, Z_hclust
 end
@@ -1713,71 +1714,16 @@ function J_LoGo(sigma::MatNum, separators::MatNum, cliques::MatNum)
     return jlogo
 end
 """
-    struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
-        clustering::T1
-        S::T2
-        D::T3
-        k::T4
-    end
-
-Result type for Direct Bubble Hierarchical Tree (DBHT) clustering.
-
-`DBHTClustering` encapsulates the output of a DBHT clustering analysis, including the hierarchical clustering result, similarity and distance matrices, and the optimal number of clusters. This struct is returned by [`clusterise`](@ref) when using a DBHT-based clustering estimator.
-
-# Fields
-
-  - `clustering`: Hierarchical clustering result, typically a [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) object.
-  - `S`: Similarity matrix used for DBHT clustering.
-  - `D`: Distance (dissimilarity) matrix used for DBHT clustering.
-  - `k`: Optimal number of clusters, as determined by the estimator's cluster selection method.
-
-# Constructor
-
-    DBHTClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum,
-                   k::Integer)
-
-Keyword arguments correspond to the fields above.
-
-# Validation
-
-  - `!isempty(S)`
-  - `!isempty(D)`
-  - `size(S) == size(D)`
-  - `k >= 1`.
-
-# Related
-
-  - [`DBHT`](@ref)
-  - [`clusterise`](@ref)
-  - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
-"""
-struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
-    clustering::T1
-    S::T2
-    D::T3
-    k::T4
-    function DBHTClustering(clustering::Clustering.Hclust, S::MatNum, D::MatNum, k::Integer)
-        @argcheck(!isempty(S), IsEmptyError)
-        @argcheck(!isempty(D), IsEmptyError)
-        @argcheck(size(S) == size(D), DimensionMismatch)
-        @argcheck(one(k) <= k, DomainError)
-        return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
-    end
-end
-function DBHTClustering(; clustering::Clustering.Hclust, S::MatNum, D::MatNum, k::Integer)
-    return DBHTClustering(clustering, S, D, k)
-end
-"""
-    clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
+    clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
 
-Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `ClusteringEstimator` configured with a `DBHT` algorithm.
+Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `ClustersEstimator` configured with a `DBHT` algorithm.
 
-This method computes the similarity and distance matrices from the input data matrix `X` using the estimator's configured estimators and algorithms, applies the DBHT clustering pipeline, and returns a [`DBHTClustering`](@ref) result containing the hierarchical clustering, similarity and distance matrices, and the optimal number of clusters.
+This method computes the similarity and distance matrices from the input data matrix `X` using the estimator's configured estimators and algorithms, applies the DBHT clustering pipeline, and returns a [`Clusters`](@ref) result containing the hierarchical clustering, similarity and distance matrices, and the optimal number of clusters.
 
 # Arguments
 
-  - `cle`: A `ClusteringEstimator` whose algorithm is a [`DBHT`](@ref) instance.
+  - `cle`: A `ClustersEstimator` whose algorithm is a [`DBHT`](@ref) instance.
   - `X`: Data matrix (`observations × assets` or `assets × observations` depending on `dims`).
   - `branchorder`: Symbol specifying the dendrogram branch ordering method. Accepts `:optimal` (default), `:barjoseph`, or `:r`.
   - `dims`: Integer specifying the dimension along which to compute statistics (`1` for columns/assets, `2` for rows).
@@ -1789,27 +1735,27 @@ This method computes the similarity and distance matrices from the input data ma
   - Applies the selected similarity transformation via [`dbht_similarity`](@ref).
   - Runs the full DBHT clustering pipeline via [`DBHTs`](@ref), including PMFG construction, clique and bubble hierarchy extraction, and dendrogram construction.
   - Determines the optimal number of clusters using the estimator's cluster selection method.
-  - Returns a [`DBHTClustering`](@ref) result encapsulating all relevant outputs.
+  - Returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
 
 # Returns
 
-  - `clr::DBHTClustering`: DBHT clustering result.
+  - `clr::Clusters`: DBHT clustering result.
 
 # Related
 
   - [`DBHT`](@ref)
-  - [`DBHTClustering`](@ref)
+  - [`Clusters`](@ref)
   - [`DBHTs`](@ref)
   - [`dbht_similarity`](@ref)
-  - [`ClusteringEstimator`](@ref)
+  - [`ClustersEstimator`](@ref)
 """
-function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
+function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                     branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
-    clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
-    k = optimal_number_clusters(cle.onc, clustering, D)
-    return DBHTClustering(; clustering = clustering, S = S, D = D, k = k)
+    res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
+    k = optimal_number_clusters(cle.onc, res, D)
+    return Clusters(; res = res, S = S, D = D, k = k)
 end
 function logo!(::Nothing, args...; kwargs...)
     return nothing
@@ -1936,7 +1882,7 @@ end
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
 
-This method implements the LoGo algorithm for sparse inverse covariance estimation using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the PMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is provided.
+This method implements the LoGo algorithm for sparse inverse covariance estimation using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the PMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is not `nothing`.
 
 # Arguments
 
@@ -1954,7 +1900,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - Constructs the PMFG and extracts cliques and separators.
   - Computes the LoGo sparse inverse covariance matrix via [`J_LoGo`](@ref).
   - Updates `sigma` in-place with the inverse of the LoGo estimate.
-  - Projects the result to the nearest positive definite matrix if `pdm` is provided.
+  - Projects the result to the nearest positive definite matrix if `pdm` is not `nothing`.
 
 # Validation
 
@@ -1977,20 +1923,27 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma, :sigma)
     LoGo_dist_assert(je.dist, sigma, X)
-    s = diag(sigma)
+    s = LinearAlgebra.diag(sigma)
     iscov = any(!isone, s)
     S = if iscov
         s .= sqrt.(s)
-        StatsBase.cov2cor(sigma, s)
+        StatsBase.StatsBase.cov2cor(sigma, s)
     else
         sigma
     end
     D = distance(je.dist, S, X; dims = dims, kwargs...)
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
-    sigma .= J_LoGo(sigma, separators, cliques) \ I
+    sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I
     posdef!(je.pdm, sigma)
     return nothing
+end
+"""
+"""
+function logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
+    sigma = copy(sigma)
+    logo!(je, sigma, X; dims = dims, kwargs...)
+    return sigma
 end
 """
     matrix_processing_algorithm!(je::LoGo, sigma::MatNum,
@@ -1998,7 +1951,7 @@ end
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
 
-This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of PortfolioOptimisers.jl. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is provided, the result is projected to the nearest positive definite matrix.
+This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of PortfolioOptimisers.jl. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is not `nothing`, the result is projected to the nearest positive definite matrix.
 
 # Arguments
 
@@ -2031,4 +1984,4 @@ function matrix_processing_algorithm!(je::LoGo, sigma::MatNum, X::MatNum; dims::
 end
 
 export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
-       UniqueRoot, EqualRoot, DBHT, LoGo, DBHTClustering
+       UniqueRoot, EqualRoot, DBHT, LoGo, Clusters

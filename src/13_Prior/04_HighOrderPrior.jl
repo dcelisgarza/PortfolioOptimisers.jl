@@ -77,7 +77,7 @@ function duplication_matrix(n::Int, diag::Bool = true)
     end
 
     return if diag
-        sparse(1:nsq, v, 1, nsq, m)
+        SparseArrays.sparse(1:nsq, v, 1, nsq, m)
     else
         filtered_cols = Vector{Int}(undef, 0)
         filtered_rows = Vector{Int}(undef, 0)
@@ -108,7 +108,7 @@ function duplication_matrix(n::Int, diag::Bool = true)
                 push!(filtered_cols, cols[v[i]])
             end
         end
-        sparse(filtered_rows, filtered_cols, 1, nsq, m)
+        SparseArrays.sparse(filtered_rows, filtered_cols, 1, nsq, m)
     end
 end
 function elimination_matrix(n::Int, diag::Bool = true)
@@ -136,7 +136,7 @@ function elimination_matrix(n::Int, diag::Bool = true)
         b += i
     end
 
-    return sparse(1:m, v, 1, m, nsq)
+    return SparseArrays.sparse(1:m, v, 1, m, nsq)
 end
 function summation_matrix(n::Int, diag::Bool = true)
     nsq = n^2
@@ -175,11 +175,11 @@ function summation_matrix(n::Int, diag::Bool = true)
     rows2 = rows2[.!iszero.(rows2)]
 
     return if diag
-        a = sparse(1:m, v1, 1, m, nsq)
-        b = sparse(rows2, v2, 1, m, nsq)
+        a = SparseArrays.sparse(1:m, v1, 1, m, nsq)
+        b = SparseArrays.sparse(rows2, v2, 1, m, nsq)
         a + b
     else
-        sparse(1:m, v1, 2, m, nsq)
+        SparseArrays.sparse(1:m, v1, 2, m, nsq)
     end
 end
 # COV_EXCL_STOP
@@ -271,8 +271,8 @@ function dup_elim_sum_matrices(n::Int)
         b2 += i
     end
 
-    d = sparse(1:nsq, v1, 1, nsq, m)
-    l = sparse(1:m, v2, 1, m, nsq)
+    d = SparseArrays.sparse(1:nsq, v1, 1, nsq, m)
+    l = SparseArrays.sparse(1:m, v2, 1, m, nsq)
     s = transpose(d) * d * l
 
     return d, l, s
@@ -291,13 +291,14 @@ function prior_view(pr::HighOrderPrior, i)
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
     if !isnothing(sk)
-        V = __coskewness(sk, view(pr.X, :, i), skmp)
+        V = negative_spectral_coskewness(sk, view(pr.X, :, i), skmp)
     else
         V = nothing
     end
     return HighOrderPrior(; pr = prior_view(pr.pr, i),
                           kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
-                          sk = sk, V = V, skmp = skmp)
+                          sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt, f_sk = pr.f_sk,
+                          f_V = pr.f_V)
 end
 function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     return if sym in propertynames(obj)
@@ -305,7 +306,7 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     elseif sym in propertynames(obj.pr)
         getproperty(obj.pr, sym)
     else
-        getproperty(obj, sym)
+        getfield(obj, sym)
     end
 end
 """
@@ -416,7 +417,8 @@ function HighOrderPriorEstimator(;
                                                                                  alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::HighOrderPriorEstimator,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end

@@ -84,7 +84,7 @@ BayesianBlackLittermanPrior
              │       │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       │           │      │      │       pdm ┼ Posdef
              │       │           │      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()      
+             │       │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │           │      │      │   denoise ┼ nothing
              │       │           │      │      │    detone ┼ nothing
              │       │           │      │      │       alg ┼ nothing
@@ -101,11 +101,11 @@ BayesianBlackLittermanPrior
              │       │       alg ┼ nothing
              │       │     order ┴ DenoiseDetoneAlg()
              │    re ┼ StepwiseRegression
-             │       │     crit ┼ PValue
-             │       │          │   threshold ┴ Float64: 0.05
-             │       │      alg ┼ Forward()
-             │       │   target ┼ LinearModel
-             │       │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       │   crit ┼ PValue
+             │       │        │   t ┴ Float64: 0.05
+             │       │    alg ┼ Forward()
+             │       │    tgt ┼ LinearModel
+             │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │    ve ┼ SimpleVariance
              │       │          me ┼ SimpleExpectedReturns
              │       │             │   w ┴ nothing
@@ -176,7 +176,8 @@ function BayesianBlackLittermanPrior(;
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::BayesianBlackLittermanPrior,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
@@ -251,12 +252,12 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
     f_omega = tau * calc_omega(pe.views_conf, P, f_sigma)
     (; b, M) = rr
-    sigma_hat = f_sigma \ I + transpose(P) * (f_omega \ P)
+    sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (f_omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (f_omega \ Q))
     v1 = prior_sigma \ M
     v2 = sigma_hat + transpose(M) * v1
-    v3 = prior_sigma \ I
-    posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ I
+    v3 = prior_sigma \ LinearAlgebra.I
+    posterior_sigma = (v3 - v1 * (v2 \ transpose(M)) * v3) \ LinearAlgebra.I
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,

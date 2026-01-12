@@ -139,13 +139,13 @@ julia> PortfolioOptimisers.get_bin_width_func(10)
   - [`HacineGharbiRavier`](@ref)
 """
 function get_bin_width_func(::Knuth)
-    return pyimport("astropy.stats").knuth_bin_width
+    return PythonCall.pyimport("astropy.stats").knuth_bin_width
 end
 function get_bin_width_func(::FreedmanDiaconis)
-    return pyimport("astropy.stats").freedman_bin_width
+    return PythonCall.pyimport("astropy.stats").freedman_bin_width
 end
 function get_bin_width_func(::Scott)
-    return pyimport("astropy.stats").scott_bin_width
+    return PythonCall.pyimport("astropy.stats").scott_bin_width
 end
 function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
@@ -187,12 +187,13 @@ This function determines the number of bins to use for histogram-based calculati
 function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        bin_width_func, ::Any)
     xjl, xju = extrema(xj)
-    k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))
+    k1 = (xju - xjl) /
+         PythonCall.pyconvert(eltype(xj), bin_width_func(PythonCall.Py(xj).to_numpy()))
     return round(Int,
                  if j != i
                      xil, xiu = extrema(xi)
-                     k2 = (xiu - xil) /
-                          pyconvert(eltype(xi), bin_width_func(Py(xi).to_numpy()))
+                     k2 = (xiu - xil) / PythonCall.pyconvert(eltype(xi),
+                                                             bin_width_func(PythonCall.Py(xi).to_numpy()))
                      max(k1, k2)
                  else
                      k1
@@ -200,7 +201,7 @@ function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Int
 end
 function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        ::Any, T::Integer)
-    corr = cor(xj, xi)
+    corr = Statistics.cor(xj, xi)
     return round(Int, if isone(corr)
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
                      z / 6 + 2 / (3 * z) + 1 / 3
@@ -232,7 +233,7 @@ This function computes the normalised histograms (probability mass functions) fo
 
 # Details
 
-  - The histograms are computed using `StatsBase.fit(Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
+  - The histograms are computed using `StatsAPI.fit(StatsBase.Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
   - The marginal histograms are normalised to sum to 1 before entropy calculation.
   - The joint histogram is not normalised, as it is used directly in mutual information calculations.
 
@@ -250,17 +251,17 @@ function calc_hist_data(xj::VecNum, xi::VecNum, bins::Integer)
     xil = minimum(xi) - eps(eltype(xi))
     xih = maximum(xi) + eps(eltype(xi))
 
-    hx = StatsBase.fit(Histogram, xj, range(xjl, xjh; length = bp1)).weights
+    hx = StatsAPI.fit(StatsBase.Histogram, xj, range(xjl, xjh; length = bp1)).weights
     hx /= sum(hx)
 
-    hy = StatsBase.fit(Histogram, xi, range(xil, xih; length = bp1)).weights
+    hy = StatsAPI.fit(StatsBase.Histogram, xi, range(xil, xih; length = bp1)).weights
     hy /= sum(hy)
 
-    ex = entropy(hx)
-    ey = entropy(hy)
+    ex = StatsBase.entropy(hx)
+    ey = StatsBase.entropy(hy)
 
-    hxy = StatsBase.fit(Histogram, (xj, xi),
-                        (range(xjl, xjh; length = bp1), range(xil, xih; length = bp1))).weights
+    hxy = StatsAPI.fit(StatsBase.Histogram, (xj, xi),
+                       (range(xjl, xjh; length = bp1), range(xil, xih; length = bp1))).weights
 
     return ex, ey, hxy
 end
@@ -337,7 +338,7 @@ This function computes the pairwise variation of information between all columns
 
   - For each pair of variables, the function computes marginal entropies and the joint histogram using `calc_hist_data`.
   - The mutual information is computed using `intrinsic_mutual_info`.
-  - VI is calculated as `H(X) + H(Y) - 2 * I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
+  - VI is calculated as `H(X) + H(Y) - 2 * LinearAlgebra.I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
   - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
 
 # Related

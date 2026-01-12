@@ -157,7 +157,7 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::BlackLittermanPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
@@ -168,14 +168,14 @@ end
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.
 
-This method constructs the view uncertainty matrix `Ω` for the Black-Litterman model when no explicit view confidences are provided (`views_conf = nothing`). The uncertainty for each view is set to the variance of the projected prior covariance, i.e., `Ω = diag(P * Σ * P')`, where `P` is the view matrix and `Σ` is the prior covariance matrix.
+This method constructs the view uncertainty matrix `Ω` for the Black-Litterman model when no explicit view confidences are provided (`views_conf = nothing`). The uncertainty for each view is set to the variance of the projected prior covariance, i.e., `Ω = LinearAlgebra.diag(P * Σ * P')`, where `P` is the view matrix and `Σ` is the prior covariance matrix.
 
 # Arguments
 
   - `views_conf`:
 
-      + `::Nothing`: Indicates no view confidence is specified, `Diagonal(P * sigma * transpose(P))`.
-      + `::Number`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
+      + `::Nothing`: Indicates no view confidence is specified, `LinearAlgebra.Diagonal(P * sigma * transpose(P))`.
+      + `::Number`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * LinearAlgebra.Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
       + `::VecNum`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
 
   - `P`: The view matrix (views × assets).
@@ -191,15 +191,15 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
   - [`vanilla_posteriors`](@ref)
 """
 function calc_omega(::Nothing, P::MatNum, sigma::MatNum)
-    return Diagonal(P * sigma * transpose(P))
+    return LinearAlgebra.Diagonal(P * sigma * transpose(P))
 end
 function calc_omega(views_conf::Number, P::MatNum, sigma::MatNum)
     alphas = inv(views_conf) - one(eltype(views_conf))
-    return Diagonal(alphas .* P * sigma * transpose(P))
+    return LinearAlgebra.Diagonal(alphas .* P * sigma * transpose(P))
 end
 function calc_omega(views_conf::VecNum, P::MatNum, sigma::MatNum)
     alphas = inv.(views_conf) .- one(eltype(views_conf))
-    return Diagonal(alphas .* P * sigma * transpose(P))
+    return LinearAlgebra.Diagonal(alphas .* P * sigma * transpose(P))
 end
 """
     vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum,

@@ -134,7 +134,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
 # `JuMP` Formulations
 
@@ -171,7 +171,7 @@ Where:
   - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
   - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
   - ``\\mathbf{G}``: Suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
 
@@ -209,6 +209,7 @@ Variance
            │      ub ┼ nothing
            │     rke ┴ Bool: true
      sigma ┼ 3×3 Matrix{Float64}
+      chol ┼ nothing
         rc ┼ nothing
        alg ┴ SquaredSOCRiskExpr()
 
@@ -227,28 +228,37 @@ julia> r(w)
   - [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct Variance{T1, T2, T3, T4} <: RiskMeasure
+struct Variance{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     sigma::T2
-    rc::T3
-    alg::T4
+    chol::T3
+    rc::T4
+    alg::T5
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
-                      rc::Option{<:LcE_Lc}, alg::VarianceFormulation)
+                      chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
+                      alg::VarianceFormulation)
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(settings), typeof(sigma), typeof(rc), typeof(alg)}(settings,
-                                                                             sigma, rc, alg)
+        if isa(chol, MatNum)
+            @argcheck(!isempty(chol))
+        end
+        return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg)}(settings,
+                                                                                           sigma,
+                                                                                           chol,
+                                                                                           rc,
+                                                                                           alg)
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  sigma::Option{<:MatNum} = nothing, rc::Option{<:LcE_Lc} = nothing,
+                  sigma::Option{<:MatNum} = nothing, chol::Option{<:MatNum} = nothing,
+                  rc::Option{<:LcE_Lc} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr())
-    return Variance(settings, sigma, rc, alg)
+    return Variance(settings, sigma, chol, rc, alg)
 end
 function (r::Variance)(w::VecNum)
-    return dot(w, r.sigma, w)
+    return LinearAlgebra.dot(w, r.sigma, w)
 end
 """
     factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
@@ -278,13 +288,17 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
 """
 function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
+    chol = nothing_scalar_array_selector(r.chol, pr.chol)
+    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
+                    alg = r.alg)
 end
 function risk_measure_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
+    chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
-    return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
+    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
+                    alg = r.alg)
 end
 """
     struct StandardDeviation{T1, T2} <: RiskMeasure
@@ -308,7 +322,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `sigma` is provided, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `sigma` is not `nothing`, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
 
 ## `JuMP` Formulation
 
@@ -324,7 +338,7 @@ Where:
   - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
   - ``\\sigma``: Variable representing the optimised portfolio's standard deviation.
   - ``\\mathbf{G}``: Suitable factorisation of the `N × N` covariance matrix, such as the square root matrix, or the Cholesky factorisation.
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
 
@@ -361,7 +375,8 @@ StandardDeviation
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-     sigma ┴ 3×3 Matrix{Float64}
+     sigma ┼ 3×3 Matrix{Float64}
+      chol ┴ nothing
 
 julia> r(w)
 1.1585208588621345
@@ -373,23 +388,29 @@ julia> r(w)
   - [`factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct StandardDeviation{T1, T2} <: RiskMeasure
+struct StandardDeviation{T1, T2, T3} <: RiskMeasure
     settings::T1
     sigma::T2
-    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum})
+    chol::T3
+    function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
+                               chol::Option{<:MatNum})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(settings), typeof(sigma)}(settings, sigma)
+        if isa(chol, MatNum)
+            @argcheck(!isempty(chol))
+        end
+        return new{typeof(settings), typeof(sigma), typeof(chol)}(settings, sigma, chol)
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           sigma::Option{<:MatNum} = nothing)
-    return StandardDeviation(settings, sigma)
+                           sigma::Option{<:MatNum} = nothing,
+                           chol::Option{<:MatNum} = nothing)
+    return StandardDeviation(settings, sigma, chol)
 end
 function (r::StandardDeviation)(w::VecNum)
-    return sqrt(dot(w, r.sigma, w))
+    return sqrt(LinearAlgebra.dot(w, r.sigma, w))
 end
 """
     factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
@@ -419,11 +440,13 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
 """
 function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return StandardDeviation(; settings = r.settings, sigma = sigma)
+    chol = nothing_scalar_array_selector(r.chol, pr.chol)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 function risk_measure_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    return StandardDeviation(; settings = r.settings, sigma = sigma)
+    chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 """
     struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
@@ -446,7 +469,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `sigma` is provided, `!isempty(sigma)`.
+  - If `sigma` is not `nothing`, `!isempty(sigma)`.
 
 # `JuMP` Formulations
 
@@ -494,7 +517,7 @@ Where:
       + Else it is equal to 1.
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
 
-## Ellipse uncertainty set
+## Ellipsoidal uncertainty set
 
 ```math
 \\begin{align}
@@ -523,7 +546,7 @@ Where:
       + Else it is equal to 1.
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
   - ``\\mathrm{vec}(\\cdot)``: Vectorisation operator, which unrolls a matrix as a column vector in column-major order.
-  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
+  - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
 
@@ -619,7 +642,7 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
     return UncertaintySetVariance(settings, ucs, sigma)
 end
 function (r::UncertaintySetVariance)(w::VecNum)
-    return dot(w, r.sigma, w)
+    return LinearAlgebra.dot(w, r.sigma, w)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance,
                                 flag::Union{Val{false}, Val{true}, Nothing} = nothing)

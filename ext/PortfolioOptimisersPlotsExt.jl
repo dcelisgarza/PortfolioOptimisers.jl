@@ -1,10 +1,10 @@
 module PortfolioOptimisersPlotsExt
 
 using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
-      Clustering, Distributions
+      Clustering, Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
-                            MatNum_Pr, PrE_Pr, ClE_Cl, VecVecNum
+                            MatNum_Pr, PrE_Pr, HClE_HCl, VecVecNum
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                                          fees::Option{<:Fees} = nothing;
@@ -49,7 +49,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            ekwargs...)
     ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     ret = view(ret, :, idx)
     nx = view(nx, idx)
     f = plot(; f_kwargs...)
@@ -78,7 +78,7 @@ function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:
                                                                     legend = false),
                                               ekwargs...)
     M = length(w)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     return if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
@@ -140,28 +140,28 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
                     ekwargs...)
 end
 function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractClusteringResult,
-                                             nx::AbstractVector = 1:length(clr.clustering.order);
+                                             nx::AbstractVector = 1:length(clr.res.order);
                                              dend_theme = :Spectral,
                                              dend_kwargs = (; xrotation = 90),
                                              fig_kwargs = (; size = (600, 600)), ekwargs...)
-    N = length(clr.clustering.order)
-    nx = view(nx, clr.clustering.order)
-    idx = cutree(clr.clustering; k = clr.k)
+    N = length(clr.res.order)
+    nx = view(nx, clr.res.order)
+    idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
-    dend1 = plot(clr.clustering; normalize = false, ylim = extrema(clr.clustering.heights),
+    dend1 = plot(clr.res; normalize = false, ylim = extrema(clr.res.heights),
                  xticks = (1:N, nx), dend_kwargs...)
     for (i, cl) in pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
+        a = [findfirst(x -> x == c, clr.res.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c in cl]
+        i1 = [findfirst(x -> x == c, -view(clr.res.merges, :, 1)) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c in cl]
+        i2 = [findfirst(x -> x == c, -view(clr.res.merges, :, 2)) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
-        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
         plot!(dend1,
               [xmin - 0.25, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmin - 0.25,
                xmin - 0.25, xmin - 0.25], [0, 0, 0, h, h, h, h, 0]; color = nothing,
@@ -169,7 +169,7 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
     end
     return plot(dend1; fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::ClE_Cl,
+function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::HClE_HCl,
                                            rd::PortfolioOptimisers.ReturnsResult = ReturnsResult();
                                            dims::Integer = 1,
                                            color_func = x -> if any(x .< zero(eltype(x)))
@@ -187,38 +187,37 @@ function PortfolioOptimisers.plot_clusters(pe::PrE_Pr, cle::ClE_Cl,
     nx = !isnothing(rd.nx) ? rd.nx : (1:size(pr.X, 2))
 
     X = copy(clr.S)
-    s = diag(X)
+    s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.cov2cor!(X, s)
+        StatsBase.StatsBase.cov2cor!(X, s)
     end
     clim = color_func(X)
     N = size(X, 1)
-    X = view(X, clr.clustering.order, clr.clustering.order)
-    nx = view(nx, clr.clustering.order)
-    idx = cutree(clr.clustering; k = clr.k)
+    X = view(X, clr.res.order, clr.res.order)
+    nx = view(nx, clr.res.order)
+    idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
     colgrad = cgrad(hmap_theme; hmap_theme_kwargs...)
     hmap = plot(X; st = :heatmap, yticks = (1:N, nx), xticks = (1:N, nx), xrotation = 90,
                 colorbar = false, clim = clim, xlim = (0.5, N + 0.5), ylim = (0.5, N + 0.5),
                 color = colgrad, yflip = true, hmap_kwargs...)
-    dend1 = plot(clr.clustering; xticks = false, ylim = extrema(clr.clustering.heights),
-                 dend1_kwargs...)
-    dend2 = plot(clr.clustering; yticks = false, xrotation = 90, orientation = :horizontal,
-                 yflip = true, xlim = extrema(clr.clustering.heights), dend2_kwargs...)
+    dend1 = plot(clr.res; xticks = false, ylim = extrema(clr.res.heights), dend1_kwargs...)
+    dend2 = plot(clr.res; yticks = false, xrotation = 90, orientation = :horizontal,
+                 yflip = true, xlim = extrema(clr.res.heights), dend2_kwargs...)
     for (i, cl) in pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
+        a = [findfirst(x -> x == c, clr.res.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c in cl]
+        i1 = [findfirst(x -> x == c, -view(clr.res.merges, :, 1)) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c in cl]
+        i2 = [findfirst(x -> x == c, -view(clr.res.merges, :, 2)) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
-        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
         plot!(hmap,
               [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
                xmin - 0.5, xmin - 0.5],
@@ -243,7 +242,7 @@ function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum, slv::Slv_VecSl
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3,
-                                            rw::Option{<:AbstractWeights} = nothing,
+                                            rw::Option{<:StatsBase.AbstractWeights} = nothing,
                                             theme::Symbol = :Dark2_5,
                                             dd_kwargs = (;
                                                          label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
@@ -340,7 +339,7 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSl
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             points::Integer = ceil(Int,
                                                                    4 * sqrt(size(X, 1))),
-                                            rw::Option{<:AbstractWeights} = nothing,
+                                            rw::Option{<:StatsBase.AbstractWeights} = nothing,
                                             theme::Symbol = :Paired_10,
                                             h_kwargs::NamedTuple = (;
                                                                     ylabel = "Probability Density",
@@ -356,30 +355,30 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum, slv::Slv_VecSl
     x = range(mir, mar; length = points)
     mad = LowOrderMoment(; w = rw, alg = MeanAbsoluteDeviation())(w, X, fees)
     gmd = OrderedWeightsArray()(copy(ret))
-    risks = (mu, mu - sigma, mu - mad, mu - gmd,
+    risks = [mu, mu - sigma, mu - mad, mu - gmd,
              -ValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
              -ConditionalValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
              -OrderedWeightsArray(; w = owa_tg(length(ret)))(copy(ret)),
              -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(copy(ret)),
              -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(copy(ret)),
-             mir)
+             mir]
     conf = round((1 - alpha) * 100; digits = 2)
-    risk_labels = ("Mean: $(round(risks[1], digits=2))%",
-                   "Mean - Std. Dev. ($(round(sigma, digits=2))%): $(round(risks[2], digits=2))%",
-                   "Mean - MAD ($(round(mad,digits=2))%): $(round(risks[3], digits=2))%",
-                   "Mean - GMD ($(round(gmd,digits=2))%): $(round(risks[4], digits=2))%",
-                   "$(conf)% Confidence VaR: $(round(risks[5], digits=2))%",
-                   "$(conf)% Confidence CVaR: $(round(risks[6], digits=2))%",
-                   "$(conf)% Confidence Tail Gini: $(round(risks[7], digits=2))%",
-                   "$(conf)% Confidence EVaR: $(round(risks[8], digits=2))%",
-                   "$(conf)% Confidence RLVaR ($(round(kappa, digits=2))): $(round(risks[9], digits=2))%",
-                   "Worst Realisation: $(round(risks[10], digits=2))%")
+    risk_labels = ("Mean: $(round(100*risks[1], digits=2))%",
+                   "Mean - Std. Dev. ($(round(100*sigma, digits=2))%): $(round(100*risks[2], digits=2))%",
+                   "Mean - MAD ($(round(100*mad,digits=2))%): $(round(100*risks[3], digits=2))%",
+                   "Mean - GMD ($(round(100*gmd,digits=2))%): $(round(100*risks[4], digits=2))%",
+                   "$(conf)% Confidence VaR: $(round(100*risks[5], digits=2))%",
+                   "$(conf)% Confidence CVaR: $(round(100*risks[6], digits=2))%",
+                   "$(conf)% Confidence Tail Gini: $(round(100*risks[7], digits=2))%",
+                   "$(conf)% Confidence EVaR: $(round(100*risks[8], digits=2))%",
+                   "$(conf)% Confidence RLVaR ($(round(kappa, digits=2))): $(round(100*risks[9], digits=2))%",
+                   "Worst Realisation: $(round(100*risks[10], digits=2))%")
     colours = palette(theme, length(risk_labels) + 2)
     plt = histogram(ret; normalize = :pdf, label = "", color = colours[1], h_kwargs...)
     for (i, (risk, label)) in enumerate(zip(risks, risk_labels)) #! Do not change this enumerate to pairs.
         vline!([risk]; label = label, color = colours[i + 1], l_kwargs...)
     end
-    D = fit(Normal, ret)
+    D = StatsAPI.fit(Normal, ret)
     if flag
         density!(ret;
                  label = "Normal: μ = $(round(mean(D), digits=2))%, σ = $(round(std(D), digits=2))%",

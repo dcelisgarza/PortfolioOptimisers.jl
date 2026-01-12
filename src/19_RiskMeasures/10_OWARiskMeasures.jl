@@ -539,18 +539,18 @@ function owa_model_setup(method::OWAJuMP, weights::MatNum)
     model = JuMP.Model()
     max_phi = method.max_phi
     sc = method.sc
-    @variables(model, begin
-                   theta[1:T]
-                   phi[1:N]
-               end)
-    @constraints(model, begin
-                     sc * phi >= 0
-                     sc * (phi .- max_phi) <= 0
-                     sc * (sum(phi) - 1) == 0
-                     sc * (theta - weights * phi) == 0
-                     sc * (phi[2:end] - phi[1:(end - 1)]) <= 0
-                     sc * (theta[2:end] - theta[1:(end - 1)]) >= 0
-                 end)
+    JuMP.@variables(model, begin
+                        theta[1:T]
+                        phi[1:N]
+                    end)
+    JuMP.@constraints(model, begin
+                          sc * phi >= 0
+                          sc * (phi .- max_phi) <= 0
+                          sc * (sum(phi) - 1) == 0
+                          sc * (theta - weights * phi) == 0
+                          sc * (phi[2:end] - phi[1:(end - 1)]) <= 0
+                          sc * (theta[2:end] - theta[1:(end - 1)]) >= 0
+                      end)
     return model
 end
 """
@@ -589,7 +589,7 @@ This function solves the provided JuMP model using the solver(s) specified in th
 function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     slv = method.slv
     return if optimise_JuMP_model!(model, slv).success
-        w = value.(model[:theta])
+        w = JuMP.value.(model[:theta])
     else
         @warn("Type: $method\nReverting to ncrra_weights.")
         w = ncrra_weights(weights, 0.5)
@@ -639,9 +639,10 @@ function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     x = model[:x]
     T = length(x)
     ovec = range(sc, sc; length = T)
-    @variable(model, t)
-    @constraint(model, [sc * t; ovec; sc * x] in MOI.RelativeEntropyCone(2 * T + 1))
-    @objective(model, Max, -so * t)
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model,
+                     [sc * t; ovec; sc * x] in JuMP.MOI.RelativeEntropyCone(2 * T + 1))
+    JuMP.@objective(model, Max, -so * t)
     return nothing
 end
 function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
@@ -651,9 +652,10 @@ function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     so = method.so
     x = model[:x]
     T = length(x)
-    @variable(model, t[1:T])
-    @constraint(model, [i = 1:T], [sc * t[i], sc * x[i], 1] in MOI.ExponentialCone())
-    @objective(model, Max, so * sum(t))
+    JuMP.@variable(model, t[1:T])
+    JuMP.@constraint(model, [i = 1:T],
+                     [sc * t[i], sc * x[i], 1] in JuMP.MOI.ExponentialCone())
+    JuMP.@objective(model, Max, so * sum(t))
     return nothing
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
@@ -662,11 +664,12 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumE
     sc = method.sc
     model = owa_model_setup(method, weights)
     theta = model[:theta]
-    @variable(model, x[1:T])
-    @constraints(model, begin
-                     sc * (sum(x) - 1) == 0
-                     [i = 1:T], [sc * x[i]; sc * theta[i]] in MOI.NormOneCone(2)
-                 end)
+    JuMP.@variable(model, x[1:T])
+    JuMP.@constraints(model,
+                      begin
+                          sc * (sum(x) - 1) == 0
+                          [i = 1:T], [sc * x[i]; sc * theta[i]] in JuMP.MOI.NormOneCone(2)
+                      end)
     owa_l_moment_crm_entropy(method, model)
     return owa_model_solve(model, method, weights)
 end
@@ -675,14 +678,14 @@ function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                     model::JuMP.Model)
     so = method.so
     t = model[:t]
-    @objective(model, Min, so * t)
+    JuMP.@objective(model, Min, so * t)
 end
 function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                     <:SquaredOrderedWeightsArrayAlgorithm{<:SquaredSOCRiskExpr}},
                                     model::JuMP.Model)
     so = method.so
     t = model[:t]
-    @objective(model, Min, so * t^2)
+    JuMP.@objective(model, Min, so * t^2)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                           <:MinimumSquaredDistance{<:UnionSOCRiskExpr}},
@@ -690,9 +693,10 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     sc = method.sc
     model = owa_model_setup(method, weights)
     theta = model[:theta]
-    @variable(model, t)
-    @constraint(model,
-                [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] in SecondOrderCone())
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model,
+                     [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] in
+                     JuMP.SecondOrderCone())
     owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end
@@ -702,10 +706,10 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     sc = method.sc
     model = owa_model_setup(method, weights)
     theta = model[:theta]
-    @variable(model, t)
-    @constraint(model,
-                [sc * t; 0.5; sc * (theta[2:end] - theta[1:(end - 1)])] in
-                RotatedSecondOrderCone())
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model,
+                     [sc * t; 0.5; sc * (theta[2:end] - theta[1:(end - 1)])] in
+                     JuMP.RotatedSecondOrderCone())
     owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end
@@ -716,8 +720,8 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     so = method.so
     model = owa_model_setup(method, weights)
     theta = model[:theta]
-    @variable(model, t)
-    @constraint(model, [sc * t; sc * theta] in SecondOrderCone())
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model, [sc * t; sc * theta] in JuMP.SecondOrderCone())
     owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end
@@ -727,8 +731,8 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
     sc = method.sc
     model = owa_model_setup(method, weights)
     theta = model[:theta]
-    @variable(model, t)
-    @constraint(model, [sc * t; 0.5; sc * theta] in RotatedSecondOrderCone())
+    JuMP.@variable(model, t)
+    JuMP.@constraint(model, [sc * t; 0.5; sc * theta] in JuMP.RotatedSecondOrderCone())
     owa_l_moment_crm_sumsq_obj(method, model)
     return owa_model_solve(model, method, weights)
 end
@@ -1114,7 +1118,7 @@ function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettin
 end
 function (r::OrderedWeightsArray)(x::VecNum)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
-    return dot(w, sort!(x))
+    return LinearAlgebra.dot(w, sort!(x))
 end
 struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
@@ -1157,7 +1161,7 @@ function (r::OrderedWeightsArrayRange)(x::VecNum)
     w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1
     w2 = isnothing(r.w2) ? reverse(w1) : r.w2
     w = w1 - w2
-    return dot(w, sort!(x))
+    return LinearAlgebra.dot(w, sort!(x))
 end
 
 export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDistance,

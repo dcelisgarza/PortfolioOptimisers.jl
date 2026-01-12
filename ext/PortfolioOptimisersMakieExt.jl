@@ -44,7 +44,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::MatNum,
     ax = Axis(f[fpos...]; ax_kwargs...)
     ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     ret = view(ret, :, idx)
     nx = view(nx, idx)
     for i in 1:N
@@ -71,7 +71,7 @@ function plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
                                                    xticklabelrotation = pi / 3),
                           bar_kwargs::NamedTuple = (;))
     M = length(w)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
     if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
@@ -171,21 +171,21 @@ function hcl_nodes(hcl; useheight = false)
     return nodes
 end
 function plot_dendrogram(clr::AbstractClusteringResult,
-                         nx::AbstractVector = 1:length(clr.clustering.order),
+                         nx::AbstractVector = 1:length(clr.res.order),
                          f::Option{<:Figure} = Figure(), fpos::Tuple = (1, 1),
                          ax_kwargs::NamedTuple = (; title = "Dendrogram"),
                          node_kwargs::NamedTuple = (; useheight = true),
                          dendrogram_kwargs::NamedTuple = (; colormap = :seaborn_colorblind,
-                                                          groups = cutree(clr.clustering;
+                                                          groups = cutree(clr.res;
                                                                           k = clr.k),
                                                           origin = Point2d(0,
-                                                                           clr.clustering.heights[end])))
-    N = length(clr.clustering.order)
-    nodes = hcl_nodes(clr.clustering; node_kwargs...)
+                                                                           clr.res.heights[end])))
+    N = length(clr.res.order)
+    nodes = hcl_nodes(clr.res; node_kwargs...)
     ax = Axis(f[fpos...]; ax_kwargs...)
     d = dendrogram!(ax, nodes; dendrogram_kwargs...)
     xpos = getindex.(Makie.dendrogram_node_positions(d)[][1:N], 1)
-    xticks = (xpos, string.(view(nx, clr.clustering.order)))
+    xticks = (xpos, string.(view(nx, clr.res.order)))
     ax.xticks = xticks
     return f
 end
@@ -202,35 +202,35 @@ function plot_clusters(clr::AbstractClusteringResult, X::MatNum,
                        lines_kwargs::NamedTuple = (color = :black, linewidth = 3),
                        node_kwargs::NamedTuple = (; useheight = true),
                        dendrogram_kwargs::NamedTuple = (; colormap = :seaborn_colorblind,
-                                                        groups = cutree(clr.clustering;
+                                                        groups = cutree(clr.res;
                                                                         k = clr.k),
                                                         origin = Point2d(0,
-                                                                         clr.clustering.heights[end])))
+                                                                         clr.res.heights[end])))
     assert_matrix_issquare(X)
-    iscov = any(!isone, diag(X))
+    iscov = any(!isone, LinearAlgebra.diag(X))
     if iscov
-        X = cov2cor(X)
+        X = StatsBase.cov2cor(X)
     end
     colorrange = color_func(X)
     N = size(X, 1)
-    X = view(X, clr.clustering.order, clr.clustering.order)
-    nx = view(nx, clr.clustering.order)
+    X = view(X, clr.res.order, clr.res.order)
+    nx = view(nx, clr.res.order)
     ticks = (1:size(X, 1), string.(nx))
-    idx = cutree(clr.clustering; k = clr.k)
+    idx = cutree(clr.res; k = clr.k)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     ax = Axis(f[2, 2]; yticks = ticks, xticks = ticks, ax_kwargs...)
     heatmap!(ax, 1:N, 1:N, X; colorrange = colorrange, heatmap_kwargs...)
     for (i, cl) in pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
+        a = [findfirst(x -> x == c, clr.res.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -clr.clustering.merges[:, 1]) for c in cl]
+        i1 = [findfirst(x -> x == c, -clr.res.merges[:, 1]) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -clr.clustering.merges[:, 2]) for c in cl]
+        i2 = [findfirst(x -> x == c, -clr.res.merges[:, 2]) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
-        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
         lines!(ax,
                [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
                 xmin - 0.5, xmin - 0.5],
@@ -244,12 +244,12 @@ function plot_clusters(clr::AbstractClusteringResult, X::MatNum,
                  :viridis
              end)
 
-    nodes = hcl_nodes(clr.clustering; node_kwargs...)
+    nodes = hcl_nodes(clr.res; node_kwargs...)
     ax2 = Axis(f[1, 2]; xticklabelsvisible = false)
     d = dendrogram!(ax2, nodes; dendrogram_kwargs...)
     xpos = getindex.(Makie.dendrogram_node_positions(d)[][1:N], 1)
 
-    nodes = hcl_nodes(clr.clustering; node_kwargs...)
+    nodes = hcl_nodes(clr.res; node_kwargs...)
     ax3 = Axis(f[2, 1]; xreversed = true, xticklabelsvisible = false)
     d = dendrogram!(ax3, nodes; rotation = :left, dendrogram_kwargs...)
     xpos = getindex.(Makie.dendrogram_node_positions(d)[][1:N], 1)

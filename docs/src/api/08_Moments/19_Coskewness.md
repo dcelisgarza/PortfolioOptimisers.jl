@@ -4,6 +4,6 @@
 Coskewness
 coskewness
 CoskewnessEstimator
-__coskewness
+negative_spectral_coskewness
 _coskewness
 ```

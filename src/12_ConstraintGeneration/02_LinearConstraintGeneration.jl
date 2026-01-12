@@ -1445,7 +1445,7 @@ struct RiskBudgetResult{T1} <: AbstractConstraintResult
         return new{typeof(val)}(val)
     end
 end
-function RiskBudgetResult(; val::VecNum)
+function RiskBudgetResult(; val::Num_VecNum)
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)
@@ -1517,11 +1517,11 @@ end
 
 No-op fallback for risk budget constraint generation.
 
-This method returns a uniform risk budget allocation when no explicit risk budget is provided. It creates a [`RiskBudgetResult`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
+This method returns a uniform risk budget allocation when no explicit risk budget is not `nothing`. It creates a [`RiskBudgetResult`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
 
 # Arguments
 
-  - `::Nothing`: Indicates that no risk budget is provided.
+  - `::Nothing`: Indicates that no risk budget is not `nothing`.
   - `args...`: Additional positional arguments (ignored).
   - `N::Number`: Number of assets (required).
   - `datatype::DataType`: Numeric type for the risk budget vector.
@@ -1833,7 +1833,11 @@ function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any;
     return smtx
 end
 function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)
-    return [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
+    val = [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
+    if isabstracttype(eltype(val))
+        val = concrete_typed_array(val)
+    end
+    return val
 end
 
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,

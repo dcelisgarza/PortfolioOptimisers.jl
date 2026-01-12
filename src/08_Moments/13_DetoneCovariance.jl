@@ -63,11 +63,11 @@ function DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                           detone::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
     return DetoneCovariance(ce, detone, pdm)
 end
-function factory(ce::DetoneCovariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::DetoneCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return DetoneCovariance(; ce = factory(ce.ce, w), detone = ce.detone, pdm = ce.pdm)
 end
 """
-    cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the detoned and positive definite projected covariance matrix for the data matrix `X` using the specified `DetoneCovariance` estimator.
 
@@ -107,7 +107,7 @@ function Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    sigma = cov(ce.ce, X; kwargs...)
+    sigma = Statistics.cov(ce.ce, X; kwargs...)
     if !ismutable(sigma)
         sigma = Matrix(sigma)
     end
@@ -116,7 +116,7 @@ function Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
     return sigma
 end
 """
-    cor(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
+    Statistics.cor(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the detoned and positive definite projected correlation matrix for the data matrix `X` using the specified `DetoneCovariance` estimator.
 
@@ -156,7 +156,7 @@ function Statistics.cor(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
     if dims == 2
         X = transpose(X)
     end
-    rho = cor(ce.ce, X; kwargs...)
+    rho = Statistics.cor(ce.ce, X; kwargs...)
     if !ismutable(rho)
         rho = Matrix(rho)
     end

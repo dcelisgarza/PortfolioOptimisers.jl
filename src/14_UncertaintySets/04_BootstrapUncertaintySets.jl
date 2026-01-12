@@ -90,13 +90,16 @@ Creates a bootstrap generator for time series data using the specified bootstrap
   - [`ARCHBootstrapSet`](@ref)
 """
 function bootstrap_func(::StationaryBootstrap, block_size, X, seed)
-    return pyimport("arch.bootstrap").StationaryBootstrap(block_size, X; seed = seed)
+    return PythonCall.pyimport("arch.bootstrap").StationaryBootstrap(block_size, X;
+                                                                     seed = seed)
 end
 function bootstrap_func(::CircularBootstrap, block_size, X, seed)
-    return pyimport("arch.bootstrap").CircularBlockBootstrap(block_size, X; seed = seed)
+    return PythonCall.pyimport("arch.bootstrap").CircularBlockBootstrap(block_size, X;
+                                                                        seed = seed)
 end
 function bootstrap_func(::MovingBootstrap, block_size, X, seed)
-    return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
+    return PythonCall.pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X;
+                                                                      seed = seed)
 end
 """
     struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
@@ -109,7 +112,7 @@ end
         bootstrap::T7
     end
 
-Estimator for box or ellipse uncertainty sets using bootstrap methods for time series data in portfolio optimisation.
+Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for time series data in portfolio optimisation.
 
 # Fields
 
@@ -153,7 +156,7 @@ ARCHUncertaintySet
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
@@ -178,7 +181,7 @@ ARCHUncertaintySet
   - [`CircularBootstrap`](@ref)
   - [`MovingBootstrap`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
     pe::T1
@@ -238,12 +241,12 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
+    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = pyconvert(Array, data)[1][1]
-        mu = mean(ue.pe.me, X; dims = 1, kwargs...)
+        X = PythonCall.pyconvert(Array, data)[1][1]
+        mu = Statistics.mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
-        sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
+        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, X; dims = 1, kwargs...)
     end
     return mus, sigmas
 end
@@ -276,10 +279,10 @@ Generates bootstrap samples of expected return vectors for returns data using th
 """
 function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
+    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = pyconvert(Array, data)[1][1]
-        mu = mean(ue.pe.me, X; dims = 1, kwargs...)
+        X = PythonCall.pyconvert(Array, data)[1][1]
+        mu = Statistics.mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
     end
     return mus
@@ -313,10 +316,10 @@ Generates bootstrap samples of covariance matrices for time series data using th
 """
 function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
+    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = pyconvert(Array, data)[1][1]
-        sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, kwargs...)
+        X = PythonCall.pyconvert(Array, data)[1][1]
+        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, X; dims = 1, kwargs...)
     end
     return sigmas
 end
@@ -368,12 +371,12 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
     sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = quantile(mu_j, q)
-        mu_u[j] = quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
         end
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
@@ -424,8 +427,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     mu_u = Vector{eltype(pr.X)}(undef, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = quantile(mu_j, q)
-        mu_u[j] = quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
@@ -475,22 +478,22 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
     for j in 1:N
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
         end
     end
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
+    ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                <:Any, <:Any, <:Any}, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs ellipse uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipse algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - `dims`: Dimension along which to compute statistics.
@@ -498,27 +501,27 @@ Constructs ellipse uncertainty sets for expected returns and covariance statisti
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Ellipse uncertainty set for expected returns.
-  - `sigma_ucs::EllipseUncertaintySet`: Ellipse uncertainty set for covariance.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for expected returns.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for covariance.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of expected returns and covariance using the specified bootstrap algorithm.
   - Computes deviations from prior statistics for each bootstrap sample.
-  - Computes covariance matrices of deviations and constructs ellipse uncertainty sets using the specified method and quantile.
+  - Computes covariance matrices of deviations and constructs ellipsoidal uncertainty sets using the specified method and quantile.
   - Returns both sets as a tuple.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`bootstrap_generator`](@ref)
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::MatNum,
+function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
+                                    <:Any, <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
@@ -531,29 +534,29 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:A
     end
     X_mu = transpose(X_mu)
     X_sigma = transpose(X_sigma)
-    sigma_mu = cov(ue.pe.ce, X_mu)
-    sigma_sigma = cov(ue.pe.ce, X_sigma)
+    sigma_mu = Statistics.cov(ue.pe.ce, X_mu)
+    sigma_sigma = Statistics.cov(ue.pe.ce, X_sigma)
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet()),
-           EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet()),
+           EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
+    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                   <:Any, <:Any, <:Any}, X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for expected returns using bootstrap resampling for time series data.
+Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipse algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - `dims`: Dimension along which to compute statistics.
@@ -561,25 +564,25 @@ Constructs an ellipse uncertainty set for expected returns using bootstrap resam
 
 # Returns
 
-  - `mu_ucs::EllipseUncertaintySet`: Ellipse uncertainty set for expected returns.
+  - `mu_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for expected returns.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of expected returns using the specified bootstrap algorithm.
   - Computes deviations from prior expected returns for each bootstrap sample.
-  - Computes the covariance matrix of deviations and constructs an ellipse uncertainty set using the specified method and quantile.
-  - Returns the expected returns ellipse uncertainty set.
+  - Computes the covariance matrix of deviations and constructs an ellipsoidal uncertainty set using the specified method and quantile.
+  - Returns the expected returns ellipsoidal uncertainty set.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`bootstrap_generator`](@ref)
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
+function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
                                        <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
@@ -590,24 +593,24 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, 
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
     end
     X_mu = transpose(X_mu)
-    sigma_mu = cov(ue.pe.ce, X_mu)
+    sigma_mu = Statistics.cov(ue.pe.ce, X_mu)
     if ue.alg.diagonal
-        sigma_mu = Diagonal(sigma_mu)
+        sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
-                                 class = MuEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                     class = MuEllipsoidalUncertaintySet())
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
+    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                      <:Any, <:Any, <:Any}, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
-Constructs an ellipse uncertainty set for covariance using bootstrap resampling for time series data.
+Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipse algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - `dims`: Dimension along which to compute statistics.
@@ -615,26 +618,26 @@ Constructs an ellipse uncertainty set for covariance using bootstrap resampling 
 
 # Returns
 
-  - `sigma_ucs::EllipseUncertaintySet`: Ellipse uncertainty set for covariance.
+  - `sigma_ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set for covariance.
 
 # Details
 
   - Computes prior statistics using the provided prior estimator.
   - Generates bootstrap samples of covariance using the specified bootstrap algorithm.
   - Computes deviations from prior covariance for each bootstrap sample.
-  - Computes the covariance matrix of deviations and constructs an ellipse uncertainty set using the specified method and quantile.
-  - Returns the covariance ellipse uncertainty set.
+  - Computes the covariance matrix of deviations and constructs an ellipsoidal uncertainty set using the specified method and quantile.
+  - Returns the covariance ellipsoidal uncertainty set.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`bootstrap_generator`](@ref)
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm,
+                                          <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
@@ -644,13 +647,13 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorith
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
     X_sigma = transpose(X_sigma)
-    sigma_sigma = cov(ue.pe.ce, X_sigma)
+    sigma_sigma = Statistics.cov(ue.pe.ce, X_sigma)
     if ue.alg.diagonal
-        sigma_sigma = Diagonal(sigma_sigma)
+        sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
-                                 class = SigmaEllipseUncertaintySet())
+    return EllipsoidalUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                     class = SigmaEllipsoidalUncertaintySet())
 end
 
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet

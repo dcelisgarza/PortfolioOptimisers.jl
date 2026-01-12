@@ -31,10 +31,10 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
     return NegativeSkewness(settings, mp, sk, V, alg)
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::VecNum)
-    return sqrt(dot(w, r.V, w))
+    return sqrt(LinearAlgebra.dot(w, r.V, w))
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
-    return dot(w, r.V, w)
+    return LinearAlgebra.dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, pr::HighOrderPrior, args...; kwargs...)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
@@ -53,7 +53,7 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum,
     sk = r.sk
     idx = fourth_moment_index_generator(size(sk, 1), i)
     sk = view(r.sk, i, idx)
-    V = __coskewness(sk, view(X, :, i), r.mp)
+    V = negative_spectral_coskewness(sk, view(X, :, i), r.mp)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 

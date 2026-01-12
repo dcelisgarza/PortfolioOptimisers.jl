@@ -1,0 +1,5 @@
+# JuMP Optimiser
+
+```@docs
+JuMPOptimiser
+```

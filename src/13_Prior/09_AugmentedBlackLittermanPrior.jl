@@ -1,21 +1,20 @@
 """
     struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,
-                                        T14, T15} <: AbstractLowOrderPriorEstimator_F
+                                        T14} <: AbstractLowOrderPriorEstimator_F
         a_pe::T1
         f_pe::T2
         mp::T3
         re::T4
-        ve::T5
-        a_views::T6
-        f_views::T7
-        a_sets::T8
-        f_sets::T9
-        a_views_conf::T10
-        f_views_conf::T11
-        w::T12
-        rf::T13
-        l::T14
-        tau::T15
+        a_views::T5
+        f_views::T6
+        a_sets::T7
+        f_sets::T8
+        a_views_conf::T9
+        f_views_conf::T10
+        w::T11
+        rf::T12
+        l::T13
+        tau::T14
     end
 
 Augmented Black-Litterman prior estimator for asset returns.
@@ -28,7 +27,6 @@ Augmented Black-Litterman prior estimator for asset returns.
   - `f_pe`: Factor prior estimator.
   - `mp`: Matrix post-processing estimator.
   - `re`: Regression estimator for factor loadings.
-  - `ve`: Variance estimator for residuals.
   - `a_views`: Asset views estimator or views object.
   - `f_views`: Factor views estimator or views object.
   - `a_sets`: Asset sets.
@@ -46,7 +44,6 @@ Augmented Black-Litterman prior estimator for asset returns.
                                  f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                  mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                  re::AbstractRegressionEstimator = StepwiseRegression(),
-                                 ve::AbstractVarianceEstimator = SimpleVariance(),
                                  a_views::Lc_BLV,
                                  f_views::Lc_BLV,
                                  a_sets::Option{<:AssetSets} = nothing,
@@ -61,7 +58,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, `!isempty(w)`.
+  - If `w` is not `nothing`, `!isempty(w)`.
   - If `a_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(a_sets)`.
   - If `f_views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(f_sets)`.
   - If `a_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
@@ -94,7 +91,7 @@ AugmentedBlackLittermanPrior
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │       pdm ┼ Posdef
-               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton     
+               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │           │      │   denoise ┼ nothing
                │           │      │    detone ┼ nothing
@@ -114,7 +111,7 @@ AugmentedBlackLittermanPrior
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │       pdm ┼ Posdef
-               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton     
+               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │           │      │   denoise ┼ nothing
                │           │      │    detone ┼ nothing
@@ -132,16 +129,11 @@ AugmentedBlackLittermanPrior
                │       alg ┼ nothing
                │     order ┴ DenoiseDetoneAlg()
             re ┼ StepwiseRegression
-               │     crit ┼ PValue
-               │          │   threshold ┴ Float64: 0.05
-               │      alg ┼ Forward()
-               │   target ┼ LinearModel
-               │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
-            ve ┼ SimpleVariance
-               │          me ┼ SimpleExpectedReturns
-               │             │   w ┴ nothing
-               │           w ┼ nothing
-               │   corrected ┴ Bool: true
+               │   crit ┼ PValue
+               │        │   t ┴ Float64: 0.05
+               │    alg ┼ Forward()
+               │    tgt ┼ LinearModel
+               │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
        a_views ┼ LinearConstraintEstimator
                │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
                │   key ┴ nothing
@@ -174,27 +166,25 @@ AugmentedBlackLittermanPrior
   - [`prior`](@ref)
 """
 struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,
-                                    T14, T15} <: AbstractLowOrderPriorEstimator_F
+                                    T14} <: AbstractLowOrderPriorEstimator_F
     a_pe::T1
     f_pe::T2
     mp::T3
     re::T4
-    ve::T5
-    a_views::T6
-    f_views::T7
-    a_sets::T8
-    f_sets::T9
-    a_views_conf::T10
-    f_views_conf::T11
-    w::T12
-    rf::T13
-    l::T14
-    tau::T15
+    a_views::T5
+    f_views::T6
+    a_sets::T7
+    f_sets::T8
+    a_views_conf::T9
+    f_views_conf::T10
+    w::T11
+    rf::T12
+    l::T13
+    tau::T14
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
-                                          re::AbstractRegressionEstimator,
-                                          ve::AbstractVarianceEstimator, a_views::Lc_BLV,
+                                          re::AbstractRegressionEstimator, a_views::Lc_BLV,
                                           f_views::Lc_BLV, a_sets::Option{<:AssetSets},
                                           f_sets::Option{<:AssetSets},
                                           a_views_conf::Option{<:Num_VecNum},
@@ -215,12 +205,22 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
         if !isnothing(tau)
             @argcheck(tau > zero(tau))
         end
-        return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(ve),
-                   typeof(a_views), typeof(f_views), typeof(a_sets), typeof(f_sets),
-                   typeof(a_views_conf), typeof(f_views_conf), typeof(w), typeof(rf),
-                   typeof(l), typeof(tau)}(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
-                                           f_sets, a_views_conf, f_views_conf, w, rf, l,
-                                           tau)
+        return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(a_views),
+                   typeof(f_views), typeof(a_sets), typeof(f_sets), typeof(a_views_conf),
+                   typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau)}(a_pe,
+                                                                                        f_pe,
+                                                                                        mp,
+                                                                                        re,
+                                                                                        a_views,
+                                                                                        f_views,
+                                                                                        a_sets,
+                                                                                        f_sets,
+                                                                                        a_views_conf,
+                                                                                        f_views_conf,
+                                                                                        w,
+                                                                                        rf,
+                                                                                        l,
+                                                                                        tau)
     end
 end
 function AugmentedBlackLittermanPrior(;
@@ -228,7 +228,6 @@ function AugmentedBlackLittermanPrior(;
                                       f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                       mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
-                                      ve::AbstractVarianceEstimator = SimpleVariance(),
                                       a_views::Lc_BLV, f_views::Lc_BLV,
                                       a_sets::Option{<:AssetSets} = nothing,
                                       f_sets::Option{<:AssetSets} = nothing,
@@ -237,16 +236,16 @@ function AugmentedBlackLittermanPrior(;
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
                                       tau::Option{<:Number} = nothing)
-    return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
+    return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::AugmentedBlackLittermanPrior,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
-                                        re = factory(pe.re, w), ve = factory(pe.ve, w),
-                                        a_views = pe.a_views, f_views = pe.f_views,
-                                        a_sets = pe.a_sets, f_sets = pe.f_sets,
-                                        a_views_conf = pe.a_views_conf,
+                                        re = factory(pe.re, w), a_views = pe.a_views,
+                                        f_views = pe.f_views, a_sets = pe.a_sets,
+                                        f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
 end
@@ -289,7 +288,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - `dims in (1, 2)`.
   - `length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2)`.
   - `length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2)`.
-  - If `pe.w` is provided, `length(pe.w) == size(X, 2)`.
+  - If `pe.w` is not `nothing`, `length(pe.w) == size(X, 2)`.
 
 # Details
 

@@ -152,7 +152,7 @@ These methods are called internally when no matrix processing algorithm is speci
 
 # Arguments
 
-  - `::Nothing`: Indicates that no algorithm is provided.
+  - `::Nothing`: Indicates that no algorithm is not `nothing`.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 

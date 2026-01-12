@@ -1,14 +1,14 @@
 """
     expected_return(ret::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
-    expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult;
+    expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
     expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult;
                     fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected portfolio return using the specified return estimator.
 
-`expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. Supports arithmetic, Kelly, and JuMP-based return estimators. For Kelly returns, computes the mean log-growth rate. For JuMP-based estimators, returns a vector of expected returns for each portfolio.
+`expected_return` computes the expected return for a portfolio given its weights, a prior result, and optional transaction fees. Supports arithmetic, logarithmic, and JuMP-based return estimators. For logarithmic returns, computes the mean log-growth rate. For JuMP-based estimators, returns a vector of expected returns for each portfolio.
 
 # Arguments
 
@@ -29,7 +29,7 @@ Compute the expected portfolio return using the specified return estimator.
 # Related
 
   - [`ArithmeticReturn`](@ref)
-  - [`KellyReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`VecNum`](@ref)
@@ -45,13 +45,17 @@ Compute the expected portfolio return using the specified return estimator.
 function expected_return(::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     mu = pr.mu
-    return dot(w, mu) - calc_fees(w, fees)
+    return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
 end
-function expected_return(ret::KellyReturn, w::VecNum, pr::AbstractPriorResult,
+function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
     rw = ret.w
     X = pr.X
-    kret = isnothing(rw) ? mean(log1p.(X * w)) : mean(log1p.(X * w), rw)
+    kret = if isnothing(rw)
+        Statistics.mean(log1p.(X * w))
+    else
+        Statistics.mean(log1p.(X * w), rw)
+    end
     return kret - calc_fees(w, fees)
 end
 function expected_return(ret::JuMPReturnsEstimator, w::VecVecNum, pr::AbstractPriorResult,
@@ -405,6 +409,7 @@ RatioRiskMeasure
      │            │      ub ┼ nothing
      │            │     rke ┴ Bool: true
      │      sigma ┼ nothing
+     │       chol ┼ nothing
      │         rc ┼ nothing
      │        alg ┴ SquaredSOCRiskExpr()
   rf ┴ Float64: 0.0
@@ -633,26 +638,28 @@ Compute Brinson performance attribution aggregated per asset class [brinson_attr
 
   - [brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).
 """
-function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum, asset_classes::DataFrame,
-                             col, date0 = nothing, date1 = nothing)
+function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
+                             asset_classes::DataFrames.DataFrame, col, date0 = nothing,
+                             date1 = nothing)
     # Efficient filtering of date range
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
-        timestamps = timestamp(X)
-        idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
+        timestamps = TimeSeries.timestamp(X)
+        idx = (Dates.DateTime(date0) .<= timestamps) .&
+              (timestamps .<= Dates.DateTime(date1))
         findfirst(idx), findlast(idx)
     else
         1, length(X)
     end
 
     ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
-    ret_b = dot(ret, wb)
+    ret_b = LinearAlgebra.dot(ret, wb)
 
     classes = asset_classes[!, col]
     unique_classes = unique(classes)
 
-    df = DataFrame(;
-                   index = ["Asset Allocation", "Security Selection", "Interaction",
-                            "Total Excess Return"])
+    df = DataFrames.DataFrame(;
+                              index = ["Asset Allocation", "Security Selection",
+                                       "Interaction", "Total Excess Return"])
 
     # Precompute class membership matrix for efficiency
     sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]
@@ -660,11 +667,11 @@ function brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum, asset_classes:
     for (i, class_i) in enumerate(unique_classes)
         sets_i = view(sets_mat, :, i)
 
-        w_i = dot(sets_i, w)
-        wb_i = dot(sets_i, wb)
+        w_i = LinearAlgebra.dot(sets_i, w)
+        wb_i = LinearAlgebra.dot(sets_i, wb)
 
-        ret_i = dot(ret .* sets_i, w) / w_i
-        ret_b_i = dot(ret .* sets_i, wb) / wb_i
+        ret_i = LinearAlgebra.dot(ret .* sets_i, w) / w_i
+        ret_b_i = LinearAlgebra.dot(ret .* sets_i, wb) / wb_i
 
         w_diff_i = w_i - wb_i
         ret_diff_i = ret_i - ret_b_i

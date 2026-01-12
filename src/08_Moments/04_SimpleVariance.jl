@@ -19,13 +19,13 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
     SimpleVariance(;
                    me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                   w::Option{<:AbstractWeights} = nothing, corrected::Bool = true)
+                   w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, `!isempty(w)`.
+  - If `w` is not `nothing`, `!isempty(w)`.
 
 # Examples
 
@@ -54,7 +54,7 @@ SimpleVariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
@@ -65,18 +65,19 @@ struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     w::T2
     corrected::T3
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
-                            w::Option{<:AbstractWeights}, corrected::Bool)
+                            w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
     end
 end
 function SimpleVariance(;
                         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        w::Option{<:AbstractWeights} = nothing, corrected::Bool = true)
+                        w::Option{<:StatsBase.AbstractWeights} = nothing,
+                        corrected::Bool = true)
     return SimpleVariance(me, w, corrected)
 end
 """
-    std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -124,17 +125,17 @@ function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
-        std(X; dims = dims, corrected = ve.corrected, mean = mu)
+        Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+        Statistics.std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
 """
-    std(ve::SimpleVariance, X::VecNum; mean = nothing)
+    Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
 
-This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is provided, it is used for centering; otherwise, the default mean is used.
+This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is not `nothing`, it is used for centering; otherwise, the default mean is used.
 
 # Arguments
 
@@ -186,13 +187,13 @@ julia> std(svw, X)
 """
 function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
     return if isnothing(ve.w)
-        std(X; corrected = ve.corrected, mean = mean)
+        Statistics.std(X; corrected = ve.corrected, mean = mean)
     else
-        std(X, ve.w; corrected = ve.corrected, mean = mean)
+        Statistics.std(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
 """
-    var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -239,17 +240,17 @@ function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
-        var(X; dims = dims, corrected = ve.corrected, mean = mu)
+        Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+        Statistics.var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
 """
-    var(ve::SimpleVariance, X::VecNum; mean = nothing)
+    Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 
-This method computes the variance of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is provided, it is used for centering; otherwise, the default mean is used.
+This method computes the variance of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is not `nothing`, it is used for centering; otherwise, the default mean is used.
 
 # Arguments
 
@@ -301,14 +302,14 @@ julia> var(svw, X)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
     return if isnothing(ve.w)
-        var(X; corrected = ve.corrected, mean = mean)
+        Statistics.var(X; corrected = ve.corrected, mean = mean)
     else
-        var(X, ve.w; corrected = ve.corrected, mean = mean)
+        Statistics.var(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function factory(ve::SimpleVariance, w::Option{<:AbstractWeights} = nothing)
+function factory(ve::SimpleVariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
                           corrected = ve.corrected)
 end
 
-export SimpleVariance
+export SimpleVariance, var, std

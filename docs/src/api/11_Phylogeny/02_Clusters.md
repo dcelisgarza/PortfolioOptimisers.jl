@@ -1,0 +1,18 @@
+# Clusters
+
+```@docs
+Clusters
+clusterise(cle::AbstractClusteringResult, args...; kwargs...)
+SecondOrderDifference
+SilhouetteScore
+OptimalNumberClusters
+HClustAlgorithm
+ClustersEstimator
+AbstractClustersEstimator
+AbstractClustersAlgorithm
+AbstractHierarchicalClusteringAlgorithm
+AbstractNonHierarchicalClusteringAlgorithm
+AbstractOptimalNumberClustersEstimator
+AbstractOptimalNumberClustersAlgorithm
+AbstractClusteringResult
+```

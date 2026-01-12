@@ -47,9 +47,9 @@ function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:
                                          names_sym::Symbol, mat_sym::Symbol)
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
-                  IsNothingError("$names_sym cannot be nothing if $mat_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+                  IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
         @argcheck(!isnothing(mat),
-                  IsNothingError("$mat_sym cannot be nothing if $names_sym is provided. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
+                  IsNothingError("$mat_sym cannot be nothing if $names_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
         @argcheck(!isempty(names), IsEmptyError("$names_sym cannot be empty."))
         @argcheck(!isempty(mat), IsEmptyError("$mat_sym cannot be empty."))
         @argcheck(length(names) == size(mat, 2),
@@ -93,11 +93,11 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `nx` or `X` is provided, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
-  - If `nf` or `F` is provided, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
-  - If `ts` is provided, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
-  - If `iv` is provided, `!isempty(iv)`, `all(x -> x >= 0, iv)`, and `size(iv) == size(X)`.
-  - If `ivpa` is provided, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+  - If `nx` or `X` is not `nothing`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
+  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `ts` is not `nothing`, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
+  - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
+  - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
 # Examples
 
@@ -228,21 +228,22 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
-    prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                      Rb::Option{<:TimeArray} = nothing, iv::Option{<:TimeArray} = nothing,
+    prices_to_returns(X::TimeSeries.TimeArray; F::Option{TimeSeries.TimeArray} = nothing;
+                      B::Option{<:TimeSeries.TimeArray} = nothing,
+                      iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
                       padding::Bool = false, missing_col_percent::Number = 1.0,
                       missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
                       map_func::Option{<:Function} = nothing, join_method::Symbol = :outer,
                       impute_method::Option{<:Impute.Imputor} = nothing)
 
-Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
+Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
 # Arguments
 
-  - `X`: Asset price data (timestamps × assets).
-  - `F`: Optional Factor price data (timestamps × factors).
-  - `Rb`: Optional Benchmark price data (timestamps × assets) or (timestamps × 1).
+  - `X`: Asset price data (observations × assets).
+  - `F`: Optional Factor price data (observations × factors).
+  - `B`: Optional Benchmark price data (observations × assets) or (observations × 1).
   - `iv`: Optional Implied volatility data.
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
@@ -257,6 +258,27 @@ Convert price data (and optionally factor data) in `TimeArray` format to returns
 # Returns
 
   - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
+
+# Validation
+
+  - `!isempty(X)`.
+  - `0 < missing_col_percent <= 1`
+  - `0 < missing_row_percent <= 1`.
+  - If `F` is not `nothing`, `!isempty(F)`.
+  - If `B` is not `nothing`, `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
+  - If `iv` is not `nothing`, the timestamp of the merged data matrix must be a subset of `TimeSeries.timestamp(iv)`, then `iv = values(iv)`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
+  - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
+
+# Details
+
+  - Joins asset, factor, and benchmark data as specified.
+
+  - Optionally applies a mapping function and/or collapses the time series.
+  - Handles missing values by filtering, imputation, and dropping as configured.
+  - Computes returns using the specified method.
+
+      + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
+  - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples
 
@@ -296,9 +318,10 @@ ReturnsResult
   - [`TimeSeries`](https://juliastats.org/TimeSeries.jl/stable/timearray/#The-TimeArray-time-series-type)
   - [`Impute`](https://github.com/invenia/Impute.jl)
 """
-function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                           Rb::Option{<:TimeArray} = nothing,
-                           iv::Option{<:TimeArray} = nothing,
+function prices_to_returns(X::TimeSeries.TimeArray,
+                           F::Option{<:TimeSeries.TimeArray} = nothing;
+                           B::Option{<:TimeSeries.TimeArray} = nothing,
+                           iv::Option{<:TimeSeries.TimeArray} = nothing,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Number = 1.0,
@@ -307,6 +330,7 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            map_func::Option{<:Function} = nothing,
                            join_method::Symbol = :outer,
                            impute_method::Option{<:Impute.Imputor} = nothing)
+    @argcheck(!isempty(X), IsEmptyError)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
               DomainError)
     if !isnothing(missing_row_percent)
@@ -314,57 +338,69 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                   missing_row_percent <=
                   one(missing_row_percent), DomainError)
     end
-    if !isempty(F)
-        asset_names = string.(colnames(X))
-        factor_names = string.(colnames(F))
-        X = merge(X, F; method = join_method)
-    else
-        asset_names = string.(colnames(X))
-        factor_names = String[]
+    asset_names = string.(TimeSeries.colnames(X))
+    factor_names = String[]
+    benchmark_names = String[]
+    if !isnothing(F)
+        @argcheck(!isempty(F), IsEmptyError)
+        factor_names = string.(TimeSeries.colnames(F))
+        X = TimeSeries.merge(X, F; method = join_method)
+    end
+    if !isnothing(B)
+        @argcheck(!isempty(B), IsEmptyError)
+        benchmark_names = string.(TimeSeries.colnames(B))
+        @argcheck(length(benchmark_names) in (1, length(asset_names)), DimensionMismatch)
+        X = TimeSeries.merge(X, B; method = join_method)
     end
     if !isnothing(map_func)
         X = map(map_func, X)
     end
     if !isempty(collapse_args)
-        X = collapse(X, collapse_args...)
+        X = TimeSeries.collapse(X, collapse_args...)
     end
-    X = DataFrame(X)
+    X = DataFrames.DataFrame(X)
 
     f(x) = isa(x, Number) && isnan(x) ? missing : x
 
-    DataFrames.transform!(X, 2:ncol(X) .=> ByRow((x) -> f(x)); renamecols = false)
+    DataFrames.transform!(X, 2:DataFrames.DataAPI.ncol(X) .=> DataFrames.ByRow((x) -> f(x));
+                          renamecols = false)
     if !isnothing(impute_method)
         X = Impute.impute(X, impute_method)
     end
     missing_mtx = ismissing.(Matrix(X[!, 2:end]))
     missings_cols = vec(count(missing_mtx; dims = 2))
-    keep_rows = missings_cols .<= (ncol(X) - 1) * missing_col_percent
+    keep_rows = missings_cols .<= (DataFrames.DataAPI.ncol(X) - 1) * missing_col_percent
     X = X[keep_rows, :]
     missings_rows = vec(count(missing_mtx; dims = 1))
     keep_cols = if !isnothing(missing_row_percent)
-        missings_rows .<= nrow(X) * missing_row_percent
+        missings_rows .<= DataFrames.DataAPI.nrow(X) * missing_row_percent
     else
         missings_rows .== StatsBase.mode(missings_rows)
     end
     X = X[!, [true; keep_cols]]
-    select!(X, Not(names(X, Missing)))
-    dropmissing!(X)
-    X = percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding)
-    if !isnothing(Rb)
-        @argcheck(timestamp(X) == timestamp(Rb))
-        Rb_v = values(Rb)
-        X_v = values(X)
-        X = TimeArray(timestamp(X), isa(Rb_v, AbstractMatrix) ? X_v - Rb_v : X_v .- Rb_v;
-                      colnames = colnames(X))
-    end
-    X = DataFrame(X)
+    DataFrames.select!(X, DataFrames.InvertedIndices.Not(names(X, Missing)))
+    DataFrames.dropmissing!(X)
+    X = TimeSeries.percentchange(TimeSeries.TimeArray(X; timestamp = :timestamp),
+                                 ret_method; padding = padding)
+    X = DataFrames.DataFrame(X)
     col_names = names(X)
     nx = intersect(col_names, asset_names)
     nf = intersect(col_names, factor_names)
-    oc = setdiff(col_names, union(nx, nf))
+    nb = intersect(col_names, benchmark_names)
+    oc = setdiff(col_names, union(nx, nf, nb))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
+        @argcheck(issubset(ts, TimeSeries.timestamp(iv)), ValueError)
         iv = iv[ts]
+    end
+    if !isnothing(iv)
+        iv = values(iv)
+        assert_nonempty_nonneg_finite_val(iv, :iv)
+        assert_nonempty_gt0_finite_val(ivpa, :ivpa)
+        @argcheck(size(iv) == length(nx), DimensionMismatch)
+        if isa(ivpa, VecNum)
+            @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
+        end
     end
     if isempty(nf)
         nf = nothing
@@ -376,10 +412,15 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
         nx = nothing
         X = nothing
     else
-        X = Matrix(X[!, nx])
+        X = if isempty(nb)
+            Matrix(X[!, nx])
+        elseif length(nb) == 1
+            Matrix(X[!, nx]) .- Matrix(X[!, nb])
+        else
+            Matrix(X[!, nx]) - Matrix(X[!, nb])
+        end
     end
-    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
-                         ivpa = ivpa)
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = iv, ivpa = ivpa)
 end
 """
     find_complete_indices(X::AbstractMatrix; dims::Int = 1)
@@ -422,7 +463,7 @@ Int64[]
 
 # Related
 
-  - [`find_correlated_indices`](@ref)
+  - [`find_uncorrelated_indices`](@ref)
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)

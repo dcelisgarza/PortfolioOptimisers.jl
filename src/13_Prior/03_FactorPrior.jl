@@ -39,7 +39,7 @@ FactorPrior
       │           │      │    me ┼ SimpleExpectedReturns
       │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -62,11 +62,11 @@ FactorPrior
       │       alg ┼ nothing
       │     order ┴ DenoiseDetoneAlg()
    re ┼ StepwiseRegression
-      │     crit ┼ PValue
-      │          │   threshold ┴ Float64: 0.05
-      │      alg ┼ Forward()
-      │   target ┼ LinearModel
-      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │   crit ┼ PValue
+      │        │   t ┴ Float64: 0.05
+      │    alg ┼ Forward()
+      │    tgt ┼ LinearModel
+      │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
       │             │   w ┴ nothing
@@ -107,7 +107,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-function factory(pe::FactorPrior, w::Option{<:AbstractWeights} = nothing)
+function factory(pe::FactorPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
@@ -164,11 +164,12 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * cholesky(f_sigma).L
+    posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
     if pe.rsd
         err = X - posterior_X
-        err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
+        err_sigma = LinearAlgebra.diagm(vec(Statistics.var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma
+        posdef!(pe.mp.pdm, posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,

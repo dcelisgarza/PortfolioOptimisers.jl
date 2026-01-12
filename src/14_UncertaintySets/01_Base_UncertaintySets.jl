@@ -2,7 +2,7 @@
     abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 
 Defines the abstract interface for uncertainty set estimators in portfolio optimisation.
-Subtypes of this abstract type are responsible for constructing and estimating uncertainty sets for risk or prior statistics, such as box or ellipse uncertainty sets.
+Subtypes of this abstract type are responsible for constructing and estimating uncertainty sets for risk or prior statistics, such as box or ellipsoidal uncertainty sets.
 
 # Related
 
@@ -14,12 +14,12 @@ abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
     abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 
 Defines the abstract interface for algorithms that construct uncertainty sets in portfolio optimisation.
-Subtypes implement specific methods for generating uncertainty sets, such as box or ellipse uncertainty sets, which are used to model uncertainty in risk or prior statistics.
+Subtypes implement specific methods for generating uncertainty sets, such as box or ellipsoidal uncertainty sets, which are used to model uncertainty in risk or prior statistics.
 
 # Related
 
   - [`BoxUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
 """
@@ -29,12 +29,12 @@ abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 
 Abstract type for results produced by uncertainty set algorithms in portfolio optimisation.
 
-Represents the interface for all result types that encode uncertainty sets for risk or prior statistics, such as box or ellipse uncertainty sets. Subtypes store the output of uncertainty set estimation or construction algorithms.
+Represents the interface for all result types that encode uncertainty sets for risk or prior statistics, such as box or ellipsoidal uncertainty sets. Subtypes store the output of uncertainty set estimation or construction algorithms.
 
 # Related
 
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`AbstractUncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
@@ -43,7 +43,7 @@ const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetE
 """
     abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 
-Defines the abstract interface for algorithms that compute the scaling parameter `k` for ellipse uncertainty sets in portfolio optimisation.
+Defines the abstract interface for algorithms that compute the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio optimisation.
 
 Subtypes implement specific methods for generating the scaling parameter, which controls the size of the ellipsoidal region representing uncertainty in risk or prior statistics.
 
@@ -59,7 +59,7 @@ const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
-Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is provided.
+Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is not `nothing`.
 
 # Arguments
 
@@ -76,7 +76,7 @@ Returns the argument(s) unchanged. This is a no-op function used to handle cases
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 function ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                                 <:Option{<:AbstractUncertaintySetResult}}}, args...;
@@ -86,7 +86,7 @@ end
 """
     mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is provided.
+Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is not `nothing`.
 
 # Arguments
 
@@ -103,7 +103,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`ucs`](@ref)
   - [`sigma_ucs`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 function mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
@@ -111,7 +111,7 @@ end
 """
     sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is provided.
+Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is not `nothing`.
 
 # Arguments
 
@@ -128,7 +128,7 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`ucs`](@ref)
   - [`mu_ucs`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
     return uc
@@ -198,7 +198,7 @@ Constructs an uncertainty set from a given estimator and returns data.
   - [`mu_ucs`](@ref)
   - [`sigma_ucs`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
@@ -230,7 +230,7 @@ Constructs an expected returns uncertainty set from a given estimator and return
   - [`ucs`](@ref)
   - [`sigma_ucs`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
@@ -262,7 +262,7 @@ Constructs a covariance uncertainty set from a given estimator and returns data.
   - [`ucs`](@ref)
   - [`mu_ucs`](@ref)
   - [`BoxUncertaintySet`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
@@ -277,7 +277,7 @@ Box uncertainty sets model uncertainty by specifying lower and upper bounds for 
 
   - [`BoxUncertaintySet`](@ref)
   - [`AbstractUncertaintySetAlgorithm`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 """
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 """
@@ -319,7 +319,7 @@ BoxUncertaintySet
 
   - [`BoxUncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
 """
 struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     lb::T1
@@ -345,7 +345,7 @@ end
         kwargs::T1
     end
 
-Algorithm for computing the scaling parameter `k` for ellipse uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
+Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
 
 # Fields
 
@@ -388,7 +388,7 @@ end
 """
     struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 
-Algorithm for computing the scaling parameter `k` for ellipse uncertainty sets using a general formula `sqrt((1 - q) / q)`, this ignores the distribution of the underlying data.
+Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using a general formula `sqrt((1 - q) / q)`, this ignores the distribution of the underlying data.
 
 # Related Types
 
@@ -401,7 +401,7 @@ struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
     struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 
-Algorithm for computing the scaling parameter `k` for ellipse uncertainty sets using the chi-squared distribution in portfolio optimisation.
+Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using the chi-squared distribution in portfolio optimisation.
 
 # Related Types
 
@@ -418,7 +418,7 @@ struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
     k_ucs(type::Number, args...)
 
 ArrNum
-Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio optimisation.
+Computes the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio optimisation.
 
 # Arguments
 
@@ -449,49 +449,49 @@ Computes the scaling parameter `k` for ellipse uncertainty sets in portfolio opt
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
-  - [`EllipseUncertaintySetAlgorithm`](@ref)
+  - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
-    k_mus = diag(X * (sigma_X \ transpose(X)))
-    return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
+    k_mus = LinearAlgebra.diag(X * (sigma_X \ transpose(X)))
+    return sqrt(Statistics.quantile(k_mus, one(q) - q; km.kwargs...))
 end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
 function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
-    return sqrt(cquantile(Chisq(size(X, 1)), q))
+    return sqrt(Distributions.cquantile(Distributions.Chisq(size(X, 1)), q))
 end
 function k_ucs(type::Number, args...)
     return type
 end
 """
-    struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
+    struct EllipsoidalUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
         method::T1
         diagonal::T2
     end
 
-Algorithm for constructing ellipse uncertainty sets in portfolio optimisation.
-Ellipse uncertainty sets model uncertainty by specifying an ellipsoidal region for risk or prior statistics, typically using a covariance matrix and a scaling parameter.
+Algorithm for constructing ellipsoidal uncertainty sets in portfolio optimisation.
+Ellipsoidal uncertainty sets model uncertainty by specifying an ellipsoidal region for risk or prior statistics, typically using a covariance matrix and a scaling parameter.
 
 # Fields
 
-  - `method`: Algorithm or value used to determine the scaling parameter for the ellipse.
+  - `method`: Algorithm or value used to determine the scaling parameter for the ellipsoidal.
   - `diagonal`: Indicates whether to use only the diagonal elements of the covariance matrix.
 
 # Constructor
 
-    EllipseUncertaintySetAlgorithm(;
+    EllipsoidalUncertaintySetAlgorithm(;
                                    method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                    diagonal::Bool = true)
 
-  - `method`: Sets the scaling algorithm or value for the ellipse.
+  - `method`: Sets the scaling algorithm or value for the ellipsoidal.
   - `diagonal`: Sets whether to use only diagonal elements.
 
 # Examples
 
 ```jldoctest
-julia> EllipseUncertaintySetAlgorithm()
-EllipseUncertaintySetAlgorithm
+julia> EllipsoidalUncertaintySetAlgorithm()
+EllipsoidalUncertaintySetAlgorithm
     method ┼ ChiSqKUncertaintyAlgorithm()
   diagonal ┴ Bool: true
 ```
@@ -500,79 +500,80 @@ EllipseUncertaintySetAlgorithm
 
   - [`AbstractUncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintyKAlgorithm`](@ref)
-  - [`EllipseUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
   - [`BoxUncertaintySetAlgorithm`](@ref)
 """
-struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
+struct EllipsoidalUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
-    function EllipseUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
+    function EllipsoidalUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
     end
 end
-function EllipseUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-                                        diagonal::Bool = true)
-    return EllipseUncertaintySetAlgorithm(method, diagonal)
+function EllipsoidalUncertaintySetAlgorithm(;
+                                            method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
+                                            diagonal::Bool = true)
+    return EllipsoidalUncertaintySetAlgorithm(method, diagonal)
 end
 """
-    abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
+    abstract type AbstractEllipsoidalUncertaintySetResultClass <: AbstractUncertaintySetResult end
 
-Defines the abstract interface for ellipse uncertainty set result classes in portfolio optimisation.
+Defines the abstract interface for ellipsoidal uncertainty set result classes in portfolio optimisation.
 
-Subtypes of this abstract type represent the class or category of ellipse uncertainty sets, such as those for mean or covariance statistics. Used to distinguish between different types of ellipse uncertainty set results.
-
-# Related Types
-
-  - [`MuEllipseUncertaintySet`](@ref)
-  - [`SigmaEllipseUncertaintySet`](@ref)
-"""
-abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
-"""
-    struct MuEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
-
-Represents the class identifier for mean ellipse uncertainty sets in portfolio optimisation.
-
-Used to distinguish ellipse uncertainty sets that encode uncertainty for mean statistics, such as expected returns.
+Subtypes of this abstract type represent the class or category of ellipsoidal uncertainty sets, such as those for mean or covariance statistics. Used to distinguish between different types of ellipsoidal uncertainty set results.
 
 # Related Types
 
-  - [`AbstractEllipseUncertaintySetResultClass`](@ref)
-  - [`SigmaEllipseUncertaintySet`](@ref)
+  - [`MuEllipsoidalUncertaintySet`](@ref)
+  - [`SigmaEllipsoidalUncertaintySet`](@ref)
 """
-struct MuEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
+abstract type AbstractEllipsoidalUncertaintySetResultClass <: AbstractUncertaintySetResult end
 """
-    struct SigmaEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
+    struct MuEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
 
-Represents the class identifier for covariance ellipse uncertainty sets in portfolio optimisation.
+Represents the class identifier for mean ellipsoidal uncertainty sets in portfolio optimisation.
 
-Used to distinguish ellipse uncertainty sets that encode uncertainty for covariance statistics, such as covariance matrices.
+Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for mean statistics, such as expected returns.
 
 # Related Types
 
-  - [`AbstractEllipseUncertaintySetResultClass`](@ref)
-  - [`MuEllipseUncertaintySet`](@ref)
+  - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
+  - [`SigmaEllipsoidalUncertaintySet`](@ref)
 """
-struct SigmaEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
+struct MuEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
 """
-    struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
+    struct SigmaEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
+
+Represents the class identifier for covariance ellipsoidal uncertainty sets in portfolio optimisation.
+
+Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for covariance statistics, such as covariance matrices.
+
+# Related Types
+
+  - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
+  - [`MuEllipsoidalUncertaintySet`](@ref)
+"""
+struct SigmaEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
+"""
+    struct EllipsoidalUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
         sigma::T1
         k::T2
         class::T3
     end
 
-Represents an ellipse uncertainty set for risk or prior statistics in portfolio optimisation.
+Represents an ellipsoidal uncertainty set for risk or prior statistics in portfolio optimisation.
 Stores a covariance matrix, a scaling parameter, and a class identifier for the uncertain quantity, such as expected returns or covariance.
 
 # Fields
 
   - `sigma`: Covariance matrix for the uncertainty set.
-  - `k`: Scaling parameter for the ellipse.
-  - `class`: Identifier for the type of ellipse uncertainty set (e.g., mean or covariance).
+  - `k`: Scaling parameter for the ellipsoidal.
+  - `class`: Identifier for the type of ellipsoidal uncertainty set (e.g., mean or covariance).
 
 # Constructor
 
-    EllipseUncertaintySet(; sigma::MatNum, k::Number,
-                          class::AbstractEllipseUncertaintySetResultClass)
+    EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
+                          class::AbstractEllipsoidalUncertaintySetResultClass)
 
 Keyword arguments correspond to the fields above.
 
@@ -585,49 +586,50 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> EllipseUncertaintySet([1.0 0.2; 0.2 1.0], 2.5, SigmaEllipseUncertaintySet())
-EllipseUncertaintySet
+julia> EllipsoidalUncertaintySet([1.0 0.2; 0.2 1.0], 2.5, SigmaEllipsoidalUncertaintySet())
+EllipsoidalUncertaintySet
   sigma ┼ 2×2 Matrix{Float64}
       k ┼ Float64: 2.5
-  class ┴ SigmaEllipseUncertaintySet()
+  class ┴ SigmaEllipsoidalUncertaintySet()
 ```
 
 # Related
 
-  - [`AbstractEllipseUncertaintySetResultClass`](@ref)
+  - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
   - [`BoxUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
 """
-struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
+struct EllipsoidalUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
-    function EllipseUncertaintySet(sigma::MatNum, k::Number,
-                                   class::AbstractEllipseUncertaintySetResultClass)
+    function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
+                                       class::AbstractEllipsoidalUncertaintySetResultClass)
         @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(k > zero(k))
         return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
     end
 end
-function EllipseUncertaintySet(; sigma::MatNum, k::Number,
-                               class::AbstractEllipseUncertaintySetResultClass)
-    return EllipseUncertaintySet(sigma, k, class)
+function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
+                                   class::AbstractEllipsoidalUncertaintySetResultClass)
+    return EllipsoidalUncertaintySet(sigma, k, class)
 end
-function ucs_view(risk_ucs::EllipseUncertaintySet{<:MatNum, <:Any,
-                                                  <:SigmaEllipseUncertaintySet}, i)
+function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
+                                                      <:SigmaEllipsoidalUncertaintySet}, i)
     i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
-    return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
-                                 class = risk_ucs.class)
+    return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
+                                     class = risk_ucs.class)
 end
-function ucs_view(risk_ucs::EllipseUncertaintySet{<:MatNum, <:Any,
-                                                  <:MuEllipseUncertaintySet}, i)
-    return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
-                                 class = risk_ucs.class)
+function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
+                                                      <:MuEllipsoidalUncertaintySet}, i)
+    return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
+                                     class = risk_ucs.class)
 end
 
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
-       ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet,
-       SigmaEllipseUncertaintySet, MuEllipseUncertaintySet
+       ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
+       EllipsoidalUncertaintySet, SigmaEllipsoidalUncertaintySet,
+       MuEllipsoidalUncertaintySet

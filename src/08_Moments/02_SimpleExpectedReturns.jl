@@ -13,33 +13,33 @@ A simple expected returns estimator for PortfolioOptimisers.jl, representing the
 
 # Constructor
 
-    SimpleExpectedReturns(; w::Option{<:AbstractWeights} = nothing)
+    SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-    - If `w` is provided, `!isempty(w)`.
+    - If `w` is not `nothing`, `!isempty(w)`.
 
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`Option`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
-    function SimpleExpectedReturns(w::Option{<:AbstractWeights})
+    function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights})
         assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::Option{<:AbstractWeights} = nothing)
+function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return SimpleExpectedReturns(w)
 end
 """
-    mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
@@ -90,10 +90,14 @@ julia> mean(serw, X)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
+    return if isnothing(me.w)
+        Statistics.mean(X; dims = dims)
+    else
+        Statistics.mean(X, me.w; dims = dims)
+    end
 end
 """
-    factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+    factory(me::SimpleExpectedReturns, w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Create a new `SimpleExpectedReturns` estimator with updated observation weights.
 
@@ -111,17 +115,18 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionall
 # Details
 
   - Returns a new estimator, preserving the type and updating weights as specified.
-  - If `w` is not provided, the weights from `me` are used.
+  - If `w` is not `nothing`, the weights from `me` are used.
   - Validates that weights are non-empty and finite.
 
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function factory(me::SimpleExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(me::SimpleExpectedReturns,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return SimpleExpectedReturns(; w = ifelse(isnothing(w), me.w, w))
 end
 
-export SimpleExpectedReturns
+export SimpleExpectedReturns, mean

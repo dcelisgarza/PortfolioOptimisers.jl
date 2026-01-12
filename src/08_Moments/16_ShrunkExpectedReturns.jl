@@ -81,7 +81,7 @@ Shrinkage target representing the mean squared error of expected returns.
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 """
     struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        target::T1
+        tgt::T1
     end
 
 Shrinkage algorithm implementing the James-Stein estimator for expected returns.
@@ -90,11 +90,11 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
 # Fields
 
-  - `target`: The shrinkage target type.
+  - `tgt`: The shrinkage target type.
 
 # Constructor
 
-    JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
 Keyword arguments correspond to the fields above.
 
@@ -103,7 +103,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> JamesStein()
 JamesStein
-  target ┴ GrandMean()
+  tgt ┴ GrandMean()
 ```
 
 # Related
@@ -114,17 +114,17 @@ JamesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-    function JamesStein(target::AbstractShrunkExpectedReturnsTarget)
-        return new{typeof(target)}(target)
+    tgt::T1
+    function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget)
+        return new{typeof(tgt)}(tgt)
     end
 end
-function JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return JamesStein(target)
+function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    return JamesStein(tgt)
 end
 """
     struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        target::T1
+        tgt::T1
     end
 
 Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
@@ -133,11 +133,11 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
 # Fields
 
-  - `target`: The shrinkage target type.
+  - `tgt`: The shrinkage target type.
 
 # Constructor
 
-    BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
 Keyword arguments correspond to the fields above.
 
@@ -146,7 +146,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BayesStein()
 BayesStein
-  target ┴ GrandMean()
+  tgt ┴ GrandMean()
 ```
 
 # Related
@@ -157,17 +157,17 @@ BayesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-    function BayesStein(target::AbstractShrunkExpectedReturnsTarget)
-        return new{typeof(target)}(target)
+    tgt::T1
+    function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget)
+        return new{typeof(tgt)}(tgt)
     end
 end
-function BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return BayesStein(target)
+function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    return BayesStein(tgt)
 end
 """
     struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        target::T1
+        tgt::T1
     end
 
 Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expected returns.
@@ -176,11 +176,11 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
 # Fields
 
-  - `target`: The shrinkage target type.
+  - `tgt`: The shrinkage target type.
 
 # Constructor
 
-    BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
 Keyword arguments correspond to the fields above.
 
@@ -189,7 +189,7 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> BodnarOkhrinParolya()
 BodnarOkhrinParolya
-  target ┴ GrandMean()
+  tgt ┴ GrandMean()
 ```
 
 # Related
@@ -200,13 +200,13 @@ BodnarOkhrinParolya
   - [`BayesStein`](@ref)
 """
 struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-    function BodnarOkhrinParolya(target::AbstractShrunkExpectedReturnsTarget)
-        return new{typeof(target)}(target)
+    tgt::T1
+    function BodnarOkhrinParolya(tgt::AbstractShrunkExpectedReturnsTarget)
+        return new{typeof(tgt)}(tgt)
     end
 end
-function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return BodnarOkhrinParolya(target)
+function BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    return BodnarOkhrinParolya(tgt)
 end
 """
     struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
@@ -257,7 +257,7 @@ ShrunkExpectedReturns
       │      │       alg ┼ nothing
       │      │     order ┴ DenoiseDetoneAlg()
   alg ┼ JamesStein
-      │   target ┴ GrandMean()
+      │   tgt ┴ GrandMean()
 ```
 
 # Related
@@ -284,7 +284,7 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum;
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum, args...;
                 kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
@@ -293,11 +293,11 @@ Compute the shrinkage target vector for expected returns estimation.
 
 # Arguments
 
-  - `target`: The shrinkage target type.
+  - `tgt`: The shrinkage target type.
 
-      + `target::GrandMean`: Returns a vector filled with the mean of `mu`.
-      + `target::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-      + `target::MeanSquaredError`: Returns a vector filled with the trace of `sigma` divided by `T`.
+      + `tgt::GrandMean`: Returns a vector filled with the mean of `mu`.
+      + `tgt::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
+      + `tgt::MeanSquaredError`: Returns a vector filled with the trace of `sigma` divided by `T`.
 
   - `mu`: 1D array of expected returns.
   - `sigma`: Covariance matrix of asset returns.
@@ -314,24 +314,28 @@ Compute the shrinkage target vector for expected returns estimation.
   - [`MeanSquaredError`](@ref)
   - [`ShrunkExpectedReturns`](@ref)
 """
-function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum; kwargs...)
-    val = mean(mu)
+function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum, args...; kwargs...)
+    val = Statistics.mean(mu)
     return range(val, val; length = length(mu))
 end
-function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum; isigma = nothing,
-                     kwargs...)
+function target_mean(::VolatilityWeighted, mu::ArrNum, sigma::MatNum,
+                     isigma::Option{<:MatNum} = nothing; kwargs...)
     if isnothing(isigma)
-        isigma = sigma \ I
+        isigma = sigma \ LinearAlgebra.I
+    end
+    if isone(size(mu, 1))
+        mu = vec(mu)
     end
     val = sum(isigma * mu) / sum(isigma)
     return range(val, val; length = length(mu))
 end
-function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum; T::Integer, kwargs...)
-    val = tr(sigma) / T
+function target_mean(::MeanSquaredError, mu::ArrNum, sigma::MatNum, args...; T::Integer,
+                     kwargs...)
+    val = LinearAlgebra.tr(sigma) / T
     return range(val, val; length = length(mu))
 end
 """
-    mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute shrunk expected returns using the specified estimator.
 
@@ -375,54 +379,70 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
-    b = if isone(dims)
-        transpose(target_mean(me.alg.target, transpose(mu), sigma; T = T))
-    else
-        target_mean(me.alg.target, mu, sigma; T = T)
+    flag = isone(dims)
+    if !flag
+        N, T = T, N
     end
-    evals = eigvals(sigma)
+    b = target_mean(me.alg.tgt, mu, sigma; T = T)
+    if flag
+        b = transpose(b)
+    end
+    evals = LinearAlgebra.eigvals(sigma)
     mb = mu - b
-    alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
+    alpha = (N * Statistics.mean(evals) - 2 * maximum(evals)) / LinearAlgebra.dot(mb, mb) /
+            T
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
-    isigma = sigma \ I
-    b = if isone(dims)
-        transpose(target_mean(me.alg.target, transpose(mu), sigma; isigma = isigma, T = T))
-    else
-        target_mean(me.alg.target, mu, sigma; isigma = isigma, T = T)
+    flag = isone(dims)
+    if !flag
+        N, T = T, N
+    end
+    isigma = sigma \ LinearAlgebra.I
+    b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
+    if flag
+        b = transpose(b)
     end
     mb = vec(mu - b)
-    alpha = (N + 2) / ((N + 2) + T * dot(mb, isigma, mb))
+    alpha = (N + 2) / ((N + 2) + T * LinearAlgebra.dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+    mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
-    isigma = sigma \ I
-    b = if isone(dims)
-        transpose(target_mean(me.alg.target, transpose(mu), sigma; isigma = isigma, T = T))
-    else
-        target_mean(me.alg.target, mu, sigma; isigma = isigma, T = T)
+    flag = isone(dims)
+    if !flag
+        N, T = T, N
     end
-    u = dot(reshape(mu, :, 1), isigma, reshape(mu, :, 1))
-    v = dot(reshape(b, :, 1), isigma, reshape(b, :, 1))
-    w = dot(reshape(mu, :, 1), isigma, reshape(b, :, 1))
+    isigma = sigma \ LinearAlgebra.I
+    b = target_mean(me.alg.tgt, mu, sigma, isigma; T = T)
+    if flag
+        b = transpose(b)
+        vm = vec(mu)
+        vb = vec(b)
+    else
+        vm = mu
+        vb = b
+    end
+    u = LinearAlgebra.dot(vm, isigma, vm)
+    v = LinearAlgebra.dot(vb, isigma, vb)
+    w = LinearAlgebra.dot(vm, isigma, vb)
     alpha = (u - N / (T - N)) * v - w^2
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns, w::Option{<:AbstractWeights} = nothing)
+function factory(ce::ShrunkExpectedReturns,
+                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)
 end

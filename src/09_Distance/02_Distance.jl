@@ -107,46 +107,46 @@ This method computes the correlation matrix using the provided covariance estima
 """
 function distance(::Distance{Nothing, <:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!((one(eltype(X)) .- rho) * 0.5, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::Distance{<:Integer, <:SimpleDistance},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
     scale = isodd(de.power) ? 0.5 : 1.0
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
 end
 function distance(::Distance{Nothing, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!((one(eltype(X)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho))),
                         zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function distance(::Distance{Nothing, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                   X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                   X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return -log.(rho)
 end
 function distance(::Distance{Nothing, <:CorrelationDistance},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::Distance{<:Integer, <:CorrelationDistance},
                   ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::Distance{<:Any, <:CanonicalDistance},
@@ -186,12 +186,12 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 """
 function distance(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
                   X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
                   X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     return -log.(rho)
 end
 """
@@ -285,22 +285,22 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
   - [`cor_and_dist`](@ref)
 """
 function distance(::Distance{Nothing, <:SimpleDistance}, rho::MatNum, args...; kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!((one(eltype(rho)) .- rho) * 0.5, zero(eltype(rho)),
                         one(eltype(rho))))
 end
 function distance(de::Distance{<:Integer, <:SimpleDistance}, rho::MatNum, args...;
                   kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     scale = isodd(de.power) ? 0.5 : 1.0
     return sqrt.(clamp!((one(eltype(rho)) .- rho .^ de.power) * scale, zero(eltype(rho)),
@@ -308,64 +308,64 @@ function distance(de::Distance{<:Integer, <:SimpleDistance}, rho::MatNum, args..
 end
 function distance(::Distance{Nothing, <:SimpleAbsoluteDistance}, rho::MatNum, args...;
                   kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)),
                         zero(eltype(rho)), one(eltype(rho))))
 end
 function distance(de::Distance{<:Integer, <:SimpleAbsoluteDistance}, rho::MatNum, args...;
                   kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .-
                         (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power,
                         zero(eltype(rho)), one(eltype(rho))))
 end
 function distance(::Distance{Nothing, <:LogDistance}, rho::MatNum, args...; kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function distance(de::Distance{<:Integer, <:LogDistance}, rho::MatNum, args...; kwargs...)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return -log.((all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power)
 end
 function distance(::Distance{Nothing, <:CorrelationDistance}, rho::MatNum, args...;
                   kwargs...)
     assert_matrix_issquare(rho, :rho)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .- rho, zero(eltype(rho)), one(eltype(rho))))
 end
 function distance(de::Distance{<:Integer, <:CorrelationDistance}, rho::MatNum, args...;
                   kwargs...)
     assert_matrix_issquare(rho, :rho)
-    s = diag(rho)
+    s = LinearAlgebra.diag(rho)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = StatsBase.StatsBase.cov2cor(rho, s)
     end
     return sqrt.(clamp!(one(eltype(rho)) .- rho .^ de.power, zero(eltype(rho)),
                         one(eltype(rho))))
@@ -377,7 +377,7 @@ end
     cor_and_dist(de::Distance{<:Any,
                               <:Union{<:SimpleDistance, <:SimpleAbsoluteDistance, <:LogDistance,
                                       <:LogDistance, <:VariationInfoDistance,
-                                      <:CorrelationDistance}}, Nothing,
+                                      <:CorrelationDistance}},
                  ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute and return the correlation and distance matrices. The distance matrix depends on the combination of distance and covariance estimators (see [`distance`](@ref)).
@@ -407,7 +407,7 @@ Compute and return the correlation and distance matrices. The distance matrix de
 function cor_and_dist(::Distance{Nothing, <:SimpleDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return rho,
            sqrt.(clamp!((one(eltype(X)) .- rho) * 0.5, zero(eltype(X)), one(eltype(X))))
 end
@@ -415,14 +415,14 @@ function cor_and_dist(de::Distance{<:Integer, <:SimpleDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
     scale = isodd(de.power) ? 0.5 : 1.0
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     return rho,
            sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
 end
 function cor_and_dist(::Distance{Nothing, <:SimpleAbsoluteDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return rho,
            sqrt.(clamp!((one(eltype(X)) .- (all(x -> zero(x) <= x, rho) ? rho : abs.(rho))),
                         zero(eltype(X)), one(eltype(X))))
@@ -430,37 +430,37 @@ end
 function cor_and_dist(de::Distance{<:Integer, <:SimpleAbsoluteDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return rho, sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::StatsBase.CovarianceEstimator,
                       X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(all(x -> zero(x) <= x, rho) ? rho : abs.(rho))
 end
 function cor_and_dist(de::Distance{<:Integer, <:LogDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     rho = (all(x -> zero(x) <= x, rho) ? rho : abs.(rho)) .^ de.power
     return rho, -log.(rho)
 end
 function cor_and_dist(::Distance{Nothing, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
                       X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(rho)
 end
 function cor_and_dist(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternalLTDCov,
                       X::MatNum; dims::Int = 1, kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     return rho, -log.(rho)
 end
 function cor_and_dist(de::Distance{Nothing, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
     @argcheck(dims in (1, 2))
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     if dims == 2
         X = transpose(X)
     end
@@ -470,7 +470,7 @@ function cor_and_dist(de::Distance{<:Integer, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
     @argcheck(dims in (1, 2))
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     if dims == 2
         X = transpose(X)
     end
@@ -479,13 +479,13 @@ end
 function cor_and_dist(::Distance{Nothing, <:CorrelationDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     return rho, sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function cor_and_dist(de::Distance{<:Integer, <:CorrelationDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
     return rho, sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
@@ -582,4 +582,4 @@ function distance(de::Distance{<:Any, <:CanonicalDistance}, ce::DistCov_AllInter
                     dims = dims, kwargs...)
 end
 
-export Distance
+export Distance, distance, cor_and_dist
