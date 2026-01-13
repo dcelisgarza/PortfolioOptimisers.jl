@@ -12,8 +12,8 @@ for sym in private_symbols
          end)
 end
 
-DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
-                    recursive = true)
+DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
+                    :(using PortfolioOptimisers, StatsBase); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)

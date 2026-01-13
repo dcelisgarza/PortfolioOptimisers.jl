@@ -13,7 +13,7 @@ hero:
   actions:
     - theme: brand
       text: Getting Started
-      link: examples/1_Getting_Started
+      link: examples/01_Getting_Started
     - theme: alt
       text: View on Github
       link: https://github.com/dcelisgarza/PortfolioOptimisers.jl
