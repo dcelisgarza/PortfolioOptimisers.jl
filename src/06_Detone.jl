@@ -187,4 +187,4 @@ function detone(de::Detone, X::MatNum)
     return X
 end
 
-export Detone, detone, detone!
+export Detone, dt, detone!

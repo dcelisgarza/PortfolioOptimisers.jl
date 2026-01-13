@@ -1,11 +1,11 @@
 """
     struct DenoiseCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
         ce::T1
-        denoise::T2
+        dn::T2
         pdm::T3
-        function DenoiseCovariance(ce::AbstractCovarianceEstimator, denoise::Denoise,
+        function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
                                    pdm::Option{<:Posdef})
-            return new{typeof(ce), typeof(denoise), typeof(pdm)}(ce, denoise, pdm)
+            return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)
         end
     end
 
@@ -14,13 +14,13 @@ A covariance estimator that applies a denoising algorithm and positive definite 
 # Fields
 
   - `ce`: The underlying covariance estimator to be denoised.
-  - `denoise`: The denoising algorithm to apply to the covariance matrix.
+  - `dn`: The denoising algorithm to apply to the covariance matrix.
   - `pdm`: The positive definite matrix projection method.
 
 # Constructors
 
 ```julia
-DenoiseCovariance(; ce::AbstractCovarianceEstimator; denoise::Denoise = Denoise(),
+DenoiseCovariance(; ce::AbstractCovarianceEstimator; dn::Denoise = Denoise(),
                   pdm::Option{<:Posdef} = Posdef())
 ```
 
@@ -62,19 +62,19 @@ DenoiseCovariance
 """
 struct DenoiseCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ce::T1
-    denoise::T2
+    dn::T2
     pdm::T3
-    function DenoiseCovariance(ce::AbstractCovarianceEstimator, denoise::Denoise,
+    function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
                                pdm::Option{<:Posdef})
-        return new{typeof(ce), typeof(denoise), typeof(pdm)}(ce, denoise, pdm)
+        return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)
     end
 end
 function DenoiseCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                           denoise::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
-    return DenoiseCovariance(ce, denoise, pdm)
+                           dn::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
+    return DenoiseCovariance(ce, dn, pdm)
 end
 function factory(ce::DenoiseCovariance, w::StatsBase.AbstractWeights)
-    return DenoiseCovariance(; ce = factory(ce.ce, w), denoise = ce.denoise, pdm = ce.pdm)
+    return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
@@ -102,7 +102,7 @@ Compute the denoised and positive definite projected covariance matrix for the d
   - Transposes `X` if `dims == 2` to ensure variables are in columns.
   - Ensures the covariance matrix is mutable.
   - Applies positive definite projection using the method in `ce.pdm`.
-  - Applies the denoising algorithm in `ce.denoise` with the aspect ratio `T/N`.
+  - Applies the denoising algorithm in `ce.dn` with the aspect ratio `T/N`.
   - Returns the processed covariance matrix.
 
 # Related
@@ -123,7 +123,7 @@ function Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     end
     T, N = size(X)
     posdef!(ce.pdm, sigma)
-    denoise!(ce.denoise, sigma, T / N)
+    denoise!(ce.dn, sigma, T / N)
     return sigma
 end
 """
@@ -152,7 +152,7 @@ Compute the denoised and positive definite projected correlation matrix for the 
   - Transposes `X` if `dims == 2` to ensure variables are in columns.
   - Ensures the correlation matrix is mutable.
   - Applies positive definite projection using the method in `ce.pdm`.
-  - Applies the denoising algorithm in `ce.denoise` with the aspect ratio `T/N`.
+  - Applies the denoising algorithm in `ce.dn` with the aspect ratio `T/N`.
   - Returns the processed correlation matrix.
 
 # Related
@@ -173,7 +173,7 @@ function Statistics.cor(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
     end
     T, N = size(X)
     posdef!(ce.pdm, rho)
-    denoise!(ce.denoise, rho, T / N)
+    denoise!(ce.dn, rho, T / N)
     return rho
 end
 

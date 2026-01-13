@@ -1,7 +1,7 @@
 """
     struct DetoneCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
         ce::T1
-        detone::T2
+        dt::T2
         pdm::T3
     end
 
@@ -10,14 +10,14 @@ A covariance estimator that applies a detoning algorithm and positive definite p
 # Fields
 
   - `ce`: The underlying covariance estimator to be detoned.
-  - `detone`: The detoning algorithm to apply to the covariance matrix.
+  - `dt`: The detoning algorithm to apply to the covariance matrix.
   - `pdm`: The positive definite matrix projection method.
 
 # Constructors
 
 ```julia
-DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                 detone::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
+DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(), dt::Detone = Detone(),
+                 pdm::Option{<:Posdef} = Posdef())
 ```
 
 Keyword arguments correspond to the fields above.
@@ -52,19 +52,19 @@ DetoneCovariance
 """
 struct DetoneCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ce::T1
-    detone::T2
+    dt::T2
     pdm::T3
-    function DetoneCovariance(ce::AbstractCovarianceEstimator, detone::Detone,
+    function DetoneCovariance(ce::AbstractCovarianceEstimator, dt::Detone,
                               pdm::Option{<:Posdef})
-        return new{typeof(ce), typeof(detone), typeof(pdm)}(ce, detone, pdm)
+        return new{typeof(ce), typeof(dt), typeof(pdm)}(ce, dt, pdm)
     end
 end
 function DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                          detone::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
-    return DetoneCovariance(ce, detone, pdm)
+                          dt::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
+    return DetoneCovariance(ce, dt, pdm)
 end
 function factory(ce::DetoneCovariance, w::StatsBase.AbstractWeights)
-    return DetoneCovariance(; ce = factory(ce.ce, w), detone = ce.detone, pdm = ce.pdm)
+    return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
@@ -92,7 +92,7 @@ Compute the detoned and positive definite projected covariance matrix for the da
   - Transposes `X` if `dims == 2` to ensure variables are in columns.
   - Ensures the covariance matrix is mutable.
   - Applies positive definite projection using the method in `ce.pdm`.
-  - Applies the detoning algorithm in `ce.detone`.
+  - Applies the detoning algorithm in `ce.dt`.
   - Returns the processed covariance matrix.
 
 # Related
@@ -112,7 +112,7 @@ function Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
         sigma = Matrix(sigma)
     end
     posdef!(ce.pdm, sigma)
-    detone!(ce.detone, sigma)
+    detone!(ce.dt, sigma)
     return sigma
 end
 """
@@ -141,7 +141,7 @@ Compute the detoned and positive definite projected correlation matrix for the d
   - Transposes `X` if `dims == 2` to ensure variables are in columns.
   - Ensures the correlation matrix is mutable.
   - Applies positive definite projection using the method in `ce.pdm`.
-  - Applies the detoning algorithm in `ce.detone`.
+  - Applies the detoning algorithm in `ce.dt`.
   - Returns the processed correlation matrix.
 
 # Related
@@ -161,7 +161,7 @@ function Statistics.cor(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
         rho = Matrix(rho)
     end
     posdef!(ce.pdm, rho)
-    detone!(ce.detone, rho)
+    detone!(ce.dt, rho)
     return rho
 end
 

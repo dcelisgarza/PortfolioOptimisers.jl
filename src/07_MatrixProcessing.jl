@@ -184,8 +184,8 @@ end
 """
     struct DenoiseDetoneAlgMatrixProcessing{T1, T2, T3, T4, T5} <: AbstractMatrixProcessingEstimator
         pdm::T1
-        denoise::T2
-        detone::T3
+        dn::T2
+        dt::T3
         alg::T4
         order::T5
     end
@@ -197,16 +197,16 @@ A flexible container type for configuring and applying matrix processing routine
 # Fields
 
   - `pdm`: Positive definite matrix estimator, or `nothing` to skip.
-  - `denoise`: Denoising estimator, or `nothing` to skip.
-  - `detone`: Detoning estimator, or `nothing` to skip.
+  - `dn`: Denoising estimator, or `nothing` to skip.
+  - `dt`: Detoning estimator, or `nothing` to skip.
   - `alg`: Optional custom matrix processing algorithm, or `nothing` to skip.
   - `order`: Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
 
 # Constructor
 
     DenoiseDetoneAlgMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
-                            denoise::Option{<:Denoise} = nothing,
-                            detone::Option{<:Detone} = nothing,
+                            dn::Option{<:Denoise} = nothing,
+                            dt::Option{<:Detone} = nothing,
                             alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                             order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg())
 
@@ -225,7 +225,7 @@ DenoiseDetoneAlgMatrixProcessing
       alg ┼ nothing
     order ┴ DenoiseDetoneAlg()
 
-julia> DenoiseDetoneAlgMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
+julia> DenoiseDetoneAlgMatrixProcessing(; dn = Denoise(), dt = Detone(; n = 2))
 DenoiseDetoneAlgMatrixProcessing
       pdm ┼ Posdef
           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -269,25 +269,25 @@ DenoiseDetoneAlgMatrixProcessing
 struct DenoiseDetoneAlgMatrixProcessing{T1, T2, T3, T4, T5} <:
        AbstractMatrixProcessingEstimator
     pdm::T1
-    denoise::T2
-    detone::T3
+    dn::T2
+    dt::T3
     alg::T4
     order::T5
-    function DenoiseDetoneAlgMatrixProcessing(pdm::Option{<:Posdef},
-                                              denoise::Option{<:Denoise},
-                                              detone::Option{<:Detone},
+    function DenoiseDetoneAlgMatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
+                                              dt::Option{<:Detone},
                                               alg::Option{<:AbstractMatrixProcessingAlgorithm},
                                               order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg())
-        return new{typeof(pdm), typeof(denoise), typeof(detone), typeof(alg),
-                   typeof(order)}(pdm, denoise, detone, alg, order)
+        return new{typeof(pdm), typeof(dn), typeof(dt), typeof(alg), typeof(order)}(pdm, dn,
+                                                                                    dt, alg,
+                                                                                    order)
     end
 end
 function DenoiseDetoneAlgMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
-                                          denoise::Option{<:Denoise} = nothing,
-                                          detone::Option{<:Detone} = nothing,
+                                          dn::Option{<:Denoise} = nothing,
+                                          dt::Option{<:Detone} = nothing,
                                           alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                                           order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg())
-    return DenoiseDetoneAlgMatrixProcessing(pdm, denoise, detone, alg, order)
+    return DenoiseDetoneAlgMatrixProcessing(pdm, dn, dt, alg, order)
 end
 """
     matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
@@ -345,8 +345,8 @@ This method applies a sequence of matrix processing steps to the input covarianc
 # Details
 
   - Applies positive definiteness enforcement using `mp.pdm`.
-  - Applies denoising using `mp.denoise` and the ratio `T / N` from `X`.
-  - Applies detoning using `mp.detone`.
+  - Applies denoising using `mp.dn` and the ratio `T / N` from `X`.
+  - Applies detoning using `mp.dt`.
   - Applies an optional custom matrix processing algorithm using `mp.alg`.
   - The order of operations depends on the specific type of `mp.order`.
 
@@ -367,7 +367,7 @@ julia> sigma = cov(X)
   0.00359832   0.004123   -0.0325342    0.0424332    0.0152574
  -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
 
-julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; denoise = Denoise()), sigma, X)
+julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; dn = Denoise()), sigma, X)
 
 julia> sigma
 5×5 Matrix{Float64}:
@@ -385,7 +385,7 @@ julia> sigma = cov(X)
   0.00359832   0.004123   -0.0325342    0.0424332    0.0152574
  -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
 
-julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; detone = Detone()), sigma, X)
+julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; dt = Detone()), sigma, X)
 
 julia> sigma
 5×5 Matrix{Float64}:
@@ -418,8 +418,8 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
                             sigma::MatNum, X::MatNum, args...; kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
-    denoise!(mp.denoise, sigma, T / N)
-    detone!(mp.detone, sigma)
+    denoise!(mp.dn, sigma, T / N)
+    detone!(mp.dt, sigma)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
     return nothing
 end
@@ -428,9 +428,9 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
                             sigma::MatNum, X::MatNum, args...; kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
-    denoise!(mp.denoise, sigma, T / N)
+    denoise!(mp.dn, sigma, T / N)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
-    detone!(mp.detone, sigma)
+    detone!(mp.dt, sigma)
     return nothing
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
@@ -438,8 +438,8 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
                             sigma::MatNum, X::MatNum, args...; kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
-    detone!(mp.detone, sigma)
-    denoise!(mp.denoise, sigma, T / N)
+    detone!(mp.dt, sigma)
+    denoise!(mp.dn, sigma, T / N)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
     return nothing
 end
@@ -448,9 +448,9 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
                             sigma::MatNum, X::MatNum, args...; kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
-    detone!(mp.detone, sigma)
+    detone!(mp.dt, sigma)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
-    denoise!(mp.denoise, sigma, T / N)
+    denoise!(mp.dn, sigma, T / N)
     return nothing
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
@@ -459,8 +459,8 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     T, N = size(X)
     posdef!(mp.pdm, sigma)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
-    denoise!(mp.denoise, sigma, T / N)
-    detone!(mp.detone, sigma)
+    denoise!(mp.dn, sigma, T / N)
+    detone!(mp.dt, sigma)
     return nothing
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
@@ -469,8 +469,8 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     T, N = size(X)
     posdef!(mp.pdm, sigma)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
-    detone!(mp.detone, sigma)
-    denoise!(mp.denoise, sigma, T / N)
+    detone!(mp.dt, sigma)
+    denoise!(mp.dn, sigma, T / N)
     return nothing
 end
 """
