@@ -35,11 +35,13 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - **Testing:**
     
       + **ALWAYS** run tests after making code changes and before committing.
+    
       + From Julia REPL:
         
         ```julia
-        ] activate .
-        ] test
+        using Pkg
+        Pkg.activate(".")
+        Pkg.test()
         ```
       + Add new tests as `test-*.jl` in `test/`.
       + Tests must pass before creating a pull request.
@@ -54,7 +56,6 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - **Testing:**
     
       + Run all tests: From Julia REPL, activate environment (`] activate .`) then run tests (`] test`).
-
   - **Documentation:**
     
       + Build docs locally:

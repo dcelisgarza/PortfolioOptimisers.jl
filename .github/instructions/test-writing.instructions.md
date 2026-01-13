@@ -24,7 +24,6 @@ applyTo: "test/test-*.jl"
     ```
 
   - **Import required packages**: Import all necessary packages inside the `@safetestset` block.
-
   - **Nested test sets**: Use `@testset` for grouping related tests within a `@safetestset`.
 
 ## Validation Testing

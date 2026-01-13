@@ -7,6 +7,7 @@ applyTo: "src/**/*.jl"
 ## Docstring Requirements
 
   - **All public types, functions, and macros must have docstrings**.
+
   - Docstrings should include:
     
       + Brief description of purpose.
@@ -15,10 +16,10 @@ applyTo: "src/**/*.jl"
       + `# Details` section for implementation notes (optional but recommended).
       + `# Related` section with links to related types/functions using `[@ref]` syntax.
       + Code examples using `jldoctest` blocks where appropriate.
-
   - **Docstring format**:
     
     ```julia
+    julia> result = function_name(1, 2)
     """
         function_name(arg1, arg2; kwarg1=default)
     
@@ -47,13 +48,17 @@ applyTo: "src/**/*.jl"
     # Examples
     
     ```jldoctest
-    julia> result = function_name(1, 2)
-    expected_output
     ```
+    
     """
     function function_name(arg1, arg2; kwarg1=default)
-        # implementation
+    
+    # implementation
+    
     end
+    
+    ```
+    
     ```
 
 ## Type Definitions
@@ -120,7 +125,7 @@ applyTo: "src/**/*.jl"
 
   - Always include a `# Related` section in docstrings.
   - Link to abstract parent types, related estimators, algorithms, and result types.
-  - Use the `[@ref]` syntax: `` [`TypeName`](@ref) ``.
+  - Use the `[@ref]` syntax: ``[`TypeName`](@ref)``.
 
 ## Examples in Docstrings
 
