@@ -736,7 +736,7 @@ Defining methods which dispatch on the first argument allows for a consistent fa
 
 # Arguments
 
-  - `::Nothing`: Indicates no object should be constructed.
+  - `a`: Indicates no object should be constructed.
   - `args...`: Arbitrary positional arguments (ignored).
   - `kwargs...`: Arbitrary keyword arguments (ignored).
 
@@ -860,18 +860,18 @@ function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanValue(w)
 end
 """
-    factory(::MeanValue, w::StatsBase.AbstractWeights)
+    factory(mv::MeanValue, w::StatsBase.AbstractWeights)
 
-Construct a `MeanValue` instance with optional weights, or return the input if weights are unchanged.
+Construct a `MeanValue` instance with observation weights `w`.
 
 # Arguments
 
-  - ``: A `MeanValue` instance to update or return.
-  - `w`: Weights to use for the mean calculation.
+  - `mv`: Instance to update.
+  - $(dsd[:ow])
 
 # Returns
 
-  - `mv::MeanValue`: A new `MeanValue` with the specified weights.
+  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
 
 # Related
 
@@ -934,18 +934,18 @@ function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MedianValue(w)
 end
 """
-    factory(::MedianValue, w::StatsBase.AbstractWeights)
+    factory(mv::MedianValue, w::StatsBase.AbstractWeights)
 
-Constructs a `MedianValue` instance with optional weights, or returns the input if weights are unchanged.
+Constructs a `MedianValue` instance with observation weights `w`.
 
 # Arguments
 
-  - ``: A `MedianValue` instance to update or return.
-  - `w`: Weights to use for the median calculation.
+  - `mv`: Instance to update.
+  - $(dsd[:ow])
 
 # Returns
 
-  - `mdv::MedianValue`: A new `MedianValue` with the specified weights.
+  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
 
 # Related
 
@@ -1037,16 +1037,16 @@ end
 """
     factory(sv::StdValue, w::StatsBase.AbstractWeights)
 
-Constructs a `StdValue` instance with optional weights, or returns the input if weights are unchanged.
+Constructs a `StdValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `sv`: A `StdValue` instance to update or return.
-  - `w`: Weights to use for the standard deviation calculation.
+  - `sv`: Instance to update.
+  - $(dsd[:ow])
 
 # Returns
 
-  - `sv::StdValue`: A new `StdValue` with the specified weights.
+  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
 
 # Related
 
@@ -1115,16 +1115,16 @@ end
 """
     factory(vv::VarValue, w::StatsBase.AbstractWeights)
 
-Constructs a `VarValue` instance with optional weights, or returns the input if weights are unchanged.
+Constructs a `VarValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `vv`: A `VarValue` instance to update or return.
-  - `w`: Weights to use for the variance calculation.
+  - `vv`: Instance to update.
+  - $(dsd[:ow])
 
 # Returns
 
-  - `VarValue`: A new `VarValue` with the specified weights.
+  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
 
 # Related
 
@@ -1251,16 +1251,16 @@ end
 """
     factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
 
-Construct a `StandardisedValue` instance with the given weights.
+Construct a `StandardisedValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `msv`: A `StandardisedValue` instance to update or return.
-  - `w`: Weights to use for both the mean and standard deviation measures.
+  - `msv`: Instance to update.
+  - $(dsd[:ow])
 
 # Returns
 
-  - `msv::StandardisedValue`: A new `StandardisedValue` with the specified weights applied to both `mv` and `sv`.
+  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
 
 # Related
 

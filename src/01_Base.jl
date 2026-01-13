@@ -685,4 +685,14 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 
+const dsd = Dict(:pw => "`w`: Portfolio weights vector.",
+                 :ow => "`w`: Observation weights vector.",
+                 :oow => "`ow`: Optional observation weights vector.",
+                 :me => "`me`: Expected returns estimator.",
+                 :pdm => "`pdm`: Positive definite matrix estimator.",
+                 :dt => "`dt`: Matrix detoning estimator.",
+                 :dn => "`dn`: Matrix denoising estimator.",
+                 :ce => "`ce`: Covariance estimator.", :de => "`de`: Distance estimator.",
+                 :ve => "`ve`: Variance estimator.", :pe => "`pe`: Prior estimator.")
+
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

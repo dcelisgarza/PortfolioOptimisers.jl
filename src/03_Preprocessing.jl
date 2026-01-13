@@ -257,7 +257,7 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 
 # Returns
 
-  - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
+  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
 # Validation
 

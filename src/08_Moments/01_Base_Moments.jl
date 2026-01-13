@@ -1,4 +1,27 @@
 """
+    factory(ce::StatsBase.CovarianceEstimator, args...)
+
+Fallback for covariance estimator factory methods.
+
+# Arguments
+
+  - $(dsd[:ce])
+  - `args...`: Optional arguments (ignored for base covariance estimators).
+
+# Returns
+
+  - `ce::StatsBase.CovarianceEstimator`: The original covariance estimator.
+
+# Related
+
+  - [`factory`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function factory(ce::StatsBase.CovarianceEstimator, args...)
+    return ce
+end
+"""
     abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 
 Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.

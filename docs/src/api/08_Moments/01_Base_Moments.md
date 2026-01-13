@@ -12,4 +12,5 @@ Full
 Semi
 robust_cov
 robust_cor
+factory(ce::StatsBase.CovarianceEstimator, args...)
 ```

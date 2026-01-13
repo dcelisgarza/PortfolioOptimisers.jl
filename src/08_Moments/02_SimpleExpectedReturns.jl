@@ -59,8 +59,6 @@ This method computes the expected returns as the sample mean of the input data `
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> X = [0.01 0.02; 0.03 0.04];
 
 julia> ser = SimpleExpectedReturns()
@@ -71,9 +69,7 @@ julia> mean(ser, X)
 1×2 Matrix{Float64}:
  0.02  0.03
 
-julia> w = Weights([0.2, 0.8]);
-
-julia> serw = SimpleExpectedReturns(; w = w)
+julia> serw = SimpleExpectedReturns(; w = StatsBase.Weights([0.2, 0.8]))
 SimpleExpectedReturns
   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
 
@@ -97,20 +93,20 @@ function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kw
     end
 end
 """
-    factory(::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
+    factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
 
-Create a new `SimpleExpectedReturns` estimator with updated observation weights.
+Create a new `SimpleExpectedReturns` estimator with observation weights `w`.
 
 This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing the weights stored in the input estimator with the provided weights.
 
 # Arguments
 
-  - ``: Existing `SimpleExpectedReturns` estimator.
-  - `w`: OObservation weights to use in the new estimator.
+  - $(dsd[:me])
+  - $(dsd[:ow])
 
 # Returns
 
-  - `me::SimpleExpectedReturns`: New estimator with updated weights.
+  - `me::SimpleExpectedReturns`: New estimator with observation weights `w`.
 
 # Related
 

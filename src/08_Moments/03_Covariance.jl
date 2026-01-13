@@ -33,16 +33,12 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> gwc = GeneralCovariance()
 GeneralCovariance
   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
    w ┴ nothing
 
-julia> w = Weights([0.1, 0.2, 0.7]);
-
-julia> gwc = GeneralCovariance(; w = w)
+julia> gwc = GeneralCovariance(; w = StatsBase.Weights([0.1, 0.2, 0.7]))
 GeneralCovariance
   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
@@ -142,24 +138,16 @@ end
 """
     factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
 
-Return a new `GeneralCovariance` estimator with the specified weights.
+Return a new `GeneralCovariance` estimator with observation weights `w`.
 
 # Arguments
 
   - `ce`: A `GeneralCovariance` estimator.
-  - `w`: Weights vector.
+  - $(dsd[:ow])
 
 # Returns
 
-  - `GeneralCovariance`: A new estimator with the same covariance estimator and the specified or existing weights.
-
-# Validation
-
-  - If `w` is not `nothing`, it must not be empty and must contain only finite values.
-
-# Details
-
-  - This method enables the construction of a new `GeneralCovariance` estimator with updated weights.
+  - `ce::GeneralCovariance`: A new estimator with the same covariance estimator and observation weights `w`.
 
 # Related
 
@@ -168,7 +156,7 @@ Return a new `GeneralCovariance` estimator with the specified weights.
   - [`factory`](@ref)
 """
 function factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
-    return GeneralCovariance(; ce = ce.ce, w = w)
+    return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
 end
 """
     struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
@@ -230,6 +218,58 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance(me, ce, alg)
 end
+"""
+    factory(ce::Covariance, w::StatsBase.AbstractWeights)
+
+Return a new `Covariance` estimator with observation weights `w` applied to both the expected returns and covariance estimators.
+
+# Arguments
+
+  - $(dsd[:ce])
+  - $(dsd[:ow])
+
+# Returns
+
+  - `ce::Covariance`: New estimator with weights applied to both the mean and covariance estimators.
+
+# Details
+
+  - Applies weights to both the expected returns estimator `ce.me` and the covariance estimator `ce.ce`.
+  - Preserves the moment algorithm `ce.alg` from the original estimator.
+  - Enables weighted estimation for both mean and covariance in portfolio workflows.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`GeneralCovariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
+
+# Examples
+
+```jldoctest
+julia> ce = Covariance()
+Covariance
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+   ce ┼ GeneralCovariance
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ nothing
+  alg ┴ Full()
+
+julia> w = StatsBase.Weights([0.2, 0.3, 0.5])
+StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+
+julia> ce_w = factory(ce, w)
+Covariance
+   me ┼ SimpleExpectedReturns
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+   ce ┼ GeneralCovariance
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  alg ┴ Full()
+```
+"""
 function factory(ce::Covariance, w::StatsBase.AbstractWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
