@@ -21,13 +21,48 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - **Examples:**
     
       + Example scripts and notebooks are in `examples/`. Use these as references for end-to-end workflows.
+
+### Required Before Each Commit
+
+  - **Linting and Formatting:**
+    
+      + **ALWAYS** run `pre-commit run -a` before committing changes.
+      + The repository uses pre-commit hooks for linting and formatting.
+      + Julia code is formatted using JuliaFormatter.jl.
+      + **Commits will be rejected if pre-commit tests fail.**
+      + Install pre-commit hooks once: `pre-commit install` (requires `pre-commit` via pipx).
+
   - **Testing:**
     
-      + From Julia REPL: `] activate .` then `] test`.
+      + **ALWAYS** run tests after making code changes and before committing.
+      + From Julia REPL:
+        
+        ```julia
+        ] activate .
+        ] test
+        ```
       + Add new tests as `test-*.jl` in `test/`.
-  - **Docs:**
+      + Tests must pass before creating a pull request.
+
+### Build and Development Commands
+
+  - **Formatting:**
     
-      + Build locally: `julia --project=docs`, then `using LiveServer; servedocs()`.
+      + Run linters and formatters: `pre-commit run -a`
+      + Manual Julia formatting: Install JuliaFormatter.jl globally, then format as needed.
+
+  - **Testing:**
+    
+      + Run all tests: From Julia REPL, activate environment (`] activate .`) then run tests (`] test`).
+
+  - **Documentation:**
+    
+      + Build docs locally:
+        
+         1. `julia --project=docs`
+         2. `] dev .` (first time only)
+         3. `using LiveServer`
+         4. `servedocs()`
 
 ## Project-Specific Conventions
 
@@ -113,6 +148,16 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
   - Check spelling and grammar in code, docstrings and docs.
   - Ensure new code follows established patterns and conventions.
   - Ensure new documentation adheres to established patterns and conventions.
+
+## Before Finalizing Work
+
+Before completing any task or creating a pull request, **ALWAYS**:
+
+ 1. **Run pre-commit checks**: `pre-commit run -a` - All checks must pass.
+ 2. **Run tests**: Activate environment and run tests in Julia REPL - All tests must pass.
+ 3. **Verify changes**: Ensure all file changes align with the task requirements.
+ 4. **Update documentation**: If adding new features, update relevant docstrings and docs.
+ 5. **Check code quality**: Ensure code follows established patterns and conventions.
 
 * * *
 
