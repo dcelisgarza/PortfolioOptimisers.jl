@@ -420,7 +420,7 @@ EntropyPoolingPrior
               │           │      │   alg ┴ Full()
               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
               │           │      │       pdm ┼ Posdef
-              │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton      
+              │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
               │           │      │   denoise ┼ nothing
               │           │      │    detone ┼ nothing
@@ -583,15 +583,14 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     end
 end
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::EntropyPoolingPrior, w::StatsBase.AbstractWeights)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
                                kt_views = pe.kt_views, rho_views = pe.rho_views,
                                var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
-                               opt = pe.opt, w = nothing_scalar_array_selector(pe.w, w),
-                               alg = pe.alg)
+                               opt = pe.opt, w = w, alg = pe.alg)
 end
 """
     add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Symbol)

@@ -9,8 +9,7 @@ end
 function CorrelationCovariance(; ce::StatsBase.CovarianceEstimator = Covariance())
     return CorrelationCovariance(ce)
 end
-function factory(ce::CorrelationCovariance,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::CorrelationCovariance, w::StatsBase.AbstractWeights)
     return CorrelationCovariance(; ce = factory(ce.ce, w))
 end
 function Statistics.cov(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1,

@@ -246,7 +246,7 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote
-             function factory(ce::$(ce), w::Option{<:StatsBase.AbstractWeights} = nothing)
+             function factory(ce::$(ce), w::StatsBase.AbstractWeights)
                  return $(ce)(; ve = factory(ce.ve, w))
              end
          end)

@@ -308,8 +308,7 @@ for (i, alg) in enumerate((Gerber0, Gerber1, Gerber2))
         nothing
     end
     eval(quote
-             $(doc_str)
-             function factory(alg::$(alg), ::Any)
+             @doc $(doc_str) function factory(alg::$(alg), ::Any)
                  return alg
              end
          end)
@@ -317,16 +316,16 @@ end
 for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, StandardisedGerber2))
     doc_str = if i == 1
         """
-        factory(alg::StandardisedGerber0, w::Option{<:StatsBase.AbstractWeights} = nothing)
-        factory(alg::StandardisedGerber1, w::Option{<:StatsBase.AbstractWeights} = nothing)
-        factory(alg::StandardisedGerber2, w::Option{<:StatsBase.AbstractWeights} = nothing)
+        factory(alg::StandardisedGerber0, w::StatsBase.AbstractWeights)
+        factory(alg::StandardisedGerber1, w::StatsBase.AbstractWeights)
+        factory(alg::StandardisedGerber2, w::StatsBase.AbstractWeights)
 
     Construct a new standardised Gerber covariance algorithm instance with the expected returns estimator adapted for the provided weights.
 
     # Arguments
 
       - `alg`: Standardised Gerber covariance algorithm instance (`StandardisedGerber0`, `StandardisedGerber1`, or `StandardisedGerber2`).
-      - `w`: Optional weights object (`StatsBase.AbstractWeights`), or `nothing`.
+      - `w`: Weights vector.
 
     # Returns
 
@@ -361,9 +360,7 @@ for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, Standardise
         nothing
     end
     eval(quote
-             $(doc_str)
-             function factory(alg::$(alg),
-                              w::Option{<:StatsBase.AbstractWeights} = nothing)
+             @doc $(doc_str) function factory(alg::$(alg), w::StatsBase.AbstractWeights)
                  return $(alg)(; me = factory(alg.me, w))
              end
          end)
@@ -916,7 +913,7 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::GerberCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
                             pdm = ce.pdm, t = ce.t)
 end

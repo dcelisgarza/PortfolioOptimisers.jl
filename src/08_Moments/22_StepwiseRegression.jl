@@ -130,7 +130,7 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             tgt::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, tgt)
 end
-function factory(re::StepwiseRegression, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(re::StepwiseRegression, w::StatsBase.AbstractWeights)
     return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """

@@ -67,9 +67,9 @@ function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, ex)
 end
-function factory(ce::DistanceCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
-                              w = isnothing(w) ? ce.w : w, ex = ce.ex)
+function factory(ce::DistanceCovariance, w::StatsBase.AbstractWeights)
+    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs, w = w,
+                              ex = ce.ex)
 end
 """
     cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)

@@ -347,7 +347,7 @@ HighOrderPriorEstimator
       │           │      │    me ┼ SimpleExpectedReturns
       │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
@@ -417,8 +417,7 @@ function HighOrderPriorEstimator(;
                                                                                  alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::HighOrderPriorEstimator, w::StatsBase.AbstractWeights)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end

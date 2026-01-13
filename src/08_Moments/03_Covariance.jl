@@ -139,8 +139,36 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
-function factory(ce::GeneralCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return GeneralCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
+"""
+    factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
+
+Return a new `GeneralCovariance` estimator with the specified weights.
+
+# Arguments
+
+  - `ce`: A `GeneralCovariance` estimator.
+  - `w`: Weights vector.
+
+# Returns
+
+  - `GeneralCovariance`: A new estimator with the same covariance estimator and the specified or existing weights.
+
+# Validation
+
+  - If `w` is not `nothing`, it must not be empty and must contain only finite values.
+
+# Details
+
+  - This method enables the construction of a new `GeneralCovariance` estimator with updated weights.
+
+# Related
+
+  - [`GeneralCovariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
+"""
+function factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
+    return GeneralCovariance(; ce = ce.ce, w = w)
 end
 """
     struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
@@ -202,7 +230,7 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance(me, ce, alg)
 end
-function factory(ce::Covariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::Covariance, w::StatsBase.AbstractWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """

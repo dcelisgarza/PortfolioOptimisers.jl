@@ -126,7 +126,7 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondMoment(ve, alg1, alg2)
 end
-function factory(alg::SecondMoment, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(alg::SecondMoment, w::StatsBase.AbstractWeights)
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
@@ -266,8 +266,7 @@ function StandardisedHighOrderMoment(;
                                      alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return StandardisedHighOrderMoment(ve, alg)
 end
-function factory(alg::StandardisedHighOrderMoment,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(alg::StandardisedHighOrderMoment, w::StatsBase.AbstractWeights)
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """

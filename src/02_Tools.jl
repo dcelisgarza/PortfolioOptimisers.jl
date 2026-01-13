@@ -727,7 +727,8 @@ function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 """
-    factory(::Nothing, args...; kwargs...)
+    factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
+                     <:AbstractResult}, args...; kwargs...)
 
 No-op factory function for constructing objects with a uniform interface.
 
@@ -741,7 +742,7 @@ Defining methods which dispatch on the first argument allows for a consistent fa
 
 # Returns
 
-  - `nothing`.
+  - `a`: The input unchanged.
 
 # Related
 
@@ -750,8 +751,9 @@ Defining methods which dispatch on the first argument allows for a consistent fa
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
 """
-function factory(::Nothing, args...; kwargs...)
-    return nothing
+function factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
+                          <:AbstractResult}, args...; kwargs...)
+    return a
 end
 """
     abstract type VectorToScalarMeasure <: AbstractAlgorithm end
@@ -858,32 +860,26 @@ function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanValue(w)
 end
 """
-    factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(::MeanValue, w::StatsBase.AbstractWeights)
 
 Construct a `MeanValue` instance with optional weights, or return the input if weights are unchanged.
 
 # Arguments
 
-  - `mv`: A `MeanValue` instance to update or return.
-  - `w`: Optional weights to use for the mean calculation. If `nothing`, returns `mv` unchanged.
+  - ``: A `MeanValue` instance to update or return.
+  - `w`: Weights to use for the mean calculation.
 
 # Returns
 
-  - `mv::MeanValue`: A new `MeanValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `MeanValue` if `w` is provided.
-  - Returns the original `mv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `MeanValue` instances.
+  - `mv::MeanValue`: A new `MeanValue` with the specified weights.
 
 # Related
 
   - [`MeanValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? mv : MeanValue(; w = w)
+function factory(::MeanValue, w::StatsBase.AbstractWeights)
+    return MeanValue(; w = w)
 end
 """
     struct MedianValue{T1} <: VectorToScalarMeasure
@@ -938,32 +934,26 @@ function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MedianValue(w)
 end
 """
-    factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(::MedianValue, w::StatsBase.AbstractWeights)
 
 Constructs a `MedianValue` instance with optional weights, or returns the input if weights are unchanged.
 
 # Arguments
 
-  - `mdv`: A `MedianValue` instance to update or return.
-  - `w`: Optional weights to use for the median calculation. If `nothing`, returns `mdv` unchanged.
+  - ``: A `MedianValue` instance to update or return.
+  - `w`: Weights to use for the median calculation.
 
 # Returns
 
-  - `mdv::MedianValue`: A new `MedianValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `MedianValue` if `w` is provided.
-  - Returns the original `mdv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `MedianValue` instances.
+  - `mdv::MedianValue`: A new `MedianValue` with the specified weights.
 
 # Related
 
   - [`MedianValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? mdv : MedianValue(; w = w)
+function factory(::MedianValue, w::StatsBase.AbstractWeights)
+    return MedianValue(; w = w)
 end
 """
     struct MaxValue <: VectorToScalarMeasure end
@@ -1045,32 +1035,26 @@ function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
     return StdValue(w, corrected)
 end
 """
-    factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(sv::StdValue, w::StatsBase.AbstractWeights)
 
 Constructs a `StdValue` instance with optional weights, or returns the input if weights are unchanged.
 
 # Arguments
 
   - `sv`: A `StdValue` instance to update or return.
-  - `w`: Optional weights to use for the standard deviation calculation. If `nothing`, returns `sv` unchanged.
+  - `w`: Weights to use for the standard deviation calculation.
 
 # Returns
 
-  - `sv::StdValue`: A new `StdValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `StdValue` if `w` is provided.
-  - Returns the original `sv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `StdValue` instances.
+  - `sv::StdValue`: A new `StdValue` with the specified weights.
 
 # Related
 
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? sv : StdValue(; w = w, corrected = sv.corrected)
+function factory(sv::StdValue, w::StatsBase.AbstractWeights)
+    return StdValue(; w = w, corrected = sv.corrected)
 end
 """
     struct VarValue{T1, T2} <: VectorToScalarMeasure
@@ -1129,32 +1113,26 @@ function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
     return VarValue(w, corrected)
 end
 """
-    factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(vv::VarValue, w::StatsBase.AbstractWeights)
 
 Constructs a `VarValue` instance with optional weights, or returns the input if weights are unchanged.
 
 # Arguments
 
   - `vv`: A `VarValue` instance to update or return.
-  - `w`: Optional weights to use for the variance calculation. If `nothing`, returns `vv` unchanged.
+  - `w`: Weights to use for the variance calculation.
 
 # Returns
 
-  - `VarValue`: A new `VarValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `VarValue` if `w` is provided.
-  - Returns the original `vv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `VarValue` instances.
+  - `VarValue`: A new `VarValue` with the specified weights.
 
 # Related
 
   - [`VarValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? vv : VarValue(; w = w, corrected = vv.corrected)
+function factory(vv::VarValue, w::StatsBase.AbstractWeights)
+    return VarValue(; w = w, corrected = vv.corrected)
 end
 """
     SumValue <: VectorToScalarMeasure
@@ -1271,25 +1249,18 @@ function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValu
     return StandardisedValue(mv, sv)
 end
 """
-    factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
 
-Construct a `StandardisedValue` instance with optional weights, or return the input if weights are unchanged.
+Construct a `StandardisedValue` instance with the given weights.
 
 # Arguments
 
   - `msv`: A `StandardisedValue` instance to update or return.
-  - `w`: Optional weights to use for both the mean and standard deviation measures. If `nothing`, returns `msv` unchanged.
+  - `w`: Weights to use for both the mean and standard deviation measures.
 
 # Returns
 
-  - `msv::StandardisedValue`: A new `StandardisedValue` with the specified weights applied to both `mv` and `sv`, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `StandardisedValue` if `w` is provided.
-  - Returns the original `msv` if `w` is `nothing`.
-  - Applies the weights to both the mean (`mv`) and standard deviation (`sv`) fields using their respective `factory` methods.
-  - Ensures consistent construction and updating of `StandardisedValue` instances.
+  - `msv::StandardisedValue`: A new `StandardisedValue` with the specified weights applied to both `mv` and `sv`.
 
 # Related
 
@@ -1298,12 +1269,8 @@ Construct a `StandardisedValue` instance with optional weights, or return the in
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        msv
-    else
-        StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
-    end
+function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+    return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
     vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)

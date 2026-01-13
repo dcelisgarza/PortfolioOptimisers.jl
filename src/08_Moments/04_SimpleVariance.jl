@@ -307,9 +307,8 @@ function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
         Statistics.var(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function factory(ve::SimpleVariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
-                          corrected = ve.corrected)
+function factory(ve::SimpleVariance, w::StatsBase.AbstractWeights)
+    return SimpleVariance(; me = factory(ve.me, w), w = w, corrected = ve.corrected)
 end
 
 export SimpleVariance, var, std

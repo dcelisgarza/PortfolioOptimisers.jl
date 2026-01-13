@@ -231,8 +231,7 @@ function DimensionReductionRegression(;
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(re::DimensionReductionRegression, w::StatsBase.AbstractWeights)
     return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))

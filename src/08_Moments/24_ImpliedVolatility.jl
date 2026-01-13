@@ -43,7 +43,7 @@ function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            af::Number = 252)
     return ImpliedVolatility(ce, mp, alg, af)
 end
-function factory(ce::ImpliedVolatility, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::ImpliedVolatility, w::StatsBase.AbstractWeights)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 function realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,

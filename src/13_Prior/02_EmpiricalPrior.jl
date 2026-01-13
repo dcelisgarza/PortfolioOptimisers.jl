@@ -80,7 +80,7 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing)
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::EmpiricalPrior, w::StatsBase.AbstractWeights)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end

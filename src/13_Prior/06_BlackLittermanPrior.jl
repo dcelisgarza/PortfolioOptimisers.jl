@@ -60,7 +60,7 @@ BlackLittermanPrior
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
+             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │   denoise ┼ nothing
              │           │      │    detone ┼ nothing
@@ -157,7 +157,7 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::BlackLittermanPrior, w::StatsBase.AbstractWeights)
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)

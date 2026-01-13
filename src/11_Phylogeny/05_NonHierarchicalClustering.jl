@@ -17,13 +17,9 @@ function KMeansAlgorithm(; rng::Random.AbstractRNG = Random.default_rng(),
                          seed::Option{<:Integer} = nothing, kwargs::NamedTuple = (;))
     return KMeansAlgorithm(rng, seed, kwargs)
 end
-function factory(alg::KMeansAlgorithm, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        alg
-    else
-        KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
-                        kwargs = (; alg.kwargs..., weights = w))
-    end
+function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)
+    return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
+                           kwargs = (; alg.kwargs..., weights = w))
 end
 function _get_k_clusters_from_alg(alg::KMeansAlgorithm, dist::MatNum, k::Integer)
     if !isnothing(alg.seed)
