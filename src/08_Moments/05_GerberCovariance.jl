@@ -274,15 +274,94 @@ function StandardisedGerber2(;
                              me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return StandardisedGerber2(me)
 end
-for alg in (Gerber0, Gerber1, Gerber2)
+for (i, alg) in enumerate((Gerber0, Gerber1, Gerber2))
+    doc_str = if i == 1
+        """
+          factory(alg::Gerber0, ::Any)
+          factory(alg::Gerber1, ::Any)
+          factory(alg::Gerber2, ::Any)
+
+      Return the provided Gerber covariance algorithm instance unchanged.
+
+      These methods are used to support the `factory` interface for Gerber covariance algorithm types that do not require weights or additional configuration. They enable consistent construction and dispatch for Gerber algorithm variants.
+
+      # Arguments
+
+        - `alg`: Gerber covariance algorithm instance.
+        - Unused for API compatibility.
+
+      # Returns
+
+        - `alg`: The input.
+
+      # Details
+
+        - These methods allow the `factory` interface to return the algorithm instance directly for unweighted Gerber algorithms.
+        - Used internally when constructing Gerber covariance estimators.
+
+      # Related
+
+        - [`UnstandardisedGerberCovarianceAlgorithm`](@ref)
+        - [`factory`](@ref)
+      """
+    else
+        nothing
+    end
     eval(quote
+             $(doc_str)
              function factory(alg::$(alg), ::Any)
                  return alg
              end
          end)
 end
-for alg in (StandardisedGerber0, StandardisedGerber1, StandardisedGerber2)
+for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, StandardisedGerber2))
+    doc_str = if i == 1
+        """
+        factory(alg::StandardisedGerber0, w::Option{<:StatsBase.AbstractWeights} = nothing)
+        factory(alg::StandardisedGerber1, w::Option{<:StatsBase.AbstractWeights} = nothing)
+        factory(alg::StandardisedGerber2, w::Option{<:StatsBase.AbstractWeights} = nothing)
+
+    Construct a new standardised Gerber covariance algorithm instance with the expected returns estimator adapted for the provided weights.
+
+    # Arguments
+
+      - `alg`: Standardised Gerber covariance algorithm instance (`StandardisedGerber0`, `StandardisedGerber1`, or `StandardisedGerber2`).
+      - `w`: Optional weights object (`StatsBase.AbstractWeights`), or `nothing`.
+
+    # Returns
+
+      - A new instance of the same algorithm type, with the `me` field replaced by the result of `factory(alg.me, w)`.
+
+    # Details
+
+      - These methods enable the `factory` interface for standardised Gerber covariance algorithms to support weighted expected returns estimators.
+      - The returned algorithm instance is configured for weighted or unweighted mean estimation as appropriate.
+      - Used internally when constructing weighted Gerber covariance estimators.
+
+    # Related
+
+      - [`StandardisedGerberAlgorithm`](@ref)
+      - [`factory`](@ref)
+
+    # Examples
+
+    ```jldoctest
+    julia> alg = StandardisedGerber0()
+    StandardisedGerber0
+      me ┼ SimpleExpectedReturns
+         │   w ┴ nothing
+
+    julia> factory(alg, StatsBase.Weights([0.2, 0.3, 0.5]))
+    StandardisedGerber0
+      me ┼ SimpleExpectedReturns
+         │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+    ```
+    """
+    else
+        nothing
+    end
     eval(quote
+             $(doc_str)
              function factory(alg::$(alg),
                               w::Option{<:StatsBase.AbstractWeights} = nothing)
                  return $(alg)(; me = factory(alg.me, w))
@@ -724,9 +803,9 @@ Compute the Gerber correlation matrix using an unstandardised Gerber covariance 
 
 # Details
 
-  - Computes the standard deviation vector for each asset using the estimator's variance estimator.
-  - If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
-  - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+ 1. Computes the standard deviation vector for each asset using the estimator's variance estimator.
+ 2. If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+ 3. Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
 
 # Related
 
@@ -793,10 +872,10 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
 # Details
 
-  - Computes the standard deviation vector for each asset using the estimator's variance estimator.
-  - If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
-  - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
-  - Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
+ 1. Computes the standard deviation vector for each asset using the estimator's variance estimator.
+ 2. If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+ 3. Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+ 4. Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
 
 # Related
 
