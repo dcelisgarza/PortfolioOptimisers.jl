@@ -31,27 +31,27 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DenoiseCovariance()
 DenoiseCovariance
-       ce ┼ Covariance
-          │    me ┼ SimpleExpectedReturns
-          │       │   w ┴ nothing
-          │    ce ┼ GeneralCovariance
-          │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-          │       │    w ┴ nothing
-          │   alg ┴ Full()
-  denoise ┼ Denoise
-          │      alg ┼ ShrunkDenoise
-          │          │   alpha ┴ Float64: 0.0
-          │     args ┼ Tuple{}: ()
-          │   kwargs ┼ @NamedTuple{}: NamedTuple()
-          │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-          │        m ┼ Int64: 10
-          │        n ┼ Int64: 1000
-          │      pdm ┼ Posdef
-          │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      pdm ┼ Posdef
-          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   ce ┼ Covariance
+      │    me ┼ SimpleExpectedReturns
+      │       │   w ┴ nothing
+      │    ce ┼ GeneralCovariance
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │    w ┴ nothing
+      │   alg ┴ Full()
+   dn ┼ Denoise
+      │      alg ┼ ShrunkDenoise
+      │          │   alpha ┴ Float64: 0.0
+      │     args ┼ Tuple{}: ()
+      │   kwargs ┼ @NamedTuple{}: NamedTuple()
+      │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+      │        m ┼ Int64: 10
+      │        n ┼ Int64: 1000
+      │      pdm ┼ Posdef
+      │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related

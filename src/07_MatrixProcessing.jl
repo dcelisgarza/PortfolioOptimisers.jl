@@ -217,37 +217,37 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DenoiseDetoneAlgMatrixProcessing()
 DenoiseDetoneAlgMatrixProcessing
-      pdm ┼ Posdef
-          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │   kwargs ┴ @NamedTuple{}: NamedTuple()
-  denoise ┼ nothing
-   detone ┼ nothing
-      alg ┼ nothing
-    order ┴ DenoiseDetoneAlg()
+    pdm ┼ Posdef
+        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     dn ┼ nothing
+     dt ┼ nothing
+    alg ┼ nothing
+  order ┴ DenoiseDetoneAlg()
 
 julia> DenoiseDetoneAlgMatrixProcessing(; dn = Denoise(), dt = Detone(; n = 2))
 DenoiseDetoneAlgMatrixProcessing
-      pdm ┼ Posdef
-          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │   kwargs ┴ @NamedTuple{}: NamedTuple()
-  denoise ┼ Denoise
-          │      alg ┼ ShrunkDenoise
-          │          │   alpha ┴ Float64: 0.0
-          │     args ┼ Tuple{}: ()
-          │   kwargs ┼ @NamedTuple{}: NamedTuple()
-          │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-          │        m ┼ Int64: 10
-          │        n ┼ Int64: 1000
-          │      pdm ┼ Posdef
-          │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
-   detone ┼ Detone
-          │     n ┼ Int64: 2
-          │   pdm ┼ Posdef
-          │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      alg ┼ nothing
-    order ┴ DenoiseDetoneAlg()
+    pdm ┼ Posdef
+        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     dn ┼ Denoise
+        │      alg ┼ ShrunkDenoise
+        │          │   alpha ┴ Float64: 0.0
+        │     args ┼ Tuple{}: ()
+        │   kwargs ┼ @NamedTuple{}: NamedTuple()
+        │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+        │        m ┼ Int64: 10
+        │        n ┼ Int64: 1000
+        │      pdm ┼ Posdef
+        │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     dt ┼ Detone
+        │     n ┼ Int64: 2
+        │   pdm ┼ Posdef
+        │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    alg ┼ nothing
+  order ┴ DenoiseDetoneAlg()
 ```
 
 # Related

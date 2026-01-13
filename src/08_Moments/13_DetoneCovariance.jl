@@ -27,21 +27,21 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DetoneCovariance()
 DetoneCovariance
-      ce ┼ Covariance
-         │    me ┼ SimpleExpectedReturns
-         │       │   w ┴ nothing
-         │    ce ┼ GeneralCovariance
-         │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │       │    w ┴ nothing
-         │   alg ┴ Full()
-  detone ┼ Detone
-         │     n ┼ Int64: 1
-         │   pdm ┼ Posdef
-         │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     pdm ┼ Posdef
-         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   ce ┼ Covariance
+      │    me ┼ SimpleExpectedReturns
+      │       │   w ┴ nothing
+      │    ce ┼ GeneralCovariance
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │    w ┴ nothing
+      │   alg ┴ Full()
+   dt ┼ Detone
+      │     n ┼ Int64: 1
+      │   pdm ┼ Posdef
+      │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related

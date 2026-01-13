@@ -257,10 +257,7 @@ Covariance
       │    w ┴ nothing
   alg ┴ Full()
 
-julia> w = StatsBase.Weights([0.2, 0.3, 0.5])
-StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-
-julia> ce_w = factory(ce, w)
+julia> ce_w = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
 Covariance
    me ┼ SimpleExpectedReturns
       │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]

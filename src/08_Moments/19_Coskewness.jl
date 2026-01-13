@@ -44,13 +44,13 @@ Coskewness
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │       pdm ┼ Posdef
-      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │   denoise ┼ nothing
-      │    detone ┼ nothing
-      │       alg ┼ nothing
-      │     order ┴ DenoiseDetoneAlg()
+      │     pdm ┼ Posdef
+      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      dn ┼ nothing
+      │      dt ┼ nothing
+      │     alg ┼ nothing
+      │   order ┴ DenoiseDetoneAlg()
   alg ┴ Full()
 ```
 
