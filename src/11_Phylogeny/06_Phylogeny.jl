@@ -59,7 +59,7 @@ function PhylogenyResult(; X::ArrNum)
     return PhylogenyResult(X)
 end
 """
-    phylogeny_matrix(ph::PhylogenyResult{<:MatNum}, args...; kwargs...)
+    phylogeny_matrix(pl::PhylogenyResult{<:MatNum}, args...; kwargs...)
 
 Fallback no-op for returning a validated phylogeny matrix result as-is.
 
@@ -67,20 +67,20 @@ This method provides a generic interface for handling precomputed phylogeny matr
 
 # Arguments
 
-  - `ph::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
+  - `pl::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - The input `ph` object.
+  - The input `pl` object.
 
 # Examples
 
 ```jldoctest
-julia> ph = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
+julia> pl = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
 
-julia> phylogeny_matrix(ph)
+julia> phylogeny_matrix(pl)
 PhylogenyResult
   X ┴ 3×3 Matrix{Int64}
 ```
@@ -90,11 +90,11 @@ PhylogenyResult
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(ph::PhylogenyResult{<:MatNum}, args...; kwargs...)
-    return ph
+function phylogeny_matrix(pl::PhylogenyResult{<:MatNum}, args...; kwargs...)
+    return pl
 end
 """
-    centrality_vector(ph::PhylogenyResult{<:VecNum}, args...; kwargs...)
+    centrality_vector(pl::PhylogenyResult{<:VecNum}, args...; kwargs...)
 
 Fallback no-op for returning a validated centrality vector result as-is.
 
@@ -102,20 +102,20 @@ This method provides a generic interface for handling precomputed centrality vec
 
 # Arguments
 
-  - `ph::PhylogenyResult{<:VecNum}`: Centrality vector result object.
+  - `pl::PhylogenyResult{<:VecNum}`: Centrality vector result object.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - The input `ph` object.
+  - The input `pl` object.
 
 # Examples
 
 ```jldoctest
-julia> ph = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
+julia> pl = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
 
-julia> centrality_vector(ph)
+julia> centrality_vector(pl)
 PhylogenyResult
   X ┴ Vector{Float64}: [0.2, 0.5, 0.3]
 ```
@@ -125,8 +125,8 @@ PhylogenyResult
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ph::PhylogenyResult{<:VecNum}, args...; kwargs...)
-    return ph
+function centrality_vector(pl::PhylogenyResult{<:VecNum}, args...; kwargs...)
+    return pl
 end
 """
     abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
@@ -148,9 +148,9 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
-function centrality_vector(ph::PhylogenyResult{<:MatNum}, cent::AbstractCentralityAlgorithm,
+function centrality_vector(pl::PhylogenyResult{<:MatNum}, cent::AbstractCentralityAlgorithm,
                            args...; kwargs...)
-    G = Graphs.SimpleGraph(ph.X)
+    G = Graphs.SimpleGraph(pl.X)
     return PhylogenyResult(; X = calc_centrality(cent, G))
 end
 """
@@ -1151,16 +1151,16 @@ function asset_phylogeny(w::VecNum, X::MatNum)
     return c
 end
 """
-    asset_phylogeny(ph::PhylogenyResult{<:MatNum}, w::VecNum, args...;
+    asset_phylogeny(pl::PhylogenyResult{<:MatNum}, w::VecNum, args...;
                     kwargs...)
 
 Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
 
-This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, ph)`, ignoring any additional arguments.
+This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, pl)`, ignoring any additional arguments.
 
 # Arguments
 
-  - `ph::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
+  - `pl::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
   - `w::VecNum`: Portfolio weights vector.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
@@ -1174,8 +1174,8 @@ This method provides compatibility with workflows that pass extra positional or 
   - [`PhylogenyResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(ph::PhylogenyResult{<:MatNum}, w::VecNum, args...; kwargs...)
-    return asset_phylogeny(w, ph.X)
+function asset_phylogeny(pl::PhylogenyResult{<:MatNum}, w::VecNum, args...; kwargs...)
+    return asset_phylogeny(w, pl.X)
 end
 """
     asset_phylogeny(cle::NwE_ClE_Cl,
