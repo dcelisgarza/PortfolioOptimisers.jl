@@ -702,11 +702,11 @@ const dsd = Dict(
                  :kte => "`kte`: Cokurtosis estimator.",
                  :de => "`de`: Distance matrix estimator.",
                  # Priors.
-                 :pe => "`pr`: Prior estimator.", :pr => "`pr`: Prior result.",
-                 :per => "`pr`: Prior estimator or result.",
+                 :pe => "`pe`: Prior estimator.", :pr => "`pr`: Prior result.",
+                 :per => "`pe`: Prior estimator or result.",
                  # Phylogeny.
-                 :cle => "`clr`: Clusters estimator.", :clr => "`clr`: Clusters result.",
-                 :cler => "`clr`: Clusters estimator or result.",
+                 :cle => "`cle`: Clusters estimator.", :clr => "`clr`: Clusters result.",
+                 :cler => "`cle`: Clusters estimator or result.",
                  # Turnover.
                  :tne => "`tn`: Turnover estimator(s).",
                  :tnr => "`tn`: Turnover result(s).",

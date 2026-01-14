@@ -44,9 +44,9 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
                 isa(opt.opt.sgcard, AbstractVector) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.sgcard)))
-    @argcheck(!isa(opt.opt.plg, AbstractPhylogenyConstraintResult) ||
-              isa(opt.opt.plg, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.plg))
+    @argcheck(!isa(opt.opt.pl, AbstractPhylogenyConstraintResult) ||
+              isa(opt.opt.pl, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.pl))
     return nothing
 end
 function assert_internal_optimiser(opt::VecOptE_Opt)

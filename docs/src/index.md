@@ -254,7 +254,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 
   - Prices to returns [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
   - Find complete indices [`find_complete_indices`](@ref)
-  - Find uncorrelated indices [`find_uncorrelated_indices`](@ref)
+  - Find uncorrelated indices [`find_uncorrelated_indices`]-(@ref)
 
 ### Matrix Processing
 

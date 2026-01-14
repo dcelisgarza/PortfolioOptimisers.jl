@@ -124,27 +124,27 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_
     end
     return ib
 end
-function set_iplg_constraints!(model::JuMP.Model, plgs::PhC_VecPhC)
+function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
     ib = model[:ib]
     sc = model[:sc]
-    for (i, plg) in enumerate(plgs)
-        if !isa(plg, IntegerPhylogeny)
+    for (i, pl) in enumerate(plgs)
+        if !isa(pl, IntegerPhylogeny)
             continue
         end
-        A = plg.A
-        B = plg.B
+        A = pl.A
+        B = pl.B
         model[Symbol(:card_plg_, i)] = JuMP.@constraint(model, sc * (A * ib ⊖ B) <= 0)
     end
     return nothing
 end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
-                              gcard::Option{<:LinearConstraint}, plg::Option{<:PhC_VecPhC},
+                              gcard::Option{<:LinearConstraint}, pl::Option{<:PlC_VecPlC},
                               lt::Option{<:BuyInThreshold}, st::Option{<:BuyInThreshold},
                               fees::Option{<:Fees}, ss::Option{<:Number})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
-    iplg_flag = isa(plg, IntegerPhylogeny) ||
-                isa(plg, AbstractVector) && any(x -> isa(x, IntegerPhylogeny), plg)
+    iplg_flag = isa(pl, IntegerPhylogeny) ||
+                isa(pl, AbstractVector) && any(x -> isa(x, IntegerPhylogeny), pl)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
@@ -178,7 +178,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
         end
     end
     if iplg_flag
-        set_iplg_constraints!(model, plg)
+        set_iplg_constraints!(model, pl)
     end
     return nothing
 end

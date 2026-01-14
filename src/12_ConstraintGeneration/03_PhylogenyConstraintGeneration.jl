@@ -28,12 +28,12 @@ All concrete types representing the results of phylogeny-based constraint genera
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
-const PhCE_PhC = Union{<:AbstractPhylogenyConstraintEstimator,
+const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
-const VecPhCE_PhC = AbstractVector{<:PhCE_PhC}
-const PhCE_PhC_VecPhCE_PhC = Union{<:PhCE_PhC, <:VecPhCE_PhC}
-const VecPhC = AbstractVector{<:AbstractPhylogenyConstraintResult}
-const PhC_VecPhC = Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}
+const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
+const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
         pe::T1
@@ -410,8 +410,8 @@ function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
     return IntegerPhylogeny(A, B, scale)
 end
 """
-    phylogeny_constraints(plc::Option{<:PhCE_PhC}, X::MatNum; dims::Int = 1, kwargs...)
-    phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
+    phylogeny_constraints(plc::Option{<:PlCE_PlC}, X::MatNum; dims::Int = 1, kwargs...)
+    phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
 
@@ -458,7 +458,7 @@ function phylogeny_constraints(plc::Option{<:AbstractPhylogenyConstraintResult},
                                kwargs...)
     return plc
 end
-function phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
+function phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
