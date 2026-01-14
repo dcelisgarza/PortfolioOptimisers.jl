@@ -1563,49 +1563,46 @@
         ces = [CentralityConstraint(; A = CentralityEstimator(), B = MinValue(),
                                     comp = GEQ()),
                CentralityConstraint(;
-                                    A = CentralityEstimator(;
-                                                            cent = EigenvectorCentrality()),
+                                    A = CentralityEstimator(; ct = EigenvectorCentrality()),
                                     B = MeanValue(), comp = LEQ()),
-               CentralityConstraint(;
-                                    A = CentralityEstimator(; cent = ClosenessCentrality()),
+               CentralityConstraint(; A = CentralityEstimator(; ct = ClosenessCentrality()),
                                     B = MedianValue(), comp = EQ()),
-               CentralityConstraint(; A = CentralityEstimator(; cent = StressCentrality()),
+               CentralityConstraint(; A = CentralityEstimator(; ct = StressCentrality()),
                                     B = MaxValue(), comp = EQ()),
-               CentralityConstraint(;
-                                    A = CentralityEstimator(; cent = RadialityCentrality()),
+               CentralityConstraint(; A = CentralityEstimator(; ct = RadialityCentrality()),
                                     B = 0.63, comp = EQ())]
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
-                                                    cent = ces[1],
+                                                    ct = ces[1],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[1].A, res.w, pr) >=
               minimum(centrality_vector(ces[1].A, pr).X)
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
-                                                    cent = ces[2],
+                                                    ct = ces[2],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[2].A, res.w, pr) <=
               mean(centrality_vector(ces[2].A, pr).X)
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
-                                                    cent = ces[3],
+                                                    ct = ces[3],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[3].A, res.w, pr),
                        median(centrality_vector(ces[3].A, pr).X))
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
-                                                    cent = ces[4],
+                                                    ct = ces[4],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[4].A, res.w, pr),
                        maximum(centrality_vector(ces[4].A, pr).X))
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
-                                                    cent = ces[5],
+                                                    ct = ces[5],
                                                     wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[5].A, res.w, pr), 0.63)
 
@@ -1613,8 +1610,8 @@
                        optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                          opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
                                                              bgt = 1,
-                                                             cent = centrality_constraints(ces[5],
-                                                                                           pr.X),
+                                                             ct = centrality_constraints(ces[5],
+                                                                                         pr.X),
                                                              wb = WeightBounds(; lb = -1,
                                                                                ub = 1)))).w)
     end

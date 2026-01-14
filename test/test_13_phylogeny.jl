@@ -345,7 +345,7 @@
         df2 = CSV.read(joinpath(@__DIR__, "./assets/AverageCentrality1.csv.gz"), DataFrame)
         w = fill(inv(20), 20)
         for (i, ce) in enumerate(ces)
-            v1 = centrality_vector(CentralityEstimator(; cent = ce), pr)
+            v1 = centrality_vector(CentralityEstimator(; ct = ce), pr)
             @test v1 === centrality_vector(v1)
             v1 = v1.X
             res = isapprox(v1, df1[!, i])
@@ -355,9 +355,9 @@
             end
             @test res
 
-            cte = CentralityEstimator(; cent = ce)
+            cte = CentralityEstimator(; ct = ce)
             c = average_centrality(cte, w, pr)
-            @test isapprox(c, average_centrality(cte.ne, cte.cent, w, pr))
+            @test isapprox(c, average_centrality(cte.nt, cte.ct, w, pr))
             res = isapprox(c, df2[i, 1])
             if !res
                 println("Average default centrality iteration: $i")

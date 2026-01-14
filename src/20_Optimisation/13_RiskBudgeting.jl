@@ -135,15 +135,15 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                                             rd;
-                                                                                                                                             dims = dims)
+    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                                           rd;
+                                                                                                                                           dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
+    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, wb, rb.opt.card, gcard, pl, lt, st, fees, rb.opt.ss)
     set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rb.opt.ss)
@@ -161,7 +161,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return RiskBudgetingResult(typeof(rb),
-                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
+                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct,
                                                                 gcard, sgcard, smtx, sgmtx,
                                                                 slt, sst, sglt, sgst, pl,
                                                                 tn, fees, ret), prb,

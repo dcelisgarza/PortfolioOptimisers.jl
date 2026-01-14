@@ -230,9 +230,9 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
 end
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
-                                                                                                                                             rd;
-                                                                                                                                             dims = dims)
+    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
+                                                                                                                                           rd;
+                                                                                                                                           dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -240,7 +240,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_w!(model, pr.X, mr.wi)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
+    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, wb, mr.opt.card, gcard, pl, lt, st, fees, mr.opt.ss)
     set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, mr.opt.ss)
@@ -258,7 +258,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
     return MeanRiskResult(typeof(mr),
-                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard,
+                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard,
                                                            sgcard, smtx, sgmtx, slt, sst,
                                                            sglt, sgst, pl, tn, fees, ret),
                           retcode, sol, ifelse(save, model, nothing), nothing)

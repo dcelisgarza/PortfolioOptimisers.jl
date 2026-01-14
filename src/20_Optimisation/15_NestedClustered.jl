@@ -37,9 +37,9 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
                 isa(opt.opt.lcs, AbstractVector) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
-    @argcheck(!(isa(opt.opt.cent, LinearConstraint) ||
-                isa(opt.opt.cent, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.cent)))
+    @argcheck(!(isa(opt.opt.ct, LinearConstraint) ||
+                isa(opt.opt.ct, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.ct)))
     @argcheck(!isa(opt.opt.gcard, LinearConstraint))
     @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
                 isa(opt.opt.sgcard, AbstractVector) &&

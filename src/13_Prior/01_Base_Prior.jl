@@ -288,7 +288,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+    centrality_vector(nt::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -297,8 +297,8 @@ Compute the centrality vector for a network or clustering estimator and centrali
 
 # Arguments
 
-  - `ne`: Network estimator, res estimator, or clustering result.
-  - `cent`: Centrality algorithm.
+  - `nt`: Network estimator, res estimator, or clustering result.
+  - `ct`: Centrality algorithm.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
 
@@ -313,13 +313,13 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+function centrality_vector(nt::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                            pr::AbstractPriorResult; kwargs...)
-    return centrality_vector(ne, cent, pr.X; kwargs...)
+    return centrality_vector(nt, ct, pr.X; kwargs...)
 end
 """
-    average_centrality(ne::NwE_Ph_ClE_Cl,
-                       cent::AbstractCentralityAlgorithm, w::VecNum,
+    average_centrality(nt::NwE_Ph_ClE_Cl,
+                       ct::AbstractCentralityAlgorithm, w::VecNum,
                        pr::AbstractPriorResult; kwargs...)
 
 Compute the weighted average centrality for a network or phylogeny result.
@@ -328,8 +328,8 @@ Compute the weighted average centrality for a network or phylogeny result.
 
 # Arguments
 
-  - `ne`: Network estimator or phylogeny result.
-  - `cent`: Centrality algorithm.
+  - `nt`: Network estimator or phylogeny result.
+  - `ct`: Centrality algorithm.
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
@@ -345,9 +345,9 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm, w::VecNum,
+function average_centrality(nt::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             pr::AbstractPriorResult; kwargs...)
-    return LinearAlgebra.dot(centrality_vector(ne, cent, pr; kwargs...).X, w)
+    return LinearAlgebra.dot(centrality_vector(nt, ct, pr; kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;

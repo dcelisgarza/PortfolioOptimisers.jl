@@ -530,7 +530,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return NearOptimalCenteringResult(typeof(noc),
                                       ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
                                                                        opt.lt, opt.st,
-                                                                       opt.lcs, opt.cent,
+                                                                       opt.lcs, opt.ct,
                                                                        opt.gcard,
                                                                        opt.sgcard, opt.smtx,
                                                                        opt.sgmtx, opt.slt,
@@ -557,7 +557,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, opt.cent, :cent_ineq_, :cent_eq_)
+    set_linear_weight_constraints!(model, opt.ct, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.pl, opt.lt, opt.st,
                          opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
@@ -580,7 +580,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return NearOptimalCenteringResult(typeof(noc),
                                       ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
                                                                        opt.lt, opt.st,
-                                                                       opt.lcs, opt.cent,
+                                                                       opt.lcs, opt.ct,
                                                                        opt.gcard,
                                                                        opt.sgcard, opt.smtx,
                                                                        opt.sgmtx, opt.slt,

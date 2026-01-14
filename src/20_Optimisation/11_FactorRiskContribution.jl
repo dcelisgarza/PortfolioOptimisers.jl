@@ -95,9 +95,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
 end
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                                                             rd;
-                                                                                                                                             dims = dims)
+    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                                                           rd;
+                                                                                                                                           dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -105,7 +105,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
     set_weight_constraints!(model, wb, frc.opt.bgt, frc.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
+    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, pl, lt, st, fees, frc.opt.ss)
     set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, frc.opt.ss)
@@ -125,7 +125,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
     return FactorRiskContributionResult(typeof(frc),
                                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
-                                                                         lcs, cent, gcard,
+                                                                         lcs, ct, gcard,
                                                                          sgcard, smtx,
                                                                          sgmtx, slt, sst,
                                                                          sglt, sgst, pl, tn,

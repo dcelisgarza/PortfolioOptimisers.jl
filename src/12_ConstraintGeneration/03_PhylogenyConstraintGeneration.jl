@@ -491,33 +491,33 @@ Estimator for generating centrality-based portfolio constraints.
 julia> CentralityConstraint()
 CentralityConstraint
      A ┼ CentralityEstimator
-       │     ne ┼ NetworkEstimator
-       │        │    ce ┼ PortfolioOptimisersCovariance
-       │        │       │   ce ┼ Covariance
-       │        │       │      │    me ┼ SimpleExpectedReturns
-       │        │       │      │       │   w ┴ nothing
-       │        │       │      │    ce ┼ GeneralCovariance
-       │        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │        │       │      │       │    w ┴ nothing
-       │        │       │      │   alg ┴ Full()
-       │        │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-       │        │       │      │     pdm ┼ Posdef
-       │        │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │        │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │        │       │      │      dn ┼ nothing
-       │        │       │      │      dt ┼ nothing
-       │        │       │      │     alg ┼ nothing
-       │        │       │      │   order ┴ DenoiseDetoneAlg()
-       │        │    de ┼ Distance
-       │        │       │   power ┼ nothing
-       │        │       │     alg ┴ CanonicalDistance()
-       │        │   alg ┼ KruskalTree
-       │        │       │     args ┼ Tuple{}: ()
-       │        │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │        │     n ┴ Int64: 1
-       │   cent ┼ DegreeCentrality
-       │        │     kind ┼ Int64: 0
-       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │   nt ┼ NetworkEstimator
+       │      │    ce ┼ PortfolioOptimisersCovariance
+       │      │       │   ce ┼ Covariance
+       │      │       │      │    me ┼ SimpleExpectedReturns
+       │      │       │      │       │   w ┴ nothing
+       │      │       │      │    ce ┼ GeneralCovariance
+       │      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │      │       │      │       │    w ┴ nothing
+       │      │       │      │   alg ┴ Full()
+       │      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+       │      │       │      │     pdm ┼ Posdef
+       │      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │      │       │      │      dn ┼ nothing
+       │      │       │      │      dt ┼ nothing
+       │      │       │      │     alg ┼ nothing
+       │      │       │      │   order ┴ DenoiseDetoneAlg()
+       │      │    de ┼ Distance
+       │      │       │   power ┼ nothing
+       │      │       │     alg ┴ CanonicalDistance()
+       │      │   alg ┼ KruskalTree
+       │      │       │     args ┼ Tuple{}: ()
+       │      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │      │     n ┴ Int64: 1
+       │   ct ┼ DegreeCentrality
+       │      │     kind ┼ Int64: 0
+       │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
      B ┼ MinValue()
   comp ┴ LEQ: LEQ()
 ```

@@ -707,6 +707,12 @@ const dsd = Dict(
                  # Phylogeny.
                  :cle => "`cle`: Clusters estimator.", :clr => "`clr`: Clusters result.",
                  :cler => "`cle`: Clusters estimator or result.",
+                 :ple => "`pl`: Phylogeny estimator.", :plr => "`pl`: Phylogeny result.",
+                 :pler => "`pl`: Phylogeny estimator or result.",
+                 :nte => "`nt`: Network estimator.", :ntr => "`nt`: Network result.",
+                 :nter => "`nt`: Network estimator or result.",
+                 :cte => "`ct`: Centrality estimator.", :ctr => "`ct`: Centrality result.",
+                 :cter => "`ct`: Centrality estimator or result.",
                  # Turnover.
                  :tne => "`tn`: Turnover estimator(s).",
                  :tnr => "`tn`: Turnover result(s).",

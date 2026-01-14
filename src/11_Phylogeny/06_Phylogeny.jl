@@ -148,10 +148,10 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
-function centrality_vector(pl::PhylogenyResult{<:MatNum}, cent::AbstractCentralityAlgorithm,
+function centrality_vector(pl::PhylogenyResult{<:MatNum}, ct::AbstractCentralityAlgorithm,
                            args...; kwargs...)
     G = Graphs.SimpleGraph(pl.X)
-    return PhylogenyResult(; X = calc_centrality(cent, G))
+    return PhylogenyResult(; X = calc_centrality(ct, G))
 end
 """
     struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -465,30 +465,30 @@ function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality(args, kwargs)
 end
 """
-    calc_centrality(cent::AbstractCentralityAlgorithm, g::Graphs.AbstractGraph)
+    calc_centrality(ct::AbstractCentralityAlgorithm, g::Graphs.AbstractGraph)
 
 Compute node centrality scores for a graph using the specified centrality algorithm.
 
-This function dispatches to the appropriate centrality computation from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/) based on the type of `cent`. Supported algorithms include betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, and stress centrality.
+This function dispatches to the appropriate centrality computation from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/) based on the type of `ct`. Supported algorithms include betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, and stress centrality.
 
 # Arguments
 
-  - `cent`: Centrality algorithm to use.
+  - `ct`: Centrality algorithm to use.
 
-      + `cent::BetweennessCentrality`: Computes betweenness centrality.
-      + `cent::ClosenessCentrality`: Computes closeness centrality.
-      + `cent::DegreeCentrality`: Computes degree centrality.
-      + `cent::EigenvectorCentrality`: Computes eigenvector centrality.
-      + `cent::KatzCentrality`: Computes Katz centrality.
-      + `cent::Pagerank`: Computes PageRank.
-      + `cent::RadialityCentrality`: Computes radiality centrality.
-      + `cent::StressCentrality`: Computes stress centrality.
+      + `ct::BetweennessCentrality`: Computes betweenness centrality.
+      + `ct::ClosenessCentrality`: Computes closeness centrality.
+      + `ct::DegreeCentrality`: Computes degree centrality.
+      + `ct::EigenvectorCentrality`: Computes eigenvector centrality.
+      + `ct::KatzCentrality`: Computes Katz centrality.
+      + `ct::Pagerank`: Computes PageRank.
+      + `ct::RadialityCentrality`: Computes radiality centrality.
+      + `ct::StressCentrality`: Computes stress centrality.
 
   - `g`: Graph to compute centrality on.
 
 # Returns
 
-  - `cent::VecNum`: Centrality scores for each node in the graph.
+  - `ct::VecNum`: Centrality scores for each node in the graph.
 
 # Related
 
@@ -502,29 +502,29 @@ This function dispatches to the appropriate centrality computation from [`Graphs
   - [`RadialityCentrality`](@ref)
   - [`StressCentrality`](@ref)
 """
-function calc_centrality(cent::BetweennessCentrality, g::Graphs.AbstractGraph)
-    return Graphs.betweenness_centrality(g, cent.args...; cent.kwargs...)
+function calc_centrality(ct::BetweennessCentrality, g::Graphs.AbstractGraph)
+    return Graphs.betweenness_centrality(g, ct.args...; ct.kwargs...)
 end
-function calc_centrality(cent::ClosenessCentrality, g::Graphs.AbstractGraph)
-    return Graphs.closeness_centrality(g, cent.args...; cent.kwargs...)
+function calc_centrality(ct::ClosenessCentrality, g::Graphs.AbstractGraph)
+    return Graphs.closeness_centrality(g, ct.args...; ct.kwargs...)
 end
-function calc_centrality(cent::DegreeCentrality, g::Graphs.AbstractGraph)
-    return Graphs._degree_centrality(g, cent.kind; cent.kwargs...)
+function calc_centrality(ct::DegreeCentrality, g::Graphs.AbstractGraph)
+    return Graphs._degree_centrality(g, ct.kind; ct.kwargs...)
 end
 function calc_centrality(::EigenvectorCentrality, g::Graphs.AbstractGraph)
     return Graphs.eigenvector_centrality(g::Graphs.AbstractGraph)
 end
-function calc_centrality(cent::KatzCentrality, g::Graphs.AbstractGraph)
-    return Graphs.katz_centrality(g, cent.alpha)
+function calc_centrality(ct::KatzCentrality, g::Graphs.AbstractGraph)
+    return Graphs.katz_centrality(g, ct.alpha)
 end
-function calc_centrality(cent::Pagerank, g::Graphs.AbstractGraph)
-    return Graphs.pagerank(g, cent.alpha, cent.n, cent.epsilon)
+function calc_centrality(ct::Pagerank, g::Graphs.AbstractGraph)
+    return Graphs.pagerank(g, ct.alpha, ct.n, ct.epsilon)
 end
 function calc_centrality(::RadialityCentrality, g::Graphs.AbstractGraph)
     return Graphs.radiality_centrality(g::Graphs.AbstractGraph)
 end
-function calc_centrality(cent::StressCentrality, g::Graphs.AbstractGraph)
-    return Graphs.stress_centrality(g, cent.args...; cent.kwargs...)
+function calc_centrality(ct::StressCentrality, g::Graphs.AbstractGraph)
+    return Graphs.stress_centrality(g, ct.args...; ct.kwargs...)
 end
 """
     abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
@@ -703,14 +703,14 @@ This function dispatches to the appropriate MST computation from `Graphs.jl` bas
   - [`BoruvkaTree`](@ref)
   - [`PrimTree`](@ref)
 """
-function calc_mst(cent::KruskalTree, g::Graphs.AbstractGraph)
-    return Graphs.kruskal_mst(g, cent.args...; cent.kwargs...)
+function calc_mst(ct::KruskalTree, g::Graphs.AbstractGraph)
+    return Graphs.kruskal_mst(g, ct.args...; ct.kwargs...)
 end
-function calc_mst(cent::BoruvkaTree, g::Graphs.AbstractGraph)
-    return Graphs.boruvka_mst(g, cent.args...; cent.kwargs...)[1]
+function calc_mst(ct::BoruvkaTree, g::Graphs.AbstractGraph)
+    return Graphs.boruvka_mst(g, ct.args...; ct.kwargs...)[1]
 end
-function calc_mst(cent::PrimTree, g::Graphs.AbstractGraph)
-    return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
+function calc_mst(ct::PrimTree, g::Graphs.AbstractGraph)
+    return Graphs.prim_mst(g, ct.args...; ct.kwargs...)
 end
 """
     abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
@@ -823,8 +823,8 @@ All concrete types implementing centrality-based estimation algorithms should su
 abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
     struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
-        ne::T1
-        cent::T2
+        nt::T1
+        ct::T2
     end
 
 Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
@@ -833,14 +833,14 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 
 # Fields
 
-  - `ne`: NetworkEstimator estimator.
-  - `cent`: Centrality algorithm.
+  - `nt`: NetworkEstimator estimator.
+  - `ct`: Centrality algorithm.
 
 # Constructor
 
     CentralityEstimator(;
-                        ne::NwE_Ph_ClE_Cl = NetworkEstimator(),
-                        cent::AbstractCentralityAlgorithm = DegreeCentrality())
+                        nt::NwE_Ph_ClE_Cl = NetworkEstimator(),
+                        ct::AbstractCentralityAlgorithm = DegreeCentrality())
 
 Keyword arguments correspond to the fields above.
 
@@ -849,33 +849,33 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> CentralityEstimator()
 CentralityEstimator
-    ne ┼ NetworkEstimator
-       │    ce ┼ PortfolioOptimisersCovariance
-       │       │   ce ┼ Covariance
-       │       │      │    me ┼ SimpleExpectedReturns
-       │       │      │       │   w ┴ nothing
-       │       │      │    ce ┼ GeneralCovariance
-       │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │       │      │       │    w ┴ nothing
-       │       │      │   alg ┴ Full()
-       │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-       │       │      │     pdm ┼ Posdef
-       │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton       
-       │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │       │      │      dn ┼ nothing
-       │       │      │      dt ┼ nothing
-       │       │      │     alg ┼ nothing
-       │       │      │   order ┴ DenoiseDetoneAlg()
-       │    de ┼ Distance
-       │       │   power ┼ nothing
-       │       │     alg ┴ CanonicalDistance()
-       │   alg ┼ KruskalTree
-       │       │     args ┼ Tuple{}: ()
-       │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │     n ┴ Int64: 1
-  cent ┼ DegreeCentrality
-       │     kind ┼ Int64: 0
-       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+  nt ┼ NetworkEstimator
+     │    ce ┼ PortfolioOptimisersCovariance
+     │       │   ce ┼ Covariance
+     │       │      │    me ┼ SimpleExpectedReturns
+     │       │      │       │   w ┴ nothing
+     │       │      │    ce ┼ GeneralCovariance
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │      │       │    w ┴ nothing
+     │       │      │   alg ┴ Full()
+     │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+     │       │      │     pdm ┼ Posdef
+     │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │       │      │      dn ┼ nothing
+     │       │      │      dt ┼ nothing
+     │       │      │     alg ┼ nothing
+     │       │      │   order ┴ DenoiseDetoneAlg()
+     │    de ┼ Distance
+     │       │   power ┼ nothing
+     │       │     alg ┴ CanonicalDistance()
+     │   alg ┼ KruskalTree
+     │       │     args ┼ Tuple{}: ()
+     │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │     n ┴ Int64: 1
+  ct ┼ DegreeCentrality
+     │     kind ┼ Int64: 0
+     │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -884,27 +884,27 @@ CentralityEstimator
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
-    ne::T1
-    cent::T2
-    function CentralityEstimator(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm)
-        return new{typeof(ne), typeof(cent)}(ne, cent)
+    nt::T1
+    ct::T2
+    function CentralityEstimator(nt::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm)
+        return new{typeof(nt), typeof(ct)}(nt, ct)
     end
 end
-function CentralityEstimator(; ne::NwE_Ph_ClE_Cl = NetworkEstimator(),
-                             cent::AbstractCentralityAlgorithm = DegreeCentrality())
-    return CentralityEstimator(ne, cent)
+function CentralityEstimator(; nt::NwE_Ph_ClE_Cl = NetworkEstimator(),
+                             ct::AbstractCentralityAlgorithm = DegreeCentrality())
+    return CentralityEstimator(nt, ct)
 end
 """
-    calc_adjacency(ne::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    calc_adjacency(nt::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the adjacency matrix for a network estimator.
 
 # Arguments
 
-  - `ne`: NetworkEstimator estimator.
+  - `nt`: NetworkEstimator estimator.
 
-      + `ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
-      + `ne::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
+      + `nt::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
+      + `nt::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute.
@@ -920,23 +920,23 @@ Compute the adjacency matrix for a network estimator.
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
 """
-function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
+function calc_adjacency(nt::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::MatNum; dims::Int = 1, kwargs...)
-    D = distance(ne.de, ne.ce, X; dims = dims, kwargs...)
+    D = distance(nt.de, nt.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
-    tree = calc_mst(ne.alg, G)
+    tree = calc_mst(nt.alg, G)
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
 end
-function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
+function calc_adjacency(nt::NetworkEstimator{<:Any, <:Any,
                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
                         X::MatNum; dims::Int = 1, kwargs...)
-    S, D = cor_and_dist(ne.de, ne.ce, X; dims = dims, kwargs...)
-    S = dbht_similarity(ne.alg; S = S, D = D)
+    S, D = cor_and_dist(nt.de, nt.ce, X; dims = dims, kwargs...)
+    S = dbht_similarity(nt.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
 end
 """
-    phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    phylogeny_matrix(nt::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the phylogeny matrix for a network estimator.
 
@@ -944,7 +944,7 @@ This function constructs the adjacency matrix for the network, then computes the
 
 # Arguments
 
-  - `ne`: NetworkEstimator estimator.
+  - `nt`: NetworkEstimator estimator.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute.
   - `kwargs...`: Additional keyword arguments.
@@ -958,10 +958,10 @@ This function constructs the adjacency matrix for the network, then computes the
   - [`NetworkEstimator`](@ref)
   - [`calc_adjacency`](@ref)
 """
-function phylogeny_matrix(ne::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    A = calc_adjacency(ne, X; dims = dims, kwargs...)
+function phylogeny_matrix(nt::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    A = calc_adjacency(nt, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
-    for i in 0:(ne.n)
+    for i in 0:(nt.n)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - LinearAlgebra.I
@@ -1006,7 +1006,7 @@ function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal
     return PhylogenyResult(; X = P * transpose(P) - LinearAlgebra.I)
 end
 """
-    centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm,
+    centrality_vector(nt::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                       X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the centrality vector for a network and centrality algorithm.
@@ -1015,8 +1015,8 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 
 # Arguments
 
-  - `ne`: Phylogeny estimator.
-  - `cent`: Centrality algorithm.
+  - `nt`: Phylogeny estimator.
+  - `ct`: Centrality algorithm.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute.
   - `kwargs...`: Additional keyword arguments.
@@ -1031,10 +1031,10 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`CentralityEstimator`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::NwE_ClE_Cl, cent::AbstractCentralityAlgorithm, X::MatNum;
+function centrality_vector(nt::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, X::MatNum;
                            dims::Int = 1, kwargs...)
-    P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
-    return centrality_vector(P, cent; dims = dims, kwargs...)
+    P = phylogeny_matrix(nt, X; dims = dims, kwargs...)
+    return centrality_vector(P, ct; dims = dims, kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)
@@ -1060,11 +1060,11 @@ This function applies the centrality algorithm in the estimator to the network c
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
+    return centrality_vector(cte.nt, cte.ct, X; dims = dims, kwargs...)
 end
 """
-    average_centrality(ne::NwE_Ph_ClE_Cl,
-                       cent::AbstractCentralityAlgorithm, w::VecNum, X::MatNum;
+    average_centrality(nt::NwE_Ph_ClE_Cl,
+                       ct::AbstractCentralityAlgorithm, w::VecNum, X::MatNum;
                        dims::Int = 1, kwargs...)
 
 Compute the weighted average centrality for a network and centrality algorithm.
@@ -1073,8 +1073,8 @@ This function computes the centrality vector and returns the weighted average us
 
 # Arguments
 
-  - `ne`: NetworkEstimator estimator.
-  - `cent`: Centrality algorithm.
+  - `nt`: NetworkEstimator estimator.
+  - `ct`: Centrality algorithm.
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute.
@@ -1090,9 +1090,9 @@ This function computes the centrality vector and returns the weighted average us
   - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function average_centrality(ne::NwE_Ph_ClE_Cl, cent::AbstractCentralityAlgorithm, w::VecNum,
+function average_centrality(nt::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             X::MatNum; dims::Int = 1, kwargs...)
-    return LinearAlgebra.dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
+    return LinearAlgebra.dot(centrality_vector(nt, ct, X; dims = dims, kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, X::MatNum;
@@ -1121,7 +1121,7 @@ This function applies the centrality algorithm in the estimator to the network a
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, X::MatNum; dims::Int = 1,
                             kwargs...)
-    return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
+    return average_centrality(cte.nt, cte.ct, w, X; dims = dims, kwargs...)
 end
 """
     asset_phylogeny(w::VecNum, X::MatNum)
