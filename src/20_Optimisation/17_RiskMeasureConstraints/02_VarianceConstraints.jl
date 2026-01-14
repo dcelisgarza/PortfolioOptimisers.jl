@@ -110,8 +110,6 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
         model[key], key
     end
 end
-"""
-"""
 function variance_risk_bounds_val(flag::Bool, ub::Frontier)
     return _Frontier(; N = ub.N, factor = 1, flag = flag)
 end

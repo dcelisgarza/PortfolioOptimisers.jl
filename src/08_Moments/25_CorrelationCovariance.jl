@@ -1,5 +1,3 @@
-"""
-"""
 struct CorrelationCovariance{T1} <: AbstractCovarianceEstimator
     ce::T1
     function CorrelationCovariance(ce::StatsBase.CovarianceEstimator)

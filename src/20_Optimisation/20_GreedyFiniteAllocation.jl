@@ -11,8 +11,6 @@ function factory(res::GreedyAllocationOptimisation, fb)
     return GreedyAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
                                         res.cash, fb)
 end
-"""
-"""
 struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     unit::T1
     args::T2

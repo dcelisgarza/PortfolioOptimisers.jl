@@ -5,8 +5,6 @@ end
 function assert_external_optimiser(::NaiveOptimisationEstimator)
     return nothing
 end
-"""
-"""
 struct NaiveOptimisationResult{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     pr::T2
@@ -18,8 +16,6 @@ end
 function factory(res::NaiveOptimisationResult, fb)
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
-"""
-"""
 struct InverseVolatility{T1, T2, T3, T4, T5, T6} <: NaiveOptimisationEstimator
     pe::T1
     wb::T2
@@ -74,8 +70,6 @@ function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothi
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
-"""
-"""
 struct EqualWeighted{T1, T2, T3, T4, T5} <: NaiveOptimisationEstimator
     wb::T1
     sets::T2
@@ -122,8 +116,6 @@ function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
-"""
-"""
 struct RandomWeighted{T1, T2, T3, T4, T5, T6, T7} <: NaiveOptimisationEstimator
     rng::T1
     seed::T2

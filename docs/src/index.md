@@ -158,21 +158,21 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 nothing # hide
 ```
 
-`PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`](@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
+`PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`]-(@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
 
 ```@example 0_index
 opt = JuMPOptimiser(; slv = slv);
 nothing # hide
 ```
 
-Here we will use the traditional Mean-Risk [`MeanRisk`](@ref) optimsation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
+Here we will use the traditional Mean-Risk [`MeanRisk`]-(@ref) optimsation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
 
 ```@example 0_index
 # Vanilla (Markowitz) mean risk optimisation.
 mr = MeanRisk(; opt = opt)
 ```
 
-As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction). For now, we will perform the optimisation via [`optimise`](@ref).
+As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction). For now, we will perform the optimisation via [`optimise`]-(@ref).
 
 ```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
@@ -181,7 +181,7 @@ res = optimise(mr, rd)
 
 The solution lives in the `sol` field, but the weights can be accessed via the `w` property.
 
-`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do so, a greedy algorithm [`GreedyAllocation`](@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`](@ref) which uses mixed-integer programming (MIP) and requires a capable solver.
+`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do so, a greedy algorithm [`GreedyAllocation`]-(@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`]-(@ref) which uses mixed-integer programming (MIP) and requires a capable solver.
 
 Here we will use the latter.
 
@@ -325,7 +325,7 @@ Overloads `Statistics.mean`.
           * Grand Mean [`GrandMean`](@ref)
           * Volatility Weighted [`VolatilityWeighted`](@ref)
           * Mean Squared Error [`MeanSquaredError`](@ref)
-  - Standard deviation expected returns [`StandardDeviationExpectedReturns`](@ref)
+  - Standard deviation expected returns [`StandardDeviationExpectedReturns`]-(@ref)
 
 #### [Variance and Standard Deviation](@id readme-variance)
 
@@ -394,12 +394,12 @@ Overloads `Statistics.cov` and `Statistics.cor`.
   - Denoised covariance with custom covariance estimator [`DenoiseCovariance`](@ref)
   - Detoned covariance with custom covariance estimator [`DetoneCovariance`](@ref)
   - Custom processed covariance with custom covariance estimator [`ProcessedCovariance`](@ref)
-  - Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`](@ref)
+  - Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`]-(@ref)
     
-      + Premium [`ImpliedVolatilityPremium`](@ref)
-      + Regression [`ImpliedVolatilityRegression`](@ref)
+      + Premium [`ImpliedVolatilityPremium`]-(@ref)
+      + Regression [`ImpliedVolatilityRegression`]-(@ref)
   - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
-  - Correlation covariance [`CorrelationCovariance`](@ref)
+  - Correlation covariance [`CorrelationCovariance`]-(@ref)
 
 #### [Coskewness](@id readme-coskewness)
 
@@ -466,7 +466,7 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
   - High order prior [`HighOrderPrior`](@ref)
     
       + High order [`HighOrderPriorEstimator`](@ref)
-      + High order factor model [`HighOrderFactorPriorEstimator`](@ref)
+      + High order factor model [`HighOrderFactorPriorEstimator`]-(@ref)
 
 ### Uncertainty sets
 
@@ -514,13 +514,13 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 ##### Hierarchical
 
   - Hierarchical clustering [`HClustAlgorithm`](@ref)
-  - Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`](@ref)
+  - Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`]-(@ref)
 
 ##### Non hierachical
 
-Non hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`](@ref) optimisations.
+Non hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`]-(@ref) optimisations.
 
-  - K-means clustering [`KMeansAlgorithm`](@ref)
+  - K-means clustering [`KMeansAlgorithm`]-(@ref)
 
 #### Networks
 
@@ -573,48 +573,48 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
 
 ### Portfolio optimisation
 
-Optimisations are implemented via [`optimise`](@ref). Optimisations consume an estimator and return a result.
+Optimisations are implemented via [`optimise`]-(@ref). Optimisations consume an estimator and return a result.
 
 #### Naïve
 
-These return a [`NaiveOptimisationResult`](@ref).
+These return a [`NaiveOptimisationResult`]-(@ref).
 
-  - Inverse Volatility [`InverseVolatility`](@ref)
-  - Equal Weighted [`EqualWeighted`](@ref)
-  - Random (Dirichlet) [`RandomWeighted`](@ref)
+  - Inverse Volatility [`InverseVolatility`]-(@ref)
+  - Equal Weighted [`EqualWeighted`]-(@ref)
+  - Random (Dirichlet) [`RandomWeighted`]-(@ref)
 
 #### Traditional
 
-These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`](@ref), which encodes all supported constraints.
+These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`]-(@ref), which encodes all supported constraints.
 
-  - Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)
+  - Mean-Risk [`MeanRisk`]-(@ref) returns a [`MeanRiskResult`]-(@ref)
 
-  - Factor Risk Contribution [`FactorRiskContribution`](@ref) returns a [`FactorRiskContributionResult`](@ref)
-  - Near Optimal Centering [`NearOptimalCentering`](@ref) returns a [`NearOptimalCenteringResult`](@ref)
-  - Asset and factor risk budgeting [`AssetRiskBudgeting`](@ref), [`FactorRiskBudgeting`](@ref)
+  - Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
+  - Near Optimal Centering [`NearOptimalCentering`]-(@ref) returns a [`NearOptimalCenteringResult`]-(@ref)
+  - Asset and factor risk budgeting [`AssetRiskBudgeting`]-(@ref), [`FactorRiskBudgeting`]-(@ref)
     
-      + Risk Budgeting [`RiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+      + Risk Budgeting [`RiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
     
-      + Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+      + Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
         
-          * Basic [`BasicRelaxedRiskBudgeting`](@ref)
-          * Regularised [`RegularisedRelaxedRiskBudgeting`](@ref)
-          * Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+          * Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
+          * Regularised [`RegularisedRelaxedRiskBudgeting`]-(@ref)
+          * Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(@ref)
 
 ##### Traditional Optimisation Features
 
   - Objective functions for non risk budgeting optimisations
     
-      + Minimum risk [`MinimumRisk`](@ref)
-      + Maximum utility [`MaximumUtility`](@ref)
-      + Maximum return over risk ratio [`MaximumRatio`](@ref)
-      + Maximum return [`MaximumReturn`](@ref)
-      + Custom objective penalty [`CustomJuMPObjective`](@ref)
+      + Minimum risk [`MinimumRisk`]-(@ref)
+      + Maximum utility [`MaximumUtility`]-(@ref)
+      + Maximum return over risk ratio [`MaximumRatio`]-(@ref)
+      + Maximum return [`MaximumReturn`]-(@ref)
+      + Custom objective penalty [`CustomJuMPObjective`]-(@ref)
 
   - Portfolio returns
     
-      + Arithmetic returns [`ArithmeticReturn`](@ref)
-      + Logarithmic returns [`LogarithmicReturn`](@ref)
+      + Arithmetic returns [`ArithmeticReturn`]-(@ref)
+      + Logarithmic returns [`LogarithmicReturn`]-(@ref)
   - Regularisation penalty
     
       + L1

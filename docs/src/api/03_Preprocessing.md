@@ -2,7 +2,7 @@
 
 ## Prices to returns
 
-Other than [`FiniteAllocationOptimisationEstimator`](@ref), all optimisations work based off returns data rather than price data. These functions and types are involved in computing returns.
+Other than [`FiniteAllocationOptimisationEstimator`]-(@ref), all optimisations work based off returns data rather than price data. These functions and types are involved in computing returns.
 
 ```@docs
 AbstractReturnsResult

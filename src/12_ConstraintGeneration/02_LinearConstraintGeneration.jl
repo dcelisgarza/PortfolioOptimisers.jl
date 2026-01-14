@@ -247,7 +247,7 @@ Container for asset set and group information used in constraint generation.
 
 `AssetSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
 
-If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
+If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`]-(@ref) with [`NestedClustered`]-(@ref).
 
 # Fields
 
@@ -1698,7 +1698,7 @@ julia> asset_sets_matrix(est, sets)
 # Related
 
   - [`AssetSets`](@ref)
-  - [`asset_sets_matrix`](@ref)
+  - [`asset_sets_matrix`]-(@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
 struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
@@ -1792,7 +1792,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix`](@ref)
+  - [`asset_sets_matrix`]-(@ref)
 """
 function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
@@ -1808,7 +1808,7 @@ It is used for type stability and to provide a uniform interface for processing 
 
 # Related
 
-  - [`asset_sets_matrix`](@ref)
+  - [`asset_sets_matrix`]-(@ref)
 """
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
@@ -1817,15 +1817,13 @@ end
     asset_sets_matrix(smtx::VecMatNum_ASetMatE,
                       sets::AssetSets)
 
-Broadcasts [`asset_sets_matrix`](@ref) over the vector.
+Broadcasts [`asset_sets_matrix`]-(@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
 function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
-"""
-"""
 function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
     return view(smtx, :, i)
 end

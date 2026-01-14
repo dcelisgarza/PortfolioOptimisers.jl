@@ -22,17 +22,11 @@ const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasu
                         <:Skewness, <:MedianAbsoluteDeviation}
 const ERkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
                    <:Variance, <:UncertaintySetVariance, <:EqualRiskMeasure}
-"""
-"""
 const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
-"""
-"""
 const SlvRM = Union{<:EntropicValueatRisk, <:EntropicValueatRiskRange,
                     <:EntropicDrawdownatRisk, <:RelativeEntropicDrawdownatRisk,
                     <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
                     <:RelativisticDrawdownatRisk, <:RelativeRelativisticDrawdownatRisk}
-"""
-"""
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return r(calc_net_returns(w, X, fees))

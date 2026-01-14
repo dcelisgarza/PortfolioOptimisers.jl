@@ -1,5 +1,3 @@
-"""
-"""
 struct RiskBudgetingResult{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     oe::T1
     pa::T2
@@ -34,8 +32,6 @@ struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
     rkb::T1
 end
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
-"""
-"""
 struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
     rkb::T1
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb})
@@ -48,8 +44,6 @@ end
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     return AssetRiskBudgeting(; rkb = risk_budget_view(r.rkb, i))
 end
-"""
-"""
 struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
@@ -66,8 +60,6 @@ function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, flag = r.flag)
 end
-"""
-"""
 struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2

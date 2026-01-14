@@ -27,11 +27,7 @@ abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
 function factory(alg::AbstractClustersAlgorithm, args...)
     return alg
 end
-"""
-"""
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
-"""
-"""
 abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
     abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
@@ -354,7 +350,7 @@ HClustAlgorithm
 
 # Related
 
-  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
   - [`ClustersEstimator`](@ref)
 """
 struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
@@ -434,7 +430,7 @@ ClustersEstimator
 # Related
 
   - [`AbstractClustersEstimator`](@ref)
-  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator

@@ -1,5 +1,1 @@
 # JuMP Optimiser
-
-```@docs
-JuMPOptimiser
-```

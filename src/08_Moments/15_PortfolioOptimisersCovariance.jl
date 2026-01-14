@@ -142,8 +142,6 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
-"""
-"""
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                    t::Number = 0.95, absolute::Bool = false)

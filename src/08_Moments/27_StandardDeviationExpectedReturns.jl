@@ -1,5 +1,3 @@
-"""
-"""
 struct StandardDeviationExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     ce::T1
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)

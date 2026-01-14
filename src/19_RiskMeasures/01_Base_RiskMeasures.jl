@@ -110,7 +110,7 @@ Creates a `Frontier` with the specified number of points, scaling factor, and fl
 
     Frontier(; N::Integer = 20)
 
-Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
+Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`]-(@ref) and [`second_moment_bound_val`]-(@ref).
 
     PortfolioOptimisers._Frontier(; N::Integer = 20, factor::Number, flag::Bool)
 

@@ -1,5 +1,3 @@
-"""
-"""
 struct FactorRiskContributionResult{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
     oe::T1
     pa::T2
@@ -27,8 +25,6 @@ function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
         getfield(r, sym)
     end
 end
-"""
-"""
 struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
        RiskJuMPOptimisationEstimator
     opt::T1

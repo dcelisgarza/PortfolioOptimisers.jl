@@ -1,5 +1,3 @@
-"""
-"""
 struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     pa::T2
@@ -22,8 +20,6 @@ function Base.getproperty(r::MeanRiskResult, sym::Symbol)
         getfield(r, sym)
     end
 end
-"""
-"""
 struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2

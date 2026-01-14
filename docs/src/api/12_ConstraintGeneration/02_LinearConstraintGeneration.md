@@ -15,7 +15,6 @@ estimator_to_val
 parse_equation
 linear_constraints
 risk_budget_constraints
-asset_sets_matrix
 AbstractParsingResult
 group_to_val!
 _parse_equation
@@ -24,6 +23,5 @@ _format_term
 _collect_terms!
 _collect_terms
 _eval_numeric_functions
-asset_sets_matrix_view
 nothing_asset_sets_view
 ```

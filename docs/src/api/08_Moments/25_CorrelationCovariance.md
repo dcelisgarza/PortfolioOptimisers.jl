@@ -1,5 +1,1 @@
 # Correlation covariance
-
-```@docs
-CorrelationCovariance
-```

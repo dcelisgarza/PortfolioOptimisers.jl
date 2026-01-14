@@ -1,5 +1,1 @@
 # Greedy allocation
-
-```@docs
-GreedyAllocation
-```

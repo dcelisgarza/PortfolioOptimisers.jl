@@ -1,5 +1,3 @@
-"""
-"""
 struct KMeansAlgorithm{T1, T2, T3} <: AbstractNonHierarchicalClusteringAlgorithm
     rng::T1
     seed::T2
