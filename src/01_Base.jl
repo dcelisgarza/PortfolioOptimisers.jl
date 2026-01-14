@@ -685,14 +685,42 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 
-const dsd = Dict(:pw => "`w`: Portfolio weights vector.",
+const dsd = Dict(
+                 # Weight vectors.
+                 :pw => "`w`: Portfolio weights vector.",
                  :ow => "`w`: Observation weights vector.",
-                 :oow => "`ow`: Optional observation weights vector.",
-                 :me => "`me`: Expected returns estimator.",
+                 :oow => "`w`: Optional observation weights vector.",
+                 # Matrix processing.
                  :pdm => "`pdm`: Positive definite matrix estimator.",
-                 :dt => "`dt`: Matrix detoning estimator.",
                  :dn => "`dn`: Matrix denoising estimator.",
-                 :ce => "`ce`: Covariance estimator.", :de => "`de`: Distance estimator.",
-                 :ve => "`ve`: Variance estimator.", :pe => "`pe`: Prior estimator.")
+                 :dt => "`dt`: Matrix detoning estimator.",
+                 :mp => "`mp`: Matrix processing estimator.",
+                 # Moments.
+                 :me => "`me`: Expected returns estimator.",
+                 :ce => "`ce`: Covariance estimator.", :ve => "`ve`: Variance estimator.",
+                 :ske => "`ske`: Coskewness estimator.",
+                 :kte => "`kte`: Cokurtosis estimator.",
+                 :de => "`de`: Distance matrix estimator.",
+                 # Priors.
+                 :pe => "`pr`: Prior estimator.", :pr => "`pr`: Prior result.",
+                 :per => "`pr`: Prior estimator or result.",
+                 # Phylogeny.
+                 :cle => "`clr`: Clusters estimator.", :clr => "`clr`: Clusters result.",
+                 :cler => "`clr`: Clusters estimator or result.",
+                 # Turnover.
+                 :tne => "`tn`: Turnover estimator(s).",
+                 :tnr => "`tn`: Turnover result(s).",
+                 :tner => "`tn`: Turnover estimator(s) or result(s).",
+                 # Tracking.
+                 :tre => "`tr`: Tracking error estimator(s).",
+                 :trr => "`tr`: Tracking error result(s).",
+                 :trer => "`tr`: Tracking error estimator(s) or result(s).",
+                 # Weight bounds.
+                 :wbe => "`wb`: Weight bounds estimator.",
+                 :wbr => "`wb`: Weight bounds result.",
+                 :wber => "`wb`: Weight bounds estimator or result.",
+                 # Fees.
+                 :feese => "`fees`: Fees estimator.", :feesr => "`fees`: Fees result.",
+                 :feeser => "`fees`: Fees estimator or result.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar
