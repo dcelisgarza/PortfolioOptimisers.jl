@@ -30,10 +30,10 @@ julia> function PortfolioOptimisers.posdef(est::MyPosdefEstimator, X::PortfolioO
        end
 
 julia> posdef!(MyPosdefEstimator(), [1.0 2.0; 2.0 1.0])
-Projecting to positive definite matrix in-place....
+Projecting to positive definite matrix in-place...
 
 julia> posdef(MyPosdefEstimator(), [1.0 2.0; 2.0 1.0])
-Projecting to positive definite matrix in-place....
+Projecting to positive definite matrix in-place...
 2×2 Matrix{Float64}:
  1.0  2.0
  2.0  1.0
@@ -104,12 +104,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - `pdm`: The estimator specifying the positive definite projection algorithm.
+  - $(glossary[:opdm])
 
       + `::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
       + `::Nothing`: No-op.
 
-  - `X`: The matrix to be projected in-place.
+  - $(glossary[:sigrhoX])
 
 # Returns
 
@@ -117,6 +117,7 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Validation
 
+  - `X` is validated with [`assert_matrix_issquare`](@ref).
   - If the matrix cannot be made positive definite, a warning is emitted.
 
 # Examples

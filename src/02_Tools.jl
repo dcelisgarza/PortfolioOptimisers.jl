@@ -224,14 +224,14 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
+    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
 
 Assert that the input matrix is square.
 
 # Arguments
 
-  - `A`: Input matrix to validate.
-  - `A_sym`: Symbolic name used in error messages.
+  - `X`: Input matrix to validate.
+  - `X_sym`: Symbolic name used in error messages.
 
 # Returns
 
@@ -239,15 +239,15 @@ Assert that the input matrix is square.
 
 # Validation
 
-  - `size(A, 1) == size(A, 2)`.
+  - `size(X, 1) == size(X, 2)`.
 
 # Details
 
   - Throws `DimensionMismatch` if the check fails.
 """
-function assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
-    @argcheck(size(A, 1) == size(A, 2),
-              DimensionMismatch("size($A_sym, 1) == size($A_sym, 2) must hold. Got\nsize($A_sym, 1) => $(size(A, 1))\nsize($A_sym, 2) => $(size(A, 2))."))
+function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+    @argcheck(size(X, 1) == size(X, 2),
+              DimensionMismatch("size($X_sym, 1) == size($X_sym, 2) must hold. Got\nsize($X_sym, 1) => $(size(X, 1))\nsize($X_sym, 2) => $(size(X, 2))."))
     return nothing
 end
 """

@@ -61,7 +61,7 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 # Fields
 
   - `n`: Number of leading principal components to remove.
-  - `pdm`:  Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - $(glossary[:opdm])
 
 # Constructor
 
@@ -114,12 +114,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - `dt`: The estimator specifying the detoning algorithm.
+  - $(glossary[:odt])
 
-      + `dt::Detone`: The top `n` principal components are removed from `X` in-place.
-      + `dt::Nothing`: No-op and returns `nothing`.
+      + `::Detone`: The top `n` principal components are removed from `X` in-place.
+      + `::Nothing`: No-op and returns `nothing`.
 
-  - `X`: The covariance or correlation matrix to be detoned (modified in-place).
+  - $(glossary[:sigrhoX])
 
 # Returns
 

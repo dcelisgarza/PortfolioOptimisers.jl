@@ -747,8 +747,13 @@ const glossary = Dict(
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
                       :dn => "`dn`: Matrix denoising estimator.",
+                      :dna => "`dna`: Matrix denoising algorithm.",
                       :dt => "`dt`: Matrix detoning estimator.",
                       :mp => "`mp`: Matrix processing estimator.",
+                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
+                      :odn => "`dn`: Optional matrix denoising estimator.",
+                      :odt => "`dt`: Optional matrix detoning estimator.",
+                      :omp => "`mp`: Optional matrix processing estimator.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
                       :ce => "`ce`: Covariance estimator.",#
@@ -794,7 +799,18 @@ const glossary = Dict(
                       # Fees.
                       :feese => "`fees`: Fees estimator.",#
                       :feesr => "`fees`: Fees result.",
-                      :feeser => "`fees`: Fees estimator or result.")
+                      :feeser => "`fees`: Fees estimator or result.",
+                      # Stats.
+                      :sigma => "`sigma`: Covariance matrix.",#
+                      :mu => "`mu`: Expected returns vector.",#
+                      :rho => "`rho`: Correlation matrix.",
+                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
+                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
+                      :kt => "`kt`: Cokurtosis matrix.",# 
+                      :sk => "`sk`: Coskewness matrix.",#
+                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
+                      :X => "`X`: Data matrix.",#
+                      :F => "`F`: Data matrix.")
 
 """
     validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")

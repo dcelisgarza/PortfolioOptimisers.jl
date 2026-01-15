@@ -57,7 +57,7 @@ All concrete types that implement a specific denoising algorithm should subtype 
 
 # Interfaces
 
-If you wish to implement a new denoising algorithm, that works with an existing denoising estimator subtype `AbstractDenoiseAlgorithm`, including all necessary parameters as part of the struct, and implement the following method:
+If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, including all necessary parameters as part of the struct, and implement the following method:
 
   - [`_denoise!`](@ref): In-place denoising of a covariance or correlation matrix using the specific algorithm.
 
@@ -77,10 +77,10 @@ julia> function PortfolioOptimisers._denoise!(de::MyDenoiseAlgorithm,
        end
 
 julia> denoise!(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
-"Denoising matrix using custom algorithm..."
+Denoising matrix using custom algorithm...
 
 julia> denoise(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
-"Denoising matrix using custom algorithm..."
+Denoising matrix using custom algorithm...
 2×2 Matrix{Float64}:
  2.0  1.0
  1.0  2.0
@@ -216,7 +216,7 @@ A flexible container type for configuring and applying denoising algorithms to c
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
-  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - $(glossary[:opdm])
 
 # Constructor
 
@@ -293,7 +293,7 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise(alg, args, kwargs, kernel, m, n, pdm)
 end
 """
-    _denoise!(de::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
+    _denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
               num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
@@ -302,12 +302,11 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 # Arguments
 
-  - `alg`: The denoising algorithm to apply.
-  - `X`: The matrix to be denoised (modified in-place).
+  - `alg`: Denoising algorithm.
+  - $(glossary[:sigrhoX])
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
-  - `pdm`: Positive definite matrix estimator.
 
 # Returns
 
@@ -340,7 +339,7 @@ function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
+function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
@@ -354,8 +353,8 @@ function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     corr1 = vecs_l * LinearAlgebra.Diagonal(vals_l) * transpose(vecs_l)
 
     X .= corr0 +
-         de.alpha * corr1 +
-         (one(de.alpha) - de.alpha) * LinearAlgebra.Diagonal(corr1)
+         alg.alpha * corr1 +
+         (one(alg.alpha) - alg.alpha) * LinearAlgebra.Diagonal(corr1)
     return nothing
 end
 """
@@ -461,13 +460,13 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - `de`: The estimator specifying the denoising algorithm.
+  - $(glossary[:odn])
 
-      + `de::Denoise`: The specified denoising algorithm is applied to `X` in-place.
-      + `de::Nothing`: No-op.
+      + `::Denoise`: The specified denoising algorithm is applied to `X` in-place.
+      + `::Nothing`: No-op.
 
-  - `X`: The covariance or correlation matrix to be denoised (modified in-place).
-  - `q`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
+  - $(glossary[:sigrhoX])
+  - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 # Returns
 
