@@ -5,7 +5,7 @@ Fallback for covariance estimator factory methods.
 
 # Arguments
 
-  - $(dsd[:ce])
+  - $(glossary[:ce])
   - `args...`: Optional arguments (ignored for base covariance estimators).
 
 # Returns

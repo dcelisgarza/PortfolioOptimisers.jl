@@ -143,7 +143,7 @@ Return a new `GeneralCovariance` estimator with observation weights `w`.
 # Arguments
 
   - `ce`: A `GeneralCovariance` estimator.
-  - $(dsd[:ow])
+  - $(glossary[:ow])
 
 # Returns
 
@@ -225,8 +225,8 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 
 # Arguments
 
-  - $(dsd[:ce])
-  - $(dsd[:ow])
+  - $(glossary[:ce])
+  - $(glossary[:ow])
 
 # Returns
 

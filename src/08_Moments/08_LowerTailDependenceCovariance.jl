@@ -187,7 +187,8 @@ function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return lower_tail_dependence(X, ce.alpha, ce.ex) ⊙ (std_vec ⊗ std_vec)
+    sigma = lower_tail_dependence(X, ce.alpha, ce.ex)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 
 export LowerTailDependenceCovariance

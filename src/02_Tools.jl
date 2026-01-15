@@ -789,8 +789,6 @@ const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
 
 Algorithm for reducing a vector of real values to its minimum.
 
-`MinValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the minimum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their minimum.
-
 # Examples
 
 ```jldoctest
@@ -812,13 +810,11 @@ struct MinValue <: VectorToScalarMeasure end
         w::T1
     end
 
-Algorithm for reducing a vector of real values to its mean.
-
-`MeanValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean (average) value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mean.
+Algorithm for reducing a vector of real values to its optionally weighted mean.
 
 # Fields
 
-  - `w`: Optional weights to use for the mean calculation.
+  - $(glossary[:oow])
 
 # Constructors
 
@@ -830,7 +826,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -867,7 +863,7 @@ Construct a `MeanValue` instance with observation weights `w`.
 # Arguments
 
   - `mv`: Instance to update.
-  - $(dsd[:ow])
+  - $(glossary[:ow])
 
 # Returns
 
@@ -886,13 +882,11 @@ end
         w::T1
     end
 
-Algorithm for reducing a vector of real values to its median.
-
-`MedianValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the median value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their median.
+Algorithm for reducing a vector of real values to its optionally weighted median.
 
 # Fields
 
-  - `w`: Optional weights to use for the median calculation.
+  - $(glossary[:oow])
 
 # Constructors
 
@@ -904,7 +898,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -941,7 +935,7 @@ Constructs a `MedianValue` instance with observation weights `w`.
 # Arguments
 
   - `mv`: Instance to update.
-  - $(dsd[:ow])
+  - $(glossary[:ow])
 
 # Returns
 
@@ -959,8 +953,6 @@ end
     struct MaxValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its maximum.
-
-`MaxValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the maximum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their maximum.
 
 # Examples
 
@@ -984,13 +976,11 @@ struct MaxValue <: VectorToScalarMeasure end
         corrected::T2
     end
 
-Algorithm for reducing a vector of real values to its standard deviation.
-
-`StdValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the standard deviation of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their standard deviation.
+Algorithm for reducing a vector of real values to its optionally weighted standard deviation.
 
 # Fields
 
-  - `w`: Optional weights to use for the standard deviation calculation.
+  - $(glossary[:oow])
   - `corrected`: Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population).
 
 # Constructors
@@ -1003,7 +993,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -1042,7 +1032,7 @@ Constructs a `StdValue` instance with observation weights `w`.
 # Arguments
 
   - `sv`: Instance to update.
-  - $(dsd[:ow])
+  - $(glossary[:ow])
 
 # Returns
 
@@ -1062,13 +1052,11 @@ end
         corrected::T2
     end
 
-Algorithm for reducing a vector of real values to its variance.
-
-`VarValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the variance of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their variance.
+Algorithm for reducing a vector of real values to its optionally weighted variance.
 
 # Fields
 
-  - `w`: Optional weights to use for the variance calculation.
+  - $(glossary[:oow])
   - `corrected`: Indicates whether to use Bessel's correction (`true` for sample variance, `false` for population).
 
 # Constructors
@@ -1081,7 +1069,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -1120,7 +1108,7 @@ Constructs a `VarValue` instance with observation weights `w`.
 # Arguments
 
   - `vv`: Instance to update.
-  - $(dsd[:ow])
+  - $(glossary[:ow])
 
 # Returns
 
@@ -1138,8 +1126,6 @@ end
     SumValue <: VectorToScalarMeasure
 
 Algorithm for reducing a vector of real values to its sum.
-
-`SumValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the sum of all elements in a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their sum.
 
 # Examples
 
@@ -1161,8 +1147,6 @@ struct SumValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its product.
 
-`ProdValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the product of all elements in a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their product.
-
 # Examples
 
 ```jldoctest
@@ -1182,8 +1166,6 @@ struct ProdValue <: VectorToScalarMeasure end
     ModeValue <: VectorToScalarMeasure
 
 Algorithm for reducing a vector of real values to its mode.
-
-`ModeValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mode (most frequent value) of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mode.
 
 # Examples
 
@@ -1206,9 +1188,7 @@ struct ModeValue <: VectorToScalarMeasure end
         sv::T2
     end
 
-Algorithm for reducing a vector of real values to its mean divided by its standard deviation.
-
-`StandardisedValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean of a vector divided by its standard deviation (i.e., a standardised score). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their standardised value.
+Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation.
 
 # Fields
 
@@ -1256,7 +1236,7 @@ Construct a `StandardisedValue` instance with observation weights `w`.
 # Arguments
 
   - `msv`: Instance to update.
-  - $(dsd[:ow])
+  - $(glossary[:ow])
 
 # Returns
 
@@ -1301,10 +1281,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
 # Related
 
   - [`VectorToScalarMeasure`](@ref)
-  - [`MinValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`MaxValue`](@ref)
+  - [`Num_VecToScaM`](@ref)
 """
 function vec_to_real_measure(::MinValue, val::VecNum; kwargs...)
     return minimum(val)

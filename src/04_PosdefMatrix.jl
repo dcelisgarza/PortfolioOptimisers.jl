@@ -3,7 +3,41 @@
 
 Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement positive definite matrix projection or estimation (e.g., for covariance or correlation matrices) should subtype `AbstractPosdefEstimator`. This enables a consistent interface for positive definite matrix estimation routines throughout the package.
+All concrete types that implement positive definite matrix projection or estimation should subtype `AbstractPosdefEstimator`.
+
+# Interfaces
+
+In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`posdef!`](@ref): In-place projection of a matrix to the nearest positive definite matrix.
+  - [`posdef`](@ref): Optional out-of-place projection of a matrix to the nearest positive definite matrix.
+
+For example, we can create a dummy positive definite estimator as follows:
+
+```jldoctest
+julia> struct MyPosdefEstimator <: PortfolioOptimisers.AbstractPosdefEstimator end
+
+julia> function PortfolioOptimisers.posdef!(est::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
+           # Implement your in-place PD projection logic here.
+           println("Projecting to positive definite matrix in-place...")
+           return nothing
+       end
+
+julia> function PortfolioOptimisers.posdef(est::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
+           X = copy(X)
+           posdef!(est, X)
+           return X
+       end
+
+julia> posdef!(MyPosdefEstimator(), [1.0 2.0; 2.0 1.0])
+Projecting to positive definite matrix in-place....
+
+julia> posdef(MyPosdefEstimator(), [1.0 2.0; 2.0 1.0])
+Projecting to positive definite matrix in-place....
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
+```
 
 # Related
 
@@ -72,8 +106,8 @@ For matrices without unit diagonal, the function converts them into correlation 
 
   - `pdm`: The estimator specifying the positive definite projection algorithm.
 
-      + `pdm::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
-      + `pdm::Nothing`: No-op.
+      + `::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
+      + `::Nothing`: No-op.
 
   - `X`: The matrix to be projected in-place.
 

@@ -3,7 +3,42 @@
 
 Abstract supertype for all denoising estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement denoising of covariance or correlation matrices should subtype `AbstractDenoiseEstimator`. This enables a consistent interface for denoising routines throughout the package.
+All concrete types that implement denoising of covariance-like or correlation-like matrices should subtype `AbstractDenoiseEstimator`.
+
+# Interfaces
+
+In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`denoise!`](@ref): In-place denoising.
+  - [`denoise`](@ref): Optional out-of-place denoising.
+
+For example, we can create a dummy denoising estimator as follows:
+
+```jldoctest
+julia> struct MyDenoiseEstimator <: PortfolioOptimisers.AbstractDenoiseEstimator end
+
+julia> function PortfolioOptimisers.denoise!(est::MyDenoiseEstimator,
+                                             X::PortfolioOptimisers.MatNum)
+           # Implement your in-place denoising estimator here.
+           println("Denoising matrix in-place...")
+           return nothing
+       end
+
+julia> function PortfolioOptimisers.denoise(est::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
+           X = copy(X)
+           denoise!(est, X)
+           return X
+       end
+
+julia> denoise!(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+Denoising matrix in-place...
+
+julia> denoise(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+Denoising matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
+```
 
 # Related
 
@@ -19,6 +54,37 @@ abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 Abstract supertype for all denoising algorithm types in `PortfolioOptimisers.jl`.
 
 All concrete types that implement a specific denoising algorithm should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
+
+# Interfaces
+
+If you wish to implement a new denoising algorithm, that works with an existing denoising estimator subtype `AbstractDenoiseAlgorithm`, including all necessary parameters as part of the struct, and implement the following method:
+
+  - [`_denoise!`](@ref): In-place denoising of a covariance or correlation matrix using the specific algorithm.
+
+For example, we can create a dummy denoising algorithm as follows:
+
+```jldoctest
+julia> struct MyDenoiseAlgorithm <: PortfolioOptimisers.AbstractDenoiseAlgorithm end
+
+julia> function PortfolioOptimisers._denoise!(de::MyDenoiseAlgorithm,
+                                              X::PortfolioOptimisers.MatNum,
+                                              vals::PortfolioOptimisers.VecNum,
+                                              vecs::PortfolioOptimisers.MatNum,
+                                              num_factors::Integer)
+           # Implement your in-place denoising logic here.
+           println("Denoising matrix using custom algorithm...")
+           return nothing
+       end
+
+julia> denoise!(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
+"Denoising matrix using custom algorithm..."
+
+julia> denoise(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
+"Denoising matrix using custom algorithm..."
+2×2 Matrix{Float64}:
+ 2.0  1.0
+ 1.0  2.0
+```
 
 # Related
 

@@ -897,7 +897,8 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
+    sigma = gerber(ce, X, std_vec)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:StandardisedGerberCovarianceAlgorithm},
@@ -911,7 +912,8 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
-    return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
+    sigma = gerber(ce, X)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),

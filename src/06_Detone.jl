@@ -3,7 +3,41 @@
 
 Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
-All concrete types representing detoning estimators (such as [`Detone`](@ref)) should subtype `AbstractDetoneEstimator`. This enables a consistent interface for detoning routines and downstream analysis.
+All concrete types representing detoning estimators should subtype `AbstractDetoneEstimator`.
+
+# Interfaces
+
+In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`detone!`](@ref): In-place detoning.
+  - [`detone`](@ref): Optional out-of-place detoning.
+
+For example, we can create a dummy detoning estimator as follows:
+
+```jldoctest
+julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator end
+
+julia> function PortfolioOptimisers.detone!(est::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
+           # Implement your in-place detoning estimator here.
+           println("Detoning matrix in-place...")
+           return nothing
+       end
+
+julia> function PortfolioOptimisers.detone(est::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
+           X = copy(X)
+           detone!(est, X)
+           return X
+       end
+
+julia> detone!(MyDetoneEstimator(), [1.0 2.0; 2.0 1.0])
+Detoning matrix in-place...
+
+julia> detone(MyDetoneEstimator(), [1.0 2.0; 2.0 1.0])
+Detoning matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
+```
 
 # Related
 

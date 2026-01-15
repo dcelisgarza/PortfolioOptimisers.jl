@@ -3,11 +3,9 @@
 
 Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
 
-All custom estimators (e.g., for moments, risk, or priors) should subtype `AbstractEstimator`.
+All custom estimators should subtype `AbstractEstimator`. This enables a consistent interface for estimation routines throughout the package.
 
-This enables a consistent interface for estimation routines throughout the package.
-
-Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different characteristics, to entirely different methodologies or algorithms yielding different results. Results are often encapsulated in result types, this simplifies dispatch and usage.
+Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different numerical characteristics, to entirely different methodologies or algorithms yielding different results.
 
 # Related
 
@@ -20,11 +18,9 @@ abstract type AbstractEstimator end
 
 Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
 
-All algorithms (e.g., solvers, metaheuristics) should subtype `AbstractAlgorithm`.
+All algorithms should subtype `AbstractAlgorithm`. This enables a consistent interface for estimation routines throughout the package.
 
-This allows for flexible extension and dispatch of routines.
-
-Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details or entirely different procedures.
+Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details to entirely different procedures for estimating a quantity.
 
 # Related
 
@@ -35,13 +31,11 @@ abstract type AbstractAlgorithm end
 """
     abstract type AbstractResult end
 
-Abstract supertype for all result types returned by optimizers in `PortfolioOptimisers.jl`.
+Abstract supertype for all result types in `PortfolioOptimisers.jl`.
 
-All result objects (e.g., optimization outputs, solution summaries) should subtype `AbstractResult`.
+All result objects should subtype `AbstractResult`. This enables a consistent interface for estimation routines throughout the package.
 
-This ensures a unified interface for accessing results across different estimators and algorithms.
-
-Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a variety of information.
+Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a wide range of information.
 
 # Related
 
@@ -298,7 +292,7 @@ end
 Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
 function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
-    return i == 1 ? obj : throw(BoundsError())
+    return i == 1 ? obj : throw(BoundsError(obj, i))
 end
 """
     const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
@@ -685,7 +679,8 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 
-const dsd = Dict(
+"""
+    glossary = Dict(
                  # Weight vectors.
                  :pw => "`w`: Portfolio weights vector.",
                  :ow => "`w`: Observation weights vector.",
@@ -697,36 +692,115 @@ const dsd = Dict(
                  :mp => "`mp`: Matrix processing estimator.",
                  # Moments.
                  :me => "`me`: Expected returns estimator.",
-                 :ce => "`ce`: Covariance estimator.", :ve => "`ve`: Variance estimator.",
+                 :ce => "`ce`: Covariance estimator.",
+                 :ve => "`ve`: Variance estimator.",
                  :ske => "`ske`: Coskewness estimator.",
                  :kte => "`kte`: Cokurtosis estimator.",
                  :de => "`de`: Distance matrix estimator.",
                  # Priors.
-                 :pe => "`pe`: Prior estimator.", :pr => "`pr`: Prior result.",
+                 :pe => "`pe`: Prior estimator.",
+                 :pr => "`pr`: Prior result.",
                  :per => "`pe`: Prior estimator or result.",
                  # Phylogeny.
-                 :cle => "`cle`: Clusters estimator.", :clr => "`clr`: Clusters result.",
+                 :cle => "`cle`: Clusters estimator.",
+                 :clr => "`clr`: Clusters result.",
                  :cler => "`cle`: Clusters estimator or result.",
-                 :ple => "`pl`: Phylogeny estimator.", :plr => "`pl`: Phylogeny result.",
+                 :ple => "`pl`: Phylogeny estimator.", 
+                 :plr => "`pl`: Phylogeny result.",
                  :pler => "`pl`: Phylogeny estimator or result.",
-                 :nte => "`nt`: Network estimator.", :ntr => "`nt`: Network result.",
+                 :nte => "`nt`: Network estimator.",
+                 :ntr => "`nt`: Network result.",
                  :nter => "`nt`: Network estimator or result.",
-                 :cte => "`ct`: Centrality estimator.", :ctr => "`ct`: Centrality result.",
+                 :cte => "`ct`: Centrality estimator.",
+                 :ctr => "`ct`: Centrality result.",
                  :cter => "`ct`: Centrality estimator or result.",
                  # Turnover.
-                 :tne => "`tn`: Turnover estimator(s).",
-                 :tnr => "`tn`: Turnover result(s).",
-                 :tner => "`tn`: Turnover estimator(s) or result(s).",
+                 :tne => "`tn`: Turnover estimator.",
+                 :tnr => "`tn`: Turnover result.",
+                 :tner => "`tn`: Turnover estimator or result.",
+                 :tnes => "`tn`: Turnover estimator(s).",
+                 :tnrs => "`tn`: Turnover result(s).",
+                 :tners => "`tn`: Turnover estimator(s) or result(s).",
                  # Tracking.
-                 :tre => "`tr`: Tracking error estimator(s).",
-                 :trr => "`tr`: Tracking error result(s).",
-                 :trer => "`tr`: Tracking error estimator(s) or result(s).",
+                 :tre => "`tr`: Tracking error estimator.",
+                 :trr => "`tr`: Tracking error result.",
+                 :trer => "`tr`: Tracking error estimator or result.",
+                 :tres => "`tr`: Tracking error estimator(s).",
+                 :trrs => "`tr`: Tracking error result(s).",
+                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
                  # Weight bounds.
                  :wbe => "`wb`: Weight bounds estimator.",
                  :wbr => "`wb`: Weight bounds result.",
                  :wber => "`wb`: Weight bounds estimator or result.",
                  # Fees.
-                 :feese => "`fees`: Fees estimator.", :feesr => "`fees`: Fees result.",
+                 :feese => "`fees`: Fees estimator.",
+                 :feesr => "`fees`: Fees result.",
                  :feeser => "`fees`: Fees estimator or result.")
+
+This dictionary contains the glossary terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+"""
+const glossary = Dict(
+                      # Weight vectors.
+                      :pw => "`w`: Portfolio weights vector.",
+                      :ow => "`w`: Observation weights vector.",
+                      :oow => "`w`: Optional observation weights vector.",
+                      # Matrix processing.
+                      :pdm => "`pdm`: Positive definite matrix estimator.",
+                      :dn => "`dn`: Matrix denoising estimator.",
+                      :dt => "`dt`: Matrix detoning estimator.",
+                      :mp => "`mp`: Matrix processing estimator.",
+                      # Moments.
+                      :me => "`me`: Expected returns estimator.",
+                      :ce => "`ce`: Covariance estimator.",#
+                      :ve => "`ve`: Variance estimator.",#
+                      :ske => "`ske`: Coskewness estimator.",
+                      :kte => "`kte`: Cokurtosis estimator.",
+                      :de => "`de`: Distance matrix estimator.",
+                      # Priors.
+                      :pe => "`pe`: Prior estimator.",#
+                      :pr => "`pr`: Prior result.",#
+                      :per => "`pe`: Prior estimator or result.",
+                      # Phylogeny.
+                      :cle => "`cle`: Clusters estimator.",#
+                      :clr => "`clr`: Clusters result.",#
+                      :cler => "`cle`: Clusters estimator or result.",#
+                      :ple => "`pl`: Phylogeny estimator.",# 
+                      :plr => "`pl`: Phylogeny result.",
+                      :pler => "`pl`: Phylogeny estimator or result.",
+                      :nte => "`nt`: Network estimator.",#
+                      :ntr => "`nt`: Network result.",
+                      :nter => "`nt`: Network estimator or result.",
+                      :cte => "`ct`: Centrality estimator.",#
+                      :ctr => "`ct`: Centrality result.",
+                      :cter => "`ct`: Centrality estimator or result.",
+                      # Turnover.
+                      :tne => "`tn`: Turnover estimator.",#
+                      :tnr => "`tn`: Turnover result.",
+                      :tner => "`tn`: Turnover estimator or result.",
+                      :tnes => "`tn`: Turnover estimator(s).",
+                      :tnrs => "`tn`: Turnover result(s).",
+                      :tners => "`tn`: Turnover estimator(s) or result(s).",
+                      # Tracking.
+                      :tre => "`tr`: Tracking error estimator.",
+                      :trr => "`tr`: Tracking error result.",
+                      :trer => "`tr`: Tracking error estimator or result.",
+                      :tres => "`tr`: Tracking error estimator(s).",
+                      :trrs => "`tr`: Tracking error result(s).",
+                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                      # Weight bounds.
+                      :wbe => "`wb`: Weight bounds estimator.",
+                      :wbr => "`wb`: Weight bounds result.",
+                      :wber => "`wb`: Weight bounds estimator or result.",
+                      # Fees.
+                      :feese => "`fees`: Fees estimator.",#
+                      :feesr => "`fees`: Fees result.",
+                      :feeser => "`fees`: Fees estimator or result.")
+
+"""
+    validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+
+Validation rules for certain glossary terms used in the documentation of `PortfolioOptimisers.jl`.
+"""
+validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

@@ -1495,7 +1495,8 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
-    return smythbroby(ce, X, mean_vec, std_vec) ⊙ (std_vec ⊗ std_vec)
+    sigma = smythbroby(ce, X, mean_vec, std_vec)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
@@ -1511,7 +1512,8 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
-    return smythbroby(ce, X) ⊙ (std_vec ⊗ std_vec)
+    sigma = smythbroby(ce, X)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 
 export SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, SmythBrobyGerber1,

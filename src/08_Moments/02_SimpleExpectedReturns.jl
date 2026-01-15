@@ -101,8 +101,8 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 
 # Arguments
 
-  - $(dsd[:me])
-  - $(dsd[:ow])
+  - $(glossary[:me])
+  - $(glossary[:ow])
 
 # Returns
 
