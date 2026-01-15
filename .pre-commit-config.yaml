@@ -38,11 +38,11 @@ repos:
     hooks:
       - id: yamlfmt
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.37.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
   - repo: https://github.com/ericphanson/ExplicitImports.jl
-    rev: v1.14.0
+    rev: v1.15.0
     hooks:
       - id: explicit-imports
         name: ExplicitImports checks
