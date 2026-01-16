@@ -111,13 +111,11 @@ for res in results[1:5]
 end
 mean_w ./= 5
 res = optimise(MeanRisk(; r = rs, opt = JuMPOptimiser(; pe = pr, slv = slv)))
-
 pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
                        :distance => results[5].w, :mean_w => mean_w,
                        :sum_covs => results[6].w, :multi_risk => res.w);
              formatters = [resfmt])
-
 #=
 For extra credit we can do the same but maximising the ratio of return to risk.
 =#
@@ -145,9 +143,87 @@ For clustering optimisations, the scalarisers apply to each sub-optimisation, so
 
 It is also possible to mix any and all compatible risk measures. We will demonstrate this by mixing the variance with the negative skewness.
 
-We will set the weight for the negative skewness to 8 because it's usually a much smaller number than the variance. We will also precompute the clustering results. 
+In this example we have tuned the weight of the negative skewness to demonstrate how clusters may end up with different risk measures due to the choice of scalariser.
+
+We will use the heirarchical equal risk contribution optimisation, precomputing the clustering results using the direct bubble hierarchy tree algorithm.
+
+The [`HierarchicalEqualRiskContribution`]-(@ref) optimisation estimator accepts inner and outer risk measures and inner and outer scalarisers.
+=#
+clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
+r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1))]
+
+results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
+                                                      ro = r[1],# outer (inter-cluster) risk measure
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,#
+                                                      scai = SumScalariser(),# inner (intra-cluster)
+                                                      scao = SumScalariser(),# outer (inter-cluster)
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = MaxScalariser(),
+                                                      scao = MaxScalariser(),
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = MinScalariser(),
+                                                      scao = MinScalariser(),
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = LogSumExpScalariser(),
+                                                      scao = LogSumExpScalariser(),
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr)))]
+
+pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
+                       :neg_skew => results[2].w, :sum_sca => results[3].w,
+                       :max_sca => results[4].w, :min_sca => results[5].w,
+                       :log_sum_exp => results[6].w); formatters = [resfmt])
+
+#=
+When the weights are different enough that one risk measure domintes over the other in all contexts, then the results of the max and min scalarisers will be as expected, i.e. they will be as if only one risk measure was used.
 =#
 
-clr = clusterise(ClustersEstimator(), pr.X)
+r = [Variance(), NegativeSkewness()]
 
-r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 8))]
+results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
+                                                      ro = r[1],# outer (inter-cluster) risk measure
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,#
+                                                      scai = SumScalariser(),# inner (intra-cluster)
+                                                      scao = SumScalariser(),# outer (inter-cluster)
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = MaxScalariser(),
+                                                      scao = MaxScalariser(),
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = MinScalariser(),
+                                                      scao = MinScalariser(),
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr))),
+           optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
+                                                      scai = LogSumExpScalariser(),
+                                                      scao = LogSumExpScalariser(),
+                                                      opt = HierarchicalOptimiser(; pe = pr,
+                                                                                  cle = clr)))]
+
+pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
+                       :neg_skew => results[2].w, :sum_sca => results[3].w,
+                       :max_sca => results[4].w, :min_sca => results[5].w,
+                       :log_sum_exp => results[6].w); formatters = [resfmt])
+
+#=
+Note how the max scalariser produced the same weights as the negative skewness and the min scalariser produced the same weights as the variance. This is because in all cases, the same the value of the negative skewness was greater than that of the variance. A similar behaviour can be observed with other clustering optimisers. [`NearOptimalCentering`]-(@ref) can also have unintuitive behaviour when computing the risk bounds with an effective frontier [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) due to the fact that each point in the efficient frontier can have a different risk measure dominating the others.
+=#

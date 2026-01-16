@@ -494,5 +494,5 @@ function no_bounds_risk_measure end
 function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
-       MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
+       MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
        HierarchicalRiskMeasure

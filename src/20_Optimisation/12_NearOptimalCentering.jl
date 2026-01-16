@@ -162,22 +162,35 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::Ve
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
-    risk_min = zero(datatype)
+    N = length(rs)
+    risk_min = zeros(datatype, N)
     flag = isa(w_opt, VecNum)
-    risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
-    risk_max = zero(datatype)
+    risk_opt = if flag
+        zeros(datatype, N)
+    else
+        zeros(datatype, N, length(w_opt))
+    end
+    risk_max = zeros(datatype, N)
     gamma = scalarisation.gamma
-    for r in rs
+    for (i, r) in enumerate(rs)
         scale = r.settings.scale * gamma
-        risk_min += exp(expected_risk(r, w_min, X, fees) * scale)
+        risk_min[i] = expected_risk(r, w_min, X, fees) * scale
         tmp = expected_risk(r, w_opt, X, fees) * scale
-        risk_opt += flag ? exp(tmp) : exp.(tmp)
-        risk_max += exp(expected_risk(r, w_max, X, fees) * scale)
+        if flag
+            risk_opt[i] = tmp
+        else
+            risk_opt[i, :] .= tmp
+        end
+        risk_max[i] = expected_risk(r, w_max, X, fees) * scale
     end
     igamma = inv(gamma)
-    risk_min = log(risk_min) * igamma
-    risk_opt = (flag ? log(risk_opt) : log.(risk_opt)) * igamma
-    risk_max = log(risk_max) * igamma
+    risk_min = LogExpFunctions.logsumexp(risk_min) * igamma
+    risk_opt = if flag
+        LogExpFunctions.logsumexp(risk_opt) * igamma
+    else
+        vec(LogExpFunctions.logsumexp(risk_opt; dims = 1)) * igamma
+    end
+    risk_max = LogExpFunctions.logsumexp(risk_max) * igamma
     return risk_min, risk_opt, risk_max
 end
 function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPriorResult,
