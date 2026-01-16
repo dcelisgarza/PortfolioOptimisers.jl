@@ -8,6 +8,7 @@ RiskMeasureSettings
 HierarchicalRiskMeasureSettings
 SumScalariser
 MaxScalariser
+MinScalariser
 LogSumExpScalariser
 AbstractBaseRiskMeasure
 NoOptimisationRiskMeasure

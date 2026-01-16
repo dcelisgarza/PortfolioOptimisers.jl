@@ -94,6 +94,33 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::VecNum, roku::MatNum, rkbo
     end
     return crisk
 end
+function herc_scalarised_risk_o!(::MinScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
+                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    crisk = typemax(eltype(X))
+    for ro in ros
+        unitary_expected_risks!(wk, roku, ro, X, fees)
+        rkbo[cl] .= inv.(view(roku, cl))
+        rkbo[cl] ./= sum(view(rkbo, cl))
+        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
+        if crisk_i < crisk
+            crisk = crisk_i
+        end
+    end
+    return crisk
+end
+function herc_scalarised_risk_o!(::MinScalariser, wk::VecNum, roku::MatNum, rkbo::VecNum,
+                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    crisk = typemax(eltype(X))
+    for (i, ro) in pairs(ros)
+        rkbo[cl] .= inv.(view(roku, cl, i))
+        rkbo[cl] ./= sum(view(rkbo, cl))
+        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
+        if crisk_i < crisk
+            crisk = crisk_i
+        end
+    end
+    return crisk
+end
 function herc_scalarised_risk_o!(sca::LogSumExpScalariser, wk::VecNum, roku::VecNum,
                                  rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
                                  fees::Option{<:Fees})
@@ -164,6 +191,38 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::VecNum, riku::MatNum, cl::
         risk[:, 1] = ri.settings.scale * view(riku, cl, i)
         risk_i = sum(view(risk, :, 1))
         if risk_i > risk_t
+            risk_t = risk_i
+            risk[:, 2] .= inv.(view(risk, :, 1))
+            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
+        end
+    end
+    return view(risk, :, 2)
+end
+function herc_scalarised_risk_i!(::MinScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
+                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    risk_t = typemax(eltype(X))
+    risk = zeros(eltype(X), length(cl), 2)
+    for ri in ris
+        unitary_expected_risks!(wk, riku, ri, X, fees)
+        risk[:, 1] = ri.settings.scale * view(riku, cl)
+        risk_i = sum(view(risk, :, 1))
+        if risk_i < risk_t
+            risk_t = risk_i
+            risk[:, 2] .= inv.(view(risk, :, 1))
+            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
+        end
+    end
+    return view(risk, :, 2)
+end
+function herc_scalarised_risk_i!(::MinScalariser, wk::VecNum, riku::MatNum, cl::VecInt,
+                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    risk_t = typemax(eltype(X))
+    risk = zeros(eltype(X), length(cl), 2)
+    for (i, ri) in pairs(ris)
+        unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
+        risk[:, 1] = ri.settings.scale * view(riku, cl, i)
+        risk_i = sum(view(risk, :, 1))
+        if risk_i < risk_t
             risk_t = risk_i
             risk[:, 2] .= inv.(view(risk, :, 1))
             risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))

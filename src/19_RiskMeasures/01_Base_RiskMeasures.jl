@@ -284,6 +284,7 @@ Subtype `Scalariser` to implement different methods for aggregating risk measure
 
   - [`SumScalariser`](@ref)
   - [`MaxScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
 """
 abstract type Scalariser <: AbstractEstimator end
@@ -311,6 +312,7 @@ Where:
 
   - [`Scalariser`](@ref)
   - [`MaxScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
@@ -325,7 +327,7 @@ Scalariser that selects the risk expression whose scaled value is the largest.
 
 ```math
 \\begin{align}
-\\phi &= \\underset{i \\in (1,\\,N)}{\\max}  \\left( w_i \\cdot r_i \\right)\\,.
+\\phi &= \\underset{i \\in (1,\\,N)}{\\max} \\left(w_i \\cdot r_i \\right)\\,.
 \\end{align}
 ```
 
@@ -340,11 +342,42 @@ Where:
 
   - [`Scalariser`](@ref)
   - [`SumScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
 struct MaxScalariser <: Scalariser end
+"""
+    struct MinScalariser <: Scalariser end
+
+Scalariser that selects the risk expression whose scaled value is the largest.
+
+`MinScalariser` aggregates a vector of risk measures by selecting the minimum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+
+```math
+\\begin{align}
+\\phi &= \\underset{i \\in (1,\\,N)}{\\min} \\left( w_i \\cdot r_i \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``N``: Number of risk measures.
+  - ``i``: Subscript denoting the `i`-th risk measure.
+  - ``r_i``: `i`-th risk measure value.
+  - ``w_i``: Weight of the `i`-th risk measure.
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`SumScalariser`](@ref)
+  - [`MaxScalariser`](@ref)
+  - [`LogSumExpScalariser`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+"""
+struct MinScalariser <: Scalariser end
 """
     struct LogSumExpScalariser{T1} <: Scalariser
         gamma::T1
@@ -397,6 +430,7 @@ LogSumExpScalariser
   - [`Scalariser`](@ref)
   - [`SumScalariser`](@ref)
   - [`MaxScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """

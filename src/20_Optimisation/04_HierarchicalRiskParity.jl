@@ -118,6 +118,30 @@ function hrp_scalarised_risk(::MaxScalariser, wu::MatNum, wk::VecNum, rku::VecNu
     end
     return lrisk, rrisk
 end
+function hrp_scalarised_risk(::MinScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
+                             fees::Option{<:Fees})
+    lrisk = zero(eltype(X))
+    rrisk = zero(eltype(X))
+    trisk = typemax(eltype(X))
+    for r in rs
+        fill!(wu, zero(eltype(X)))
+        unitary_expected_risks!(wk, rku, r, X, fees)
+        wu[lc, 1] .= inv.(view(rku, lc))
+        wu[lc, 1] ./= sum(view(wu, lc, 1))
+        wu[rc, 2] .= inv.(view(rku, rc))
+        wu[rc, 2] ./= sum(view(wu, rc, 2))
+        lrisk_i = expected_risk(r, view(wu, :, 1), X, fees) * r.settings.scale
+        rrisk_i = expected_risk(r, view(wu, :, 2), X, fees) * r.settings.scale
+        trisk_i = lrisk_i + rrisk_i
+        if trisk_i < trisk
+            lrisk = lrisk_i
+            rrisk = rrisk_i
+            trisk = trisk_i
+        end
+    end
+    return lrisk, rrisk
+end
 function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
                              lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
