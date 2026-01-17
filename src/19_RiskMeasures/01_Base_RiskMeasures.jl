@@ -278,18 +278,46 @@ end
 
 Abstract supertype for scalarisation strategies used to combine multiple risk measures into a single scalar value for optimisation.
 
-Subtype `Scalariser` to implement different methods for aggregating risk measures, such as weighted sum, maximum, or log-sum-exp. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+Subtype `Scalariser` to implement different methods for aggregating risk measures. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+
+# Related Types
+
+  - [`NonHierarchicalScalariser`](@ref)
+  - [`HierarchicalScalariser`](@ref)
+"""
+abstract type Scalariser <: AbstractEstimator end
+"""
+    abstract type NonHierarchicalScalariser <: Scalariser end
+
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible with all portfolio optimisation estimators.
+
+Subtype `NonHierarchicalScalariser` to implement aggregation methods that work with all optimisation estimators.
 
 # Related Types
 
   - [`SumScalariser`](@ref)
   - [`MaxScalariser`](@ref)
-  - [`MinScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
+  - [`Scalariser`](@ref)
+  - [`HierarchicalScalariser`](@ref)
 """
-abstract type Scalariser <: AbstractEstimator end
+abstract type NonHierarchicalScalariser <: Scalariser end
 """
-    struct SumScalariser <: Scalariser end
+    abstract type HierarchicalScalariser <: Scalariser end
+
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible only with hierarchical optimisations.
+
+Subtype `HierarchicalScalariser` to implement aggregation methods that only work with hierarchical optimisation estimators.
+
+# Related Types
+
+  - [`MinScalariser`](@ref)
+  - [`Scalariser`](@ref)
+  - [`NonHierarchicalScalariser`](@ref)
+"""
+abstract type HierarchicalScalariser <: Scalariser end
+"""
+    struct SumScalariser <: NonHierarchicalScalariser end
 
 Scalariser that combines multiple risk measures using a weighted sum.
 
@@ -317,9 +345,9 @@ Where:
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct SumScalariser <: Scalariser end
+struct SumScalariser <: NonHierarchicalScalariser end
 """
-    struct MaxScalariser <: Scalariser end
+    struct MaxScalariser <: NonHierarchicalScalariser end
 
 Scalariser that selects the risk expression whose scaled value is the largest.
 
@@ -347,9 +375,9 @@ Where:
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct MaxScalariser <: Scalariser end
+struct MaxScalariser <: NonHierarchicalScalariser end
 """
-    struct MinScalariser <: Scalariser end
+    struct MinScalariser <: HierarchicalScalariser end
 
 Scalariser that selects the risk expression whose scaled value is the largest.
 
@@ -377,9 +405,9 @@ Where:
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct MinScalariser <: Scalariser end
+struct MinScalariser <: HierarchicalScalariser end
 """
-    struct LogSumExpScalariser{T1} <: Scalariser
+    struct LogSumExpScalariser{T1} <: NonHierarchicalScalariser
         gamma::T1
     end
 
@@ -434,7 +462,7 @@ LogSumExpScalariser
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct LogSumExpScalariser{T1} <: Scalariser
+struct LogSumExpScalariser{T1} <: NonHierarchicalScalariser
     gamma::T1
     function LogSumExpScalariser(gamma::Number)
         @argcheck(gamma > zero(gamma))

@@ -15,5 +15,7 @@ NoOptimisationRiskMeasure
 OptimisationRiskMeasure
 AbstractRiskMeasureSettings
 Scalariser
+NonHierarchicalScalariser
+HierarchicalScalariser
 nothing_scalar_array_selector
 ```
