@@ -807,12 +807,6 @@
         mr = MeanRisk(; r = r, opt = opt)
         w4 = optimise(mr, rd).w
         @test isapprox(w4, w2, rtol = 1e-4)
-
-        #! Add this once hte formulation is fixed
-        # opt = JuMPOptimiser(; pe = pr, bgt = 1, slv = slv, sca = MinScalariser())
-        # mr = MeanRisk(; r = r, opt = opt)
-        # w5 = optimise(mr, rd).w
-        # @test isapprox(w5, w0_2)
     end
     @testset "Arithmetic return uncertainty set" begin
         rng = StableRNG(123456789)

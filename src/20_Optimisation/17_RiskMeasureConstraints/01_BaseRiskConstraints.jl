@@ -44,17 +44,6 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
     JuMP.@constraint(model, risk_ms, risk .- risk_vec .>= 0)
     return nothing
 end
-#=
-function scalarise_risk_expression!(model::JuMP.Model, ::MinScalariser)
-    if !haskey(model, :risk_vec)
-        return nothing
-    end
-    risk_vec = model[:risk_vec]
-    JuMP.@variable(model, risk)
-    JuMP.@constraint(model, risk_ms, risk .- risk_vec .<= 0)
-    return nothing
-end
-=#
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
