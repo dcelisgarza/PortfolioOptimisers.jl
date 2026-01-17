@@ -225,38 +225,6 @@ function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPr
     end
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(::MinScalariser, rs::VecRM, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::Option{<:Slv_VecSlv},
-                                      w_min::VecNum, w_opt::VecNum_VecVecNum, w_max::VecNum)
-    X = pr.X
-    rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    risk_min = typemax(datatype)
-    flag = isa(w_opt, VecNum)
-    risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
-    risk_max = typemax(datatype)
-    for r in rs
-        scale = r.settings.scale
-        risk_min_i = expected_risk(r, w_min, X, fees) * scale
-        risk_opt_i = expected_risk(r, w_opt, X, fees) * scale
-        risk_max_i = expected_risk(r, w_max, X, fees) * scale
-        if risk_min_i <= risk_min
-            risk_min = risk_min_i
-        end
-        if flag
-            if risk_opt_i <= risk_opt
-                risk_opt = risk_opt_i
-            end
-        else
-            idx = risk_opt_i .<= risk_opt
-            risk_opt[idx] = view(risk_opt_i, idx)
-        end
-        if risk_max_i <= risk_max
-            risk_max = risk_max_i
-        end
-    end
-    return risk_min, risk_opt, risk_max
-end
 struct NearOptimalSetup{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12}
     w_opt::T1
     rk_opt::T2
