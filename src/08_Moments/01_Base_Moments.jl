@@ -26,7 +26,7 @@ end
 
 Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement covariance estimation (e.g., sample covariance, shrinkage estimators) should subtype `AbstractCovarianceEstimator`. This enables a consistent interface for covariance estimation routines throughout the package.
+All concrete types that implement covariance estimation should subtype `AbstractCovarianceEstimator`.
 
 # Related
 
@@ -39,7 +39,7 @@ abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 
 Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement variance estimation (e.g., sample variance, robust variance estimators) should subtype `AbstractVarianceEstimator`. This enables a consistent interface for variance estimation routines and allows for flexible extension and dispatch within the package.
+All concrete types that implement variance estimation should subtype `AbstractVarianceEstimator`.
 
 # Related
 
@@ -55,7 +55,7 @@ end
 
 Abstract supertype for all expected returns estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement expected returns estimation (e.g., sample mean, Bayesian estimators) should subtype `AbstractExpectedReturnsEstimator`. This enables a consistent interface for expected returns estimation routines throughout the package.
+All concrete types that implement expected returns estimation should subtype `AbstractExpectedReturnsEstimator`.
 
 # Related
 

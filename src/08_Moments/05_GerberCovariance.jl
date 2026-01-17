@@ -3,7 +3,7 @@
 
 Abstract supertype for all Gerber covariance estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing Gerber covariance estimation algorithms should subtype `BaseGerberCovariance`. This enables a consistent interface for Gerber-based covariance estimators throughout the package.
+All concrete types implementing Gerber covariance estimation algorithms should subtype `BaseGerberCovariance`.
 
 # Related
 

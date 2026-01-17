@@ -3,7 +3,7 @@
 
 Abstract supertype for all coskewness estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing coskewness estimation algorithms should subtype `CoskewnessEstimator`. This enables a consistent interface for coskewness-based higher moment estimators throughout the package.
+All concrete types implementing coskewness estimation algorithms should subtype `CoskewnessEstimator`.
 
 # Related
 

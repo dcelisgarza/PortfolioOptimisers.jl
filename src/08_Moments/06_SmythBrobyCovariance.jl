@@ -3,7 +3,7 @@
 
 Abstract supertype for all Smyth-Broby covariance estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing Smyth-Broby covariance estimation algorithms should subtype `BaseSmythBrobyCovariance`. This enables a consistent interface for Smyth-Broby-based covariance estimators throughout the package.
+All concrete types implementing Smyth-Broby covariance estimation algorithms should subtype `BaseSmythBrobyCovariance`.
 
 # Related
 

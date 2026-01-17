@@ -3,7 +3,7 @@
 
 Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
 
-All custom estimators should subtype `AbstractEstimator`. This enables a consistent interface for estimation routines throughout the package.
+All custom estimators should subtype `AbstractEstimator`.
 
 Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different numerical characteristics, to entirely different methodologies or algorithms yielding different results.
 
@@ -18,7 +18,7 @@ abstract type AbstractEstimator end
 
 Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
 
-All algorithms should subtype `AbstractAlgorithm`. This enables a consistent interface for estimation routines throughout the package.
+All algorithms should subtype `AbstractAlgorithm`.
 
 Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details to entirely different procedures for estimating a quantity.
 
@@ -33,7 +33,7 @@ abstract type AbstractAlgorithm end
 
 Abstract supertype for all result types in `PortfolioOptimisers.jl`.
 
-All result objects should subtype `AbstractResult`. This enables a consistent interface for estimation routines throughout the package.
+All result objects should subtype `AbstractResult`.
 
 Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a wide range of information.
 

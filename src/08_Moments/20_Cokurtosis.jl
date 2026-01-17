@@ -3,7 +3,7 @@
 
 Abstract supertype for all cokurtosis estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing cokurtosis estimation algorithms should subtype `CokurtosisEstimator`. This enables a consistent interface for cokurtosis-based higher moment estimators throughout the package.
+All concrete types implementing cokurtosis estimation algorithms should subtype `CokurtosisEstimator`.
 
 # Related
 

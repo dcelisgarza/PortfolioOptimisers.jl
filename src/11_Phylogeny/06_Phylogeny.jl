@@ -717,7 +717,7 @@ end
 
 Abstract supertype for all network estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing network-based estimation algorithms should subtype `AbstractNetworkEstimator`. This enables a consistent interface for network estimators throughout the package.
+All concrete types implementing network-based estimation algorithms should subtype `AbstractNetworkEstimator`.
 
 # Related
 
@@ -813,7 +813,7 @@ end
 
 Abstract supertype for all centrality estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing centrality-based estimation algorithms should subtype `AbstractCentralityEstimator`. This enables a consistent interface for centrality estimators throughout the package.
+All concrete types implementing centrality-based estimation algorithms should subtype `AbstractCentralityEstimator`.
 
 # Related
 

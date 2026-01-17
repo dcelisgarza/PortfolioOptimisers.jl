@@ -3,7 +3,7 @@
 
 Abstract supertype for all regression estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing regression estimation algorithms should subtype `AbstractRegressionEstimator`. This enables a consistent interface for regression-based moment estimation throughout the package.
+All concrete types implementing regression estimation algorithms should subtype `AbstractRegressionEstimator`.
 
 # Related
 
@@ -17,7 +17,7 @@ abstract type AbstractRegressionEstimator <: AbstractEstimator end
 
 Abstract supertype for all regression result types in PortfolioOptimisers.jl.
 
-All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`. This enables a consistent interface for handling regression results, such as fitted parameters, rr, and intercepts, throughout the package.
+All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`.
 
 # Related
 

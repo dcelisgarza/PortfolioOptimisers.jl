@@ -3,7 +3,7 @@
 
 Abstract supertype for all constraint result types in PortfolioOptimisers.jl.
 
-All concrete types representing the result of constraint generation or evaluation should subtype `AbstractConstraintResult`. This enables a consistent interface for handling constraint results across different estimators and algorithms.
+All concrete types representing the result of constraint generation or evaluation should subtype `AbstractConstraintResult`.
 
 # Related
 

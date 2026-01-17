@@ -3,7 +3,7 @@
 
 Abstract supertype for all distance estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing distance-based estimation algorithms should subtype `AbstractDistanceEstimator`. This enables a consistent interface for distance-based measures (such as correlation distance, absolute distance, or information-theoretic distances) throughout the package.
+All concrete types implementing distance-based estimation algorithms should subtype `AbstractDistanceEstimator`.
 
 # Related
 

@@ -132,7 +132,7 @@ end
 
 Abstract supertype for all equation parsing result types in PortfolioOptimisers.jl.
 
-All concrete types representing parsing results should subtype `AbstractParsingResult`. This enables a consistent interface for handling different types of parsed constraint equations.
+All concrete types representing parsing results should subtype `AbstractParsingResult`.
 
 # Related
 

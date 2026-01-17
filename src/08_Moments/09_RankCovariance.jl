@@ -3,7 +3,7 @@
 
 Abstract supertype for all rank-based covariance estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing rank-based covariance estimation algorithms (such as Kendall's tau or Spearman's rho) should subtype `RankCovarianceEstimator`. This enables a consistent interface for rank-based covariance estimators throughout the package and allows for flexible extension and dispatch.
+All concrete types implementing rank-based covariance estimation algorithms should subtype `RankCovarianceEstimator`.
 
 # Related
 

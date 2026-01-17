@@ -3,7 +3,7 @@
 
 Abstract supertype for all shrunk expected returns estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing shrinkage-based expected returns estimation algorithms should subtype `AbstractShrunkExpectedReturnsEstimator`. This enables a consistent interface for shrinkage estimators throughout the package.
+All concrete types implementing shrinkage-based expected returns estimation algorithms should subtype `AbstractShrunkExpectedReturnsEstimator`.
 
 # Related
 

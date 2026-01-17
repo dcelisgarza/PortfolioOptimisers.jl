@@ -3,7 +3,7 @@
 
 Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClustersEstimator`. This enables a consistent interface for clustering estimators throughout the package.
+All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClustersEstimator`.
 
 # Related
 
@@ -34,7 +34,7 @@ abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgo
 
 Abstract supertype for all optimal number of clusters estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing algorithms to estimate the optimal number of clusters should subtype `AbstractOptimalNumberClustersEstimator`. This enables a consistent interface for cluster number estimation.
+All concrete types implementing algorithms to estimate the optimal number of clusters should subtype `AbstractOptimalNumberClustersEstimator`.
 
 # Related
 
@@ -59,7 +59,7 @@ const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 
 Abstract supertype for all clustering result types in PortfolioOptimisers.jl.
 
-All concrete types representing the result of a clustering estimation should subtype `AbstractClusteringResult`. This enables a consistent interface for clustering results throughout the package.
+All concrete types representing the result of a clustering estimation should subtype `AbstractClusteringResult`.
 
 # Related
 
