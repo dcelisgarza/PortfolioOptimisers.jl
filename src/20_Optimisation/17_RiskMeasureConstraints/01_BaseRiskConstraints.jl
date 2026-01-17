@@ -49,6 +49,7 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MinScalariser)
         return nothing
     end
     risk_vec = model[:risk_vec]
+    #! Doesn't work.
     JuMP.@variable(model, risk)
     JuMP.@constraint(model, risk_ms, risk .- risk_vec .<= 0)
     return nothing

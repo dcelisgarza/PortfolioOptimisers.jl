@@ -90,11 +90,9 @@
             @test success
         end
     end
-    df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"), DataFrame)
-
     @testset "HierarchicalRiskParity vector rm" begin
         sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1.2e2),
-                LogSumExpScalariser(; gamma = 1e6)]
+                LogSumExpScalariser(; gamma = 1e6), MinScalariser()]
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity2.csv.gz"),
                       DataFrame)
         for (i, sca) in pairs(sces)
@@ -177,7 +175,7 @@
     end
     @testset "HierarchicalEqualRiskContribution scalarisers" begin
         sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
-                LogSumExpScalariser(; gamma = 1e2)]
+                LogSumExpScalariser(; gamma = 1e2), MinScalariser()]
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/HierarchicalEqualRiskContribution2.csv.gz"),
                       DataFrame)
