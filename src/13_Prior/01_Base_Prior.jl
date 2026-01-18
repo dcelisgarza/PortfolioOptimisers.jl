@@ -234,7 +234,7 @@ function clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwa
     return clusterise(cle, pr.X; kwargs...)
 end
 """
-    phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult;
+    phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
                      kwargs...)
 
 Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
@@ -243,7 +243,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 
 # Arguments
 
-  - `necle`: Network estimator, res estimator, or clustering result.
+  - `pl`: Network estimator, res estimator, or clustering result.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
@@ -258,8 +258,8 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(necle::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
-    return phylogeny_matrix(necle, pr.X; kwargs...)
+function phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
+    return phylogeny_matrix(pl, pr.X; kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -379,7 +379,7 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPri
     return average_centrality(cte, w, pr.X; kwargs...)
 end
 """
-    asset_phylogeny(cle::NwE_ClE_Cl,
+    asset_phylogeny(pl::NwE_ClE_Cl,
                     w::VecNum, pr::AbstractPriorResult; dims::Int = 1, kwargs...)
 
 Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
@@ -388,7 +388,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 
 # Arguments
 
-  - `cle`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
+  - `pl`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object containing asset returns.
   - `dims`: Dimension along which to compute the phylogeny matrix.
@@ -400,7 +400,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 
 # Details
 
-  - Computes the phylogeny matrix from the asset returns in `pr` using `cle`.
+  - Computes the phylogeny matrix from the asset returns in `pr` using `pl`.
   - Evaluates the weighted sum of the phylogeny matrix using the weights `w`.
   - Normalises the score by the sum of absolute weights.
   - Returns a real-valued score quantifying the phylogenetic structure of the allocation.
@@ -413,9 +413,9 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::NwE_ClE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
+function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
                          kwargs...)
-    return asset_phylogeny(cle, w, pr.X; dims = dims, kwargs...)
+    return asset_phylogeny(pl, w, pr.X; dims = dims, kwargs...)
 end
 """
     struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:

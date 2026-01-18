@@ -277,7 +277,7 @@
                                 opti = FactorRiskContribution(; re = rr, opt = jopti),
                                 opto = FactorRiskContribution(; opt = jopto)),
                 NestedClustered(;
-                                cle = ClustersEstimator(;
+                                clr = ClustersEstimator(;
                                                         ce = PortfolioOptimisersCovariance(),
                                                         de = Distance(;
                                                                       alg = CanonicalDistance()),
