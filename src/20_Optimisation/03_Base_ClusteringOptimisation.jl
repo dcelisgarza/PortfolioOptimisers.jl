@@ -18,41 +18,41 @@ end
 struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
        BaseClusteringOptimisationEstimator
     pr::T1
-    cle::T2
+    clr::T2
     slv::T3
     fees::T4
     wb::T5
     sets::T6
     wf::T7
     strict::T8
-    function HierarchicalOptimiser(pr::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
+    function HierarchicalOptimiser(pr::PrE_Pr, clr::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    fees::Option{<:FeesE_Fees}, wb::Option{<:WbE_Wb},
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,
                                    strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pr), typeof(cle), typeof(slv), typeof(fees), typeof(wb),
-                   typeof(sets), typeof(wf), typeof(strict)}(pr, cle, slv, fees, wb, sets,
+        return new{typeof(pr), typeof(clr), typeof(slv), typeof(fees), typeof(wb),
+                   typeof(sets), typeof(wf), typeof(strict)}(pr, clr, slv, fees, wb, sets,
                                                              wf, strict)
     end
 end
 function HierarchicalOptimiser(; pr::PrE_Pr = EmpiricalPrior(),
-                               cle::HClE_HCl = ClustersEstimator(),
+                               clr::HClE_HCl = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                fees::Option{<:FeesE_Fees} = nothing,
                                wb::Option{<:WbE_Wb} = WeightBounds(),
                                sets::Option{<:AssetSets} = nothing,
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
-    return HierarchicalOptimiser(pr, cle, slv, fees, wb, sets, wf, strict)
+    return HierarchicalOptimiser(pr, clr, slv, fees, wb, sets, wf, strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i)
     pr = prior_view(hco.pr, i)
     fees = fees_view(hco.fees, i)
     wb = weight_bounds_view(hco.wb, i)
     sets = nothing_asset_sets_view(hco.sets, i)
-    return HierarchicalOptimiser(; pr = pr, cle = hco.cle, fees = fees, slv = hco.slv,
+    return HierarchicalOptimiser(; pr = pr, clr = hco.clr, fees = fees, slv = hco.slv,
                                  wb = wb, wf = hco.wf, sets = sets, strict = hco.strict)
 end
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,

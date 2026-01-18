@@ -15,7 +15,7 @@ function factory(res::NestedClusteredResult, fb)
                                  res.cv, res.retcode, res.w, fb)
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
-    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.clr, AbstractClusteringResult))
     return nothing
 end
 function assert_rc_variance(::Any)
@@ -56,7 +56,7 @@ end
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pr, AbstractPriorResult))
-    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.clr, AbstractClusteringResult))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -120,7 +120,7 @@ function NestedClustered(; pr::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = Clusters
     return NestedClustered(pr, cle, wb, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)
-    @argcheck(!isa(opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.clr, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_internal_optimiser(opt.opti)
@@ -130,7 +130,7 @@ end
 function assert_external_optimiser(opt::NestedClustered)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pr, AbstractPriorResult))
-    @argcheck(!isa(opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.clr, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_external_optimiser(opt.opti)
