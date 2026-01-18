@@ -163,7 +163,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_smip_constraints!(model, wb, rrb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rrb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rrb.opt.te, nothing, nothing, nothing, fees;
+    set_tracking_error_constraints!(model, pr, rrb.opt.tr, nothing, nothing, nothing, fees;
                                     rd = rd)
     set_number_effective_assets!(model, rrb.opt.nea)
     set_l1_regularisation!(model, rrb.opt.l1)

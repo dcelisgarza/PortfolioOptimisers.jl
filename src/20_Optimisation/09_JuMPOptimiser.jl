@@ -53,7 +53,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     sets::T18
     pl::T19
     tn::T20 # Turnover
-    te::T21 # TrackingError
+    tr::T21 # TrackingError
     fees::T22
     ret::T23
     sca::T24
@@ -80,7 +80,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            sglt::Option{<:BtE_Bt_VecOptBtE_Bt},
                            sgst::Option{<:BtE_Bt_VecOptBtE_Bt}, sets::Option{<:AssetSets},
                            pl::Option{<:PlCE_PhC_VecPlCE_PlC},
-                           tn::Option{<:TnE_Tn_VecTnE_Tn}, te::Option{<:Tr_VecTr},
+                           tn::Option{<:TnE_Tn_VecTnE_Tn}, tr::Option{<:Tr_VecTr},
                            fees::Option{<:FeesE_Fees}, ret::JuMPReturnsEstimator,
                            sca::NonHierarchicalScalariser,
                            ccnt::Option{<:CustomJuMPConstraint},
@@ -196,8 +196,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if isa(tn, AbstractVector)
             @argcheck(!isempty(tn))
         end
-        if isa(te, AbstractVector)
-            @argcheck(!isempty(te))
+        if isa(tr, AbstractVector)
+            @argcheck(!isempty(tr))
         end
         if !isnothing(nea)
             @argcheck(nea > zero(nea))
@@ -209,7 +209,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(lt), typeof(st), typeof(lcs), typeof(ct), typeof(gcard),
                    typeof(sgcard), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
                    typeof(sglt), typeof(sgst), typeof(sets), typeof(pl), typeof(tn),
-                   typeof(te), typeof(fees), typeof(ret), typeof(sca), typeof(ccnt),
+                   typeof(tr), typeof(fees), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(strict)}(pr,
                                                                                        slv,
@@ -231,7 +231,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                                                                        sets,
                                                                                        pl,
                                                                                        tn,
-                                                                                       te,
+                                                                                       tr,
                                                                                        fees,
                                                                                        ret,
                                                                                        sca,
@@ -265,7 +265,7 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        sets::Option{<:AssetSets} = nothing,
                        pl::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                        tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
-                       te::Option{<:Tr_VecTr} = nothing,
+                       tr::Option{<:Tr_VecTr} = nothing,
                        fees::Option{<:FeesE_Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sca::NonHierarchicalScalariser = SumScalariser(),
@@ -277,7 +277,7 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
     return JuMPOptimiser(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
-                         sgmtx, slt, sst, sglt, sgst, sets, pl, tn, te, fees, ret, sca,
+                         sgmtx, slt, sst, sglt, sgst, sets, pl, tn, tr, fees, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
@@ -307,7 +307,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     end
     sets = nothing_asset_sets_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
-    te = tracking_view(opt.te, i, X)
+    tr = tracking_view(opt.tr, i, X)
     fees = fees_view(opt.fees, i)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
@@ -316,7 +316,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          lt = lt, st = st, lcs = opt.lcs, ct = opt.ct, gcard = opt.gcard,
                          sgcard = opt.sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt,
                          sst = sst, sglt = sglt, sgst = sgst, sets = sets, pl = opt.pl,
-                         tn = tn, te = te, fees = fees, ret = ret, sca = opt.sca,
+                         tn = tn, tr = tr, fees = fees, ret = ret, sca = opt.sca,
                          ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, scard = opt.scard, nea = opt.nea, l1 = opt.l1,
                          l2 = opt.l2, strict = opt.strict)
@@ -377,7 +377,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          lt = lt, st = st, lcs = lcs, ct = ct, gcard = gcard,
                          sgcard = sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst,
                          sglt = sglt, sgst = sgst, sets = opt.sets, pl = pl, tn = tn,
-                         te = opt.te, fees = fees, ret = ret, sca = opt.sca,
+                         tr = opt.tr, fees = fees, ret = ret, sca = opt.sca,
                          ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, nea = opt.nea, l1 = opt.l1,
                          l2 = opt.l2, strict = opt.strict)

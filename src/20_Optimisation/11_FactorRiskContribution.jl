@@ -110,7 +110,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, frc.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, frc.opt.te, frc, pl, fees, b1; rd = rd)
+    set_tracking_error_constraints!(model, pr, frc.opt.tr, frc, pl, fees, b1; rd = rd)
     set_number_effective_assets!(model, frc.opt.nea)
     set_l1_regularisation!(model, frc.opt.l1)
     set_l2_regularisation!(model, frc.opt.l2)

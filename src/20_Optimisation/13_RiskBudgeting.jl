@@ -148,7 +148,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rb.opt.te, rb, pl, fees; rd = rd)
+    set_tracking_error_constraints!(model, pr, rb.opt.tr, rb, pl, fees; rd = rd)
     set_number_effective_assets!(model, rb.opt.nea)
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)

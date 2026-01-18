@@ -614,15 +614,29 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
   - Portfolio returns
     
       + Arithmetic returns [`ArithmeticReturn`]-(@ref)
+        
+          * Uncertainty set
+          * Custom value
+    
       + Logarithmic returns [`LogarithmicReturn`]-(@ref)
   - Regularisation penalty
     
       + L1
       + L2
-  - Weight
+  - Weight bounds
   - Budget
-  - Turnover
-  - Tracking
+    
+      + Long
+        
+          * Exact
+          * Range
+    
+      + Short
+        
+          * Exact
+          * Range
+  - Turnover(s)
+  - Tracking(s)
     
       + Returns
         

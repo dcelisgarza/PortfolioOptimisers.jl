@@ -3,22 +3,22 @@ function set_tracking_error_constraints!(args...; kwargs...)
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         te::TrackingError{<:Any, <:Any, <:NOCTracking},
+                                         tr::TrackingError{<:Any, <:Any, <:NOCTracking},
                                          args...; kwargs...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
-    wb = tracking_benchmark(te.tr, X)
-    err = te.err
+    wb = tracking_benchmark(tr.tr, X)
+    err = tr.err
     T = size(X, 1)
     f = err * T
     t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
-    te = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
+    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
     model[Symbol(:cte_noc_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
                                                                              begin
                                                                                  [sc * t_te;
-                                                                                  sc * te] in
+                                                                                  sc * tr] in
                                                                                  JuMP.MOI.NormOneCone(1 +
                                                                                                       T)
                                                                                  sc *
@@ -30,7 +30,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         te::TrackingError{<:Any, <:Any,
+                                         tr::TrackingError{<:Any, <:Any,
                                                            <:Union{<:SOCTracking,
                                                                    <:SquaredSOCTracking}},
                                          args...; kwargs...)
@@ -38,15 +38,15 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
-    wb = tracking_benchmark(te.tr, X)
-    err = te.err
-    f = err * sqrt(size(X, 1) - te.alg.ddof)
+    wb = tracking_benchmark(tr.tr, X)
+    err = tr.err
+    f = err * sqrt(size(X, 1) - tr.alg.ddof)
     t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
-    te = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
+    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
     model[Symbol(:cte_soc_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
                                                                              begin
                                                                                  [sc * t_te;
-                                                                                  sc * te] in
+                                                                                  sc * tr] in
                                                                                  JuMP.SecondOrderCone()
                                                                                  sc *
                                                                                  (t_te -
@@ -57,14 +57,14 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         te::RiskTrackingError{<:Any, <:Any, <:Any,
+                                         tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; kwargs...)
-    r = te.r
-    wb = te.tr.w
-    err = te.err
+    r = tr.r
+    wb = tr.tr.w
+    err = tr.err
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -82,14 +82,14 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         te::RiskTrackingError{<:Any, <:Any, <:Any,
+                                         tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; kwargs...)
-    ri = te.r
-    wb = te.tr.w
-    err = te.err
+    ri = tr.r
+    wb = tr.tr.w
+    err = tr.err
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
@@ -113,8 +113,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
                                          tres::Tr_VecTr, args...; kwargs...)
-    for (i, te) in enumerate(tres)
-        set_tracking_error_constraints!(model, i, pr, te, args...; kwargs...)
+    for (i, tr) in enumerate(tres)
+        set_tracking_error_constraints!(model, i, pr, tr, args...; kwargs...)
     end
     return nothing
 end

@@ -1369,28 +1369,28 @@
                                                             "./assets/SP500_idx.csv.gz"));
                                           timestamp = :Date)[(end - 252):end])
         opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            te = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
+                            tr = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 3e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            te = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
+                            tr = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 2.5e-3, alg = NOCTracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            te = TrackingError(; tr = WeightsTracking(; w = w0),
+                            tr = TrackingError(; tr = WeightsTracking(; w = w0),
                                                err = 2e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            te = [TrackingError(; tr = WeightsTracking(; w = w0),
+                            tr = [TrackingError(; tr = WeightsTracking(; w = w0),
                                                 err = 2e-3, alg = NOCTracking())])
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
@@ -1398,7 +1398,7 @@
 
         tr = RiskTrackingError(; err = 0.0, tr = WeightsTracking(; w = w0),
                                alg = DependentVariableTracking())
-        opt = JuMPOptimiser(; pr = pr, slv = slv, te = tr)
+        opt = JuMPOptimiser(; pr = pr, slv = slv, tr = tr)
         mre = MeanRisk(; r = ConditionalValueatRisk(), opt = opt)
         res = optimise(mre)
         @test isapprox(res.w,
@@ -1408,7 +1408,7 @@
 
         tr = RiskTrackingError(; err = 0.5, tr = WeightsTracking(; w = w0),
                                alg = IndependentVariableTracking())
-        opt = JuMPOptimiser(; pr = pr, slv = slv, te = tr)
+        opt = JuMPOptimiser(; pr = pr, slv = slv, tr = tr)
         mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
         res = optimise(mre)
         @test isapprox(res.w,
@@ -1418,7 +1418,7 @@
 
         tr = RiskTrackingError(; err = 0, tr = WeightsTracking(; w = w0),
                                alg = IndependentVariableTracking())
-        opt = JuMPOptimiser(; pr = pr, slv = slv, te = tr)
+        opt = JuMPOptimiser(; pr = pr, slv = slv, tr = tr)
         mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
         res = optimise(mre)
         @test isapprox(res.w, w0, rtol = 1e-6)

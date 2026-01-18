@@ -576,7 +576,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
                           opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
-    set_tracking_error_constraints!(model, opt.pr, opt.te, noc, opt.pl, opt.fees; rd = rd)
+    set_tracking_error_constraints!(model, opt.pr, opt.tr, noc, opt.pl, opt.fees; rd = rd)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
