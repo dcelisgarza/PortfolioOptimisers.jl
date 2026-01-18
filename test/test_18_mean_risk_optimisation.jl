@@ -1426,7 +1426,7 @@
         @test isapprox(res.w, w0, rtol = 1e-6)
     end
     @testset "Phylogeny" begin
-        plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 1)
+        plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.001)
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
@@ -1454,7 +1454,7 @@
                          1.0879558335436499e-14, 8.09956925306327e-16, 0.9999960892795525];
                         rtol = 1e-6))
 
-        plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 2)
+        plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
         res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
@@ -1472,25 +1472,25 @@
                             0.15784094556549422, -4.439084812281355e-13,
                             -1.4843816960768885e-12, 0.1276616300735639,
                             0.0696639310927601]; rtol = 1e-6)
-        plc = SemiDefinitePhylogenyEstimator(; pe = clr)
+        plc = SemiDefinitePhylogenyEstimator(; pl = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
         @test isapprox(JuMP.value.(res.pl.A .* res.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
 
-        plc = SemiDefinitePhylogenyEstimator(; pe = ClustersEstimator(), p = 1000)
+        plc = SemiDefinitePhylogenyEstimator(; pl = ClustersEstimator(), p = 1000)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
-        plc = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pe = clr, p = 10),
+        plc = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pl = clr, p = 10),
                                     rd.X)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
-        plc = SemiDefinitePhylogenyEstimator(; pe = clr)
+        plc = SemiDefinitePhylogenyEstimator(; pl = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(),
@@ -1507,7 +1507,7 @@
                         2.8259584736181038e-9, 1.9502905591238874e-9, 0.4730283635464767],
                        rtol = 1e-6)
 
-        plc = SemiDefinitePhylogenyEstimator(; pe = clr, p = 5)
+        plc = SemiDefinitePhylogenyEstimator(; pl = clr, p = 5)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(),
@@ -1526,7 +1526,7 @@
                         6.674140406117119e-11, 3.620870179464855e-11,
                         2.9544937962876324e-11, 0.5589695057771867], rtol = 1e-6)
 
-        plc = SemiDefinitePhylogenyEstimator(; pe = clr)
+        plc = SemiDefinitePhylogenyEstimator(; pl = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
@@ -1543,7 +1543,7 @@
                         9.192974758044433e-10, 1.3752920313726993e-9, 0.05823418837805521],
                        rtol = 1e-6)
 
-        plc = SemiDefinitePhylogenyEstimator(; pe = clr, p = 5)
+        plc = SemiDefinitePhylogenyEstimator(; pl = clr, p = 5)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, pl = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
         res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),

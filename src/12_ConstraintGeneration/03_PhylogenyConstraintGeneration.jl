@@ -34,10 +34,9 @@ const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
 const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
-#! Change pe to pl in semidefinite phylogeny estimator and integer phylogeny estimator
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-        pe::T1
+        pl::T1
         p::T2
     end
 
@@ -47,13 +46,13 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 
 # Fields
 
-  - `pe`: Phylogeny or clustering estimator.
+  - `pl`: Phylogeny or clustering estimator.
   - `p`: Non-negative penalty parameter for the constraint.
 
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pe::NwE_ClE_Cl = NetworkEstimator(),
+                                   pl::NwE_ClE_Cl = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -65,7 +64,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 ```jldoctest
 julia> SemiDefinitePhylogenyEstimator()
 SemiDefinitePhylogenyEstimator
-  pe ┼ NetworkEstimator
+  pl ┼ NetworkEstimator
      │    ce ┼ PortfolioOptimisersCovariance
      │       │   ce ┼ Covariance
      │       │      │    me ┼ SimpleExpectedReturns
@@ -100,16 +99,16 @@ SemiDefinitePhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
+    pl::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pe::NwE_ClE_Cl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pl::NwE_ClE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
-        return new{typeof(pe), typeof(p)}(pe, p)
+        return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pl::NwE_ClE_Cl = NetworkEstimator(),
                                         p::Number = 0.05)
-    return SemiDefinitePhylogenyEstimator(pe, p)
+    return SemiDefinitePhylogenyEstimator(pl, p)
 end
 const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
@@ -212,14 +211,14 @@ function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
+    validate_length_integer_phylogeny_constraint_B(pl::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
-Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pe`.
+Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pl`.
 
 # Arguments
 
-  - `pe`: Clustering estimator containing algorithm and maximum group information.
+  - `pl`: Clustering estimator containing algorithm and maximum group information.
   - `B`: Vector of integers representing group sizes or allocations.
   - `args...`: No validation is performed.
 
@@ -229,12 +228,12 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
 
 # Validation
 
-  - Throws `DomainError` if `length(B) > pe.onc.max_k` (when `max_k` is set).
+  - Throws `DomainError` if `length(B) > pl.onc.max_k` (when `max_k` is set).
   - Calls internal [`_validate_length_integer_phylogeny_constraint_B`](@ref) for further checks.
 
 # Details
 
-  - Checks if `pe.onc.max_k` is set and validates `length(B)` accordingly.
+  - Checks if `pl.onc.max_k` is set and validates `length(B)` accordingly.
   - Delegates to `_validate_length_integer_phylogeny_constraint_B` for algorithm-specific validation.
   - Used in the construction and validation of integer phylogeny constraints.
 
@@ -243,12 +242,12 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
-    if !isnothing(pe.onc.max_k)
-        @argcheck(length(B) <= pe.onc.max_k,
-                  DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
+function validate_length_integer_phylogeny_constraint_B(pl::ClustersEstimator, B::VecNum)
+    if !isnothing(pl.onc.max_k)
+        @argcheck(length(B) <= pl.onc.max_k,
+                  DomainError("`length(B) <= pl.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pl.onc.max_k)"))
     end
-    _validate_length_integer_phylogeny_constraint_B(pe.onc.alg, B)
+    _validate_length_integer_phylogeny_constraint_B(pl.onc.alg, B)
     return nothing
 end
 function validate_length_integer_phylogeny_constraint_B(args...)
@@ -256,7 +255,7 @@ function validate_length_integer_phylogeny_constraint_B(args...)
 end
 """
     struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-        pe::T1
+        pl::T1
         B::T2
         scale::T3
     end
@@ -267,14 +266,14 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 
 # Fields
 
-  - `pe`: Phylogeny or clustering estimator.
+  - `pl`: Phylogeny or clustering estimator.
   - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
   - `scale`: Non-negative big-M parameter for the MIP formulation.
 
 # Constructor
 
     IntegerPhylogenyEstimator(;
-                              pe::NwE_ClE_Cl = NetworkEstimator(),
+                              pl::NwE_ClE_Cl = NetworkEstimator(),
                               B::Int_VecInt = 1,
                               scale::Number = 100_000.0)
 
@@ -289,7 +288,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 ```jldoctest
 julia> IntegerPhylogenyEstimator()
 IntegerPhylogenyEstimator
-     pe ┼ NetworkEstimator
+     pl ┼ NetworkEstimator
         │    ce ┼ PortfolioOptimisersCovariance
         │       │   ce ┼ Covariance
         │       │      │    me ┼ SimpleExpectedReturns
@@ -325,20 +324,20 @@ IntegerPhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
+    pl::T1
     B::T2
     scale::T3
-    function IntegerPhylogenyEstimator(pe::NwE_ClE_Cl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pl::NwE_ClE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
-            validate_length_integer_phylogeny_constraint_B(pe, B)
+            validate_length_integer_phylogeny_constraint_B(pl, B)
         end
-        return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
+        return new{typeof(pl), typeof(B), typeof(scale)}(pl, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
+function IntegerPhylogenyEstimator(; pl::NwE_ClE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
                                    scale::Number = 100_000.0)
-    return IntegerPhylogenyEstimator(pe, B, scale)
+    return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
     struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
@@ -447,12 +446,12 @@ If a vector broadcasts the function over each element, returning a vector of con
 """
 function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::MatNum;
                                dims::Int = 1, kwargs...)
-    return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+    return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pl, X; dims = dims, kwargs...),
                                  p = plc.p)
 end
 function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::MatNum; dims::Int = 1,
                                kwargs...)
-    return IntegerPhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+    return IntegerPhylogeny(; A = phylogeny_matrix(plc.pl, X; dims = dims, kwargs...),
                             B = plc.B, scale = plc.scale)
 end
 function phylogeny_constraints(plc::Option{<:AbstractPhylogenyConstraintResult}, args...;
