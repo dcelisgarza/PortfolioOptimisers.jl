@@ -963,7 +963,7 @@
         w = res.w
         @test count(w .> 1e-10) <= 3
 
-        opt = JuMPOptimiser(; l2 = 0.1, pe = pr, slv = mip_slv, card = 3)
+        opt = JuMPOptimiser(; l2 = 0.1, pr = pr, slv = mip_slv, card = 3)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise(mre)
         w = res.w
