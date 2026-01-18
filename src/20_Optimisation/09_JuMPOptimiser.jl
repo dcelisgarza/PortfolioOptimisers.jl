@@ -248,7 +248,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                                                                                        strict)
     end
 end
-function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
+function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        wb::Option{<:WbE_Wb} = WeightBounds(),
                        bgt::Option{<:Num_BgtCE} = 1.0, sbgt::Option{<:Num_BgtRg} = nothing,
                        lt::Option{<:BtE_Bt} = nothing, st::Option{<:BtE_Bt} = nothing,
@@ -312,7 +312,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
     cobj = custom_objective_view(opt.cobj, i)
-    return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
+    return JuMPOptimiser(; pr = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = opt.lcs, ct = opt.ct, gcard = opt.gcard,
                          sgcard = opt.sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt,
                          sst = sst, sglt = sglt, sgst = sgst, sets = sets, pl = opt.pl,
@@ -373,7 +373,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
     (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, sgmtx, slt, sst, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
                                                                                                                                            rd;
                                                                                                                                            dims = dims)
-    return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
+    return JuMPOptimiser(; pr = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, ct = ct, gcard = gcard,
                          sgcard = sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst,
                          sglt = sglt, sgst = sgst, sets = opt.sets, pl = pl, tn = tn,

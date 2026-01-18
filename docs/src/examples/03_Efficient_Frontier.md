@@ -68,7 +68,7 @@ pr = prior(EmpiricalPrior(), rd)
 Let's create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
 
 ````@example 03_Efficient_Frontier
-opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+opt = JuMPOptimiser(; pr = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
 ````
 
 We can now use `opt` to create the `MeanRisk` estimator. In order to get the entire frontier, we need to minimise the risk (which is the default value).

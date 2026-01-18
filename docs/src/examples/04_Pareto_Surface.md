@@ -125,7 +125,7 @@ The `NearOptimalCentering` estimator will not return the portfolio which satisfi
 ````@example 04_Pareto_Surface
 # Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
-opt = JuMPOptimiser(; pe = pr, slv = slv)
+opt = JuMPOptimiser(; pr = pr, slv = slv)
 obj = MaximumRatio(; rf = rf)
 opt1 = NearOptimalCentering(; r = r1, obj = obj, opt = opt)
 opt2 = NearOptimalCentering(; r = r2, obj = obj, opt = opt)

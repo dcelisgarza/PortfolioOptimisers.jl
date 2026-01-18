@@ -68,7 +68,7 @@ pr = prior(EmpiricalPrior(), rd)
 We can provide the prior result to `JuMPOptimiser`.
 
 ````@example 02_Mean_Risk_Objectives
-opt = JuMPOptimiser(; pe = pr, slv = slv)
+opt = JuMPOptimiser(; pr = pr, slv = slv)
 ````
 
 Here we define the estimators for different objective functions.

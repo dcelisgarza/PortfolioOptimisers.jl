@@ -59,7 +59,7 @@
     pr = prior(EmpiricalPrior(), rd)
     sets = AssetSets(; dict = Dict("nx" => rd.nf))
     lcs = LinearConstraintEstimator(; val = ["VLUE <= 0.74", "QUAL >= -0.07", "MTUM==0.09"])
-    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    opt = JuMPOptimiser(; pr = pr, slv = slv)
     r = Variance(; rc = lcs)
     obj = MaximumRatio()
     frc = FactorRiskContribution(; r = r, obj = obj, opt = opt, flag = false, sets = sets)
@@ -74,7 +74,7 @@
                                           wi = range(; start = inv(size(rd.F, 2)),
                                                      stop = inv(size(rd.F, 2)),
                                                      length = size(rd.F, 2)),
-                                          opt = JuMPOptimiser(; pe = pr,
+                                          opt = JuMPOptimiser(; pr = pr,
                                                               slv = Solver(;
                                                                            solver = Clarabel.Optimizer,
                                                                            settings = ["verbose" => false,
