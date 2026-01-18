@@ -59,7 +59,7 @@ function PhylogenyResult(; X::ArrNum)
     return PhylogenyResult(X)
 end
 """
-    phylogeny_matrix(pl::PhylogenyResult{<:MatNum}, args...; kwargs...)
+    phylogeny_matrix(plr::PhylogenyResult{<:MatNum}, args...; kwargs...)
 
 Fallback no-op for returning a validated phylogeny matrix result as-is.
 
@@ -67,20 +67,20 @@ This method provides a generic interface for handling precomputed phylogeny matr
 
 # Arguments
 
-  - `pl::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
+  - `plr::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - The input `pl` object.
+  - The input `plr` object.
 
 # Examples
 
 ```jldoctest
-julia> pl = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
+julia> plr = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
 
-julia> phylogeny_matrix(pl)
+julia> phylogeny_matrix(plr)
 PhylogenyResult
   X ┴ 3×3 Matrix{Int64}
 ```
@@ -90,11 +90,11 @@ PhylogenyResult
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(pl::PhylogenyResult{<:MatNum}, args...; kwargs...)
-    return pl
+function phylogeny_matrix(plr::PhylogenyResult{<:MatNum}, args...; kwargs...)
+    return plr
 end
 """
-    centrality_vector(pl::PhylogenyResult{<:VecNum}, args...; kwargs...)
+    centrality_vector(plr::PhylogenyResult{<:VecNum}, args...; kwargs...)
 
 Fallback no-op for returning a validated centrality vector result as-is.
 
@@ -102,20 +102,20 @@ This method provides a generic interface for handling precomputed centrality vec
 
 # Arguments
 
-  - `pl::PhylogenyResult{<:VecNum}`: Centrality vector result object.
+  - `plr::PhylogenyResult{<:VecNum}`: Centrality vector result object.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - The input `pl` object.
+  - The input `plr` object.
 
 # Examples
 
 ```jldoctest
-julia> pl = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
+julia> plr = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
 
-julia> centrality_vector(pl)
+julia> centrality_vector(plr)
 PhylogenyResult
   X ┴ Vector{Float64}: [0.2, 0.5, 0.3]
 ```
@@ -125,8 +125,8 @@ PhylogenyResult
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(pl::PhylogenyResult{<:VecNum}, args...; kwargs...)
-    return pl
+function centrality_vector(plr::PhylogenyResult{<:VecNum}, args...; kwargs...)
+    return plr
 end
 """
     abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
@@ -148,9 +148,9 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
-function centrality_vector(pl::PhylogenyResult{<:MatNum}, ct::AbstractCentralityAlgorithm,
+function centrality_vector(plr::PhylogenyResult{<:MatNum}, ct::AbstractCentralityAlgorithm,
                            args...; kwargs...)
-    G = Graphs.SimpleGraph(pl.X)
+    G = Graphs.SimpleGraph(plr.X)
     return PhylogenyResult(; X = calc_centrality(ct, G))
 end
 """
@@ -725,7 +725,9 @@ All concrete types implementing network-based estimation algorithms should subty
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
-const NwE_Ph_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
+                             <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
 const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
     struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
@@ -839,7 +841,7 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 # Constructor
 
     CentralityEstimator(;
-                        pl::NwE_Ph_ClE_Cl = NetworkEstimator(),
+                        pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
                         ct::AbstractCentralityAlgorithm = DegreeCentrality())
 
 Keyword arguments correspond to the fields above.
@@ -886,25 +888,25 @@ CentralityEstimator
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     pl::T1
     ct::T2
-    function CentralityEstimator(pl::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm)
+    function CentralityEstimator(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm)
         return new{typeof(pl), typeof(ct)}(pl, ct)
     end
 end
-function CentralityEstimator(; pl::NwE_Ph_ClE_Cl = NetworkEstimator(),
+function CentralityEstimator(; pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
                              ct::AbstractCentralityAlgorithm = DegreeCentrality())
     return CentralityEstimator(pl, ct)
 end
 """
-    calc_adjacency(pl::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    calc_adjacency(nte::NetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the adjacency matrix for a network estimator.
 
 # Arguments
 
-  - `pl`: NetworkEstimator estimator.
+  - `nte`: NetworkEstimator estimator.
 
-      + `pl::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
-      + `pl::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
+      + `nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
+      + `nte::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute.
@@ -920,23 +922,23 @@ Compute the adjacency matrix for a network estimator.
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
 """
-function calc_adjacency(pl::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
+function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::MatNum; dims::Int = 1, kwargs...)
-    D = distance(pl.de, pl.ce, X; dims = dims, kwargs...)
+    D = distance(nte.de, nte.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
-    tree = calc_mst(pl.alg, G)
+    tree = calc_mst(nte.alg, G)
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
 end
-function calc_adjacency(pl::NetworkEstimator{<:Any, <:Any,
-                                             <:AbstractSimilarityMatrixAlgorithm, <:Any},
+function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any,
+                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
                         X::MatNum; dims::Int = 1, kwargs...)
-    S, D = cor_and_dist(pl.de, pl.ce, X; dims = dims, kwargs...)
-    S = dbht_similarity(pl.alg; S = S, D = D)
+    S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
+    S = dbht_similarity(nte.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
 end
 """
-    phylogeny_matrix(pl::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
+    phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the phylogeny matrix for a network estimator.
 
@@ -944,7 +946,7 @@ This function constructs the adjacency matrix for the network, then computes the
 
 # Arguments
 
-  - `pl`: NetworkEstimator estimator.
+  - `nte`: NetworkEstimator estimator.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute.
   - `kwargs...`: Additional keyword arguments.
@@ -958,10 +960,11 @@ This function constructs the adjacency matrix for the network, then computes the
   - [`NetworkEstimator`](@ref)
   - [`calc_adjacency`](@ref)
 """
-function phylogeny_matrix(pl::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
-    A = calc_adjacency(pl, X; dims = dims, kwargs...)
+function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
+                          kwargs...)
+    A = calc_adjacency(nte, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
-    for i in 0:(pl.n)
+    for i in 0:(nte.n)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - LinearAlgebra.I
@@ -1033,8 +1036,8 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, X::MatNum;
                            dims::Int = 1, kwargs...)
-    P = phylogeny_matrix(pl, X; dims = dims, kwargs...)
-    return centrality_vector(P, ct; dims = dims, kwargs...)
+    return centrality_vector(phylogeny_matrix(pl, X; dims = dims, kwargs...), ct;
+                             dims = dims, kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)
@@ -1063,7 +1066,7 @@ function centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, k
     return centrality_vector(cte.pl, cte.ct, X; dims = dims, kwargs...)
 end
 """
-    average_centrality(pl::NwE_Ph_ClE_Cl,
+    average_centrality(pl::NwE_Pl_ClE_Cl,
                        ct::AbstractCentralityAlgorithm, w::VecNum, X::MatNum;
                        dims::Int = 1, kwargs...)
 
@@ -1090,7 +1093,7 @@ This function computes the centrality vector and returns the weighted average us
   - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function average_centrality(pl::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
+function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             X::MatNum; dims::Int = 1, kwargs...)
     return LinearAlgebra.dot(centrality_vector(pl, ct, X; dims = dims, kwargs...).X, w)
 end

@@ -711,7 +711,8 @@ const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
                  :nte => "`pl`: Network estimator.",
                  :ntr => "`pl`: Network result.",
                  :nter => "`pl`: Network estimator or result.",
-                 :cte => "`ct`: Centrality estimator.",
+                 :cte => "`cte`: Centrality estimator.",
+                 :cta => "`ct`: Centrality algorithm.",
                  :ctr => "`ct`: Centrality result.",
                  :cter => "`ct`: Centrality estimator or result.",
                  # Turnover.
@@ -764,18 +765,19 @@ const glossary = Dict(
                       # Priors.
                       :pe => "`pe`: Prior estimator.",#
                       :pr => "`pr`: Prior result.",#
-                      :per => "`pe`: Prior estimator or result.",
+                      :per => "`pr`: Prior estimator or result.",
                       # Phylogeny.
                       :cle => "`cle`: Clusters estimator.",#
                       :clr => "`clr`: Clusters result.",#
-                      :cler => "`cle`: Clusters estimator or result.",#
-                      :ple => "`pl`: Phylogeny estimator.",# 
-                      :plr => "`pl`: Phylogeny result.",
+                      :cler => "`clr`: Clusters estimator or result.",#
+                      :ple => "`ple`: Phylogeny estimator.",# 
+                      :plr => "`plr`: Phylogeny result.",
                       :pler => "`pl`: Phylogeny estimator or result.",
-                      :nte => "`pl`: Network estimator.",#
+                      :nte => "`nte`: Network estimator.",#
                       :ntr => "`pl`: Network result.",
                       :nter => "`pl`: Network estimator or result.",
-                      :cte => "`ct`: Centrality estimator.",#
+                      :cte => "`cte`: Centrality estimator.",#
+                      :cta => "`ct`: Centrality algorithm.",
                       :ctr => "`ct`: Centrality result.",
                       :cter => "`ct`: Centrality estimator or result.",
                       # Turnover.

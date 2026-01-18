@@ -52,7 +52,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pl::NwE_ClE_Cl = NetworkEstimator(),
+                                   pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -101,12 +101,12 @@ SemiDefinitePhylogenyEstimator
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pl::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pl::NwE_ClE_Cl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pl::NwE_ClE_Cl = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
                                         p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
@@ -211,14 +211,14 @@ function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(pl::ClustersEstimator, B::VecNum)
+    validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
-Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pl`.
+Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `cle`.
 
 # Arguments
 
-  - `pl`: Clustering estimator containing algorithm and maximum group information.
+  - `cle`: Clustering estimator containing algorithm and maximum group information.
   - `B`: Vector of integers representing group sizes or allocations.
   - `args...`: No validation is performed.
 
@@ -228,12 +228,12 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
 
 # Validation
 
-  - Throws `DomainError` if `length(B) > pl.onc.max_k` (when `max_k` is set).
+  - Throws `DomainError` if `length(B) > cle.onc.max_k` (when `max_k` is set).
   - Calls internal [`_validate_length_integer_phylogeny_constraint_B`](@ref) for further checks.
 
 # Details
 
-  - Checks if `pl.onc.max_k` is set and validates `length(B)` accordingly.
+  - Checks if `cle.onc.max_k` is set and validates `length(B)` accordingly.
   - Delegates to `_validate_length_integer_phylogeny_constraint_B` for algorithm-specific validation.
   - Used in the construction and validation of integer phylogeny constraints.
 
@@ -242,12 +242,12 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(pl::ClustersEstimator, B::VecNum)
-    if !isnothing(pl.onc.max_k)
-        @argcheck(length(B) <= pl.onc.max_k,
-                  DomainError("`length(B) <= pl.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pl.onc.max_k)"))
+function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
+    if !isnothing(cle.onc.max_k)
+        @argcheck(length(B) <= cle.onc.max_k,
+                  DomainError("`length(B) <= cle.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(cle.onc.max_k)"))
     end
-    _validate_length_integer_phylogeny_constraint_B(pl.onc.alg, B)
+    _validate_length_integer_phylogeny_constraint_B(cle.onc.alg, B)
     return nothing
 end
 function validate_length_integer_phylogeny_constraint_B(args...)
@@ -273,7 +273,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 # Constructor
 
     IntegerPhylogenyEstimator(;
-                              pl::NwE_ClE_Cl = NetworkEstimator(),
+                              pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
                               B::Int_VecInt = 1,
                               scale::Number = 100_000.0)
 
@@ -327,7 +327,7 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
     pl::T1
     B::T2
     scale::T3
-    function IntegerPhylogenyEstimator(pl::NwE_ClE_Cl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pl, B)
@@ -335,8 +335,8 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstim
         return new{typeof(pl), typeof(B), typeof(scale)}(pl, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pl::NwE_ClE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
-                                   scale::Number = 100_000.0)
+function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+                                   B::Int_VecInt = 1, scale::Number = 100_000.0)
     return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
