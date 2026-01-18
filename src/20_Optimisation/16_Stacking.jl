@@ -16,7 +16,7 @@ function factory(res::StackingResult, fb)
 end
 struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        BaseStackingOptimisationEstimator
-    pe::T1
+    pr::T1
     wb::T2
     sets::T3
     opti::T4
@@ -26,7 +26,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     strict::T8
     ex::T9
     fb::T10
-    function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+    function Stacking(pr::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                       opti::VecOptE_Opt, opto::OptimisationEstimator,
                       cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
                       strict::Bool, ex::FLoops.Transducers.Executor,
@@ -35,8 +35,8 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                   typeof(cv), typeof(wf), typeof(strict), typeof(ex), typeof(fb)}(pe, wb,
+        return new{typeof(pr), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
+                   typeof(cv), typeof(wf), typeof(strict), typeof(ex), typeof(fb)}(pr, wb,
                                                                                    sets,
                                                                                    opti,
                                                                                    opto, cv,
@@ -45,18 +45,18 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
                                                                                    ex, fb)
     end
 end
-function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
+function Stacking(; pr::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   sets::Option{<:AssetSets} = nothing, opti::VecOptE_Opt,
                   opto::OptimisationEstimator,
                   cv::Option{<:CrossValidationEstimator} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::Option{<:OptimisationEstimator} = nothing)
-    return Stacking(pe, wb, sets, opti, opto, cv, wf, strict, ex, fb)
+    return Stacking(pr, wb, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.pr, AbstractPriorResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_external_optimiser(opt.opti)
@@ -71,19 +71,19 @@ function assert_internal_optimiser(opt::Stacking)
     return nothing
 end
 function opt_view(st::Stacking, i, X::MatNum)
-    X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
-    pe = prior_view(st.pe, i)
+    X = isa(st.pr, AbstractPriorResult) ? st.pr.X : X
+    pr = prior_view(st.pr, i)
     wb = weight_bounds_view(st.wb, i)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
-    return Stacking(; pe = pe, wb = wb, opti = opti, opto = opto, cv = st.cv, wf = st.wf,
+    return Stacking(; pr = pr, wb = wb, opti = opti, opto = opto, cv = st.cv, wf = st.wf,
                     sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
 function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
-    pr = prior(st.pe, rd; dims = dims)
+    pr = prior(st.pr, rd; dims = dims)
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)

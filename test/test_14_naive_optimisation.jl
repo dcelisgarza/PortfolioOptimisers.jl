@@ -28,7 +28,7 @@
     sets = AssetSets(; dict = Dict("nx" => rd.nx))
     wb = WeightBoundsEstimator(; lb = "AAPL" => 0.07)
 
-    res = optimise(InverseVolatility(; pe = pr), rd)
+    res = optimise(InverseVolatility(; pr = pr), rd)
     w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     w /= sum(w)
     @test isapprox(res.w, w)
@@ -42,7 +42,7 @@
     res = optimise(RandomWeighted(), rd)
     @test isapprox(sum(res.w), 1)
 
-    res = optimise(InverseVolatility(; wb = wb, sets = sets, pe = pr), rd)
+    res = optimise(InverseVolatility(; wb = wb, sets = sets, pr = pr), rd)
     w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     @test isapprox(res.w[1], 0.07)
 

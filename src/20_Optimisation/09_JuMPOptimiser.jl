@@ -33,7 +33,7 @@ end
 struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16,
                      T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30,
                      T31, T32, T33, T34, T35} <: BaseJuMPOptimisationEstimator
-    pe::T1 # PriorEstimator
+    pr::T1 # PriorEstimator
     slv::T2
     wb::T3 # WeightBounds
     bgt::T4 # BudgetRange
@@ -68,7 +68,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l1::T33
     l2::T34
     strict::T35
-    function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
+    function JuMPOptimiser(pr::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
                            lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
                            lcs::Option{<:LcE_Lc_VecLcE_Lc}, ct::Option{<:Lc_CC_VecCC},
@@ -205,13 +205,13 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
-        return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
+        return new{typeof(pr), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(lt), typeof(st), typeof(lcs), typeof(ct), typeof(gcard),
                    typeof(sgcard), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
                    typeof(sglt), typeof(sgst), typeof(sets), typeof(pl), typeof(tn),
                    typeof(te), typeof(fees), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
-                   typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(strict)}(pe,
+                   typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(strict)}(pr,
                                                                                        slv,
                                                                                        wb,
                                                                                        bgt,
@@ -276,13 +276,13 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, strict::Bool = false)
-    return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
+    return JuMPOptimiser(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, sets, pl, tn, te, fees, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
-    X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
-    pe = prior_view(opt.pe, i)
+    X = isa(opt.pr, AbstractPriorResult) ? opt.pr.X : X
+    pr = prior_view(opt.pr, i)
     wb = weight_bounds_view(opt.wb, i)
     bgt = budget_view(opt.bgt, i)
     lt = threshold_view(opt.lt, i)
@@ -312,7 +312,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
     cobj = custom_objective_view(opt.cobj, i)
-    return JuMPOptimiser(; pr = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
+    return JuMPOptimiser(; pr = pr, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = opt.lcs, ct = opt.ct, gcard = opt.gcard,
                          sgcard = opt.sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt,
                          sst = sst, sglt = sglt, sgst = sgst, sets = sets, pl = opt.pl,
@@ -323,7 +323,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
-    pr = prior(opt.pe, rd; dims = dims)
+    pr = prior(opt.pr, rd; dims = dims)
     datatype = eltype(pr.X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
                                    datatype = datatype)

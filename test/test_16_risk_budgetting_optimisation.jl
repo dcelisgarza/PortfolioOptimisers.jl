@@ -219,8 +219,8 @@
                                                                       solver = Clarabel.Optimizer,
                                                                       settings = ["verbose" => false,
                                                                                   "max_iter" => 1])),
-                                     fb = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+                                     fb = InverseVolatility(; pr = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)

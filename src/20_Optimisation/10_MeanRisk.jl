@@ -44,7 +44,7 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance
     return MeanRisk(opt, r, obj, wi, fb)
 end
 function opt_view(mr::MeanRisk, i, X::MatNum)
-    X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
+    X = isa(mr.opt.pr, AbstractPriorResult) ? mr.opt.pr.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)

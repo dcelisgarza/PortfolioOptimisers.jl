@@ -111,8 +111,8 @@
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+                                            fb = InverseVolatility(; pr = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
 
         w0 = range(; start = inv(length(pr.mu)), stop = inv(length(pr.mu)),
                    length = length(pr.mu))
@@ -133,8 +133,8 @@
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+                                            fb = InverseVolatility(; pr = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
     end
     @testset "Constrained" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
@@ -195,8 +195,8 @@
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+                                            fb = InverseVolatility(; pr = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
     end
     @testset "Pareto Surface" begin
         opt = JuMPOptimiser(; pr = pr, slv = slv)

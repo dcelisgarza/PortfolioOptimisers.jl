@@ -63,7 +63,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
     return FactorRiskContribution(opt, re, r, obj, pl, sets, wi, flag, fb)
 end
 function opt_view(frc::FactorRiskContribution, i, X::MatNum)
-    X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
+    X = isa(frc.opt.pr, AbstractPriorResult) ? frc.opt.pr.X : X
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
     r = risk_measure_view(frc.r, i, X)

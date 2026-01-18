@@ -88,7 +88,7 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Var
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::MatNum)
-    X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
+    X = isa(rb.opt.pr, AbstractPriorResult) ? rb.opt.pr.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
     rba = risk_budgeting_algorithm_view(rb.rba, i)

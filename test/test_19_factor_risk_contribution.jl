@@ -79,6 +79,6 @@
                                                                            solver = Clarabel.Optimizer,
                                                                            settings = ["verbose" => false,
                                                                                        "max_iter" => 1])),
-                                          fb = InverseVolatility(; pe = pr)), rd)
-    @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+                                          fb = InverseVolatility(; pr = pr)), rd)
+    @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
 end

@@ -46,7 +46,7 @@
     T, N = size(pr.X)
     res = optimise(MeanRisk(;
                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
-                                                sbgt = 1, bgt = 1, pe = pr, slv = slv)))
+                                                sbgt = 1, bgt = 1, pr = pr, slv = slv)))
     @testset "Fees" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
         f1s = [0.02002313426946848, 0.12149580659357644]
