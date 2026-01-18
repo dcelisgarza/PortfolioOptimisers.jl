@@ -357,7 +357,7 @@
 
             cte = CentralityEstimator(; ct = ce)
             c = average_centrality(cte, w, pr)
-            @test isapprox(c, average_centrality(cte.nt, cte.ct, w, pr))
+            @test isapprox(c, average_centrality(cte.pl, cte.ct, w, pr))
             res = isapprox(c, df2[i, 1])
             if !res
                 println("Average default centrality iteration: $i")

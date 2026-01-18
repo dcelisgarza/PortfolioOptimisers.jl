@@ -34,7 +34,7 @@ const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
 const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
-#! Change pe to nt in semidefinite phylogeny estimator and integer phylogeny estimator
+#! Change pe to pl in semidefinite phylogeny estimator and integer phylogeny estimator
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
         pe::T1
@@ -492,7 +492,7 @@ Estimator for generating centrality-based portfolio constraints.
 julia> CentralityConstraint()
 CentralityConstraint
      A ┼ CentralityEstimator
-       │   nt ┼ NetworkEstimator
+       │   pl ┼ NetworkEstimator
        │      │    ce ┼ PortfolioOptimisersCovariance
        │      │       │   ce ┼ Covariance
        │      │       │      │    me ┼ SimpleExpectedReturns

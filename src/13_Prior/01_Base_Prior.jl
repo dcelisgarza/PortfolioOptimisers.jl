@@ -288,7 +288,7 @@ function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kw
     return centrality_vector(cte, pr.X; kwargs...)
 end
 """
-    centrality_vector(nt::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
+    centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                       pr::AbstractPriorResult; kwargs...)
 
 Compute the centrality vector for a network or clustering estimator and centrality algorithm.
@@ -297,7 +297,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 
 # Arguments
 
-  - `nt`: Network estimator, res estimator, or clustering result.
+  - `pl`: Network estimator, res estimator, or clustering result.
   - `ct`: Centrality algorithm.
   - `pr`: Prior result object.
   - `kwargs...`: Additional keyword arguments.
@@ -313,12 +313,12 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(nt::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
+function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
                            pr::AbstractPriorResult; kwargs...)
-    return centrality_vector(nt, ct, pr.X; kwargs...)
+    return centrality_vector(pl, ct, pr.X; kwargs...)
 end
 """
-    average_centrality(nt::NwE_Ph_ClE_Cl,
+    average_centrality(pl::NwE_Ph_ClE_Cl,
                        ct::AbstractCentralityAlgorithm, w::VecNum,
                        pr::AbstractPriorResult; kwargs...)
 
@@ -328,7 +328,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 
 # Arguments
 
-  - `nt`: Network estimator or phylogeny result.
+  - `pl`: Network estimator or phylogeny result.
   - `ct`: Centrality algorithm.
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object.
@@ -345,9 +345,9 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(nt::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
+function average_centrality(pl::NwE_Ph_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             pr::AbstractPriorResult; kwargs...)
-    return LinearAlgebra.dot(centrality_vector(nt, ct, pr; kwargs...).X, w)
+    return LinearAlgebra.dot(centrality_vector(pl, ct, pr; kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
