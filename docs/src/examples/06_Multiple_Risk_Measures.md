@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/06_Multiple_Risk_Measures.jl"
 ```
@@ -78,12 +77,12 @@ Some risk measures can use precomputed prior statistics which take precedence ov
 
 We will also precompute the prior statistics to minimise redundant work. First lets create a vector of Variances onto which we will push the different variances. We'll use 5 variance estimators, and their equally weighted sum.
 
- 1. Denoised covariance using the spectral algorithm.
- 2. Gerber 1 covariance.
- 3. Smyth Broby 1 covariance.
- 4. Mutual Information covariance.
- 5. Distance covariance.
- 6. Equally weighted sum of all the above covariances.
+  1. Denoised covariance using the spectral algorithm.
+  2. Gerber 1 covariance.
+  3. Smyth Broby 1 covariance.
+  4. Mutual Information covariance.
+  5. Distance covariance.
+  6. Equally weighted sum of all the above covariances.
 
 For the multi risk measure optimisation, we will weigh each risk measure equally. It should give the same result as adding all covariances together, but not the same as averaging the weights of the individual optimisations.
 
@@ -242,6 +241,7 @@ pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
 
 Note how the max scalariser produced the same weights as the negative skewness and the min scalariser produced the same weights as the variance. This is because in all cases, the same the value of the negative skewness was greater than that of the variance. A similar behaviour can be observed with other clustering optimisers. [`NearOptimalCentering`]-(@ref) can also have unintuitive behaviour when computing the risk bounds with an effective frontier [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) due to the fact that each point in the efficient frontier can have a different risk measure dominating the others.
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

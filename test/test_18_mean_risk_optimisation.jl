@@ -1082,7 +1082,7 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    lt = BuyInThreshold(; val = 0.000001),
+                                                    lt = Threshold(; val = 0.000001),
                                                     gcard = LinearConstraintEstimator(;
                                                                                       val = :(JNJ <=
                                                                                               BAC)))),
@@ -1092,7 +1092,7 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv,
-                                                    sglt = BuyInThreshold(0.015),
+                                                    sglt = Threshold(0.015),
                                                     sgcard = LinearConstraintEstimator(;
                                                                                        key = "ux_industries",
                                                                                        val = [:(ux_industries ==
@@ -1104,10 +1104,10 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv,
-                                                    sglt = [BuyInThresholdEstimator(;
-                                                                                    val = fill(0.015,
-                                                                                               7),
-                                                                                    key = "ux_industries")],
+                                                    sglt = [ThresholdEstimator(;
+                                                                               val = fill(0.015,
+                                                                                          7),
+                                                                               key = "ux_industries")],
                                                     sgcard = [LinearConstraintEstimator(;
                                                                                         key = "ux_industries",
                                                                                         val = [:(ux_industries >=
@@ -1147,7 +1147,7 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    lt = BuyInThreshold(0.05),
+                                                    lt = Threshold(0.05),
                                                     gcard = LinearConstraintEstimator(;
                                                                                       val = [:(4 *
                                                                                                BAC +
@@ -1165,7 +1165,7 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    lt = BuyInThreshold(0.05),
+                                                    lt = Threshold(0.05),
                                                     gcard = LinearConstraintEstimator(;
                                                                                       val = :(AMD +
                                                                                               Consumer_Staples >=
@@ -1176,7 +1176,7 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    lt = BuyInThreshold(0.05),
+                                                    lt = Threshold(0.05),
                                                     gcard = LinearConstraintEstimator(;
                                                                                       val = [:(AMD +
                                                                                                Consumer_Staples >=
@@ -1193,30 +1193,28 @@
     end
     @testset "Buy-in threshold" begin
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv,
-                            lt = BuyInThresholdEstimator(;
-                                                         val = ["WMT" => 0.23,
-                                                                "group2" => 0.48]),
+                            lt = ThresholdEstimator(;
+                                                    val = ["WMT" => 0.23, "group2" => 0.48]),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise(mre)
         @test res.w[findfirst(x -> x == "WMT", rd.nx)] >= 0.23
         @test res.w[2:2:end][res.w[2:2:end] .> 1e-9][1] >= 0.48
 
-        opt = JuMPOptimiser(; pr = pr, slv = mip_slv, lt = BuyInThreshold(; val = 0.15),
+        opt = JuMPOptimiser(; pr = pr, slv = mip_slv, lt = Threshold(; val = 0.15),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise(mre)
         res.w[res.w .>= 1e-10] .>= 0.15
 
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv,
-                            lt = BuyInThreshold(; val = fill(0.15, size(pr.X, 2))),
-                            sets = sets)
+                            lt = Threshold(; val = fill(0.15, size(pr.X, 2))), sets = sets)
         mre = MeanRisk(; opt = opt)
         @test isapprox(res.w, optimise(mre).w)
 
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
-                            sbgt = 1, bgt = 1, st = BuyInThreshold(; val = 0.25),
-                            lt = BuyInThreshold(; val = 0.4), sets = sets)
+                            sbgt = 1, bgt = 1, st = Threshold(; val = 0.25),
+                            lt = Threshold(; val = 0.4), sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
@@ -1228,8 +1226,8 @@
         end
 
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
-                            sbgt = 1, bgt = 1, st = BuyInThreshold(; val = 0.25),
-                            lt = BuyInThreshold(; val = 0.4), sets = sets)
+                            sbgt = 1, bgt = 1, st = Threshold(; val = 0.25),
+                            lt = Threshold(; val = 0.4), sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)

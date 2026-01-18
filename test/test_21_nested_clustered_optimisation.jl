@@ -404,9 +404,9 @@
         opt = NestedClustered(; clr = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
                                               opt = JuMPOptimiser(; pr = pr, slv = mip_slv,
-                                                                  lt = BuyInThresholdEstimator(;
-                                                                                               val = ["WMT" => 0.2,
-                                                                                                      "group2" => 0.48]),
+                                                                  lt = ThresholdEstimator(;
+                                                                                          val = ["WMT" => 0.2,
+                                                                                                 "group2" => 0.48]),
                                                                   sets = sets)),
                               opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
         res = optimise(opt, rd)
@@ -432,9 +432,9 @@
         opt = NestedClustered(; clr = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
                                               opt = JuMPOptimiser(; pr = pr, slv = mip_slv,
-                                                                  lt = threshold_constraints(BuyInThresholdEstimator(;
-                                                                                                                     val = ["WMT" => 0.2,
-                                                                                                                            "group2" => 0.48]),
+                                                                  lt = threshold_constraints(ThresholdEstimator(;
+                                                                                                                val = ["WMT" => 0.2,
+                                                                                                                       "group2" => 0.48]),
                                                                                              sets))),
                               opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
         @test isapprox(res.w, optimise(opt, rd).w)

@@ -2,12 +2,6 @@
 
 This section explains `PortfolioOptimisers.jl` API in detail. The pages are organised in exactly the same way as the `src` folder itself. This means there should be a 1 to 1 correspondence between documentation and source files[^1].
 
-## Naming conventions in function arguments and struct fieldnames
-
-We generally do not make distinctions between estimator and result types unless they are absolutely needed for a higher order purpose. This means prior and clustering estimators and results are denoted as `pe`, `pr`, `cle`, and `clr`. When a function or struct accepts both, `pe` and `cle` are used since the estimators are preferred for safety because they guaranteed to be side effect free.
-
-Optional parameters like constraints are not distinguished to keep the API names simple.
-
 ## Design philosophy
 
 There are three overarching design choices in `PortfolioOptimisers.jl`:

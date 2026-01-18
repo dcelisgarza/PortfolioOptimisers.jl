@@ -1,7 +1,7 @@
-# Buy-in Threshold Constraints
+# Threshold Constraints
 
 ```@docs
-BuyInThresholdEstimator
-BuyInThreshold
+ThresholdEstimator
+Threshold
 threshold_constraints
 ```
