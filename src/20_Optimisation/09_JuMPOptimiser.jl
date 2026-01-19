@@ -400,11 +400,11 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
     return JuMPOptimiser(; pr = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, ct = ct, gcard = gcard,
                          sgcard = sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst,
-                         sglt = sglt, sgst = sgst, tn = tn, fees = fees, tr = opt.tr,
-                         sets = opt.sets, pl = pl, ret = ret, sca = opt.sca,
-                         ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
-                         ss = opt.ss, card = opt.card, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, strict = opt.strict)
+                         sglt = sglt, sgst = sgst, tn = tn, fees = fees, sets = opt.sets,
+                         tr = opt.tr, pl = pl, ret = ret, sca = opt.sca, ccnt = opt.ccnt,
+                         cobj = opt.cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
+                         card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
+                         strict = opt.strict)
 end
 
 export ProcessedJuMPOptimiserAttributes, JuMPOptimiser
