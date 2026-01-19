@@ -260,7 +260,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     return MeanRiskResult(typeof(mr),
                           ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard,
                                                            sgcard, smtx, sgmtx, slt, sst,
-                                                           sglt, sgst, pl, tn, fees, ret),
+                                                           sglt, sgst, tn, fees, pl, ret),
                           retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},

@@ -177,8 +177,8 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     return RiskBudgetingResult(typeof(rrb),
                                ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct,
                                                                 gcard, sgcard, smtx, sgmtx,
-                                                                slt, sst, sglt, sgst, pl,
-                                                                tn, fees, ret), prb,
+                                                                slt, sst, sglt, sgst, tn,
+                                                                fees, pl, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

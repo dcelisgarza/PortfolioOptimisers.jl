@@ -128,8 +128,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                          lcs, ct, gcard,
                                                                          sgcard, smtx,
                                                                          sgmtx, slt, sst,
-                                                                         sglt, sgst, pl, tn,
-                                                                         fees, ret), rr,
+                                                                         sglt, sgst, tn,
+                                                                         fees, pl, ret), rr,
                                         frc_plg, retcode, sol, ifelse(save, model, nothing),
                                         nothing)
 end
