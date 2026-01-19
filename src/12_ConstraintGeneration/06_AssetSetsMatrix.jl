@@ -101,7 +101,7 @@ julia> asset_sets_matrix("nx_sector", sets)
 
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix_view`](@ref)
+  - [`asset_sets_matrix_view`]-(@ref)
 """
 function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
