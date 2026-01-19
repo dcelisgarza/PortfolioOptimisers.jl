@@ -611,18 +611,6 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
       + Maximum return [`MaximumReturn`]-(@ref)
       + Custom objective penalty [`CustomJuMPObjective`]-(@ref)
 
-  - Portfolio returns
-    
-      + Arithmetic returns [`ArithmeticReturn`]-(@ref)
-        
-          * Uncertainty set
-          * Custom value
-    
-      + Logarithmic returns [`LogarithmicReturn`]-(@ref)
-  - Regularisation penalty
-    
-      + L1
-      + L2
   - Weight bounds
   - Budget
     
@@ -635,6 +623,41 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
         
           * Exact
           * Range
+  - Threshold
+    
+      + Asset
+        
+          * Long
+          * Short
+    
+      + Set
+        
+          * Long
+          * Short
+      + Set group
+        
+          * Long
+          * Short
+  - Linear constraints
+  - Centrality
+  - Cardinality
+    
+      + Asset
+      + Asset group
+      + Set
+      + Set group
+  - Portfolio returns
+    
+      + Arithmetic returns [`ArithmeticReturn`]-(@ref)
+        
+          * Uncertainty set
+          * Custom value
+    
+      + Logarithmic returns [`LogarithmicReturn`]-(@ref)
+  - Regularisation penalty
+    
+      + L1
+      + L2
   - Turnover(s)
   - Tracking(s)
     
@@ -648,13 +671,6 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
           * Independent variable
           * Dependent variable
   - Phylogeny
-  - Cardinality
-    
-      + Asset
-      + Asset group
-      + Set
-      + Set group
-  - Buy-in threshold
   - N-dimensional Pareto fronts [`Frontier`](@ref)
     
       + Return based
