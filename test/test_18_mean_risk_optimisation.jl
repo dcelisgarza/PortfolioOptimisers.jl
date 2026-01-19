@@ -1012,7 +1012,7 @@
         @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 1
 
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, scard = 2,
-                            slt = Threshold(; val = 0.51),
+                            slt = Threshold(; val = fill(0.51, 3)),
                             smtx = AssetSetsMatrixEstimator(; val = "clusters1"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
