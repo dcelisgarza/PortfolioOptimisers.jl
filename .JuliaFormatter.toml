@@ -1,5 +1,6 @@
 # Alignment
 # Syntax transformations.
+# format_markdown = true
 align_assignment = true
 align_conditional = true
 align_matrix = true
@@ -10,7 +11,6 @@ always_use_return = true
 annotate_untyped_fields_with_any = true
 conditional_to_if = true
 format_docstrings = true
-format_markdown = true
 import_to_using = true
 indent = 4
 indent_submodule = true
