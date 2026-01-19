@@ -21,8 +21,8 @@
 
 Portfolio optimisation is the science of either:
 
-  - Minimising risk whilst keeping returns to acceptable levels.
-  - Maximising returns whilst keeping risk to acceptable levels.
+- Minimising risk whilst keeping returns to acceptable levels.
+- Maximising returns whilst keeping risk to acceptable levels.
 
 To some definition of acceptable, and with any number of additional constraints available to the optimisation type.
 
@@ -34,10 +34,10 @@ For more information on the package's *vast* feature list, please check out the 
 
 ## Caveat emptor
 
-  - `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
-  - The documentation is still under construction.
-  - Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
-  - Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
+- `PortfolioOptimisers.jl` is under active development and still in `v0.*.*`. Therefore, breaking changes should be expected with `v0.X.0` releases. All other releases will fall under `v0.X.Y`.
+- The documentation is still under construction.
+- Testing coverage is still under `95 %`. We're mainly missing assertion tests, but some lesser used features are partially or wholly untested.
+- Please feel free to submit issues, discussions and/or PRs regarding missing docs, examples, features, tests, and bugs.
 
 ## Installation
 
@@ -208,17 +208,17 @@ plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 
 ### Documentation
 
-  - Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
-  - Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
-  - Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
+- Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
+- Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
+- Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
 
 ### API
 
-  - Unstable: there will likely be breaking changes as I figure out better, more general ways to do things, or better naming conventions.
+- Unstable: there will likely be breaking changes as I figure out better, more general ways to do things, or better naming conventions.
 
 ### Internals
 
-  - Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
+- Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
 
 ## Features
 
@@ -230,483 +230,483 @@ Without further ado, here is a summary of the features in this package.
 
 Every optimisation but the finite allocation work off of returns data. Some optimisations may use price data in the future.
 
-  - Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
-  - Computing them, validating and cleaning up data.
+- Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
+- Computing them, validating and cleaning up data.
 
 ### Co-moment matrix processing
 
 Price data is often noisy and follows general macroeconomic trends. Every optimisation model is at risk of overfitting the data. In particular, those which rely on summary statistics (moments) can be overly sensitive to the input data, for example a covariance matrix. It is therefore important to have methods that increase the robustness of their estimation.
 
-  - Positive definite projection.
+- Positive definite projection.
 
-  - Matrix denoising.
-    
-      + Spectral, shrunk, fixed.
-  - Matrix detoning.
+- Matrix denoising.
+
+  - Spectral, shrunk, fixed.
+- Matrix detoning.
 
 ### Moment estimation
 
 Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
 
-  - Expected returns.
-    
-      + Arithmetic expected returns.
-    
-      + Shrunk expected returns.
-        
-          * James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
-      + Equilibrium expected returns.
-      + Excess expected returns.
+- Expected returns.
 
-  - Variance.
-  - Covariance/Correlation matrix.
-    
-      + Custom: estimator + processing pipeline.
-    
-      + Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
-        
-          * Full.
-          * Semi.
-      + Gerber.
-        
-          * Gerber 0, 1, 2. Standardised and unstandardised.
-      + Smyth-Broby.
-        
-          * Smyth-Broby 0, 1, 2. Standardised and unstandardised.
-          * Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
-      + Distance covariance.
-      + Lower tail dependence.
-      + Kendall.
-      + Spearman.
-      + Mutual information.
-        
-          * Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-      + Denoised.
-      + Detoned.
-      + Custom algorithm.
-      + Coskewness.
-        
-          * Full.
-          * Semi.
-      + Cokurtosis.
-        
-          * Full.
-          * Semi.
-      + Implied volatility.
+  - Arithmetic expected returns.
+
+  - Shrunk expected returns.
+
+    - James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
+  - Equilibrium expected returns.
+  - Excess expected returns.
+
+- Variance.
+- Covariance/Correlation matrix.
+
+  - Custom: estimator + processing pipeline.
+
+  - Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
+
+    - Full.
+    - Semi.
+  - Gerber.
+
+    - Gerber 0, 1, 2. Standardised and unstandardised.
+  - Smyth-Broby.
+
+    - Smyth-Broby 0, 1, 2. Standardised and unstandardised.
+    - Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
+  - Distance covariance.
+  - Lower tail dependence.
+  - Kendall.
+  - Spearman.
+  - Mutual information.
+
+    - Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
+  - Denoised.
+  - Detoned.
+  - Custom algorithm.
+  - Coskewness.
+
+    - Full.
+    - Semi.
+  - Cokurtosis.
+
+    - Full.
+    - Semi.
+  - Implied volatility.
 
 ### Regression Models
 
 Factor models and implied volatility use regression in their estimation.
 
-  - Stepwise.
-    
-      + Forward and Backward.
-        
-          * P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
+- Stepwise.
 
-  - Dimensional reduction.
-    
-      + Principal Component.
-      + Probabilistic Principal Component.
+  - Forward and Backward.
+
+    - P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
+
+- Dimensional reduction.
+
+  - Principal Component.
+  - Probabilistic Principal Component.
 
 ### Ordered weights array and Linear moments
 
-  - Ordered weights arrays.
-    
-      + Gini Mean Difference.
-      + Conditional Value at Risk.
-      + Weighted Conditional Value at Risk.
-      + Tail Gini.
-      + Worst Realisation.
-      + Range.
-      + Conditional Value at Risk Range.
-      + Weighted Conditional Value at Risk Range.
-      + Tail Gini Range.
+- Ordered weights arrays.
 
-  - Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
-    
-      + Normalised Constant Relative Risk Aversion.
-      + Minimum Squared Distance.
-      + Minimum Sum Squares.
+  - Gini Mean Difference.
+  - Conditional Value at Risk.
+  - Weighted Conditional Value at Risk.
+  - Tail Gini.
+  - Worst Realisation.
+  - Range.
+  - Conditional Value at Risk Range.
+  - Weighted Conditional Value at Risk Range.
+  - Tail Gini Range.
+
+- Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
+
+  - Normalised Constant Relative Risk Aversion.
+  - Minimum Squared Distance.
+  - Minimum Sum Squares.
 
 ### Distance Matrices
 
 Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
 
-  - Distance: these compare pairwise relationships.
-  - Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
+- Distance: these compare pairwise relationships.
+- Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
 
 Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
 
-  - Simple.
+- Simple.
 
-  - Absolute.
-  - Logarithmic.
-  - Correlation.
-  - Variation of Information.
-    
-      + Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-  - Canonical: depends on the covariance/correlation estimator used.
+- Absolute.
+- Logarithmic.
+- Correlation.
+- Variation of Information.
+
+  - Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
+- Canonical: depends on the covariance/correlation estimator used.
 
 ### Phylogeny
 
 These define asset relationships. They can be used to set constraints on and/or compute the relatedness of assets in a portfolio.
 
-  - Clustering.
-    
-      + Optimal number of clusters:
-        
-          * Predefined, Second order difference, Standardised silhouette scores.
-    
-      + Hierarchical clustering.
-      + Direct Bubble Hierarchy Trees.
-        
-          * Local Global sparsification of the inverse covariance/correlation matrix.
+- Clustering.
 
-  - Phylogeny matrices.
-    
-      + Network (Minimum Spanning Tree) adjacency.
-      + Clustering adjacency.
-  - Centrality vectors and average centrality.
-    
-      + Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
-  - Asset phylogeny score.
+  - Optimal number of clusters:
+
+    - Predefined, Second order difference, Standardised silhouette scores.
+
+  - Hierarchical clustering.
+  - Direct Bubble Hierarchy Trees.
+
+    - Local Global sparsification of the inverse covariance/correlation matrix.
+
+- Phylogeny matrices.
+
+  - Network (Minimum Spanning Tree) adjacency.
+  - Clustering adjacency.
+- Centrality vectors and average centrality.
+
+  - Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
+- Asset phylogeny score.
 
 ### Constraint generation
 
 These let users easily manually or programatically define optimisation constraints.
 
-  - Equation parsing.
+- Equation parsing.
 
-  - Linear weights.
-  - Risk budget.
-  - Asset set matrices.
-  - Phylogeny.
-    
-      + Phylogeny matrix.
-        
-          * Semi definite.
-          * Mixed integer programming.
-    
-      + Centrality.
-  - Weight bounds.
-  - Buy-in threshold.
+- Linear weights.
+- Risk budget.
+- Asset set matrices.
+- Phylogeny.
+
+  - Phylogeny matrix.
+
+    - Semi definite.
+    - Mixed integer programming.
+
+  - Centrality.
+- Weight bounds.
+- Buy-in threshold.
 
 ### Prior statistics
 
 As previously mentioned, every optimisation but the finite allocation work off of returns data. These returns can be adjusted and summarised using these estimators. Like the moment estimators, these can be mixed in various ways.
 
-  - Empirical.
+- Empirical.
 
+- Factor model.
+- High order moments (coskewness and cokurtosis).
+- Black-Litterman.
+
+  - Vanilla.
+  - Bayesian.
   - Factor model.
-  - High order moments (coskewness and cokurtosis).
-  - Black-Litterman.
-    
-      + Vanilla.
-      + Bayesian.
-      + Factor model.
-      + Augmented.
-  - Entropy pooling.
-  - Opinion pooling.
+  - Augmented.
+- Entropy pooling.
+- Opinion pooling.
 
 ### Uncertainty sets
 
 These sets can be used to make some optimisations more robust. Namely, there exist uncertainty sets on expected returns and covariance. They can be used on any optimisation which uses any one of these quantities.
 
-  - Box.
-    
-      + Delta.
-    
-      + Normally distributed returns.
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
+- Box.
 
-  - Ellipsoidal uncertainty sets.
-    
-      + Normally distributed returns.
-    
-      + Autoregressive Conditional Heteroskedasticity.
-        
-          * Circular, moving, stationary bootstrap.
+  - Delta.
+
+  - Normally distributed returns.
+  - Autoregressive Conditional Heteroskedasticity.
+
+    - Circular, moving, stationary bootstrap.
+
+- Ellipsoidal uncertainty sets.
+
+  - Normally distributed returns.
+
+  - Autoregressive Conditional Heteroskedasticity.
+
+    - Circular, moving, stationary bootstrap.
 
 ### Turnover (Rebalancing)
 
 These penalise moving away from a benchmark vector of weights.
 
-  - Risk measure (experimental).
-  - Constraints.
-  - Fees.
+- Risk measure (experimental).
+- Constraints.
+- Fees.
 
 ### Fees
 
 These encode various types of fees, which can be used in portfolio optimisation and analysis.
 
-  - Relative long.
-  - Relative short
-  - Fixed long.
-  - Fixed short.
-  - Turnover (rebalance).
+- Relative long.
+- Relative short
+- Fixed long.
+- Fixed short.
+- Turnover (rebalance).
 
 ### Tracking
 
 These can be used to track the performance of an index, indicator, or portfolio.
 
-  - Risk measure (experimental).
-  - Constraints.
+- Risk measure (experimental).
+- Constraints.
 
 There are four things that can be tracked.
 
-  - Returns via L1 or L2 norm.
-    
-      + Asset weights.
-      + Returns vector.
+- Returns via L1 or L2 norm.
 
-  - Risk tracking via asset weights.
-    
-      + Dependent variables (experimental).
-      + Independent variables.
+  - Asset weights.
+  - Returns vector.
+
+- Risk tracking via asset weights.
+
+  - Dependent variables (experimental).
+  - Independent variables.
 
 ### Risk measures
 
 Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
 
-  - Variance.
+- Variance.
 
-  - Risk Contribution Variance.
-    
-      + Asset risk contribution.
-      + Factor risk contribution.
-  - Uncertainty set variance.
+- Risk Contribution Variance.
+
+  - Asset risk contribution.
+  - Factor risk contribution.
+- Uncertainty set variance.
+- Standard deviation.
+- First lower moment.
+- Second lower moment.
+
+  - Semi variance.
+  - Semi deviation.
+- Second central moment (historical returns, no covariance matrix).
+
+  - Variance.
   - Standard deviation.
-  - First lower moment.
-  - Second lower moment.
-    
-      + Semi variance.
-      + Semi deviation.
-  - Second central moment (historical returns, no covariance matrix).
-    
-      + Variance.
-      + Standard deviation.
-  - Mean absolute deviation.
-  - Third lower moment (historical returns, no coskewness matrix).
-    
-      + Standardised (semi skewness).
-      + Unstandardised.
-  - Fourth lower moment (historical returns, no cokurtosis matrix).
-    
-      + Standardised (semi kurtosis).
-      + Unstandardised.
-  - Third central moment (historical returns, no coskewness matrix).
-    
-      + Standardised (skewness).
-      + Unstandardised.
-  - Fourth central moment (historical returns, no cokurtosis matrix).
-    
-      + Standardised (kurtosis).
-      + Unstandardised.
-  - Square root kurtosis.
-    
-      + Full.
-      + Semi.
-  - Negative skewness.
-    
-      + Full.
-      + Semi (experimental).
-  - Negative quadratic skewness.
-    
-      + Full.
-      + Semi (experimental).
-  - Value at Risk.
-  - Conditional Value at Risk.
-  - Distributionally Robust Conditional Value at Risk.
-  - Entropic Value at Risk.
-  - Relativistic Value at Risk.
-  - Value at Risk Range.
-  - Conditional Value at Risk Range.
-  - Distributionally Robust Conditional Value at Risk Range.
-  - Entropic Value at Risk Range.
-  - Relativistic Value at Risk Range.
-  - Drawdown at Risk.
-    
-      + Absolute (simple returns).
-      + Relative (compounded returns).
-  - Conditional Drawdown at Risk.
-    
-      + Absolute (simple returns).
-      + Relative (compounded returns).
-  - Entropic Drawdown at Risk.
-    
-      + Absolute (simple returns).
-      + Relative (compounded returns).
-  - Relativistic Drawdown at Risk.
-    
-      + Absolute (simple returns).
-      + Relative (compounded returns).
-  - Ordered Weights Array risk measure.
-  - Ordered Weights Array range risk measure.
-  - Average Drawdown.
-  - Ulcer Index.
-  - Maximum Drawdown.
-  - Brownian Distance Variance.
-  - Worst Realisation.
-  - Range.
-  - Equal risk.
-  - Turnover risk.
-  - Tracking risk.
-  - Mean return risk.
-  - Ratio of measures.
+- Mean absolute deviation.
+- Third lower moment (historical returns, no coskewness matrix).
+
+  - Standardised (semi skewness).
+  - Unstandardised.
+- Fourth lower moment (historical returns, no cokurtosis matrix).
+
+  - Standardised (semi kurtosis).
+  - Unstandardised.
+- Third central moment (historical returns, no coskewness matrix).
+
+  - Standardised (skewness).
+  - Unstandardised.
+- Fourth central moment (historical returns, no cokurtosis matrix).
+
+  - Standardised (kurtosis).
+  - Unstandardised.
+- Square root kurtosis.
+
+  - Full.
+  - Semi.
+- Negative skewness.
+
+  - Full.
+  - Semi (experimental).
+- Negative quadratic skewness.
+
+  - Full.
+  - Semi (experimental).
+- Value at Risk.
+- Conditional Value at Risk.
+- Distributionally Robust Conditional Value at Risk.
+- Entropic Value at Risk.
+- Relativistic Value at Risk.
+- Value at Risk Range.
+- Conditional Value at Risk Range.
+- Distributionally Robust Conditional Value at Risk Range.
+- Entropic Value at Risk Range.
+- Relativistic Value at Risk Range.
+- Drawdown at Risk.
+
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Conditional Drawdown at Risk.
+
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Entropic Drawdown at Risk.
+
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Relativistic Drawdown at Risk.
+
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Ordered Weights Array risk measure.
+- Ordered Weights Array range risk measure.
+- Average Drawdown.
+- Ulcer Index.
+- Maximum Drawdown.
+- Brownian Distance Variance.
+- Worst Realisation.
+- Range.
+- Equal risk.
+- Turnover risk.
+- Tracking risk.
+- Mean return risk.
+- Ratio of measures.
 
 ### Portfolio statistics
 
 These are used to summarise a portfolio's risk and return characteristics.
 
-  - Expected returns.
-    
-      + Arithmetic.
-      + Logarithmic.
+- Expected returns.
 
-  - Risk-adjusted return ratio.
-    
-      + Vanilla.
-      + Sharpe ratio information criterion.
-  - Risk contribution.
-    
-      + Asset risk contribution.
-      + Factor risk contribution.
+  - Arithmetic.
+  - Logarithmic.
+
+- Risk-adjusted return ratio.
+
+  - Vanilla.
+  - Sharpe ratio information criterion.
+- Risk contribution.
+
+  - Asset risk contribution.
+  - Factor risk contribution.
 
 ### Optimisation
 
 There are many different optimisation methods, each with different characteristics and configurable options, including exclusive constraint types and risk measures. Though all of them have an optional fallback method in case the optimisation fails.
 
-  - Clustering.
-    
-      + Hierarchical Risk Parity.
-      + Hierarchical Equal Risk Contribution.
-      + Nested Clustered Optimisation.
-      + Schur Complement Hierarchical Risk Parity.
+- Clustering.
 
-  - `JuMP`-based.
-    
-      + Mean Risk.
-    
-      + Factor Risk Contribution.
-      + Near Optimal Centering.
-      + Risk Budgeting.
-        
-          * Asset risk budgeting.
-          * Factor risk budgeting.
-      + Relaxed Risk Budgeting.
-  - Stacking.
-  - Naive.
-    
-      + Inverse volatility.
-      + Equal weighted.
-      + Random weighted.
-  - Finite Allocation.
-    
-      + Discrete.
-      + Greedy.
+  - Hierarchical Risk Parity.
+  - Hierarchical Equal Risk Contribution.
+  - Nested Clustered Optimisation.
+  - Schur Complement Hierarchical Risk Parity.
+
+- `JuMP`-based.
+
+  - Mean Risk.
+
+  - Factor Risk Contribution.
+  - Near Optimal Centering.
+  - Risk Budgeting.
+
+    - Asset risk budgeting.
+    - Factor risk budgeting.
+  - Relaxed Risk Budgeting.
+- Stacking.
+- Naive.
+
+  - Inverse volatility.
+  - Equal weighted.
+  - Random weighted.
+- Finite Allocation.
+
+  - Discrete.
+  - Greedy.
 
 ### Optimisation constraints
 
 Many of these use the various constraint generation mechanisms mentioned above. These constrain the optimisation so the results meet the user's requirements. Some have specific requirements like a Mixed Integer Programming capable solver, others cannot be used in conjunction with each other, and there exist combinations that make problems infeasible.
 
-  - `JuMP`-based.
-    
-      + Risk constraints.
-        
-          * Maximum risk for all supported measures (can be simultaneously provided).
-    
-      + Return constraints.
-        
-          * Minimum return.
-          * Expected return uncertainty set.
-      + Pareto front/surface/hypersurface (efficient frontier 2D, 3D, ND).
-        
-          * Via risk constraints.
-          * Via return constraints.
-      + Objective functions.
-        
-          * Minimum risk.
-          * Maximum utility.
-          * Maximum risk-adjusted return ratio.
-          * Maximum return.
-      + Budget constraints.
-        
-          * Long and/or short budget.
-            
-              - Exact.
-              - Upper and lower bounds.
-        
-          * Cost budget.
-          * Market impact budget.
-      + Weight bounds.
-      + Linear weights.
-      + Cardinality.
-        
-          * Asset.
-          * Set.
-      + Group cardinality.
-        
-          * Asset.
-          * Set.
-      + Long and short buy-in threshold.
-      + Turnover.
-      + Fees.
-      + Tracking.
-      + Phylogeny.
-      + Centrality.
-      + Regularisation.
-        
-          * L1.
-          * L2.
-      + Custom: via subtyping and multiple dispatch.
-        
-          * Constraint.
-          * Objective.
-          * Objective penalty.
+- `JuMP`-based.
 
-  - Non-`JuMP`-based.
-    
-      + Weight bounds.
-        
-          * Upper.
-          * Lower.
-    
-      + Weight finaliser.
-  - Optimisers without a fixed risk measure.
-    
-      + Scalarisers for multiple simultaneous risk measures.
-        
-          * Weighted sum.
-          * Max risk.
-          * LogSumExp.
+  - Risk constraints.
+
+    - Maximum risk for all supported measures (can be simultaneously provided).
+
+  - Return constraints.
+
+    - Minimum return.
+    - Expected return uncertainty set.
+  - Pareto front/surface/hypersurface (efficient frontier 2D, 3D, ND).
+
+    - Via risk constraints.
+    - Via return constraints.
+  - Objective functions.
+
+    - Minimum risk.
+    - Maximum utility.
+    - Maximum risk-adjusted return ratio.
+    - Maximum return.
+  - Budget constraints.
+
+    - Long and/or short budget.
+
+      - Exact.
+      - Upper and lower bounds.
+
+    - Cost budget.
+    - Market impact budget.
+  - Weight bounds.
+  - Linear weights.
+  - Cardinality.
+
+    - Asset.
+    - Set.
+  - Group cardinality.
+
+    - Asset.
+    - Set.
+  - Long and short buy-in threshold.
+  - Turnover.
+  - Fees.
+  - Tracking.
+  - Phylogeny.
+  - Centrality.
+  - Regularisation.
+
+    - L1.
+    - L2.
+  - Custom: via subtyping and multiple dispatch.
+
+    - Constraint.
+    - Objective.
+    - Objective penalty.
+
+- Non-`JuMP`-based.
+
+  - Weight bounds.
+
+    - Upper.
+    - Lower.
+
+  - Weight finaliser.
+- Optimisers without a fixed risk measure.
+
+  - Scalarisers for multiple simultaneous risk measures.
+
+    - Weighted sum.
+    - Max risk.
+    - LogSumExp.
 
 ### Plotting
 
-  - Simple or compound cumulative returns.
-    
-      + Portfolio.
-      + Assets.
+- Simple or compound cumulative returns.
 
-  - Portfolio composition.
-    
-      + Single portfolio.
-    
-      + Multi portfolio.
-        
-          * Stacked bar.
-          * Stacked area.
-  - Risk contribution.
-    
-      + Asset risk contribution.
-      + Factor risk contribution.
-  - Asset dendrogram.
-  - Asset clusters + optional dendrogram.
-  - Simple or compound drawdowns.
-  - Portfolio returns histogram + density.
-  - 2/3D risk measure scatter plots.
+  - Portfolio.
+  - Assets.
+
+- Portfolio composition.
+
+  - Single portfolio.
+
+  - Multi portfolio.
+
+    - Stacked bar.
+    - Stacked area.
+- Risk contribution.
+
+  - Asset risk contribution.
+  - Factor risk contribution.
+- Asset dendrogram.
+- Asset clusters + optional dendrogram.
+- Simple or compound drawdowns.
+- Portfolio returns histogram + density.
+- 2/3D risk measure scatter plots.
 
 ## How to Cite
 

@@ -1568,17 +1568,16 @@
                        rtol = 1e-6)
     end
     @testset "Centrality" begin
-        ces = [CentralityConstraint(; A = CentralityEstimator(), B = MinValue(),
-                                    comp = GEQ()),
+        ces = [CentralityConstraint(; A = CentralityEstimator(), B = MinValue(), comp = >=),
                CentralityConstraint(;
                                     A = CentralityEstimator(; ct = EigenvectorCentrality()),
-                                    B = MeanValue(), comp = LEQ()),
+                                    B = MeanValue(), comp = <=),
                CentralityConstraint(; A = CentralityEstimator(; ct = ClosenessCentrality()),
-                                    B = MedianValue(), comp = EQ()),
+                                    B = MedianValue(), comp = ==),
                CentralityConstraint(; A = CentralityEstimator(; ct = StressCentrality()),
-                                    B = MaxValue(), comp = EQ()),
+                                    B = MaxValue(), comp = ==),
                CentralityConstraint(; A = CentralityEstimator(; ct = RadialityCentrality()),
-                                    B = 0.63, comp = EQ())]
+                                    B = 0.63, comp = ==)]
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                 opt = JuMPOptimiser(; pr = pr, slv = slv, sbgt = 1, bgt = 1,

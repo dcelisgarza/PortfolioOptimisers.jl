@@ -134,9 +134,7 @@
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
             rb = RiskBudgeting(; r = r, opt = opt,
-                               rba = AssetRiskBudgeting(;
-                                                        rkb = RiskBudgetResult(;
-                                                                               val = 1:20)))
+                               rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:20)))
             res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
@@ -293,8 +291,7 @@
             opt = JuMPOptimiser(; pr = pr, slv = slv)
             rb = RiskBudgeting(; r = r, opt = opt,
                                rba = FactorRiskBudgeting(; flag = true, re = rr,
-                                                         rkb = RiskBudgetResult(;
-                                                                                val = 1:5)))
+                                                         rkb = RiskBudget(; val = 1:5)))
             res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;

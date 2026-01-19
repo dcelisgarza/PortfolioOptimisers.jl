@@ -299,7 +299,7 @@ IntegerPhylogenyEstimator
         │       │      │   alg ┴ Full()
         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
         │       │      │     pdm ┼ Posdef
-        │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton      
+        │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
         │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
         │       │      │      dn ┼ nothing
         │       │      │      dt ┼ nothing
@@ -483,7 +483,7 @@ Estimator for generating centrality-based portfolio constraints.
 
     CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
                          B::Num_VecToScaM = MinValue(),
-                         comp::ComparisonOperator = LEQ())
+                         comp::ComparisonOperator = <=)
 
 # Examples
 
@@ -519,7 +519,7 @@ CentralityConstraint
        │      │     kind ┼ Int64: 0
        │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
      B ┼ MinValue()
-  comp ┴ LEQ: LEQ()
+  comp ┴ typeof(<=): <=
 ```
 
 # Related
@@ -539,8 +539,7 @@ struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
     end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                              B::Num_VecToScaM = MinValue(),
-                              comp::ComparisonOperator = LEQ())
+                              B::Num_VecToScaM = MinValue(), comp::ComparisonOperator = <=)
     return CentralityConstraint(A, B, comp)
 end
 const VecCC = AbstractVector{<:CentralityConstraint}

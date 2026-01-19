@@ -259,9 +259,7 @@ This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decou
 ### Matrix Processing
 
 - Positive definite projection [`Posdef`](@ref), [`posdef!`](@ref), [`posdef`](@ref)
-
 - Denoising [`Denoise`](@ref), [`denoise!`](@ref), [`denoise`](@ref)
-
   - Spectral [`SpectralDenoise`](@ref)
   - Fixed [`FixedDenoise`](@ref)
   - Shrunk [`ShrunkDenoise`](@ref)
@@ -280,14 +278,10 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
 #### Regression types
 
 - Stepwise [`StepwiseRegression`](@ref)
-
   - Algorithms
-
     - Forward [`Forward`](@ref)
     - Backward [`Backward`](@ref)
-
   - Selection criteria
-
     - P-value [`PValue`](@ref)
     - Akaike information criteria [`AIC`](@ref)
     - Corrected Akaike information criteria [`AICC`](@ref)
@@ -296,9 +290,7 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
     - Adjusted R-squared criteria [`AdjustedRSquared`](@ref)
 
 - Dimensional reduction with custom mean and variance estimators [`DimensionReductionRegression`](@ref)
-
   - Dimensional reduction targets
-
     - Principal component [`PCA`](@ref)
     - Probabilistic principal component [`PPCA`](@ref)
 
@@ -309,19 +301,14 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
 Overloads `Statistics.mean`.
 
 - Optionally weighted expected returns [`SimpleExpectedReturns`](@ref)
-
 - Equilibrium expected returns with custom covariance [`EquilibriumExpectedReturns`](@ref)
 - Excess expected returns with custom expected returns estimator [`ExcessExpectedReturns`](@ref)
 - Shrunk expected returns with custom expected returns and custom covariance estimators [`ShrunkExpectedReturns`](@ref)
-
   - Algorithms
-
     - James-Stein [`JamesStein`](@ref)
     - Bayes-Stein [`BayesStein`](@ref)
     - Bodnar-Okhrin-Parolya [`BodnarOkhrinParolya`](@ref)
-
   - Targets: all algorithms can have any of the following targets
-
     - Grand Mean [`GrandMean`](@ref)
     - Volatility Weighted [`VolatilityWeighted`](@ref)
     - Mean Squared Error [`MeanSquaredError`](@ref)
@@ -338,37 +325,27 @@ Overloads `Statistics.var` and `Statistics.std`.
 Overloads `Statistics.cov` and `Statistics.cor`.
 
 - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](@ref)
-
 - Covariance with custom covariance estimator [`Covariance`](@ref)
-
   - Full covariance [`Full`](@ref)
   - Semi (downside) covariance [`Semi`](@ref)
 - Gerber covariances with custom variance estimator [`GerberCovariance`](@ref)
-
   - Unstandardised algorithms
-
     - Gerber 0 [`Gerber0`](@ref)
     - Gerber 1 [`Gerber1`](@ref)
     - Gerber 2 [`Gerber2`](@ref)
-
   - Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimator
-
     - Gerber 0 [`StandardisedGerber0`](@ref)
     - Gerber 1 [`StandardisedGerber1`](@ref)
     - Gerber 2 [`StandardisedGerber2`](@ref)
 - Smyth-Broby extension of Gerber covariances with custom expected returns and variance estimators [`SmythBrobyCovariance`](@ref)
-
   - Unstandardised algorithms
-
     - Smyth-Broby 0 [`SmythBroby0`](@ref)
     - Smyth-Broby 1 [`SmythBroby1`](@ref)
     - Smyth-Broby 2 [`SmythBroby2`](@ref)
     - Smyth-Broby-Gerber 0 [`SmythBrobyGerber0`](@ref)
     - Smyth-Broby-Gerber 1 [`SmythBrobyGerber1`](@ref)
     - Smyth-Broby-Gerber 2 [`SmythBrobyGerber2`](@ref)
-
   - Standardised algorithms (Z-transforms the data beforehand)
-
     - Smyth-Broby 0 [`StandardisedSmythBroby0`](@ref)
     - Smyth-Broby 1 [`StandardisedSmythBroby1`](@ref)
     - Smyth-Broby 2 [`StandardisedSmythBroby2`](@ref)
@@ -378,24 +355,19 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 - Distance covariance with custom distance estimator via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
 - Lower Tail Dependence covariance [`LowerTailDependenceCovariance`](@ref)
 - Rank covariances
-
   - Kendall covariance [`KendallCovariance`](@ref)
   - Spearman covariance [`SpearmanCovariance`](@ref)
 - Mutual information covariance with custom variance estimator and various binning algorithms [`MutualInfoCovariance`](@ref)
-
   - [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
-
     - Knuth's optimal bin width [`Knuth`](@ref)
     - Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
     - Scott's bin width [`Scott`](@ref)
-
-  - Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
+  - Hacine-Gharbi-Ravier bin width [`HacineGharbiRavier`](@ref)
   - Predefined number of bins
 - Denoised covariance with custom covariance estimator [`DenoiseCovariance`](@ref)
 - Detoned covariance with custom covariance estimator [`DetoneCovariance`](@ref)
 - Custom processed covariance with custom covariance estimator [`ProcessedCovariance`](@ref)
 - Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`]-(@ref)
-
   - Premium [`ImpliedVolatilityPremium`]-(@ref)
   - Regression [`ImpliedVolatilityRegression`]-(@ref)
 - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
@@ -406,7 +378,6 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 Implements [`coskewness`](@ref).
 
 - Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
-
   - Full coskewness [`Full`](@ref)
   - Semi (downside) coskewness [`Semi`](@ref)
 
@@ -415,7 +386,6 @@ Implements [`coskewness`](@ref).
 Implements [`cokurtosis`](@ref).
 
 - Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
-
   - Full cokurtosis [`Full`](@ref)
   - Semi (downside) cokurtosis [`Semi`](@ref)
 
@@ -429,18 +399,14 @@ Implements [`distance`](@ref) and [`cor_and_dist`](@ref).
 The distance estimators are used together with various distance matrix algorithms.
 
 - Simple distance [`SimpleDistance`](@ref)
-
 - Simple absolute distance [`SimpleAbsoluteDistance`](@ref)
 - Logarithmic distance [`LogDistance`](@ref)
 - Correlation distance [`CorrelationDistance`](@ref)
 - Variation of Information distance with various binning algorithms [`VariationInfoDistance`](@ref)
-
   - [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
-
     - Knuth's optimal bin width [`Knuth`](@ref)
     - Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
     - Scott's bin width [`Scott`](@ref)
-
   - Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
   - Predefined number of bins
 - Canonical distance [`CanonicalDistance`](@ref)
@@ -454,7 +420,6 @@ The distance estimators are used together with various distance matrix algorithm
 Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`](@ref), [`Clusters`](@ref), and [`clusterise`](@ref). Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
 - Automatic choice of number of clusters via [`OptimalNumberClusters`](@ref) and [`VectorToScalarMeasure`](@ref)
-
   - Second order difference [`SecondOrderDifference`](@ref)
   - Silhouette scores [`SilhouetteScore`](@ref)
   - Predefined number of clusters.
@@ -477,23 +442,17 @@ Non hierarchical clustering algorithms are incompatible with hierarchical cluste
 Adjacency matrices encode asset relationships either with clustering or graph theory via [`phylogeny_matrix`](@ref) and [`PhylogenyResult`](@ref).
 
 - Network adjacency [`NetworkEstimator`](@ref) with custom tree algorithms, covariance, and distance estimators
-
   - Minimum spanning trees [`KruskalTree`](@ref), [`BoruvkaTree`](@ref), [`PrimTree`](@ref)
-
   - Triangulated Maximally Filtered Graph with various similarity matrix estimators
-
     - Maximum distance similarity [`MaximumDistanceSimilarity`](@ref)
     - Exponential similarity [`ExponentialSimilarity`](@ref)
     - General exponential similarity [`GeneralExponentialSimilarity`](@ref)
-
 - Clustering adjacency [`ClustersEstimator`](@ref) and [`Clusters`](@ref)
 
 ##### Centrality and phylogeny measures
 
 - Centrality estimator [`CentralityEstimator`](@ref) with custom adjacency matrix estimators (clustering and network) and centrality measures
-
   - Centrality measures
-
     - Betweenness [`BetweennessCentrality`](@ref)
     - Closeness [`ClosenessCentrality`](@ref)
     - Degree [`DegreeCentrality`](@ref)
@@ -502,35 +461,40 @@ Adjacency matrices encode asset relationships either with clustering or graph th
     - Pagerank [`Pagerank`](@ref)
     - Radiality [`RadialityCentrality`](@ref)
     - Stress [`StressCentrality`](@ref)
-
 - Centrality vector [`centrality_vector`](@ref)
 - Average centrality [`average_centrality`](@ref)
 - The asset phylogeny score [`asset_phylogeny`](@ref)
 
 ### Optimisation constraints
 
-Non clustering optimisers support a wide range of constraints, while naive and clustering optimisers only support weight bounds. Furthermore, entropy pooling prior supports a variety of views constraints. It is therefore important to provide users with the ability to generate constraints manually and/or programmatically. We therefore provide a wide, robust, and extensible range of types and functions that make this easy, fast, and safe.
+Non clustering optimisers support a wide range of constraints, while naive and clustering optimisers only support weight bounds. Furthermore, entropy pooling prior supports a variety of views constraints. It is therefore important to provide users with the ability to generate constraints manually and/or programmatically. We therefore provide a wide, robust, and extensible range of types such as [`AbstractEstimatorValueAlgorithm`](@ref) and [`UniformValues`](@ref), and functions that make this easy, fast, and safe.
+
+Constraints can be defined via their estimators or directly by their result types. Some using estimators need to map key-value pairs to the asset universe, this is done by defining the assets and asset groups in [`AssetSets`](@ref). Internally, `PortfolioOptimisers.jl` uses all the information and calls [`group_to_val!`](@ref), [`group_to_val`](@ref), and [`replace_group_by_assets`](@ref) to produce the appropriate arrays.
+
+- Equation parsing [`parse_equation`](@ref) and [`ParsingResult`](@ref).
+- Linear constraints [`linear_constraints`](@ref), [`LinearConstraintEstimator`](@ref), [`PartialLinearConstraint`](@ref), and [`LinearConstraint`](@ref)
+- Risk budgeting constraints [`risk_budget_constraints`](@ref), [`RiskBudgetEstimator`](@ref), and [`RiskBudget`](@ref)
+- Phylogeny constraints [`phylogeny_constraints`](@ref), [`centrality_constraints`](@ref), [`SemiDefinitePhylogenyEstimator`](@ref), [`SemiDefinitePhylogeny`](@ref), [`IntegerPhylogenyEstimator](@ref), [`IntegerPhylogeny`](@ref), [`CentralityConstraint`](@ref)
+- Weight bounds constraints [`weight_bounds_constraints`](@ref), [`WeightBoundsEstimator`](@ref), [`WeightBounds`](@ref)
+- Asset set matrices [`asset_sets_matrix`](@ref) and [`AssetSetsMatrixEstimator`](@ref)
+- Threshold constraints [`threshold_constraints`](@ref), [`ThresholdEstimator`](@ref), and [`Threshold`](@ref)
 
 ### Prior statistics
 
 Many optimisations and constraints use prior statistics computed via [`prior`](@ref).
 
 - Low order prior [`LowOrderPrior`](@ref)
-
   - Empirical [`EmpiricalPrior`](@ref)
-
   - Factor model [`FactorPrior`](@ref)
   - Black-Litterman
-
     - Vanilla [`BlackLittermanPrior`](@ref)
     - Bayesian [`BayesianBlackLittermanPrior`](@ref)
     - Factor model [`FactorBlackLittermanPrior`](@ref)
     - Augmented [`AugmentedBlackLittermanPrior`](@ref)
   - Entropy pooling [`EntropyPoolingPrior`](@ref)
+    - Entropy pooling priors via [`replace_prior_views`](@ref), [`ParsingResult`](@ref), and [`RhoParsingResult`](@ref)
   - Opinion pooling [`OpinionPoolingPrior`](@ref)
-
 - High order prior [`HighOrderPrior`](@ref)
-
   - High order [`HighOrderPriorEstimator`](@ref)
   - High order factor model [`HighOrderFactorPriorEstimator`]-(@ref)
 
@@ -541,9 +505,7 @@ In order to make optimisations more robust to noise and measurement error, it is
 `PortfolioOptimisers.jl` implements two types of uncertainty sets.
 
 - [`BoxUncertaintySet`](@ref) and [`BoxUncertaintySetAlgorithm`](@ref)
-
 - [`EllipsoidalUncertaintySet`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) with various algorithms for computing the scaling parameter via [`k_ucs`](@ref)
-
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
@@ -552,9 +514,7 @@ In order to make optimisations more robust to noise and measurement error, it is
 It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets.
 
 - Normally distributed returns [`NormalUncertaintySet`](@ref)
-
-- Bootstrapping via Autoregressive Conditional Heteroskedasticity [`ARCHUncertaintySet`](@ref) via [`arch`](https://arch.readthedocs.io/en/latest/bootstrap/timeseries-bootstraps.html)
-
+- Bootstrapping via Autoregressive Conditional Heteroscedasticity [`ARCHUncertaintySet`](@ref) via [`arch`](https://arch.readthedocs.io/en/latest/bootstrap/timeseries-bootstraps.html)
   - Circular [`CircularBootstrap`](@ref)
   - Moving [`MovingBootstrap`](@ref)
   - Stationary [`StationaryBootstrap`](@ref)
@@ -565,10 +525,9 @@ The following estimator can only generate box sets.
 
 ### Fees
 
-Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naïve ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
+Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
 
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
-
   - Proportional long
   - Proportional short
   - Fixed long
@@ -579,7 +538,7 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
 
 Optimisations are implemented via [`optimise`]-(@ref). Optimisations consume an estimator and return a result.
 
-#### Naïve
+#### Naive
 
 These return a [`NaiveOptimisationResult`]-(@ref).
 
@@ -592,15 +551,11 @@ These return a [`NaiveOptimisationResult`]-(@ref).
 These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`]-(@ref), which encodes all supported constraints.
 
 - Mean-Risk [`MeanRisk`]-(@ref) returns a [`MeanRiskResult`]-(@ref)
-
 - Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
 - Near Optimal Centering [`NearOptimalCentering`]-(@ref) returns a [`NearOptimalCenteringResult`]-(@ref)
 - Asset and factor risk budgeting [`AssetRiskBudgeting`]-(@ref), [`FactorRiskBudgeting`]-(@ref)
-
   - Risk Budgeting [`RiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
-
   - Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
-
     - Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
     - Regularised [`RegularisedRelaxedRiskBudgeting`]-(@ref)
     - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(@ref)
@@ -608,73 +563,53 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 ##### Traditional Optimisation Features
 
 - Objective functions for non risk budgeting optimisations
-
   - Minimum risk [`MinimumRisk`]-(@ref)
   - Maximum utility [`MaximumUtility`]-(@ref)
   - Maximum return over risk ratio [`MaximumRatio`]-(@ref)
   - Maximum return [`MaximumReturn`]-(@ref)
   - Custom objective penalty [`CustomJuMPObjective`]-(@ref)
-
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), [`WeightBounds`](@ref)
 - Budget
-
   - Long
-
     - Exact
     - Range [`BudgetRange`]-(@ref)
-
   - Short
-
     - Exact
     - Range [`BudgetRange`]-(@ref)
 - Threshold [`ThresholdEstimator`](@ref) and [`Threshold`](@ref)
-
   - Asset
-
     - Long
     - Short
-
-  - Set [`AssetSetMatrixEstimator`](@ref)
-
+  - Set [`AssetSetsMatrixEstimator`](@ref)
     - Long
     - Short
 - Linear constraints [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
 - Centralit(y/ies) [`CentralityEstimator`](@ref)
 - Cardinality
-
   - Asset
   - Asset group(s) [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
   - Set(s)
   - Set group(s) [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
 - Turnover(s) [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
-
   - Proportional long
   - Proportional short
   - Fixed long
   - Fixed short
   - Turnover [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
 - Tracking error(s) [`TrackingError`](@ref)
-
   - Returns
-
     - Benchmark returns vector [`ReturnsTracking`](@ref)
-
       - L1-error [`NOCTracking`](@ref)
       - L2-error [`SOCTracking`](@ref), [`SquaredSOCTracking`](@ref)
-
     - Benchmark portfolio weights [`WeightsTracking`](@ref)
-
       - L1-error [`NOCTracking`](@ref)
       - L2-error [`SOCTracking`](@ref), [`SquaredSOCTracking`](@ref)
 - Phylogen(y/ies) [`IntegerPhylogenyEstimator`](@ref) and [`SemiDefinitePhylogenyEstimator`](@ref)
 - Portfolio returns
-
   - Arithmetic returns [`ArithmeticReturn`]-(@ref)
-
     - Uncertainty set
     - Custom value
-
   - Logarithmic returns [`LogarithmicReturn`]-(@ref)
 - Objective vector scalarisation
   - Weighted sum [`SumScalariser`](@ref)
@@ -684,11 +619,9 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 - Custom objective penalty
 - Number of effective assets
 - Regularisation penalty
-
   - L1
   - L2
 - N-dimensional Pareto fronts [`Frontier`](@ref)
-
   - Return based
   - Risk based
 
@@ -713,7 +646,6 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 Some risk measures including linear moments may be formulated using ordered weights arrays.
 
 - Gini Mean Difference.
-
 - Conditional Value at Risk.
 - Weighted Conditional Value at Risk.
 - Tail Gini.
@@ -723,7 +655,6 @@ Some risk measures including linear moments may be formulated using ordered weig
 - Weighted Conditional Value at Risk Range.
 - Tail Gini Range.
 - Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
-
   - Normalised Constant Relative Risk Aversion.
   - Minimum Squared Distance.
   - Minimum Sum Squares.
@@ -752,49 +683,38 @@ There are four things that can be tracked.
 Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
 
 - Variance.
-
 - Risk Contribution Variance.
-
   - Asset risk contribution.
   - Factor risk contribution.
 - Uncertainty set variance.
 - Standard deviation.
 - First lower moment.
 - Second lower moment.
-
   - Semi variance.
   - Semi deviation.
 - Second central moment (historical returns, no covariance matrix).
-
   - Variance.
   - Standard deviation.
 - Mean absolute deviation.
 - Third lower moment (historical returns, no coskewness matrix).
-
   - Standardised (semi skewness).
   - Unstandardised.
 - Fourth lower moment (historical returns, no cokurtosis matrix).
-
   - Standardised (semi kurtosis).
   - Unstandardised.
 - Third central moment (historical returns, no coskewness matrix).
-
   - Standardised (skewness).
   - Unstandardised.
 - Fourth central moment (historical returns, no cokurtosis matrix).
-
   - Standardised (kurtosis).
   - Unstandardised.
 - Square root kurtosis.
-
   - Full.
   - Semi.
 - Negative skewness.
-
   - Full.
   - Semi (experimental).
 - Negative quadratic skewness.
-
   - Full.
   - Semi (experimental).
 - Value at Risk.
@@ -808,19 +728,15 @@ Different optimisations support different risk measures, most measures can also 
 - Entropic Value at Risk Range.
 - Relativistic Value at Risk Range.
 - Drawdown at Risk.
-
   - Absolute (simple returns).
   - Relative (compounded returns).
 - Conditional Drawdown at Risk.
-
   - Absolute (simple returns).
   - Relative (compounded returns).
 - Entropic Drawdown at Risk.
-
   - Absolute (simple returns).
   - Relative (compounded returns).
 - Relativistic Drawdown at Risk.
-
   - Absolute (simple returns).
   - Relative (compounded returns).
 - Ordered Weights Array risk measure.
@@ -842,111 +758,26 @@ Different optimisations support different risk measures, most measures can also 
 These are used to summarise a portfolio's risk and return characteristics.
 
 - Expected returns.
-
   - Arithmetic.
   - Logarithmic.
-
 - Risk-adjusted return ratio.
-
   - Vanilla.
   - Sharpe ratio information criterion.
 - Risk contribution.
-
   - Asset risk contribution.
   - Factor risk contribution.
-
-### Optimisation constraints
-
-Many of these use the various constraint generation mechanisms mentioned above. These constrain the optimisation so the results meet the user's requirements. Some have specific requirements like a Mixed Integer Programming capable solver, others cannot be used in conjunction with each other, and there exist combinations that make problems infeasible.
-
-- `JuMP`-based.
-
-  - Risk constraints.
-
-    - Maximum risk for all supported measures (can be simultaneously provided).
-
-  - Return constraints.
-
-    - Minimum return.
-    - Expected return uncertainty set.
-  - Pareto front/surface/hypersurface (efficient frontier 2D, 3D, ND).
-
-    - Via risk constraints.
-    - Via return constraints.
-  - Objective functions.
-
-    - Minimum risk.
-    - Maximum utility.
-    - Maximum risk-adjusted return ratio.
-    - Maximum return.
-  - Budget constraints.
-
-    - Long and/or short budget.
-
-      - Exact.
-      - Upper and lower bounds.
-
-    - Cost budget.
-    - Market impact budget.
-  - Weight bounds.
-  - Linear weights.
-  - Cardinality.
-
-    - Asset.
-    - Set.
-  - Group cardinality.
-
-    - Asset.
-    - Set.
-  - Long and short buy-in threshold.
-  - Turnover.
-  - Fees.
-  - Tracking.
-  - Phylogeny.
-  - Centrality.
-  - Regularisation.
-
-    - L1.
-    - L2.
-  - Custom: via subtyping and multiple dispatch.
-
-    - Constraint.
-    - Objective.
-    - Objective penalty.
-
-- Non-`JuMP`-based.
-
-  - Weight bounds.
-
-    - Upper.
-    - Lower.
-
-  - Weight finaliser.
-- Optimisers without a fixed risk measure.
-
-  - Scalarisers for multiple simultaneous risk measures.
-
-    - Weighted sum.
-    - Max risk.
-    - LogSumExp.
 
 ### Plotting
 
 - Simple or compound cumulative returns.
-
   - Portfolio.
   - Assets.
-
 - Portfolio composition.
-
   - Single portfolio.
-
   - Multi portfolio.
-
     - Stacked bar.
     - Stacked area.
 - Risk contribution.
-
   - Asset risk contribution.
   - Factor risk contribution.
 - Asset dendrogram.

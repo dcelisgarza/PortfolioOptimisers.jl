@@ -38,7 +38,7 @@ end PortfolioOptimisers
 
 #=
 src_files = String[]
-sizehint!(src_files, 146)
+sizehint!(src_files, 148)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files
         if file == "PortfolioOptimisers.jl"
@@ -97,9 +97,11 @@ include("11_Phylogeny/05_NonHierarchicalClustering.jl")
 include("11_Phylogeny/06_Phylogeny.jl")
 include("12_ConstraintGeneration/01_Base_ConstraintGeneration.jl")
 include("12_ConstraintGeneration/02_LinearConstraintGeneration.jl")
-include("12_ConstraintGeneration/03_PhylogenyConstraintGeneration.jl")
-include("12_ConstraintGeneration/04_WeightBoundsConstraintGeneration.jl")
-include("12_ConstraintGeneration/05_ThresholdConstraintGeneration.jl")
+include("12_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl")
+include("12_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl")
+include("12_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl")
+include("12_ConstraintGeneration/06_AssetSetsMatrix.jl")
+include("12_ConstraintGeneration/07_ThresholdConstraintGeneration.jl")
 include("13_Prior/01_Base_Prior.jl")
 include("13_Prior/02_EmpiricalPrior.jl")
 include("13_Prior/03_FactorPrior.jl")

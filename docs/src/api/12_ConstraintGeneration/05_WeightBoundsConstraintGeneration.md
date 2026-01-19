@@ -1,4 +1,4 @@
-# Weight Bounds Constraints
+# Weight bounds constraints
 
 ```@docs
 WeightBounds

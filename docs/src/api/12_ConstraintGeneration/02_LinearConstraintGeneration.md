@@ -6,15 +6,10 @@ LinearConstraint
 LinearConstraintEstimator
 ParsingResult
 RhoParsingResult
-AssetSets
-RiskBudgetResult
-RiskBudgetEstimator
-AssetSetsMatrixEstimator
 replace_group_by_assets
 estimator_to_val
 parse_equation
 linear_constraints
-risk_budget_constraints
 AbstractParsingResult
 group_to_val!
 _parse_equation

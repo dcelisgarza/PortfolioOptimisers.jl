@@ -289,11 +289,11 @@
                                                                                     alg = SecondOrderDifference())),
                                 opti = RiskBudgeting(;
                                                      rba = AssetRiskBudgeting(;
-                                                                              rkb = RiskBudgetResult(;
-                                                                                                     val = fill(inv(size(pr.X,
-                                                                                                                         2)),
-                                                                                                                size(pr.X,
-                                                                                                                     2)))),
+                                                                              rkb = RiskBudget(;
+                                                                                               val = fill(inv(size(pr.X,
+                                                                                                                   2)),
+                                                                                                          size(pr.X,
+                                                                                                               2)))),
                                                      opt = jopti),
                                 opto = MeanRisk(; opt = jopto)),
                 NestedClustered(; pr = pr, clr = clr,

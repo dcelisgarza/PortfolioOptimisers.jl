@@ -112,8 +112,8 @@
             opt = JuMPOptimiser(; pr = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt,
                                       rba = AssetRiskBudgeting(;
-                                                               rkb = RiskBudgetResult(;
-                                                                                      val = 20:-1:1)),
+                                                               rkb = RiskBudget(;
+                                                                                val = 20:-1:1)),
                                       alg = alg)
             res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
@@ -180,8 +180,8 @@
         for (i, alg) in enumerate(algs)
             rb = RelaxedRiskBudgeting(; opt = opt,
                                       rba = FactorRiskBudgeting(; re = rr,
-                                                                rkb = RiskBudgetResult(;
-                                                                                       val = 1:5)))
+                                                                rkb = RiskBudget(;
+                                                                                 val = 1:5)))
             res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)
