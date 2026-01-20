@@ -38,8 +38,7 @@ CurrentModule = PortfolioOptimisers
 
 [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
-!!! danger
-
+!!! Danger
     Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
 Portfolio optimisation is the science of either:
@@ -67,11 +66,12 @@ For more information on the package's *vast* feature list, please check out the 
 `PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
 
 ```julia
+julia> using Pkg
+
 julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
-using Pkg
 ```
 
-## Quickstart
+## Quick-start
 
 The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs contain toy examples of the many, many features.
 
@@ -165,7 +165,7 @@ opt = JuMPOptimiser(; slv = slv);
 nothing # hide
 ```
 
-Here we will use the traditional Mean-Risk [`MeanRisk`]-(@ref) optimsation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
+Here we will use the traditional Mean-Risk [`MeanRisk`]-(@ref) optimisation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
 
 ```@example 0_index
 # Vanilla (Markowitz) mean risk optimisation.
@@ -195,7 +195,7 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 da = DiscreteAllocation(; slv = mip_slv)
 ```
 
-The discrete allocation minimises the absolute or relative L1- or L2-norm (configurable) between the ideal allocation to the one you can afford plus the leftover cash. As such, it needs to know a few extra things, namely the optimal weights `res.w`, a vector of latest prices `vec(values(prices[end]))`, and available cash which we define to be `4206.90`.
+The discrete allocation minimises the absolute or relative L1- or L2-norm (configurable) between the ideal allocation to the one you can afford plus the leftover cash. As such, it needs to know a few extra things, namely the optimal weights `res.w`, a vector of the latest prices `vec(values(prices[end]))`, and available cash which we define to be `4206.90`.
 
 ```@example 0_index
 # Perform the finite discrete allocation, uses the final asset
@@ -213,7 +213,7 @@ df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cos
 pretty_table(df; formatters = [fmt2])
 ```
 
-We can also visualise the portfolio using various plotting functions. For example we can plot the portfolio's cumulative returns, in this case compound returns.
+We can also visualise the portfolio using various plotting functions. For example, we can plot the portfolio's cumulative returns, in this case compound returns.
 
 ```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
@@ -234,7 +234,7 @@ We can plot the portfolio drawdowns, in this case compound drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
-We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.
+Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.
 
 ```@example 0_index
 # Plot the risk contribution per asset.
@@ -244,8 +244,7 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
 
 This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
-!!! info
-
+!!! Info
     This section is under active development.
 
 ## Features
@@ -407,7 +406,7 @@ The distance estimators are used together with various distance matrix algorithm
     - Knuth's optimal bin width [`Knuth`](@ref)
     - Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
     - Scott's bin width [`Scott`](@ref)
-  - Hacine Gharbi Ravier bin width [`HacineGharbiRavier`](@ref)
+  - Hacine-Gharbi-Ravier bin width [`HacineGharbiRavier`](@ref)
   - Predefined number of bins
 - Canonical distance [`CanonicalDistance`](@ref)
 
@@ -429,9 +428,9 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 - Hierarchical clustering [`HClustAlgorithm`](@ref)
 - Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`]-(@ref)
 
-##### Non hierachical
+##### Non-hierarchical
 
-Non hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`]-(@ref) optimisations.
+Non-hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`]-(@ref) optimisations.
 
 - K-means clustering [`KMeansAlgorithm`]-(@ref)
 
@@ -474,7 +473,7 @@ Constraints can be defined via their estimators or directly by their result type
 - Equation parsing [`parse_equation`](@ref) and [`ParsingResult`](@ref).
 - Linear constraints [`linear_constraints`](@ref), [`LinearConstraintEstimator`](@ref), [`PartialLinearConstraint`](@ref), and [`LinearConstraint`](@ref)
 - Risk budgeting constraints [`risk_budget_constraints`](@ref), [`RiskBudgetEstimator`](@ref), and [`RiskBudget`](@ref)
-- Phylogeny constraints [`phylogeny_constraints`](@ref), [`centrality_constraints`](@ref), [`SemiDefinitePhylogenyEstimator`](@ref), [`SemiDefinitePhylogeny`](@ref), [`IntegerPhylogenyEstimator](@ref), [`IntegerPhylogeny`](@ref), [`CentralityConstraint`](@ref)
+- Phylogeny constraints [`phylogeny_constraints`](@ref), [`centrality_constraints`](@ref), [`SemiDefinitePhylogenyEstimator`](@ref), [`SemiDefinitePhylogeny`](@ref), [`IntegerPhylogenyEstimator`](@ref), [`IntegerPhylogeny`](@ref), [`CentralityConstraint`](@ref)
 - Weight bounds constraints [`weight_bounds_constraints`](@ref), [`WeightBoundsEstimator`](@ref), [`WeightBounds`](@ref)
 - Asset set matrices [`asset_sets_matrix`](@ref) and [`AssetSetsMatrixEstimator`](@ref)
 - Threshold constraints [`threshold_constraints`](@ref), [`ThresholdEstimator`](@ref), and [`Threshold`](@ref)
@@ -492,7 +491,6 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
     - Factor model [`FactorBlackLittermanPrior`](@ref)
     - Augmented [`AugmentedBlackLittermanPrior`](@ref)
   - Entropy pooling [`EntropyPoolingPrior`](@ref)
-    - Entropy pooling priors via [`replace_prior_views`](@ref), [`ParsingResult`](@ref), and [`RhoParsingResult`](@ref)
   - Opinion pooling [`OpinionPoolingPrior`](@ref)
 - High order prior [`HighOrderPrior`](@ref)
   - High order [`HighOrderPriorEstimator`](@ref)
@@ -500,7 +498,7 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
 
 ### Uncertainty sets
 
-In order to make optimisations more robust to noise and measurement error, it is possible to define uncertainty sets on the expected returns and covariance. These can be used in optimisations which use either of these two quantities. These are implemented via [`ucs`](@ref), [`mu_ucs`](@ref), [`sigma_ucs`](@ref).
+In order to make optimisations more robust to noise and measurement error, it is possible to define uncertainty sets on the expected returns and covariance. These can be used in optimisations which use either of these two quantities. These are implemented via [`ucs`](@ref), [`mu_ucs`](@ref), and [`sigma_ucs`](@ref).
 
 `PortfolioOptimisers.jl` implements two types of uncertainty sets.
 
@@ -523,6 +521,10 @@ The following estimator can only generate box sets.
 
 - [`DeltaUncertaintySet`](@ref)
 
+### [Turnover](@id readme-turnover)
+
+The turnover is defined as the element-wise absolute difference between the vector of current weights and a vector of benchmark weights. It can be used as a constraint, method for fee calculation, and risk measure. These are all implemented using [`turnover_constraints`](@ref), [`TurnoverEstimator`](@ref), and [`Turnover`](@ref).
+
 ### Fees
 
 Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`](@ref) and [`calc_asset_fees`](@ref).
@@ -532,7 +534,123 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
   - Proportional short
   - Fixed long
   - Fixed short
-  - Turnover [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
+  - Turnover
+
+### Portfolio returns and drawdowns
+
+Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`](@ref), [`calc_net_asset_returns`](@ref), [`cumulative_returns`](@ref), [`drawdowns`](@ref).
+
+### Tracking
+
+These can be used to track the performance of an index, indicator, or portfolio.
+
+- Risk measure (experimental).
+- Constraints.
+
+There are four things that can be tracked.
+
+- Returns via L1 or L2 norm.
+
+  - Asset weights.
+  - Returns vector.
+
+- Risk tracking via asset weights.
+
+  - Dependent variables (experimental).
+  - Independent variables.
+
+### Risk measures
+
+Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
+
+- Variance.
+- Risk Contribution Variance.
+  - Asset risk contribution.
+  - Factor risk contribution.
+- Uncertainty set variance.
+- Standard deviation.
+- First lower moment.
+- Second lower moment.
+  - Semi variance.
+  - Semi deviation.
+- Second central moment (historical returns, no covariance matrix).
+  - Variance.
+  - Standard deviation.
+- Mean absolute deviation.
+- Third lower moment (historical returns, no coskewness matrix).
+  - Standardised (semi skewness).
+  - Unstandardised.
+- Fourth lower moment (historical returns, no cokurtosis matrix).
+  - Standardised (semi kurtosis).
+  - Unstandardised.
+- Third central moment (historical returns, no coskewness matrix).
+  - Standardised (skewness).
+  - Unstandardised.
+- Fourth central moment (historical returns, no cokurtosis matrix).
+  - Standardised (kurtosis).
+  - Unstandardised.
+- Square root kurtosis.
+  - Full.
+  - Semi.
+- Negative skewness.
+  - Full.
+  - Semi (experimental).
+- Negative quadratic skewness.
+  - Full.
+  - Semi (experimental).
+- Value at Risk.
+- Conditional Value at Risk.
+- Distributionally Robust Conditional Value at Risk.
+- Entropic Value at Risk.
+- Relativistic Value at Risk.
+- Value at Risk Range.
+- Conditional Value at Risk Range.
+- Distributionally Robust Conditional Value at Risk Range.
+- Entropic Value at Risk Range.
+- Relativistic Value at Risk Range.
+- Drawdown at Risk.
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Conditional Drawdown at Risk.
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Entropic Drawdown at Risk.
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Relativistic Drawdown at Risk.
+  - Absolute (simple returns).
+  - Relative (compounded returns).
+- Ordered Weights Array risk measure.
+- Ordered Weights Array range risk measure.
+- Average Drawdown.
+- Ulcer Index.
+- Maximum Drawdown.
+- Brownian Distance Variance.
+- Worst Realisation.
+- Range.
+- Equal risk.
+- Turnover risk.
+- Tracking risk.
+- Mean return risk.
+- Ratio of measures.
+
+#### Ordered weights arrays and linear moments
+
+Some risk measures including linear moments may be formulated using ordered weights arrays.
+
+- Gini Mean Difference.
+- Conditional Value at Risk.
+- Weighted Conditional Value at Risk.
+- Tail Gini.
+- Worst Realisation.
+- Range.
+- Conditional Value at Risk Range.
+- Weighted Conditional Value at Risk Range.
+- Tail Gini Range.
+- Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
+  - Normalised Constant Relative Risk Aversion.
+  - Minimum Squared Distance.
+  - Minimum Sum Squares.
 
 ### Portfolio optimisation
 
@@ -640,118 +758,6 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 - Discrete
 - Greedy
-
-### Ordered weights arrays and linear moments
-
-Some risk measures including linear moments may be formulated using ordered weights arrays.
-
-- Gini Mean Difference.
-- Conditional Value at Risk.
-- Weighted Conditional Value at Risk.
-- Tail Gini.
-- Worst Realisation.
-- Range.
-- Conditional Value at Risk Range.
-- Weighted Conditional Value at Risk Range.
-- Tail Gini Range.
-- Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
-  - Normalised Constant Relative Risk Aversion.
-  - Minimum Squared Distance.
-  - Minimum Sum Squares.
-
-### Tracking
-
-These can be used to track the performance of an index, indicator, or portfolio.
-
-- Risk measure (experimental).
-- Constraints.
-
-There are four things that can be tracked.
-
-- Returns via L1 or L2 norm.
-
-  - Asset weights.
-  - Returns vector.
-
-- Risk tracking via asset weights.
-
-  - Dependent variables (experimental).
-  - Independent variables.
-
-### Risk measures
-
-Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
-
-- Variance.
-- Risk Contribution Variance.
-  - Asset risk contribution.
-  - Factor risk contribution.
-- Uncertainty set variance.
-- Standard deviation.
-- First lower moment.
-- Second lower moment.
-  - Semi variance.
-  - Semi deviation.
-- Second central moment (historical returns, no covariance matrix).
-  - Variance.
-  - Standard deviation.
-- Mean absolute deviation.
-- Third lower moment (historical returns, no coskewness matrix).
-  - Standardised (semi skewness).
-  - Unstandardised.
-- Fourth lower moment (historical returns, no cokurtosis matrix).
-  - Standardised (semi kurtosis).
-  - Unstandardised.
-- Third central moment (historical returns, no coskewness matrix).
-  - Standardised (skewness).
-  - Unstandardised.
-- Fourth central moment (historical returns, no cokurtosis matrix).
-  - Standardised (kurtosis).
-  - Unstandardised.
-- Square root kurtosis.
-  - Full.
-  - Semi.
-- Negative skewness.
-  - Full.
-  - Semi (experimental).
-- Negative quadratic skewness.
-  - Full.
-  - Semi (experimental).
-- Value at Risk.
-- Conditional Value at Risk.
-- Distributionally Robust Conditional Value at Risk.
-- Entropic Value at Risk.
-- Relativistic Value at Risk.
-- Value at Risk Range.
-- Conditional Value at Risk Range.
-- Distributionally Robust Conditional Value at Risk Range.
-- Entropic Value at Risk Range.
-- Relativistic Value at Risk Range.
-- Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Conditional Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Entropic Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Relativistic Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Ordered Weights Array risk measure.
-- Ordered Weights Array range risk measure.
-- Average Drawdown.
-- Ulcer Index.
-- Maximum Drawdown.
-- Brownian Distance Variance.
-- Worst Realisation.
-- Range.
-- Equal risk.
-- Turnover risk.
-- Tracking risk.
-- Mean return risk.
-- Ratio of measures.
 
 ### Portfolio statistics
 

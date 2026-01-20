@@ -5,7 +5,6 @@ PartialLinearConstraint
 LinearConstraint
 LinearConstraintEstimator
 ParsingResult
-RhoParsingResult
 replace_group_by_assets
 estimator_to_val
 parse_equation

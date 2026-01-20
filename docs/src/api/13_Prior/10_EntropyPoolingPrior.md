@@ -1,6 +1,7 @@
 # Entropy Pooling
 
 ```@docs
+RhoParsingResult
 H0_EntropyPooling
 H1_EntropyPooling
 H2_EntropyPooling

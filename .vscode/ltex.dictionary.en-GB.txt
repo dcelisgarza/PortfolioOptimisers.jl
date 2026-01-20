@@ -13,3 +13,11 @@ Pagerank
 Radiality
 Black-Litterman
 Centering
+Smyth-Broby
+Smyth-Broby-Gerber
+PortfolioOptimisers
+jl
+@id
+sparsification
+Gini
+Distributionally
