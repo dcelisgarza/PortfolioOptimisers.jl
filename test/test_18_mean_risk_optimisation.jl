@@ -1124,7 +1124,7 @@
                                                     sgmtx = AssetSetsMatrixEstimator(;
                                                                                      val = "nx_industries"),
                                                     sets = sets)), rd)
-        @test res.sgmtx[1] == m_idx
+        @test res.sgmtx == m_idx
         @test count((m_idx * res.w) .> 1e-10) == 4
 
         res = optimise(MeanRisk(;
@@ -1142,6 +1142,20 @@
                                                     sgmtx = [AssetSetsMatrixEstimator(;
                                                                                       val = "nx_industries")],
                                                     sets = sets)), rd)
+        @test 4 <= count((m_idx * res.w) .> 5e-10) <= 6
+
+        slt = ThresholdEstimator(; val = fill(0.015, 7), key = "ux_industries")
+        smtx = AssetSetsMatrixEstimator(; val = "nx_industries")
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; slv = mip_slv, scard = 5, slt = slt,
+                                                    smtx = smtx, sglt = slt,
+                                                    sgcard = LinearConstraintEstimator(;
+                                                                                       key = "ux_industries",
+                                                                                       val = [:(ux_industries >=
+                                                                                                4),
+                                                                                              :(ux_industries <=
+                                                                                                6)]),
+                                                    sgmtx = smtx, sets = sets)), rd)
         @test 4 <= count((m_idx * res.w) .> 5e-10) <= 6
 
         res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -1165,7 +1179,30 @@
                                                     sgmtx = [AssetSetsMatrixEstimator(;
                                                                                       val = "nx_industries")],
                                                     sets = sets)), rd)
+        @test res.sgmtx[1] == m_idx
         ts = res.sgmtx[1] * res.w
+        @test 4 <= count(abs.(ts) .> 5e-10) <= 6
+        @test all(ts[ts .< 0 .&& abs.(ts) .>= 1e-10] .<= -0.32 + sqrt(eps()))
+        @test all(ts[ts .>= 0 .&& abs.(ts) .>= 1e-10] .>= 0.53 - sqrt(eps()))
+
+        smtx = AssetSetsMatrixEstimator(; val = "nx_industries")
+        slt = ThresholdEstimator(; val = fill(0.53, 7), key = "ux_industries")
+        sst = ThresholdEstimator(; val = fill(0.32, 7), key = "ux_industries")
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; slv = mip_slv,
+                                                    wb = WeightBounds(; lb = -1, ub = 1),
+                                                    sbgt = 1, bgt = nothing, scard = 8,
+                                                    smtx = smtx, slt = slt, sst = sst,
+                                                    sglt = slt, sgst = sst,
+                                                    sgcard = LinearConstraintEstimator(;
+                                                                                       key = "ux_industries",
+                                                                                       val = [:(ux_industries >=
+                                                                                                4),
+                                                                                              :(ux_industries <=
+                                                                                                6)]),
+                                                    sgmtx = smtx, sets = sets)), rd)
+        @test res.sgmtx == m_idx
+        ts = res.sgmtx * res.w
         @test 4 <= count(abs.(ts) .> 5e-10) <= 6
         @test all(ts[ts .< 0 .&& abs.(ts) .>= 1e-10] .<= -0.32 + sqrt(eps()))
         @test all(ts[ts .>= 0 .&& abs.(ts) .>= 1e-10] .>= 0.53 - sqrt(eps()))
