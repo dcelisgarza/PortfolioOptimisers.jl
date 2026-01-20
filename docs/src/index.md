@@ -540,26 +540,28 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
 
 Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`](@ref), [`calc_net_asset_returns`](@ref), [`cumulative_returns`](@ref), [`drawdowns`](@ref).
 
-### Tracking
+### [Tracking](@id readme-tracking)
 
-These can be used to track the performance of an index, indicator, or portfolio.
+It is often useful to create portfolios that track the performance of an index, indicator, or another portfolio.
 
-- Risk measure (experimental).
-- Constraints.
+- Tracking error [`tracking_benchmark`](@ref), [`TrackingError`](@ref)
+  - Returns tracking [`ReturnsTracking`](@ref)
+  - Weights tracking [`WeightsTracking`](@ref)
 
-There are four things that can be tracked.
+The error can be computed using different algorithms using [`norm_tracking`](@ref).
 
-- Returns via L1 or L2 norm.
+- L1-norm [`NOCTracking`](@ref)
+- L2-norm [`SOCTracking`](@ref)
+- L2-norm squared [`SquaredSOCTracking`](@ref)
 
-  - Asset weights.
-  - Returns vector.
+Tracking can also be used in risk measures, which allows for two approaches.
 
-- Risk tracking via asset weights.
-
-  - Dependent variables (experimental).
-  - Independent variables.
+- Dependent variable tracking [`DependentVariableTracking`](@ref)
+- Independent variable tracking [`IndependentVariableTracking`](@ref)
 
 ### Risk measures
+
+`PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types.
 
 Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
 
