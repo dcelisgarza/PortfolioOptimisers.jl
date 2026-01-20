@@ -1021,6 +1021,21 @@
         @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 1
 
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, scard = 2,
+                            slt = Threshold(; val = fill(0.73, 3)),
+                            sst = Threshold(; val = 0.38),
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = nothing,
+                            smtx = AssetSetsMatrixEstimator(; val = "clusters1"),
+                            sets = sets)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
+                       opt = opt)
+        res = optimise(mre, rd)
+        w = res.w
+        @test count([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)] .> 1e-10) <= 2
+        ts = res.smtx * w
+        @test isapprox(minimum(ts), -0.38)
+        @test isapprox(maximum(ts), 0.73)
+
+        opt = JuMPOptimiser(; pr = pr, slv = mip_slv, scard = 2,
                             smtx = AssetSetsMatrixEstimator(; val = "clusters2"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
@@ -1109,6 +1124,7 @@
                                                     sgmtx = AssetSetsMatrixEstimator(;
                                                                                      val = "nx_industries"),
                                                     sets = sets)), rd)
+        @test res.sgmtx[1] == m_idx
         @test count((m_idx * res.w) .> 1e-10) == 4
 
         res = optimise(MeanRisk(;
@@ -1127,6 +1143,32 @@
                                                                                       val = "nx_industries")],
                                                     sets = sets)), rd)
         @test 4 <= count((m_idx * res.w) .> 5e-10) <= 6
+
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; slv = mip_slv,
+                                                    wb = WeightBounds(; lb = -1, ub = 1),
+                                                    sbgt = 1, bgt = nothing,
+                                                    sglt = [ThresholdEstimator(;
+                                                                               val = fill(0.53,
+                                                                                          7),
+                                                                               key = "ux_industries")],
+                                                    sgst = [ThresholdEstimator(;
+                                                                               val = fill(0.32,
+                                                                                          7),
+                                                                               key = "ux_industries")],
+                                                    sgcard = [LinearConstraintEstimator(;
+                                                                                        key = "ux_industries",
+                                                                                        val = [:(ux_industries >=
+                                                                                                 4),
+                                                                                               :(ux_industries <=
+                                                                                                 6)])],
+                                                    sgmtx = [AssetSetsMatrixEstimator(;
+                                                                                      val = "nx_industries")],
+                                                    sets = sets)), rd)
+        ts = res.sgmtx[1] * res.w
+        @test 4 <= count(abs.(ts) .> 5e-10) <= 6
+        @test all(ts[ts .< 0 .&& abs.(ts) .>= 1e-10] .<= -0.32 + sqrt(eps()))
+        @test all(ts[ts .>= 0 .&& abs.(ts) .>= 1e-10] .>= 0.53 - sqrt(eps()))
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,

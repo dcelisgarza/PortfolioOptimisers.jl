@@ -842,7 +842,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     varmap = Dict{String, Float64}()
     constant::datatype = 0.0
     for (coeff, var) in terms
-        if var === nothing
+        if isnothing(var)
             constant += coeff
         else
             varmap[var] = get(varmap, var, 0.0) + coeff
