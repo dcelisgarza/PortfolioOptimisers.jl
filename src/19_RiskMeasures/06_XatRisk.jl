@@ -87,6 +87,11 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
+function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    alg = factory(r.alg, pr, args...; kwargs...)
+    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
+end
 function risk_measure_view(r::ValueatRisk, i)
     alg = valueat_risk_formulation_view(r.alg, i)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w, alg = alg)
@@ -165,35 +170,27 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})
     gain = -sorted_x[idx]
     return loss - gain
 end
-struct DrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
+struct DrawdownatRisk{T1, T2, T3} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
-    alg::T4
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
-                            w::Option{<:StatsBase.AbstractWeights}, alg::MIPValueatRisk)
+                            w::Option{<:StatsBase.AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
-                                                                            w, alg)
+        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         alpha::Number = 0.05,
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
-                        alg::MIPValueatRisk = MIPValueatRisk())
-    return DrawdownatRisk(settings, alpha, w, alg)
+                        w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return DrawdownatRisk(settings, alpha, w)
 end
-for r in (ValueatRisk, DrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 alg = factory(r.alg, pr, args...; kwargs...)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
-             end
-         end)
+function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 function absolute_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))

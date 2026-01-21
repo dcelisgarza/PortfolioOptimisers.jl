@@ -574,15 +574,15 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
 - Standard deviation [`StandardDeviation`](@ref)
-- Uncertainty set variance [`UncertaintySetVariance`](@ref) (same as the variance when used in hierarchical optimisations)
-- Low order moment [`LowOrderMoment`](@ref)
+- Uncertainty set variance [`UncertaintySetVariance`](@ref) (same as variance when used in non-traditional optimisation)
+- Low order moments [`LowOrderMoment`](@ref)
   - First lower moment [`FirstLowerMoment`](@ref)
   - Mean absolute deviation [`MeanAbsoluteDeviation`](@ref)
   - Second moment [`SecondMoment`](@ref)
     - Second squared moments
       - Scenario variance [`Full`](@ref)
       - Scenario semi-variance [`Semi`](@ref)
-      - Formulations
+      - Traditional optimisation formulations
         - Quadratic risk expression [`QuadRiskExpr`](@ref)
         - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
         - Rotated second order cone [`RSOCRiskExpr`](@ref)
@@ -591,23 +591,76 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
       - Scenario semi-standard deviation [`Semi`](@ref)
 - Kurtosis [`Kurtosis`](@ref)
   - Actual kurtosis
-    - Kurtosis [`Full`](@ref)
-    - Semi-kurtosis [`Semi`](@ref)
-    - Formulations
+    - Full and semi-kurtosis are supported in traditional optimisers via the `kt` field. Risk calculation uses
+      - Kurtosis [`Full`](@ref)
+      - Semi-kurtosis [`Semi`](@ref)
+    - Traditional optimisation formulations
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
       - Rotated second order cone [`RSOCRiskExpr`](@ref)
   - Square root kurtosis [`SOCRiskExpr`](@ref)
     - Full [`Full`](@ref)
     - Semi [`Semi`](@ref)
-- Nagative skewness [`NegativeSkewness`](@ref)
+- Negative skewness [`NegativeSkewness`]-(@ref)
   - Squared negative skewness
-    - Negative skewness [`Full`](@ref)
-    - Negative semi-skewness [`Semi`](@ref)
-    - Formulations
+    - Full and semi-skewness are supported in traditional optimisers via the `sk` and `V` fields. Risk calculation uses
+      - Negative skewness [`Full`](@ref)
+      - Negative semi-skewness [`Semi`](@ref)
+    - Traditional optimisation formulations
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
     - Square root negative skewness [`SOCRiskExpr`](@ref)
+- Value at Risk [`ValueatRisk`]-(@ref)
+  - Traditional optimisation formulations
+    - Exact MIP formulation [`MIPValueatRisk`]-(@ref)
+    - Approximate distribution based [`DistributionValueatRisk`]-(@ref)
+- Value at Risk Range [`ValueatRiskRange`]-(@ref)
+  - Traditional optimisation formulations
+    - Exact MIP formulation [`MIPValueatRisk`]-(@ref)
+    - Approximate distribution based [`DistributionValueatRisk`]-(@ref)
+- Drawdown at Risk [`DrawdownatRisk`]-(@ref)
+- Conditional Value at Risk [`ConditionalValueatRisk`]-(@ref)
+- Distributionally Robust Conditional Value at Risk [`DistributionallyRobustConditionalValueatRisk`]-(@ref) (same as conditional value at risk when used in non-traditional optimisation)
+- Conditional Value at Risk Range [`ConditionalValueatRiskRange`]-(@ref)
+- Distributionally Robust Conditional Value at Risk Range [`DistributionallyRobustConditionalValueatRiskRange`]-(@ref) (same as conditional value at risk range when used in non-traditional optimisation)
+- Conditional Drawdown at Risk [`ConditionalDrawdownatRisk`]-(@ref)
+- Distributionally Robust Conditional Drawdown at Risk [`DistributionallyRobustConditionalDrawdownatRisk`]-(@ref)(same as conditional drawdown at risk when used in non-traditional optimisation)
+- Entropic Value at Risk [`EntropicValueatRisk`]-(@ref)
+- Entropic Value at Risk Range [`EntropicValueatRiskRange`]-(@ref)
+- Entropic Drawdown at Risk [`EntropicDrawdownatRisk`]-(@ref)
+- Relativistic Value at Risk [`RelativisticValueatRisk`]-(@ref)
+- Relativistic Value at Risk Range [`RelativisticValueatRiskRange`]-(@ref)
+- Relativistic Drawdown at Risk [`RelativisticDrawdownatRisk`]-(@ref)
+- Ordered Weights Array
+  - Risk measures
+    - Ordered Weights Array risk measure [`OrderedWeightsArray`]-(@ref)
+    - Ordered Weights Array range risk measure [`OrderedWeightsArrayRange`]-(@ref)
+  - Traditional optimisation formulations
+    - Exact [`ExactOrderedWeightsArray`]-(@ref)
+    - Approximate [`ApproxOrderedWeightsArray`]-(@ref)
+  - Array functions
+    - Gini Mean Difference [`owa_gmd`](@ref)
+    - Worst Realisation [`owa_wr`](@ref)
+    - Range [`owa_rg`](@ref)
+    - Conditional Value at Risk [`owa_cvar`](@ref)
+    - Weighted Conditional Value at Risk [`owa_wcvar`](@ref)
+    - Conditional Value at Risk Range [`owa_cvarrg`](@ref)
+    - Weighted Conditional Value at Risk Range [`owa_wcvarrg`](@ref)
+    - Tail Gini [`owa_tg`](@ref)
+    - Tail Gini Range [`owa_tgrg`](@ref)
+    - Linear moments (L-moments)
+      - Linear Moment [`owa_l_moment`](@ref)
+      - Linear Moment Convex Risk Measure [`owa_l_moment_crm`](@ref)
+        - L-moment combination formulations
+          - Maximum Entropy [`MaximumEntropy`]-(@ref)
+            - Entropy formulations
+              - Exponential Cone Entropy [`ExponentialConeEntropy`]-(@ref)
+              - Relative Entropy [`RelativeEntropy`]-(@ref)
+          - Minimum Squared Distance [`MinimumSquaredDistance`]-(@ref)
+          - Minimum Sum Squares [`MinimumSumSquares`]-(@ref)
+- Average Drawdown [`AverageDrawdown`]-(@ref)
+- Ulcer Index [`UlcerIndex`]-(@ref)
+- Maximum Drawdown [`MaximumDrawdown`]-(@ref)
 
 #### Risk measures for hierarchical optimisation
 
@@ -622,6 +675,13 @@ These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only suppor
   - Standardised fourth moment [`StandardisedHighOrderMoment`](@ref) and [`FourthMoment`](@ref)
     - Full [`Full`](@ref)
     - Semi [`Semi`](@ref)
+- Relative Drawdown at Risk [`RelativeDrawdownatRisk`]-(@ref)
+- Relative Conditional Drawdown at Risk [`RelativeConditionalDrawdownatRisk`]-(@ref)
+- Relative Entropic Drawdown at Risk [`RelativeEntropicDrawdownatRisk`]-(@ref)
+- Relative Relativistic Drawdown at Risk [`RelativeRelativisticDrawdownatRisk`]-(@ref)
+- Relative Average Drawdown [`RelativeAverageDrawdown`]-(@ref)
+- Relative Ulcer Index [`RelativeUlcerIndex`]-(@ref)
+- Relative Maximum Drawdown [`RelativeMaximumDrawdown`]-(@ref)
 
 #### Ordered weights arrays and linear moments
 

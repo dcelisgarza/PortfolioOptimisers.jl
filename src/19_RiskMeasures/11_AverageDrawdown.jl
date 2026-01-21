@@ -17,44 +17,6 @@ function (r::AverageDrawdown)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, r.w))
 end
-#=
-function (::AverageDrawdown{<:Any, Nothing})(x::VecNum)
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for i in cs
-        if i > peak
-            peak = i
-        end
-        dd = peak - i
-        if dd > zero(dd)
-            val += dd
-        end
-    end
-    popfirst!(x)
-    return val / length(x)
-end
-function (r::AverageDrawdown{<:Any, <:StatsBase.AbstractWeights})(x::VecNum)
-    @argcheck(length(r.w) == length(x))
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd = peak - i
-        if dd > zero(dd)
-            wi = isone(idx) ? one(eltype(r.w)) : r.w[idx - 1]
-            val += dd * wi
-        end
-    end
-    popfirst!(x)
-    return val / sum(r.w)
-end
-=#
 struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
@@ -75,44 +37,6 @@ function (r::RelativeAverageDrawdown)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, r.w))
 end
-#=
-function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::VecNum)
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for i in cs
-        if i > peak
-            peak = i
-        end
-        dd = one(eltype(x)) - i / peak
-        if dd > zero(dd)
-            val += dd
-        end
-    end
-    popfirst!(x)
-    return val / length(x)
-end
-function (r::RelativeAverageDrawdown{<:Any, <:StatsBase.AbstractWeights})(x::VecNum)
-    @argcheck(length(r.w) == length(x))
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for (idx, i) in pairs(cs)
-        if i > peak
-            peak = i
-        end
-        dd = one(eltype(x)) - i / peak
-        if dd > zero(dd)
-            wi = isone(idx) ? one(eltype(r.w)) : r.w[idx - 1]
-            val += dd * wi
-        end
-    end
-    popfirst!(x)
-    return val / sum(r.w)
-end
-=#
 for r in (AverageDrawdown, RelativeAverageDrawdown)
     eval(quote
              function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
