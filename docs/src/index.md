@@ -561,80 +561,58 @@ Tracking can also be used in risk measures, which allows for two approaches.
 
 ### Risk measures
 
-`PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types.
+`PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types based on the type of optimisations that support them.
 
-Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
+#### Risk measures for traditional optimisation
 
-- Variance.
-- Risk Contribution Variance.
-  - Asset risk contribution.
-  - Factor risk contribution.
-- Uncertainty set variance.
-- Standard deviation.
-- First lower moment.
-- Second lower moment.
-  - Semi variance.
-  - Semi deviation.
-- Second central moment (historical returns, no covariance matrix).
-  - Variance.
-  - Standard deviation.
-- Mean absolute deviation.
-- Third lower moment (historical returns, no coskewness matrix).
-  - Standardised (semi skewness).
-  - Unstandardised.
-- Fourth lower moment (historical returns, no cokurtosis matrix).
-  - Standardised (semi kurtosis).
-  - Unstandardised.
-- Third central moment (historical returns, no coskewness matrix).
-  - Standardised (skewness).
-  - Unstandardised.
-- Fourth central moment (historical returns, no cokurtosis matrix).
-  - Standardised (kurtosis).
-  - Unstandardised.
-- Square root kurtosis.
-  - Full.
-  - Semi.
-- Negative skewness.
-  - Full.
-  - Semi (experimental).
-- Negative quadratic skewness.
-  - Full.
-  - Semi (experimental).
-- Value at Risk.
-- Conditional Value at Risk.
-- Distributionally Robust Conditional Value at Risk.
-- Entropic Value at Risk.
-- Relativistic Value at Risk.
-- Value at Risk Range.
-- Conditional Value at Risk Range.
-- Distributionally Robust Conditional Value at Risk Range.
-- Entropic Value at Risk Range.
-- Relativistic Value at Risk Range.
-- Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Conditional Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Entropic Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Relativistic Drawdown at Risk.
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Ordered Weights Array risk measure.
-- Ordered Weights Array range risk measure.
-- Average Drawdown.
-- Ulcer Index.
-- Maximum Drawdown.
-- Brownian Distance Variance.
-- Worst Realisation.
-- Range.
-- Equal risk.
-- Turnover risk.
-- Tracking risk.
-- Mean return risk.
-- Ratio of measures.
+These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimisation estimators.
+
+- Variance [`Variance`]
+  - Traditional optimisations also support:
+    - Risk contribution
+    - Formulations
+      - Quadratic risk expression [`QuadRiskExpr`](@ref)
+      - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
+- Standard deviation [`StandardDeviation`](@ref)
+- Uncertainty set variance [`UncertaintySetVariance`](@ref) (same as the variance when used in hierarchical optimisations)
+- Low order moment [`LowOrderMoment`](@ref)
+  - First lower moment [`FirstLowerMoment`](@ref)
+  - Mean absolute deviation [`MeanAbsoluteDeviation`](@ref)
+  - Second moment [`SecondMoment`](@ref)
+    - Second squared moments
+      - Scenario variance [`Full`](@ref)
+      - Scenario semi-variance [`Semi`](@ref)
+      - Formulations
+        - Quadratic risk expression [`QuadRiskExpr`](@ref)
+        - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
+        - Rotated second order cone [`RSOCRiskExpr`](@ref)
+    - Second moments [`SOCRiskExpr`](@ref)
+      - Scenario standard deviation [`Full`](@ref)
+      - Scenario semi-standard deviation [`Semi`](@ref)
+- Kurtosis [`Kurtosis`](@ref)
+  - Quadratic kurtosis [`Full`](@ref)
+  - Quadratic semi-kurtosis [`Semi`](@ref)
+  - Formulations
+    - Quadratic risk expression [`QuadRiskExpr`](@ref)
+    - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
+    - Rotated second order cone [`RSOCRiskExpr`](@ref)
+  - Square root kurtosis [`SOCRiskExpr`](@ref)
+    - Full [`Full`](@ref)
+    - Semi [`Semi`](@ref)
+
+#### Risk measures for hierarchical optimisation
+
+These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only supported by hierarchical optimisation estimators.
+
+- High order moment [`HighOrderMoment`](@ref)
+  - Unstandardised third lower moment [`ThirdLowerMoment`](@ref)
+  - Standardised third lower moment [`StandardisedHighOrderMoment`](@ref) and [`ThirdLowerMoment`](@ref)
+  - Unstandardised fourth moment [`FourthMoment`](@ref)
+    - Full [`Full`](@ref)
+    - Semi [`Semi`](@ref)
+  - Standardised fourth moment [`StandardisedHighOrderMoment`](@ref) and [`FourthMoment`](@ref)
+    - Full [`Full`](@ref)
+    - Semi [`Semi`](@ref)
 
 #### Ordered weights arrays and linear moments
 
