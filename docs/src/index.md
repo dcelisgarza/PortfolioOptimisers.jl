@@ -590,15 +590,24 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
       - Scenario standard deviation [`Full`](@ref)
       - Scenario semi-standard deviation [`Semi`](@ref)
 - Kurtosis [`Kurtosis`](@ref)
-  - Quadratic kurtosis [`Full`](@ref)
-  - Quadratic semi-kurtosis [`Semi`](@ref)
-  - Formulations
-    - Quadratic risk expression [`QuadRiskExpr`](@ref)
-    - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
-    - Rotated second order cone [`RSOCRiskExpr`](@ref)
+  - Actual kurtosis
+    - Kurtosis [`Full`](@ref)
+    - Semi-kurtosis [`Semi`](@ref)
+    - Formulations
+      - Quadratic risk expression [`QuadRiskExpr`](@ref)
+      - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
+      - Rotated second order cone [`RSOCRiskExpr`](@ref)
   - Square root kurtosis [`SOCRiskExpr`](@ref)
     - Full [`Full`](@ref)
     - Semi [`Semi`](@ref)
+- Nagative skewness [`NegativeSkewness`](@ref)
+  - Squared negative skewness
+    - Negative skewness [`Full`](@ref)
+    - Negative semi-skewness [`Semi`](@ref)
+    - Formulations
+      - Quadratic risk expression [`QuadRiskExpr`](@ref)
+      - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
+    - Square root negative skewness [`SOCRiskExpr`](@ref)
 
 #### Risk measures for hierarchical optimisation
 
