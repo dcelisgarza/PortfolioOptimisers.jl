@@ -46,9 +46,6 @@ All concrete types that implement variance estimation should subtype `AbstractVa
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-function has_pretty_show_method(::AbstractCovarianceEstimator)
-    return true
-end
 @define_pretty_show(AbstractCovarianceEstimator)
 """
     abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
