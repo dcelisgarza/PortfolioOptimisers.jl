@@ -235,7 +235,7 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
     return rk, rt, sr - N / (T * sr)
 end
 """
-    struct ReturnRiskMeasure{T1} <: NoOptimisationRiskMeasure
+    struct ReturnRiskMeasure{T1} <: NonOptimisationRiskMeasure
         rt::T1
     end
 
@@ -265,11 +265,11 @@ ReturnRiskMeasure
 # Related
 
   - [`JuMPReturnsEstimator`]-(@ref)
-  - [`RatioRiskMeasure`](@ref)
+  - [`ReturnRiskRatioRiskMeasure`](@ref)
   - [`expected_return`](@ref)
   - [`expected_risk`](@ref)
 """
-struct ReturnRiskMeasure{T1} <: NoOptimisationRiskMeasure
+struct ReturnRiskMeasure{T1} <: NonOptimisationRiskMeasure
     rt::T1
     function ReturnRiskMeasure(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
@@ -373,7 +373,7 @@ function expected_risk(r::ReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult,
     return expected_return(r.rt, w, pr, fees)
 end
 """
-    struct RatioRiskMeasure{T1, T2, T3} <: NoOptimisationRiskMeasure
+    struct ReturnRiskRatioRiskMeasure{T1, T2, T3} <: NonOptimisationRiskMeasure
         rt::T1
         rk::T2
         rf::T3
@@ -381,7 +381,7 @@ end
 
 Ratio-based risk measure.
 
-`RatioRiskMeasure` is a risk measure that computes the risk-adjusted return ratio, such as the Sharpe ratio, for a portfolio. It combines a return estimator, a risk measure, and a risk-free rate to produce a ratio metric, used in portfolio performance analysis.
+`ReturnRiskRatioRiskMeasure` is a risk measure that computes the risk-adjusted return ratio, such as the Sharpe ratio, for a portfolio. It combines a return estimator, a risk measure, and a risk-free rate to produce a ratio metric, used in portfolio performance analysis.
 
 # Fields
 
@@ -391,14 +391,14 @@ Ratio-based risk measure.
 
 # Constructor
 
-    RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
+    ReturnRiskRatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
                      rk::AbstractBaseRiskMeasure = Variance(), rf::Number = 0.0)
 
 # Examples
 
 ```jldoctest
-julia> RatioRiskMeasure()
-RatioRiskMeasure
+julia> ReturnRiskRatioRiskMeasure()
+ReturnRiskRatioRiskMeasure
   rt ┼ ArithmeticReturn
      │   ucs ┼ nothing
      │    lb ┼ nothing
@@ -422,25 +422,26 @@ RatioRiskMeasure
   - [`expected_ratio`](@ref)
   - [`expected_risk`](@ref)
 """
-struct RatioRiskMeasure{T1, T2, T3} <: NoOptimisationRiskMeasure
+struct ReturnRiskRatioRiskMeasure{T1, T2, T3} <: NonOptimisationRiskMeasure
     rt::T1
     rk::T2
     rf::T3
-    function RatioRiskMeasure(rt::JuMPReturnsEstimator, rk::AbstractBaseRiskMeasure,
-                              rf::Number)
+    function ReturnRiskRatioRiskMeasure(rt::JuMPReturnsEstimator,
+                                        rk::AbstractBaseRiskMeasure, rf::Number)
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
 end
-function RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
-                          rk::AbstractBaseRiskMeasure = Variance(), rf::Number = 0.0)
-    return RatioRiskMeasure(rt, rk, rf)
+function ReturnRiskRatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
+                                    rk::AbstractBaseRiskMeasure = Variance(),
+                                    rf::Number = 0.0)
+    return ReturnRiskRatioRiskMeasure(rt, rk, rf)
 end
 """
-    factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+    factory(r::ReturnRiskRatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 
-Construct a new `RatioRiskMeasure` object with updated return and risk estimators based on the provided prior result.
+Construct a new `ReturnRiskRatioRiskMeasure` object with updated return and risk estimators based on the provided prior result.
 
-This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal return estimator and risk measure using the prior result and any additional arguments or keyword arguments. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal return estimator and risk measure using the prior result and any additional arguments or keyword arguments. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
 
 # Arguments
 
@@ -451,30 +452,30 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Returns
 
-  - `r::RatioRiskMeasure`: New risk measure object with updated return estimator and risk measure.
+  - `r::ReturnRiskRatioRiskMeasure`: New risk measure object with updated return estimator and risk measure.
 
 # Details
 
   - Calls `factory(r.rt, pr, args...; kwargs...)` to update the return estimator using the prior result and arguments.
   - Calls `factory(r.rk, pr, args...; kwargs...)` to update the risk measure using the prior result and arguments.
-  - Returns a new `RatioRiskMeasure` object with the updated fields and original risk-free rate.
+  - Returns a new `ReturnRiskRatioRiskMeasure` object with the updated fields and original risk-free rate.
 
 # Related
 
-  - [`RatioRiskMeasure`](@ref)
+  - [`ReturnRiskRatioRiskMeasure`](@ref)
   - [`AbstractPriorResult`](@ref)
 """
-function factory(r::RatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ReturnRiskRatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     rt = factory(r.rt, pr, args...; kwargs...)
     rk = factory(r.rk, pr, args...; kwargs...)
-    return RatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
+    return ReturnRiskRatioRiskMeasure(; rt = rt, rk = rk, rf = r.rf)
 end
 """
-    factory(r::RatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS; kwargs...)
+    factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS; kwargs...)
 
-Construct a new `RatioRiskMeasure` object with an updated uncertainty set risk measure.
+Construct a new `ReturnRiskRatioRiskMeasure` object with an updated uncertainty set risk measure.
 
-This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided uncertainty set and any additional keyword arguments. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided uncertainty set and any additional keyword arguments. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
 
 # Arguments
 
@@ -484,30 +485,30 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Returns
 
-  - `r::RatioRiskMeasure`: New risk measure object with updated uncertainty set risk measure.
+  - `r::ReturnRiskRatioRiskMeasure`: New risk measure object with updated uncertainty set risk measure.
 
 # Details
 
   - Calls `factory(r.rk, ucs; kwargs...)` to update the risk measure.
   - Preserves the return estimator and risk-free rate.
-  - Returns a new `RatioRiskMeasure` object with the updated risk measure.
+  - Returns a new `ReturnRiskRatioRiskMeasure` object with the updated risk measure.
 
 # Related
 
-  - [`RatioRiskMeasure`](@ref)
+  - [`ReturnRiskRatioRiskMeasure`](@ref)
   - [`UncertaintySetVariance`](@ref)
 """
-function factory(r::RatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
-                 kwargs...)
+function factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:UncertaintySetVariance},
+                 ucs::UcSE_UcS; kwargs...)
     rk = factory(r.rk, ucs; kwargs...)
-    return RatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
+    return ReturnRiskRatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
 end
 """
-    factory(r::RatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
+    factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
 
-Construct a new `RatioRiskMeasure` object with an updated solver-based risk measure.
+Construct a new `ReturnRiskRatioRiskMeasure` object with an updated solver-based risk measure.
 
-Creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided solver and any additional keyword arguments. The return estimator and risk-free rate are preserved. Enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+Creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided solver and any additional keyword arguments. The return estimator and risk-free rate are preserved. Enables composable updates to ratio-based risk measures in portfolio analytics workflows.
 
 # Arguments
 
@@ -517,30 +518,30 @@ Creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk 
 
 # Returns
 
-  - `r::RatioRiskMeasure`: New risk measure object with updated solver-based risk measure.
+  - `r::ReturnRiskRatioRiskMeasure`: New risk measure object with updated solver-based risk measure.
 
 # Details
 
   - Calls `factory(r.rk, slv; kwargs...)` to update the risk measure.
   - Preserves the return estimator and risk-free rate.
-  - Returns a new `RatioRiskMeasure` object with the updated risk measure.
+  - Returns a new `ReturnRiskRatioRiskMeasure` object with the updated risk measure.
 
 # Related
 
-  - [`RatioRiskMeasure`](@ref)
+  - [`ReturnRiskRatioRiskMeasure`](@ref)
   - [`SlvRM`]-(@ref)
   - [`Slv_VecSlv`](@ref)
 """
-function factory(r::RatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
+function factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
     rk = factory(r.rk, slv; kwargs...)
-    return RatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
+    return ReturnRiskRatioRiskMeasure(; rt = r.rt, rk = rk, rf = r.rf)
 end
 """
-    factory(r::RatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
+    factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
 
-Construct a new `RatioRiskMeasure` object with updated risk measure weights.
+Construct a new `ReturnRiskRatioRiskMeasure` object with updated risk measure weights.
 
-This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided portfolio weights `w`. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided portfolio weights `w`. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
 
 # Arguments
 
@@ -549,35 +550,35 @@ This function creates a new [`RatioRiskMeasure`](@ref) instance by updating the 
 
 # Returns
 
-  - `r::RatioRiskMeasure`: New risk measure object with updated risk measure.
+  - `r::ReturnRiskRatioRiskMeasure`: New risk measure object with updated risk measure.
 
 # Details
 
   - Calls `factory(r.rk, w)` to update the risk measure.
   - Preserves the return estimator and risk-free rate.
-  - Returns a new `RatioRiskMeasure` object with the updated risk measure.
+  - Returns a new `ReturnRiskRatioRiskMeasure` object with the updated risk measure.
 
 # Related
 
-  - [`RatioRiskMeasure`](@ref)
+  - [`ReturnRiskRatioRiskMeasure`](@ref)
   - [`VecNum`](@ref)
   - [`TnTrRM`]-(@ref)
   - [`factory`](@ref)
 """
-function factory(r::RatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
-    return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
+function factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
+    return ReturnRiskRatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 """
-    expected_risk(r::RatioRiskMeasure, w::VecNum, pr::AbstractPriorResult;
+    expected_risk(r::ReturnRiskRatioRiskMeasure, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected risk for a portfolio using a ratio-based risk measure.
 
-`expected_risk` returns the risk-adjusted return ratio (e.g., Sharpe ratio) for the portfolio, using the specified return estimator, risk measure, and risk-free rate in the [`RatioRiskMeasure`](@ref).
+`expected_risk` returns the risk-adjusted return ratio (e.g., Sharpe ratio) for the portfolio, using the specified return estimator, risk measure, and risk-free rate in the [`ReturnRiskRatioRiskMeasure`](@ref).
 
 # Arguments
 
-  - `r`: [`RatioRiskMeasure`](@ref) containing a return estimator, risk measure, and risk-free rate.
+  - `r`: [`ReturnRiskRatioRiskMeasure`](@ref) containing a return estimator, risk measure, and risk-free rate.
   - `w`: Portfolio weights.
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
@@ -589,7 +590,7 @@ Compute the expected risk for a portfolio using a ratio-based risk measure.
 
 # Related
 
-  - [`RatioRiskMeasure`](@ref)
+  - [`ReturnRiskRatioRiskMeasure`](@ref)
   - [`VecNum`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`Option`](@ref)
@@ -597,7 +598,7 @@ Compute the expected risk for a portfolio using a ratio-based risk measure.
   - [`expected_ratio`](@ref)
   - [`expected_return`](@ref)
 """
-function expected_risk(r::RatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
+function expected_risk(r::ReturnRiskRatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
 end
@@ -690,4 +691,5 @@ function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
 end
 
 export expected_return, expected_ratio, expected_risk_ret_ratio, expected_sric,
-       expected_risk_ret_sric, RatioRiskMeasure, ReturnRiskMeasure, brinson_attribution
+       expected_risk_ret_sric, ReturnRiskMeasure, ReturnRiskRatioRiskMeasure,
+       brinson_attribution

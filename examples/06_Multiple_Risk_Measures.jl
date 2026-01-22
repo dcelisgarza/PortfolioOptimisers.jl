@@ -116,7 +116,7 @@ pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => r
                        :sum_covs => results[6].w, :multi_risk => res.w);
              formatters = [resfmt])
 #=
-For extra credit we can do the same but maximising the ratio of return to risk.
+For extra credit we can do the same but maximising the risk-adjusted return ratio.
 =#
 results = [optimise(MeanRisk(; r = r, obj = MaximumRatio(),
                              opt = JuMPOptimiser(; pr = pr, slv = slv))) for r in rs]
@@ -136,7 +136,7 @@ pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => r
 #=
 ### 3.2 Different weights and scalarisers
 
-All optimisations accept multiple risk measures in the same way. We can also provide different weights for each measure and four different scalarisers, [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`LogSumExpScalariser`](@ref) which work for all optimisation estimators, and [`MinScalariser`](@ref) which only works for hierarchical ones. 
+All optimisations accept multiple risk measures in the same way. We can also provide different weights for each measure and four different scalarisers, [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`LogSumExpScalariser`](@ref) which work for all optimisation estimators, and [`MinScalariser`](@ref) which only works for hierarchical ones.
 
 For clustering optimisations, the scalarisers apply to each sub-optimisation, so what may be the choice of risk to "minimise" for one cluster may not be the minimal risk for others, or the overall portfolio. This inconsistency is unavoidable but should not be a problem in practice as the point of hierarchical optimisations is not to provide the absolute minimum risk, but a good trade-off between risk and diversification.
 

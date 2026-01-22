@@ -9,7 +9,7 @@ All concrete risk measures can be used as functors (callable structs) to compute
 
 # Related Types
 
-  - [`NoOptimisationRiskMeasure`](@ref)
+  - [`NonOptimisationRiskMeasure`](@ref)
   - [`OptimisationRiskMeasure`](@ref)
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
@@ -17,7 +17,7 @@ All concrete risk measures can be used as functors (callable structs) to compute
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
 """
-    abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+    abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
 
@@ -30,7 +30,7 @@ These risk measures are typically used for analysis, reporting, or diagnostics, 
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
 """
-abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 """
     abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 
@@ -42,7 +42,7 @@ All concrete risk measures that can be used as objectives or constraints in opti
 
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
-  - [`NoOptimisationRiskMeasure`](@ref)
+  - [`NonOptimisationRiskMeasure`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end

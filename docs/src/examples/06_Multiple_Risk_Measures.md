@@ -129,7 +129,7 @@ pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => r
              formatters = [resfmt])
 ````
 
-For extra credit we can do the same but maximising the ratio of return to risk.
+For extra credit we can do the same but maximising the risk-adjusted return ratio.
 
 ````@example 06_Multiple_Risk_Measures
 results = [optimise(MeanRisk(; r = r, obj = MaximumRatio(),

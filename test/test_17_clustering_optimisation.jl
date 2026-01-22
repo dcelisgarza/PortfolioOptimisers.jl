@@ -235,7 +235,7 @@
 
         opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn,
                                     wf = JuMPWeightFinaliser(;
-                                                             alg = SquareRelativeErrorWeightFinaliser(),
+                                                             alg = SquaredRelativeErrorWeightFinaliser(),
                                                              slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -257,7 +257,7 @@
 
         opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn,
                                     wf = JuMPWeightFinaliser(;
-                                                             alg = SquareAbsoluteErrorWeightFinaliser(),
+                                                             alg = SquaredAbsoluteErrorWeightFinaliser(),
                                                              slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)

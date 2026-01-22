@@ -11,7 +11,7 @@ MaxScalariser
 MinScalariser
 LogSumExpScalariser
 AbstractBaseRiskMeasure
-NoOptimisationRiskMeasure
+NonOptimisationRiskMeasure
 OptimisationRiskMeasure
 AbstractRiskMeasureSettings
 Scalariser

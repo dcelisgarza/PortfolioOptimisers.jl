@@ -681,8 +681,8 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
   - Formulations
     - Dependent variable tracking [`DependentVariableTracking`](@ref)
     - Independent variable tracking [`IndependentVariableTracking`](@ref)
-- Power Norm Valueat Risk [`PowerNormValueatRisk`]-(@ref)
-- Power Norm Valueat Risk Range [`PowerNormValueatRiskRange`]-(@ref)
+- Power Norm Value at Risk [`PowerNormValueatRisk`]-(@ref)
+- Power Norm Value at Risk Range [`PowerNormValueatRiskRange`]-(@ref)
 - Power Norm Drawdown at Risk [`PowerNormDrawdownatRisk`]-(@ref)
 
 #### Risk measures for hierarchical optimisation
@@ -706,24 +706,33 @@ These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only suppor
 - Relative Ulcer Index [`RelativeUlcerIndex`]-(@ref)
 - Relative Maximum Drawdown [`RelativeMaximumDrawdown`]-(@ref)
 - Relative Power Norm Drawdown at Risk [`RelativePowerNormDrawdownatRisk`]-(@ref)
+- Risk Ratio Risk Measure [`RiskRatioRiskMeasure`]-(@ref)
+- Equal Risk Measure [`EqualRiskMeasure`]-(@ref)
+- Median Absolute Deviation [`MedianAbsoluteDeviation`]-(@ref)
 
-#### Ordered weights arrays and linear moments
+#### Non-optimisation risk measures
 
-Some risk measures including linear moments may be formulated using ordered weights arrays.
+These risk measures are unsuitable for optimisation because they can return negative values. However, they can be used for performance metrics.
 
-- Gini Mean Difference.
-- Conditional Value at Risk.
-- Weighted Conditional Value at Risk.
-- Tail Gini.
-- Worst Realisation.
-- Range.
-- Conditional Value at Risk Range.
-- Weighted Conditional Value at Risk Range.
-- Tail Gini Range.
-- Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
-  - Normalised Constant Relative Risk Aversion.
-  - Minimum Squared Distance.
-  - Minimum Sum Squares.
+- Mean Return [`MeanReturn`]-(@ref)
+- Third Central Moment [`ThirdCentralMoment`]-@(ref)
+- Skewness [`Skewness`]-(@ref)
+- Return Risk Measure [`ReturnRiskMeasure`](@ref)
+- Return Risk Ratio Risk Measure [`ReturnRiskRatioRiskMeasure`](@ref)
+
+### Performance metrics
+
+- Expected risk [`expected_risk`]-(@ref)
+- Number of effective assets [`number_effective_assets`]-(@ref)
+- Risk contribution
+  - Asset risk contribution [`risk_contribution`]-(@ref)
+  - Factor risk contribution [`factor_risk_contribution`]-(@ref)
+- Expected return [`expected_return`](@ref)
+  - Arithmetic [`ArithmeticReturn`]-(@ref)
+  - Logarithmic [`LogarithmicReturn`]-(@ref)
+- Expected risk-adjusted return ratio [`expected_ratio`](@ref) and [`expected_risk_ret_ratio`](@ref)
+- Expected risk-adjusted ratio information criterion [`expected_sric`](@ref) and [`expected_risk_ret_sric`](@ref)
+- Brinson performance attribution [`brinson_attribution`](@ref)
 
 ### Portfolio optimisation
 
@@ -736,6 +745,18 @@ These return a [`NaiveOptimisationResult`]-(@ref).
 - Inverse Volatility [`InverseVolatility`]-(@ref)
 - Equal Weighted [`EqualWeighted`]-(@ref)
 - Random (Dirichlet) [`RandomWeighted`]-(@ref)
+
+##### Naive optimisation features
+
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+      - Square Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+      - Square Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 
 #### Traditional
 
@@ -759,7 +780,7 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
   - Maximum return over risk ratio [`MaximumRatio`]-(@ref)
   - Maximum return [`MaximumReturn`]-(@ref)
   - Custom objective penalty [`CustomJuMPObjective`]-(@ref)
-- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), [`WeightBounds`](@ref)
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - Budget
   - Long
     - Exact

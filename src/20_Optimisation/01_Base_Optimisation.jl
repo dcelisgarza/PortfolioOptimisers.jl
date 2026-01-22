@@ -14,9 +14,9 @@ abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
-struct SquareRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
-struct SquareAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 abstract type WeightFinaliser <: AbstractAlgorithm end
 struct IterativeWeightFinaliser{T1} <: WeightFinaliser
     iter::T1
@@ -62,7 +62,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquareRelativeErrorWeightFinaliser,
+                                              ::SquaredRelativeErrorWeightFinaliser,
                                               wi::VecNum)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
@@ -85,7 +85,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     return nothing
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquareAbsoluteErrorWeightFinaliser,
+                                              ::SquaredAbsoluteErrorWeightFinaliser,
                                               wi::VecNum)
     w = model[:w]
     sc = model[:sc]
@@ -228,5 +228,6 @@ function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::Returns
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
-       RelativeErrorWeightFinaliser, SquareRelativeErrorWeightFinaliser,
-       AbsoluteErrorWeightFinaliser, SquareAbsoluteErrorWeightFinaliser, JuMPWeightFinaliser
+       RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
+       AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
+       JuMPWeightFinaliser

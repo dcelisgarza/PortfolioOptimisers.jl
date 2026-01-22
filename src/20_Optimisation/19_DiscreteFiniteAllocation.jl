@@ -58,7 +58,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::SquareRelativeErrorWeightFinaliser)
+                             ::SquaredRelativeErrorWeightFinaliser)
     mask = iszero.(w)
     if any(mask)
         w = copy(w)
@@ -85,7 +85,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::SquareAbsoluteErrorWeightFinaliser)
+                             ::SquaredAbsoluteErrorWeightFinaliser)
     x = model[:x]
     u = model[:u]
     sc = model[:sc]

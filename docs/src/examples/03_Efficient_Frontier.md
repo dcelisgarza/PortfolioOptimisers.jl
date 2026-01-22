@@ -106,7 +106,7 @@ The efficient frontier is just a special case of a pareto front, we have a funct
 ````@example 03_Efficient_Frontier
 # Risk-free rate of 4.2/100/252
 plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
-              c = RatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
+              c = ReturnRiskRatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 ````

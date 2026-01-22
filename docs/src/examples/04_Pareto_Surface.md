@@ -115,8 +115,8 @@ r2 = Kurtosis()
 
 First we need to get the bounds of our pareto surface. We can do this in many different ways, the simplest are:
 
-  - Minimise the risk using both risk measures simultaneously subject to optional constraints.
-  - Maximise the return, utility or ratio subject to optional constraints.
+- Minimise the risk using both risk measures simultaneously subject to optional constraints.
+- Maximise the return, utility or ratio subject to optional constraints.
 
 We will simply maximise the risk-return ratio for both risk measures on their own with no added constraints. This will not give a complete surface, but it will give us a reasonable range of values.
 
@@ -215,9 +215,9 @@ Now we can view the pareto surface. For the z-axis and colourbar, we will use th
 
 ````@example 04_Pareto_Surface
 plot_measures(res3.w, pr; x = r1, y = r2,
-              z = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+              z = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),
-              c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               zlabel = "CDaR/Return")
@@ -228,7 +228,7 @@ We can view it in 2D as well.
 ````@example 04_Pareto_Surface
 gr()
 plot_measures(res3.w, pr; x = r1, y = r2,
-              c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
