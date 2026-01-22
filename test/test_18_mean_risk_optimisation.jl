@@ -722,16 +722,16 @@
 
         opt = JuMPOptimiser(; pr = pr2, slv = slv)
         mr = MeanRisk(;
-                      r = BrownianDistanceVariance(; algc = IneqBrownianDistanceVariance()),
+                      r = BrownianDistanceVariance(; alg2 = IneqBrownianDistanceVariance()),
                       opt = opt)
         res9 = optimise(mr)
 
-        mr = MeanRisk(; r = BrownianDistanceVariance(; alg = RSOCRiskExpr()), opt = opt)
+        mr = MeanRisk(; r = BrownianDistanceVariance(; alg1 = RSOCRiskExpr()), opt = opt)
         res10 = optimise(mr)
 
         mr = MeanRisk(;
-                      r = BrownianDistanceVariance(; alg = RSOCRiskExpr(),
-                                                   algc = IneqBrownianDistanceVariance()),
+                      r = BrownianDistanceVariance(; alg1 = RSOCRiskExpr(),
+                                                   alg2 = IneqBrownianDistanceVariance()),
                       opt = opt)
         res11 = optimise(mr)
         @test isapprox(res9.w,

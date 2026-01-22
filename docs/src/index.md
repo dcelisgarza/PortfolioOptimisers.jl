@@ -554,7 +554,7 @@ The error can be computed using different algorithms using [`norm_tracking`](@re
 - L2-norm [`SOCTracking`](@ref)
 - L2-norm squared [`SquaredSOCTracking`](@ref)
 
-Tracking can also be used in risk measures, which allows for two approaches.
+It is also possible to track the error in with risk measures [`RiskTrackingError`]-(@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
 - Dependent variable tracking [`DependentVariableTracking`](@ref)
 - Independent variable tracking [`IndependentVariableTracking`](@ref)
@@ -661,6 +661,26 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
 - Average Drawdown [`AverageDrawdown`]-(@ref)
 - Ulcer Index [`UlcerIndex`]-(@ref)
 - Maximum Drawdown [`MaximumDrawdown`]-(@ref)
+- Brownian Distance Variance [`BrownianDistanceVariance`]-(@ref)
+  - Traditional optimisation formulations
+    - Distance matrix constraint formulations
+      - Norm one cone Brownian distance variance [`NormOneConeBrownianDistanceVariance`]-(@ref)
+      - Inequality Brownian distance variance [`IneqBrownianDistanceVariance`]-(@ref)
+    - Risk formulation
+      - Quadratic risk expression [`QuadRiskExpr`](@ref)
+      - Rotated second order cone [`RSOCRiskExpr`](@ref)
+- Worst Realisation [`WorstRealisation`]-(@ref)
+- Range [`Range`]-(@ref)
+- Turnover Risk Measure [`TurnoverRiskMeasure`]-(@ref)
+- Tracking Risk Measure [`TrackingRiskMeasure`]-(@ref)
+  - Formulations
+    - L1-norm [`NOCTracking`](@ref)
+    - L2-norm [`SOCTracking`](@ref)
+    - L2-norm squared [`SquaredSOCTracking`](@ref)
+- Risk Tracking Risk Measure
+  - Formulations
+    - Dependent variable tracking [`DependentVariableTracking`](@ref)
+    - Independent variable tracking [`IndependentVariableTracking`](@ref)
 
 #### Risk measures for hierarchical optimisation
 

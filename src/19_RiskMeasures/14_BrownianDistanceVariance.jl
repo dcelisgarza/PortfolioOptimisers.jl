@@ -4,18 +4,18 @@ struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
 struct BrownianDistanceVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
-    alg::T2
-    algc::T3
+    alg1::T2
+    alg2::T3
     function BrownianDistanceVariance(settings::RiskMeasureSettings,
-                                      alg::BDVarRkFormulations,
-                                      algc::BrownianDistanceVarianceFormulation)
-        return new{typeof(settings), typeof(alg), typeof(algc)}(settings, alg, algc)
+                                      alg1::BDVarRkFormulations,
+                                      alg2::BrownianDistanceVarianceFormulation)
+        return new{typeof(settings), typeof(alg1), typeof(alg2)}(settings, alg1, alg2)
     end
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  alg::BDVarRkFormulations = QuadRiskExpr(),
-                                  algc::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
-    return BrownianDistanceVariance(settings, alg, algc)
+                                  alg1::BDVarRkFormulations = QuadRiskExpr(),
+                                  alg2::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
+    return BrownianDistanceVariance(settings, alg1, alg2)
 end
 function (::BrownianDistanceVariance)(x::VecNum)
     T = length(x)
