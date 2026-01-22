@@ -681,6 +681,9 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
   - Formulations
     - Dependent variable tracking [`DependentVariableTracking`](@ref)
     - Independent variable tracking [`IndependentVariableTracking`](@ref)
+- Power Norm Valueat Risk [`PowerNormValueatRisk`]-(@ref)
+- Power Norm Valueat Risk Range [`PowerNormValueatRiskRange`]-(@ref)
+- Power Norm Drawdown at Risk [`PowerNormDrawdownatRisk`]-(@ref)
 
 #### Risk measures for hierarchical optimisation
 
@@ -702,6 +705,7 @@ These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only suppor
 - Relative Average Drawdown [`RelativeAverageDrawdown`]-(@ref)
 - Relative Ulcer Index [`RelativeUlcerIndex`]-(@ref)
 - Relative Maximum Drawdown [`RelativeMaximumDrawdown`]-(@ref)
+- Relative Power Norm Drawdown at Risk [`RelativePowerNormDrawdownatRisk`]-(@ref)
 
 #### Ordered weights arrays and linear moments
 
