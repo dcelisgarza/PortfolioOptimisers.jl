@@ -762,10 +762,24 @@ These return a [`NaiveOptimisationResult`]-(@ref).
 
 These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`]-(@ref), which encodes all supported constraints.
 
-- Mean-Risk [`MeanRisk`]-(@ref) returns a [`MeanRiskResult`]-(@ref)
-- Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
-- Near Optimal Centering [`NearOptimalCentering`]-(@ref) returns a [`NearOptimalCenteringResult`]-(@ref)
-- Asset and factor risk budgeting [`AssetRiskBudgeting`]-(@ref), [`FactorRiskBudgeting`]-(@ref)
+##### Objective function optimisations
+
+- Objective functions
+  - Minimum risk [`MinimumRisk`]-(@ref)
+  - Maximum utility [`MaximumUtility`]-(@ref)
+  - Maximum return over risk ratio [`MaximumRatio`]-(@ref)
+  - Maximum return [`MaximumReturn`]-(@ref)
+- Optimisation estimators
+  - Mean-Risk [`MeanRisk`]-(@ref) returns a [`MeanRiskResult`]-(@ref)
+  - Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
+  - Near Optimal Centering [`NearOptimalCentering`]-(@ref) returns a [`NearOptimalCenteringResult`]-(@ref)
+
+##### Risk budgeting optimisations
+
+- Budget targets
+  - Asset risk budgeting [`AssetRiskBudgeting`]-(@ref)
+  - Factor risk budgeting [`FactorRiskBudgeting`]-(@ref)
+- Optimisation estimators
   - Risk Budgeting [`RiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
   - Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
     - Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
@@ -774,12 +788,7 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 ##### Traditional Optimisation Features
 
-- Objective functions for non risk budgeting optimisations
-  - Minimum risk [`MinimumRisk`]-(@ref)
-  - Maximum utility [`MaximumUtility`]-(@ref)
-  - Maximum return over risk ratio [`MaximumRatio`]-(@ref)
-  - Maximum return [`MaximumReturn`]-(@ref)
-  - Custom objective penalty [`CustomJuMPObjective`]-(@ref)
+- Custom objective penalty [`CustomJuMPObjective`]-(@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - Budget
   - Long
