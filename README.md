@@ -16,7 +16,7 @@
 
  [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
-> [!Danger]
+> [!CAUTION]
 > Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
 Portfolio optimisation is the science of either:
@@ -418,7 +418,7 @@ plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 
 There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
-> [!Info]
+> [!NOTE]
 > This section is under active development and any `<name>`-(TBA) lack docstrings. Some docstrings are also outdated, please refer to [Issue #58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
 
 ## Features
