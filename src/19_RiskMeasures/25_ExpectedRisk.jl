@@ -93,7 +93,7 @@ function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatN
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
-    rr = regression(re, rd.X, rd.F)
+    rr = regression(re, rd)
     Bt = transpose(rr.L)
     b2t = transpose(LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt))))
     b3t = transpose(LinearAlgebra.pinv(b2t))

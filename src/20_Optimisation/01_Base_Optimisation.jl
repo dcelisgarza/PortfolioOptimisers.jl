@@ -229,7 +229,6 @@ function predict_outer_estimator_returns(opt::NonFiniteAllocationOptimisationEst
                                          wi::MatNum, resi::VecOpt; kwargs...)
     return generate_grouped_returns_result(rd, pr, wi)
 end
-# function validate_prior()
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,

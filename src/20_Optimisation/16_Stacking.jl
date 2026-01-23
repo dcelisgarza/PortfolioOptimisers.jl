@@ -81,7 +81,7 @@ function opt_view(st::Stacking, i, X::MatNum)
     return Stacking(; pr = pr, wb = wb, opti = opti, opto = opto, cv = st.cv, wf = st.wf,
                     sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
-function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
     pr = prior(st.pr, rd; dims = dims)
@@ -105,8 +105,8 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     return StackingResult(typeof(st), pr, wb, resi, reso, st.cv, retcode, w, nothing)
 end
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                               <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
-                  dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                               <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
+                  branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,
                      save = save, kwargs...)
