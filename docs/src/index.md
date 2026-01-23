@@ -754,9 +754,9 @@ These return a [`NaiveOptimisationResult`]-(@ref).
   - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
     - Error formulations
       - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-      - Square Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
       - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-      - Square Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 
 #### Traditional
 
@@ -782,28 +782,29 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 - Optimisation estimators
   - Risk Budgeting [`RiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
   - Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
-    - Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
-    - Regularised [`RegularisedRelaxedRiskBudgeting`]-(@ref)
-    - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(@ref)
+    - Relaxed risk budgetting types
+      - Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
+      - Regularised [`RegularisedRelaxedRiskBudgeting`]-(@ref)
+      - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(@ref)
 
-##### Traditional Optimisation Features
+##### Traditional optimisation features
 
 - Custom objective penalty [`CustomJuMPObjective`]-(@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - Budget
-  - Long
-    - Exact
-    - Range [`BudgetRange`]-(@ref)
-  - Short
+  - Directionality
+    - Long
+    - Short
+  - Type
     - Exact
     - Range [`BudgetRange`]-(@ref)
 - Threshold [`ThresholdEstimator`](@ref) and [`Threshold`](@ref)
-  - Asset
+  - Directionality
     - Long
     - Short
-  - Set [`AssetSetsMatrixEstimator`](@ref)
-    - Long
-    - Short
+  - Type
+    - Asset
+    - Set [`AssetSetsMatrixEstimator`](@ref)
 - Linear constraints [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
 - Centralit(y/ies) [`CentralityEstimator`](@ref)
 - Cardinality
@@ -813,31 +814,18 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
   - Set group(s) [`LinearConstraintEstimator`](@ref) and [`LinearConstraint`](@ref)
 - Turnover(s) [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
-  - Proportional long
-  - Proportional short
-  - Fixed long
-  - Fixed short
-  - Turnover [`TurnoverEstimator`](@ref) and [`Turnover`](@ref)
 - Tracking error(s) [`TrackingError`](@ref)
-  - Returns
-    - Benchmark returns vector [`ReturnsTracking`](@ref)
-      - L1-error [`NOCTracking`](@ref)
-      - L2-error [`SOCTracking`](@ref), [`SquaredSOCTracking`](@ref)
-    - Benchmark portfolio weights [`WeightsTracking`](@ref)
-      - L1-error [`NOCTracking`](@ref)
-      - L2-error [`SOCTracking`](@ref), [`SquaredSOCTracking`](@ref)
 - Phylogen(y/ies) [`IntegerPhylogenyEstimator`](@ref) and [`SemiDefinitePhylogenyEstimator`](@ref)
 - Portfolio returns
   - Arithmetic returns [`ArithmeticReturn`]-(@ref)
-    - Uncertainty set
-    - Custom value
+    - Uncertainty set [`BoxUncertaintySet`](@ref), [`BoxUncertaintySetAlgorithm`](@ref), [`EllipsoidalUncertaintySet`](@ref), and [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+    - Custom expected returns vector
   - Logarithmic returns [`LogarithmicReturn`]-(@ref)
-- Objective vector scalarisation
+- Risk vector scalarisation
   - Weighted sum [`SumScalariser`](@ref)
   - Maximum value [`MaxScalariser`](@ref)
   - Log-sum-exp [`LogSumExpScalariser`](@ref)
 - Custom constraint
-- Custom objective penalty
 - Number of effective assets
 - Regularisation penalty
   - L1
@@ -848,33 +836,85 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 #### [Clustering](@id readme-clustering-opt)
 
-- Hierarchical Risk Parity
-- Hierarchical Equal Risk Parity
-- Schur Complementary Hierarchical Risk Parity
-- Nested Clustered
+##### Hierarchical clustering optimisations
 
-#### Ensemble
+- Hierarchical Risk Parity [`HierarchicalRiskParity`]-(@ref)
+- Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`]-(@ref)
+
+###### Hierarchical clustering optimisation features
+
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Risk vector scalarisation
+  - Weighted sum [`SumScalariser`](@ref)
+  - Maximum value [`MaxScalariser`](@ref)
+  - Log-sum-exp [`LogSumExpScalariser`](@ref)
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+
+##### Schur complementary optimisation
+
+- Schur Complementary Hierarchical Risk Parity [`SchurComplementHierarchicalRiskParity`]-(@ref)
+
+###### Schur complementary optimisation features
+
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+
+##### Clustering optimisation
+
+- Nested Clustered [`NestedClustered`]-(@ref)
+
+##### Clustering optimisation features
+
+- Any features supported by the inner and outer estimators.
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+- Cross validation predictor for the outer estimator
+
+#### Ensemble optimisation
 
 - Stacking
 
-#### Finite allocation
+##### Ensemble optimisation features
+
+- Any features supported by the inner and outer estimators.
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+- Cross validation predictor for the outer estimator
+
+#### Finite allocation optimisation
 
 - Discrete
 - Greedy
-
-### Portfolio statistics
-
-These are used to summarise a portfolio's risk and return characteristics.
-
-- Expected returns.
-  - Arithmetic.
-  - Logarithmic.
-- Risk-adjusted return ratio.
-  - Vanilla.
-  - Sharpe ratio information criterion.
-- Risk contribution.
-  - Asset risk contribution.
-  - Factor risk contribution.
 
 ### Plotting
 
