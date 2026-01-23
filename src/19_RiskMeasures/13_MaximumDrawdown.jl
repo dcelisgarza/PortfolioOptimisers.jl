@@ -8,23 +8,6 @@ function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return MaximumDrawdown(settings)
 end
 function (::MaximumDrawdown)(x::VecNum)
-    #=
-    pushfirst!(x, 1)
-    cs = cumsum(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for i in cs
-        if i > peak
-            peak = i
-        end
-        dd = peak - i
-        if dd > val
-            val = dd
-        end
-    end
-    popfirst!(x)
-    return val
-    =#
     dd = absolute_drawdown_vec(x)
     return -minimum(dd)
 end
@@ -39,23 +22,6 @@ function RelativeMaximumDrawdown(;
     return RelativeMaximumDrawdown(settings)
 end
 function (::RelativeMaximumDrawdown)(x::VecNum)
-    #=
-    x .= pushfirst!(x, 0) .+ one(eltype(x))
-    cs = cumprod(x)
-    val = zero(eltype(x))
-    peak = typemin(eltype(x))
-    for i in cs
-        if i > peak
-            peak = i
-        end
-        dd = one(eltype(x)) - i / peak
-        if dd > val
-            val = dd
-        end
-    end
-    popfirst!(x)
-    return val
-    =#
     dd = relative_drawdown_vec(x)
     return -minimum(dd)
 end

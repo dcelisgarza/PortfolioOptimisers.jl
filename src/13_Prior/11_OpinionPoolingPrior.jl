@@ -122,13 +122,13 @@ OpinionPoolingPrior
       │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │               │           │      │       pdm ┼ Posdef
-      │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │               │           │      │   denoise ┼ nothing
-      │               │           │      │    detone ┼ nothing
-      │               │           │      │       alg ┼ nothing
-      │               │           │      │     order ┴ DenoiseDetoneAlg()
+      │               │           │      │     pdm ┼ Posdef
+      │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()  
+      │               │           │      │      dn ┼ nothing
+      │               │           │      │      dt ┼ nothing
+      │               │           │      │     alg ┼ nothing
+      │               │           │      │   order ┴ DenoiseDetoneAlg()
       │               │        me ┼ SimpleExpectedReturns
       │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
@@ -146,7 +146,7 @@ OpinionPoolingPrior
       │          sets ┼ AssetSets
       │               │    key ┼ String: "nx"
       │               │   ukey ┼ String: "ux"
-      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"]) 
       │        ds_opt ┼ nothing
       │        dm_opt ┼ nothing
       │           opt ┼ OptimEntropyPooling
@@ -168,13 +168,13 @@ OpinionPoolingPrior
       │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │               │           │      │       pdm ┼ Posdef
-      │               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │               │           │      │   denoise ┼ nothing
-      │               │           │      │    detone ┼ nothing
-      │               │           │      │       alg ┼ nothing
-      │               │           │      │     order ┴ DenoiseDetoneAlg()
+      │               │           │      │     pdm ┼ Posdef
+      │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()  
+      │               │           │      │      dn ┼ nothing
+      │               │           │      │      dt ┼ nothing
+      │               │           │      │     alg ┼ nothing
+      │               │           │      │   order ┴ DenoiseDetoneAlg()
       │               │        me ┼ SimpleExpectedReturns
       │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
@@ -192,7 +192,7 @@ OpinionPoolingPrior
       │          sets ┼ AssetSets
       │               │    key ┼ String: "nx"
       │               │   ukey ┼ String: "ux"
-      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"]) 
       │        ds_opt ┼ nothing
       │        dm_opt ┼ nothing
       │           opt ┼ OptimEntropyPooling
@@ -215,13 +215,13 @@ OpinionPoolingPrior
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │           │      │       pdm ┼ Posdef
-      │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │           │      │   denoise ┼ nothing
-      │           │      │    detone ┼ nothing
-      │           │      │       alg ┼ nothing
-      │           │      │     order ┴ DenoiseDetoneAlg()
+      │           │      │     pdm ┼ Posdef
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton    
+      │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │      │      dn ┼ nothing
+      │           │      │      dt ┼ nothing
+      │           │      │     alg ┼ nothing
+      │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing

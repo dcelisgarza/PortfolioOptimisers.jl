@@ -9,7 +9,7 @@ All concrete risk measures can be used as functors (callable structs) to compute
 
 # Related Types
 
-  - [`NoOptimisationRiskMeasure`](@ref)
+  - [`NonOptimisationRiskMeasure`](@ref)
   - [`OptimisationRiskMeasure`](@ref)
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
@@ -17,7 +17,7 @@ All concrete risk measures can be used as functors (callable structs) to compute
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
 """
-    abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+    abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
 
@@ -30,7 +30,7 @@ These risk measures are typically used for analysis, reporting, or diagnostics, 
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
 """
-abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 """
     abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 
@@ -42,7 +42,7 @@ All concrete risk measures that can be used as objectives or constraints in opti
 
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
-  - [`NoOptimisationRiskMeasure`](@ref)
+  - [`NonOptimisationRiskMeasure`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
@@ -110,7 +110,7 @@ Creates a `Frontier` with the specified number of points, scaling factor, and fl
 
     Frontier(; N::Integer = 20)
 
-Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
+Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`]-(@ref) and [`second_moment_bound_val`]-(@ref).
 
     PortfolioOptimisers._Frontier(; N::Integer = 20, factor::Number, flag::Bool)
 
@@ -278,17 +278,46 @@ end
 
 Abstract supertype for scalarisation strategies used to combine multiple risk measures into a single scalar value for optimisation.
 
-Subtype `Scalariser` to implement different methods for aggregating risk measures, such as weighted sum, maximum, or log-sum-exp. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+Subtype `Scalariser` to implement different methods for aggregating risk measures. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
+
+# Related Types
+
+  - [`NonHierarchicalScalariser`](@ref)
+  - [`HierarchicalScalariser`](@ref)
+"""
+abstract type Scalariser <: AbstractEstimator end
+"""
+    abstract type NonHierarchicalScalariser <: Scalariser end
+
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible with all portfolio optimisation estimators.
+
+Subtype `NonHierarchicalScalariser` to implement aggregation methods that work with all optimisation estimators.
 
 # Related Types
 
   - [`SumScalariser`](@ref)
   - [`MaxScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
+  - [`Scalariser`](@ref)
+  - [`HierarchicalScalariser`](@ref)
 """
-abstract type Scalariser <: AbstractEstimator end
+abstract type NonHierarchicalScalariser <: Scalariser end
 """
-    struct SumScalariser <: Scalariser end
+    abstract type HierarchicalScalariser <: Scalariser end
+
+Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible only with hierarchical optimisations.
+
+Subtype `HierarchicalScalariser` to implement aggregation methods that only work with hierarchical optimisation estimators.
+
+# Related Types
+
+  - [`MinScalariser`](@ref)
+  - [`Scalariser`](@ref)
+  - [`NonHierarchicalScalariser`](@ref)
+"""
+abstract type HierarchicalScalariser <: Scalariser end
+"""
+    struct SumScalariser <: NonHierarchicalScalariser end
 
 Scalariser that combines multiple risk measures using a weighted sum.
 
@@ -311,13 +340,14 @@ Where:
 
   - [`Scalariser`](@ref)
   - [`MaxScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct SumScalariser <: Scalariser end
+struct SumScalariser <: NonHierarchicalScalariser end
 """
-    struct MaxScalariser <: Scalariser end
+    struct MaxScalariser <: NonHierarchicalScalariser end
 
 Scalariser that selects the risk expression whose scaled value is the largest.
 
@@ -325,7 +355,7 @@ Scalariser that selects the risk expression whose scaled value is the largest.
 
 ```math
 \\begin{align}
-\\phi &= \\underset{i \\in (1,\\,N)}{\\max}  \\left( w_i \\cdot r_i \\right)\\,.
+\\phi &= \\underset{i \\in (1,\\,N)}{\\max} \\left(w_i \\cdot r_i \\right)\\,.
 \\end{align}
 ```
 
@@ -340,13 +370,44 @@ Where:
 
   - [`Scalariser`](@ref)
   - [`SumScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`LogSumExpScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct MaxScalariser <: Scalariser end
+struct MaxScalariser <: NonHierarchicalScalariser end
 """
-    struct LogSumExpScalariser{T1} <: Scalariser
+    struct MinScalariser <: HierarchicalScalariser end
+
+Scalariser that selects the risk expression whose scaled value is the largest.
+
+`MinScalariser` aggregates a vector of risk measures by selecting the minimum of their scaled values. The weights are specified in the `scale` field of [`RiskMeasureSettings`](@ref) or [`HierarchicalRiskMeasureSettings`](@ref). In clustering optimisations, the risk of each cluster is computed separately, so there is no coherence in which risk measure is chosen between clusters.
+
+```math
+\\begin{align}
+\\phi &= \\underset{i \\in (1,\\,N)}{\\min} \\left( w_i \\cdot r_i \\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``N``: Number of risk measures.
+  - ``i``: Subscript denoting the `i`-th risk measure.
+  - ``r_i``: `i`-th risk measure value.
+  - ``w_i``: Weight of the `i`-th risk measure.
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`SumScalariser`](@ref)
+  - [`MaxScalariser`](@ref)
+  - [`LogSumExpScalariser`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`HierarchicalRiskMeasureSettings`](@ref)
+"""
+struct MinScalariser <: HierarchicalScalariser end
+"""
+    struct LogSumExpScalariser{T1} <: NonHierarchicalScalariser
         gamma::T1
     end
 
@@ -397,10 +458,11 @@ LogSumExpScalariser
   - [`Scalariser`](@ref)
   - [`SumScalariser`](@ref)
   - [`MaxScalariser`](@ref)
+  - [`MinScalariser`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct LogSumExpScalariser{T1} <: Scalariser
+struct LogSumExpScalariser{T1} <: NonHierarchicalScalariser
     gamma::T1
     function LogSumExpScalariser(gamma::Number)
         @argcheck(gamma > zero(gamma))
@@ -460,5 +522,5 @@ function no_bounds_risk_measure end
 function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
-       MaxScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
+       MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
        HierarchicalRiskMeasure

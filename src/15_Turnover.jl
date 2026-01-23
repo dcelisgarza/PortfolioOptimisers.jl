@@ -154,11 +154,6 @@ Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio
 
   - `w` is validated to be non-empty, finite, and numeric.
 
-# Details
-
-  - Copies turnover values and default value from `tn`.
-  - Updates only the weights field.
-
 # Examples
 
 ```jldoctest
@@ -380,11 +375,6 @@ Create a new `Turnover` constraint with updated portfolio weights.
 # Returns
 
   - `tn::Turnover`: New constraint object with updated weights and original turnover values.
-
-# Details
-
-  - Copies turnover values from `tn`.
-  - Updates only the weights field.
 
 # Examples
 

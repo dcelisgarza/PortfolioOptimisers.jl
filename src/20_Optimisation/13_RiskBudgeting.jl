@@ -1,6 +1,5 @@
-"""
-"""
-struct RiskBudgetingResult{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
+struct RiskBudgetingResult{T1, T2, T3, T4, T5, T6, T7} <:
+       NonFiniteAllocationOptimisationResult
     oe::T1
     pa::T2
     prb::T3
@@ -34,8 +33,6 @@ struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
     rkb::T1
 end
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
-"""
-"""
 struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
     rkb::T1
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb})
@@ -48,8 +45,6 @@ end
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     return AssetRiskBudgeting(; rkb = risk_budget_view(r.rkb, i))
 end
-"""
-"""
 struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
@@ -66,8 +61,6 @@ function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, flag = r.flag)
 end
-"""
-"""
 struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2
@@ -75,7 +68,8 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     wi::T4
     fb::T5
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
-                           wi::Option{<:VecNum}, fb::Option{<:OptimisationEstimator})
+                           wi::Option{<:VecNum},
+                           fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -92,11 +86,11 @@ end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:VecNum} = nothing,
-                       fb::Option{<:OptimisationEstimator} = nothing)
+                       fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::MatNum)
-    X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
+    X = isa(rb.opt.pr, AbstractPriorResult) ? rb.opt.pr.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
     rba = risk_budgeting_algorithm_view(rb.rba, i)
@@ -143,36 +137,36 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                                              rd;
-                                                                                                                                              dims = dims)
+    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                                           rd;
+                                                                                                                                           dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, rb.opt.card, gcard, plg, lt, st, fees, rb.opt.ss)
+    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, wb, rb.opt.card, gcard, pl, lt, st, fees, rb.opt.ss)
     set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rb.opt.te, rb, plg, fees; rd = rd)
+    set_tracking_error_constraints!(model, pr, rb.opt.tr, rb, pl, fees; rd = rd)
     set_number_effective_assets!(model, rb.opt.nea)
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, rb.r, rb, pr, plg, fees; rd = rd)
+    set_risk_constraints!(model, rb.r, rb, pr, pl, fees; rd = rd)
     scalarise_risk_expression!(model, rb.opt.sca)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, plg)
+    set_sdp_phylogeny_constraints!(model, pl)
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return RiskBudgetingResult(typeof(rb),
-                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
+                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct,
                                                                 gcard, sgcard, smtx, sgmtx,
-                                                                slt, sst, sglt, sgst, plg,
-                                                                tn, fees, ret), prb,
+                                                                slt, sst, sglt, sgst, tn,
+                                                                fees, pl, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

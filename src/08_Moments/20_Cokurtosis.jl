@@ -3,7 +3,7 @@
 
 Abstract supertype for all cokurtosis estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing cokurtosis estimation algorithms should subtype `CokurtosisEstimator`. This enables a consistent interface for cokurtosis-based higher moment estimators throughout the package.
+All concrete types implementing cokurtosis estimation algorithms should subtype `CokurtosisEstimator`.
 
 # Related
 
@@ -44,13 +44,13 @@ Cokurtosis
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │       pdm ┼ Posdef
-      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │   denoise ┼ nothing
-      │    detone ┼ nothing
-      │       alg ┼ nothing
-      │     order ┴ DenoiseDetoneAlg()
+      │     pdm ┼ Posdef
+      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      dn ┼ nothing
+      │      dt ┼ nothing
+      │     alg ┼ nothing
+      │   order ┴ DenoiseDetoneAlg()
   alg ┴ Full()
 ```
 
@@ -75,7 +75,7 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis(me, mp, alg)
 end
-function factory(ce::Cokurtosis, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::Cokurtosis, w::StatsBase.AbstractWeights)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """

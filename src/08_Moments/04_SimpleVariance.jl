@@ -30,8 +30,6 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
@@ -39,9 +37,7 @@ SimpleVariance
           w ┼ nothing
   corrected ┴ Bool: true
 
-julia> w = Weights([0.2, 0.3, 0.5]);
-
-julia> SimpleVariance(; w = w, corrected = false)
+julia> SimpleVariance(; w = StatsBase.Weights([0.2, 0.3, 0.5]), corrected = false)
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
@@ -56,7 +52,7 @@ SimpleVariance
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
@@ -116,8 +112,7 @@ julia> std(sv, Xmat; dims = 1)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.std`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.std)
-  - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
@@ -150,8 +145,6 @@ This method computes the standard deviation of the input vector `X` using the co
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
@@ -164,9 +157,7 @@ julia> X = [1.0, 2.0, 3.0];
 julia> std(sv, X)
 1.0
 
-julia> w = Weights([0.2, 0.3, 0.5]);
-
-julia> svw = SimpleVariance(; w = w, corrected = false)
+julia> svw = SimpleVariance(; w = StatsBase.Weights([0.2, 0.3, 0.5]), corrected = false)
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
@@ -233,7 +224,7 @@ julia> var(sv, Xmat; dims = 1)
   - [`SimpleVariance`](@ref)
   - [`Statistics.var`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.var)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
@@ -265,8 +256,6 @@ This method computes the variance of the input vector `X` using the configuratio
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
@@ -279,9 +268,7 @@ julia> X = [1.0, 2.0, 3.0];
 julia> var(sv, X)
 1.0
 
-julia> w = Weights([0.2, 0.3, 0.5]);
-
-julia> svw = SimpleVariance(; w = w, corrected = false)
+julia> svw = SimpleVariance(; w = StatsBase.Weights([0.2, 0.3, 0.5]), corrected = false)
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │   w ┴ nothing
@@ -297,7 +284,7 @@ julia> var(svw, X)
   - [`SimpleVariance`](@ref)
   - [`Statistics.var`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.var)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::VecNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
@@ -307,9 +294,52 @@ function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
         Statistics.var(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function factory(ve::SimpleVariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
-                          corrected = ve.corrected)
+"""
+    factory(ve::SimpleVariance, w::StatsBase.AbstractWeights)
+
+Return a new `SimpleVariance` estimator with the specified observation weights.
+
+# Arguments
+
+  - `ve`: The original `SimpleVariance` estimator to update.
+  - `w`: Observation weights to use in the new estimator.
+
+# Returns
+
+  - `ve::SimpleVariance`: A new `SimpleVariance` estimator with the same mean estimator and bias correction as `ve`, but with the provided weights.
+
+# Details
+
+  - Constructs a new `SimpleVariance` estimator with updated weights.
+  - The mean estimator is updated using `factory(ve.me, w)` for consistency.
+  - The bias correction flag is preserved from the original estimator.
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
+
+# Examples
+
+```jldoctest
+julia> sv = SimpleVariance()
+SimpleVariance
+         me ┼ SimpleExpectedReturns
+            │   w ┴ nothing
+          w ┼ nothing
+  corrected ┴ Bool: true
+
+julia> svw = factory(sv, StatsBase.Weights([0.2, 0.3, 0.5]))
+SimpleVariance
+         me ┼ SimpleExpectedReturns
+            │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  corrected ┴ Bool: true
+```
+"""
+function factory(ve::SimpleVariance, w::StatsBase.AbstractWeights)
+    return SimpleVariance(; me = factory(ve.me, w), w = w, corrected = ve.corrected)
 end
 
 export SimpleVariance, var, std

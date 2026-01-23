@@ -33,13 +33,13 @@ PortfolioOptimisersCovariance
      │       │    w ┴ nothing
      │   alg ┴ Full()
   mp ┼ DenoiseDetoneAlgMatrixProcessing
-     │       pdm ┼ Posdef
-     │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │   denoise ┼ nothing
-     │    detone ┼ nothing
-     │       alg ┼ nothing
-     │     order ┴ DenoiseDetoneAlg()
+     │     pdm ┼ Posdef
+     │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │      dn ┼ nothing
+     │      dt ┼ nothing
+     │     alg ┼ nothing
+     │   order ┴ DenoiseDetoneAlg()
 ```
 
 # Related
@@ -59,8 +59,7 @@ function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covar
                                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
-function factory(ce::PortfolioOptimisersCovariance,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::PortfolioOptimisersCovariance, w::StatsBase.AbstractWeights)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
@@ -143,8 +142,6 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
-"""
-"""
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                    t::Number = 0.95, absolute::Bool = false)

@@ -4,6 +4,6 @@ The most basic moment is the simple expected return. These types and functions i
 
 ```@docs
 SimpleExpectedReturns
+factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
 mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-factory(me::SimpleExpectedReturns, w::Option{<:StatsBase.AbstractWeights} = nothing)
 ```

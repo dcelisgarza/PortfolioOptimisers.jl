@@ -68,7 +68,7 @@ pr = prior(EmpiricalPrior(), rd)
 We can provide the prior result to `JuMPOptimiser`.
 
 ````@example 02_Mean_Risk_Objectives
-opt = JuMPOptimiser(; pe = pr, slv = slv)
+opt = JuMPOptimiser(; pr = pr, slv = slv)
 ````
 
 Here we define the estimators for different objective functions.
@@ -92,7 +92,7 @@ res1 = optimise(mr1)
 res2 = optimise(mr2)
 res3 = optimise(mr3)
 res4 = optimise(mr4)
-res0 = optimise(InverseVolatility(; pe = pr))
+res0 = optimise(InverseVolatility(; pr = pr))
 ````
 
 Let's view the results as pretty tables.
@@ -128,6 +128,6 @@ pretty_table(DataFrame(;
 
 We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

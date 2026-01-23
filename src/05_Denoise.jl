@@ -3,7 +3,42 @@
 
 Abstract supertype for all denoising estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement denoising of covariance or correlation matrices should subtype `AbstractDenoiseEstimator`. This enables a consistent interface for denoising routines throughout the package.
+All concrete types that implement denoising of covariance-like or correlation-like matrices should subtype `AbstractDenoiseEstimator`.
+
+# Interfaces
+
+In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`denoise!`](@ref): In-place denoising.
+  - [`denoise`](@ref): Optional out-of-place denoising.
+
+For example, we can create a dummy denoising estimator as follows:
+
+```jldoctest
+julia> struct MyDenoiseEstimator <: PortfolioOptimisers.AbstractDenoiseEstimator end
+
+julia> function PortfolioOptimisers.denoise!(est::MyDenoiseEstimator,
+                                             X::PortfolioOptimisers.MatNum)
+           # Implement your in-place denoising estimator here.
+           println("Denoising matrix in-place...")
+           return nothing
+       end
+
+julia> function PortfolioOptimisers.denoise(est::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
+           X = copy(X)
+           denoise!(est, X)
+           return X
+       end
+
+julia> denoise!(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+Denoising matrix in-place...
+
+julia> denoise(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+Denoising matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
+```
 
 # Related
 
@@ -19,6 +54,37 @@ abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 Abstract supertype for all denoising algorithm types in `PortfolioOptimisers.jl`.
 
 All concrete types that implement a specific denoising algorithm should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
+
+# Interfaces
+
+If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, including all necessary parameters as part of the struct, and implement the following method:
+
+  - [`_denoise!`](@ref): In-place denoising of a covariance or correlation matrix using the specific algorithm.
+
+For example, we can create a dummy denoising algorithm as follows:
+
+```jldoctest
+julia> struct MyDenoiseAlgorithm <: PortfolioOptimisers.AbstractDenoiseAlgorithm end
+
+julia> function PortfolioOptimisers._denoise!(de::MyDenoiseAlgorithm,
+                                              X::PortfolioOptimisers.MatNum,
+                                              vals::PortfolioOptimisers.VecNum,
+                                              vecs::PortfolioOptimisers.MatNum,
+                                              num_factors::Integer)
+           # Implement your in-place denoising logic here.
+           println("Denoising matrix using custom algorithm...")
+           return nothing
+       end
+
+julia> denoise!(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
+Denoising matrix using custom algorithm...
+
+julia> denoise(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
+Denoising matrix using custom algorithm...
+2×2 Matrix{Float64}:
+ 2.0  1.0
+ 1.0  2.0
+```
 
 # Related
 
@@ -49,7 +115,7 @@ SpectralDenoise()
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -73,7 +139,7 @@ FixedDenoise()
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -114,7 +180,7 @@ ShrunkDenoise
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
     alpha::T1
@@ -150,7 +216,7 @@ A flexible container type for configuring and applying denoising algorithms to c
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
-  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - $(glossary[:opdm])
 
 # Constructor
 
@@ -202,7 +268,7 @@ Denoise
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 struct Denoise{T1, T2, T3, T4, T5, T6, T7} <: AbstractDenoiseEstimator
     alg::T1
@@ -227,7 +293,7 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise(alg, args, kwargs, kernel, m, n, pdm)
 end
 """
-    _denoise!(de::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
+    _denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum,
               num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
@@ -236,12 +302,11 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 # Arguments
 
-  - `alg`: The denoising algorithm to apply.
-  - `X`: The matrix to be denoised (modified in-place).
+  - `alg`: Denoising algorithm.
+  - $(glossary[:sigrhoX])
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
-  - `pdm`: Positive definite matrix estimator.
 
 # Returns
 
@@ -260,7 +325,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -274,7 +339,7 @@ function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
+function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
@@ -288,8 +353,8 @@ function _denoise!(de::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     corr1 = vecs_l * LinearAlgebra.Diagonal(vals_l) * transpose(vecs_l)
 
     X .= corr0 +
-         de.alpha * corr1 +
-         (one(de.alpha) - de.alpha) * LinearAlgebra.Diagonal(corr1)
+         alg.alpha * corr1 +
+         (one(alg.alpha) - alg.alpha) * LinearAlgebra.Diagonal(corr1)
     return nothing
 end
 """
@@ -323,7 +388,7 @@ This function is used internally to fit the MP distribution to the observed spec
 
 # References
 
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function errPDF(x::Number, vals::VecNum, q::Number,
                 kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
@@ -373,7 +438,7 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
 # References
 
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function find_max_eval(vals::VecNum, q::Number,
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
@@ -395,13 +460,13 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - `de`: The estimator specifying the denoising algorithm.
+  - $(glossary[:odn])
 
-      + `de::Denoise`: The specified denoising algorithm is applied to `X` in-place.
-      + `de::Nothing`: No-op.
+      + `::Denoise`: The specified denoising algorithm is applied to `X` in-place.
+      + `::Nothing`: No-op.
 
-  - `X`: The covariance or correlation matrix to be denoised (modified in-place).
-  - `q`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
+  - $(glossary[:sigrhoX])
+  - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 # Returns
 
@@ -450,7 +515,7 @@ julia> X
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function denoise!(::Nothing, args...)
     return nothing
@@ -494,7 +559,7 @@ Out-of-place version of [`denoise!`](@ref).
 # References
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
-  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices.* Mathematics of the USSR-Sbornik 1, 457 (1967).
+  - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 function denoise(::Nothing, args...)
     return nothing

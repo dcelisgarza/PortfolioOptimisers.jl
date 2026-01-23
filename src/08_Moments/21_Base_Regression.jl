@@ -3,7 +3,7 @@
 
 Abstract supertype for all regression estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing regression estimation algorithms should subtype `AbstractRegressionEstimator`. This enables a consistent interface for regression-based moment estimation throughout the package.
+All concrete types implementing regression estimation algorithms should subtype `AbstractRegressionEstimator`.
 
 # Related
 
@@ -17,7 +17,7 @@ abstract type AbstractRegressionEstimator <: AbstractEstimator end
 
 Abstract supertype for all regression result types in PortfolioOptimisers.jl.
 
-All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`. This enables a consistent interface for handling regression results, such as fitted parameters, rr, and intercepts, throughout the package.
+All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`.
 
 # Related
 
@@ -126,12 +126,8 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if !isnothing(w)
-        LinearModel(; kwargs = (; re.kwargs..., weights = w))
-    else
-        re
-    end
+function factory(re::LinearModel, w::StatsBase.AbstractWeights)
+    return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
 """
     StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
@@ -205,13 +201,8 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if !isnothing(w)
-        GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
-    else
-        re
-    end
+function factory(re::GeneralisedLinearModel, w::StatsBase.AbstractWeights)
+    return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
 end
 """
     StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)

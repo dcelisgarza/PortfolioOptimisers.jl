@@ -11,7 +11,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
                                                scai::Scalariser, scao::Scalariser,
                                                ex::FLoops.Transducers.Executor,
-                                               fb::Option{<:OptimisationEstimator})
+                                               fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         if isa(ri, AbstractVector)
             @argcheck(!isempty(ri))
         end
@@ -29,11 +29,11 @@ function HierarchicalEqualRiskContribution(;
                                            scai::Scalariser = SumScalariser(),
                                            scao::Scalariser = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                           fb::Option{<:OptimisationEstimator} = nothing)
+                                           fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
-    X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
+    X = isa(hec.opt.pr, AbstractPriorResult) ? hec.opt.pr.X : X
     ri = hec.ri
     ro = hec.ro
     if ri === ro
@@ -89,6 +89,33 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::VecNum, roku::MatNum, rkbo
         rkbo[cl] ./= sum(view(rkbo, cl))
         crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
         if crisk_i > crisk
+            crisk = crisk_i
+        end
+    end
+    return crisk
+end
+function herc_scalarised_risk_o!(::MinScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
+                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    crisk = typemax(eltype(X))
+    for ro in ros
+        unitary_expected_risks!(wk, roku, ro, X, fees)
+        rkbo[cl] .= inv.(view(roku, cl))
+        rkbo[cl] ./= sum(view(rkbo, cl))
+        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
+        if crisk_i < crisk
+            crisk = crisk_i
+        end
+    end
+    return crisk
+end
+function herc_scalarised_risk_o!(::MinScalariser, wk::VecNum, roku::MatNum, rkbo::VecNum,
+                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    crisk = typemax(eltype(X))
+    for (i, ro) in pairs(ros)
+        rkbo[cl] .= inv.(view(roku, cl, i))
+        rkbo[cl] ./= sum(view(rkbo, cl))
+        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
+        if crisk_i < crisk
             crisk = crisk_i
         end
     end
@@ -164,6 +191,38 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::VecNum, riku::MatNum, cl::
         risk[:, 1] = ri.settings.scale * view(riku, cl, i)
         risk_i = sum(view(risk, :, 1))
         if risk_i > risk_t
+            risk_t = risk_i
+            risk[:, 2] .= inv.(view(risk, :, 1))
+            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
+        end
+    end
+    return view(risk, :, 2)
+end
+function herc_scalarised_risk_i!(::MinScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
+                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    risk_t = typemax(eltype(X))
+    risk = zeros(eltype(X), length(cl), 2)
+    for ri in ris
+        unitary_expected_risks!(wk, riku, ri, X, fees)
+        risk[:, 1] = ri.settings.scale * view(riku, cl)
+        risk_i = sum(view(risk, :, 1))
+        if risk_i < risk_t
+            risk_t = risk_i
+            risk[:, 2] .= inv.(view(risk, :, 1))
+            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
+        end
+    end
+    return view(risk, :, 2)
+end
+function herc_scalarised_risk_i!(::MinScalariser, wk::VecNum, riku::MatNum, cl::VecInt,
+                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
+    risk_t = typemax(eltype(X))
+    risk = zeros(eltype(X), length(cl), 2)
+    for (i, ri) in pairs(ris)
+        unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
+        risk[:, 1] = ri.settings.scale * view(riku, cl, i)
+        risk_i = sum(view(risk, :, 1))
+        if risk_i < risk_t
             risk_t = risk_i
             risk[:, 2] .= inv.(view(risk, :, 1))
             risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
@@ -412,8 +471,8 @@ end
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
-    pr = prior(hec.opt.pe, rd; dims = dims)
-    clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    pr = prior(hec.opt.pr, rd; dims = dims)
+    clr = clusterise(hec.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
@@ -453,7 +512,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(pr.X))
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(typeof(hec), pr, fees, wb, clr, retcode, w, nothing)
+    return HierarchicalResult(typeof(hec), pr, clr, wb, fees, retcode, w, nothing)
 end
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing},

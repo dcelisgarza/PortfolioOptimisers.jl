@@ -8,11 +8,14 @@ RiskMeasureSettings
 HierarchicalRiskMeasureSettings
 SumScalariser
 MaxScalariser
+MinScalariser
 LogSumExpScalariser
 AbstractBaseRiskMeasure
-NoOptimisationRiskMeasure
+NonOptimisationRiskMeasure
 OptimisationRiskMeasure
 AbstractRiskMeasureSettings
 Scalariser
+NonHierarchicalScalariser
+HierarchicalScalariser
 nothing_scalar_array_selector
 ```

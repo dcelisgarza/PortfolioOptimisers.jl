@@ -594,13 +594,13 @@ UncertaintySetVariance
            │         │           │      │       │    w ┴ nothing
            │         │           │      │   alg ┴ Full()
            │         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-           │         │           │      │       pdm ┼ Posdef
-           │         │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │         │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-           │         │           │      │   denoise ┼ nothing
-           │         │           │      │    detone ┼ nothing
-           │         │           │      │       alg ┼ nothing
-           │         │           │      │     order ┴ DenoiseDetoneAlg()
+           │         │           │      │     pdm ┼ Posdef
+           │         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()   
+           │         │           │      │      dn ┼ nothing
+           │         │           │      │      dt ┼ nothing
+           │         │           │      │     alg ┼ nothing
+           │         │           │      │   order ┴ DenoiseDetoneAlg()
            │         │        me ┼ SimpleExpectedReturns
            │         │           │   w ┴ nothing
            │         │   horizon ┴ nothing
@@ -644,10 +644,6 @@ end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
 end
-function no_bounds_risk_measure(r::UncertaintySetVariance,
-                                flag::Union{Val{false}, Val{true}, Nothing} = nothing)
-    return _no_bounds_risk_measure(r, flag)
-end
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
@@ -660,9 +656,9 @@ function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
                                                    scale = r.settings.scale), rc = nothing,
                     sigma = r.sigma)
 end
-function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
-                                             flag::Union{Val{false}, Val{true}, Nothing} = nothing)
-    return _no_bounds_no_risk_expr_risk_measure(r, flag)
+function no_bounds_risk_measure(r::UncertaintySetVariance,
+                                flag::Union{Val{false}, Val{true}, Nothing} = nothing)
+    return _no_bounds_risk_measure(r, flag)
 end
 function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                               ::Union{Val{true}, Nothing})
@@ -675,6 +671,10 @@ function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{f
     return Variance(;
                     settings = RiskMeasureSettings(; rke = false, scale = r.settings.scale),
                     rc = nothing, sigma = r.sigma)
+end
+function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
+                                             flag::Union{Val{false}, Val{true}, Nothing} = nothing)
+    return _no_bounds_no_risk_expr_risk_measure(r, flag)
 end
 """
     factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,

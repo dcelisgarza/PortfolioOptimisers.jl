@@ -224,14 +224,14 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
+    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
 
 Assert that the input matrix is square.
 
 # Arguments
 
-  - `A`: Input matrix to validate.
-  - `A_sym`: Symbolic name used in error messages.
+  - `X`: Input matrix to validate.
+  - `X_sym`: Symbolic name used in error messages.
 
 # Returns
 
@@ -239,15 +239,15 @@ Assert that the input matrix is square.
 
 # Validation
 
-  - `size(A, 1) == size(A, 2)`.
+  - `size(X, 1) == size(X, 2)`.
 
 # Details
 
   - Throws `DimensionMismatch` if the check fails.
 """
-function assert_matrix_issquare(A::MatNum, A_sym::Symbol = :A)
-    @argcheck(size(A, 1) == size(A, 2),
-              DimensionMismatch("size($A_sym, 1) == size($A_sym, 2) must hold. Got\nsize($A_sym, 1) => $(size(A, 1))\nsize($A_sym, 2) => $(size(A, 2))."))
+function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+    @argcheck(size(X, 1) == size(X, 2),
+              DimensionMismatch("size($X_sym, 1) == size($X_sym, 2) must hold. Got\nsize($X_sym, 1) => $(size(X, 1))\nsize($X_sym, 2) => $(size(X, 2))."))
     return nothing
 end
 """
@@ -727,7 +727,8 @@ function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
 """
-    factory(::Nothing, args...; kwargs...)
+    factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
+                     <:AbstractResult}, args...; kwargs...)
 
 No-op factory function for constructing objects with a uniform interface.
 
@@ -735,13 +736,13 @@ Defining methods which dispatch on the first argument allows for a consistent fa
 
 # Arguments
 
-  - `::Nothing`: Indicates no object should be constructed.
+  - `a`: Indicates no object should be constructed.
   - `args...`: Arbitrary positional arguments (ignored).
   - `kwargs...`: Arbitrary keyword arguments (ignored).
 
 # Returns
 
-  - `nothing`.
+  - `a`: The input unchanged.
 
 # Related
 
@@ -750,8 +751,9 @@ Defining methods which dispatch on the first argument allows for a consistent fa
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
 """
-function factory(::Nothing, args...; kwargs...)
-    return nothing
+function factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
+                          <:AbstractResult}, args...; kwargs...)
+    return a
 end
 """
     abstract type VectorToScalarMeasure <: AbstractAlgorithm end
@@ -787,8 +789,6 @@ const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
 
 Algorithm for reducing a vector of real values to its minimum.
 
-`MinValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the minimum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their minimum.
-
 # Examples
 
 ```jldoctest
@@ -810,13 +810,11 @@ struct MinValue <: VectorToScalarMeasure end
         w::T1
     end
 
-Algorithm for reducing a vector of real values to its mean.
-
-`MeanValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean (average) value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mean.
+Algorithm for reducing a vector of real values to its optionally weighted mean.
 
 # Fields
 
-  - `w`: Optional weights to use for the mean calculation.
+  - $(glossary[:oow])
 
 # Constructors
 
@@ -828,7 +826,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -858,45 +856,37 @@ function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanValue(w)
 end
 """
-    factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(mv::MeanValue, w::StatsBase.AbstractWeights)
 
-Construct a `MeanValue` instance with optional weights, or return the input if weights are unchanged.
+Construct a `MeanValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `mv`: A `MeanValue` instance to update or return.
-  - `w`: Optional weights to use for the mean calculation. If `nothing`, returns `mv` unchanged.
+  - `mv`: Instance to update.
+  - $(glossary[:ow])
 
 # Returns
 
-  - `mv::MeanValue`: A new `MeanValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `MeanValue` if `w` is provided.
-  - Returns the original `mv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `MeanValue` instances.
+  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
 
 # Related
 
   - [`MeanValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? mv : MeanValue(; w = w)
+function factory(::MeanValue, w::StatsBase.AbstractWeights)
+    return MeanValue(; w = w)
 end
 """
     struct MedianValue{T1} <: VectorToScalarMeasure
         w::T1
     end
 
-Algorithm for reducing a vector of real values to its median.
-
-`MedianValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the median value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their median.
+Algorithm for reducing a vector of real values to its optionally weighted median.
 
 # Fields
 
-  - `w`: Optional weights to use for the median calculation.
+  - $(glossary[:oow])
 
 # Constructors
 
@@ -908,7 +898,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -938,39 +928,31 @@ function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MedianValue(w)
 end
 """
-    factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(mv::MedianValue, w::StatsBase.AbstractWeights)
 
-Constructs a `MedianValue` instance with optional weights, or returns the input if weights are unchanged.
+Constructs a `MedianValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `mdv`: A `MedianValue` instance to update or return.
-  - `w`: Optional weights to use for the median calculation. If `nothing`, returns `mdv` unchanged.
+  - `mv`: Instance to update.
+  - $(glossary[:ow])
 
 # Returns
 
-  - `mdv::MedianValue`: A new `MedianValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `MedianValue` if `w` is provided.
-  - Returns the original `mdv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `MedianValue` instances.
+  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
 
 # Related
 
   - [`MedianValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? mdv : MedianValue(; w = w)
+function factory(::MedianValue, w::StatsBase.AbstractWeights)
+    return MedianValue(; w = w)
 end
 """
     struct MaxValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its maximum.
-
-`MaxValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the maximum value of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their maximum.
 
 # Examples
 
@@ -994,13 +976,11 @@ struct MaxValue <: VectorToScalarMeasure end
         corrected::T2
     end
 
-Algorithm for reducing a vector of real values to its standard deviation.
-
-`StdValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the standard deviation of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their standard deviation.
+Algorithm for reducing a vector of real values to its optionally weighted standard deviation.
 
 # Fields
 
-  - `w`: Optional weights to use for the standard deviation calculation.
+  - $(glossary[:oow])
   - `corrected`: Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population).
 
 # Constructors
@@ -1013,7 +993,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -1045,32 +1025,26 @@ function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
     return StdValue(w, corrected)
 end
 """
-    factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(sv::StdValue, w::StatsBase.AbstractWeights)
 
-Constructs a `StdValue` instance with optional weights, or returns the input if weights are unchanged.
+Constructs a `StdValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `sv`: A `StdValue` instance to update or return.
-  - `w`: Optional weights to use for the standard deviation calculation. If `nothing`, returns `sv` unchanged.
+  - `sv`: Instance to update.
+  - $(glossary[:ow])
 
 # Returns
 
-  - `sv::StdValue`: A new `StdValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `StdValue` if `w` is provided.
-  - Returns the original `sv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `StdValue` instances.
+  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
 
 # Related
 
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? sv : StdValue(; w = w, corrected = sv.corrected)
+function factory(sv::StdValue, w::StatsBase.AbstractWeights)
+    return StdValue(; w = w, corrected = sv.corrected)
 end
 """
     struct VarValue{T1, T2} <: VectorToScalarMeasure
@@ -1078,13 +1052,11 @@ end
         corrected::T2
     end
 
-Algorithm for reducing a vector of real values to its variance.
-
-`VarValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the variance of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their variance.
+Algorithm for reducing a vector of real values to its optionally weighted variance.
 
 # Fields
 
-  - `w`: Optional weights to use for the variance calculation.
+  - $(glossary[:oow])
   - `corrected`: Indicates whether to use Bessel's correction (`true` for sample variance, `false` for population).
 
 # Constructors
@@ -1097,7 +1069,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(validation[:oow])
 
 # Examples
 
@@ -1129,39 +1101,31 @@ function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
     return VarValue(w, corrected)
 end
 """
-    factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(vv::VarValue, w::StatsBase.AbstractWeights)
 
-Constructs a `VarValue` instance with optional weights, or returns the input if weights are unchanged.
+Constructs a `VarValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `vv`: A `VarValue` instance to update or return.
-  - `w`: Optional weights to use for the variance calculation. If `nothing`, returns `vv` unchanged.
+  - `vv`: Instance to update.
+  - $(glossary[:ow])
 
 # Returns
 
-  - `VarValue`: A new `VarValue` with the specified weights, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `VarValue` if `w` is provided.
-  - Returns the original `vv` if `w` is `nothing`.
-  - Ensures consistent construction and updating of `VarValue` instances.
+  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
 
 # Related
 
   - [`VarValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return isnothing(w) ? vv : VarValue(; w = w, corrected = vv.corrected)
+function factory(vv::VarValue, w::StatsBase.AbstractWeights)
+    return VarValue(; w = w, corrected = vv.corrected)
 end
 """
     SumValue <: VectorToScalarMeasure
 
 Algorithm for reducing a vector of real values to its sum.
-
-`SumValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the sum of all elements in a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their sum.
 
 # Examples
 
@@ -1183,8 +1147,6 @@ struct SumValue <: VectorToScalarMeasure end
 
 Algorithm for reducing a vector of real values to its product.
 
-`ProdValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the product of all elements in a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their product.
-
 # Examples
 
 ```jldoctest
@@ -1204,8 +1166,6 @@ struct ProdValue <: VectorToScalarMeasure end
     ModeValue <: VectorToScalarMeasure
 
 Algorithm for reducing a vector of real values to its mode.
-
-`ModeValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mode (most frequent value) of a vector. It is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their mode.
 
 # Examples
 
@@ -1228,9 +1188,7 @@ struct ModeValue <: VectorToScalarMeasure end
         sv::T2
     end
 
-Algorithm for reducing a vector of real values to its mean divided by its standard deviation.
-
-`StandardisedValue` is a concrete subtype of [`VectorToScalarMeasure`](@ref) that returns the mean of a vector divided by its standard deviation (i.e., a standardised score). This is used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics by their standardised value.
+Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation.
 
 # Fields
 
@@ -1271,25 +1229,18 @@ function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValu
     return StandardisedValue(mv, sv)
 end
 """
-    factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
 
-Construct a `StandardisedValue` instance with optional weights, or return the input if weights are unchanged.
+Construct a `StandardisedValue` instance with observation weights `w`.
 
 # Arguments
 
-  - `msv`: A `StandardisedValue` instance to update or return.
-  - `w`: Optional weights to use for both the mean and standard deviation measures. If `nothing`, returns `msv` unchanged.
+  - `msv`: Instance to update.
+  - $(glossary[:ow])
 
 # Returns
 
-  - `msv::StandardisedValue`: A new `StandardisedValue` with the specified weights applied to both `mv` and `sv`, or the original if `w` is `nothing`.
-
-# Details
-
-  - Returns a new `StandardisedValue` if `w` is provided.
-  - Returns the original `msv` if `w` is `nothing`.
-  - Applies the weights to both the mean (`mv`) and standard deviation (`sv`) fields using their respective `factory` methods.
-  - Ensures consistent construction and updating of `StandardisedValue` instances.
+  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
 
 # Related
 
@@ -1298,12 +1249,8 @@ Construct a `StandardisedValue` instance with optional weights, or return the in
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        msv
-    else
-        StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
-    end
+function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+    return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
     vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
@@ -1334,10 +1281,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
 # Related
 
   - [`VectorToScalarMeasure`](@ref)
-  - [`MinValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`MedianValue`](@ref)
-  - [`MaxValue`](@ref)
+  - [`Num_VecToScaM`](@ref)
 """
 function vec_to_real_measure(::MinValue, val::VecNum; kwargs...)
     return minimum(val)

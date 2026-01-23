@@ -132,7 +132,7 @@ end
 
 Abstract supertype for all equation parsing result types in PortfolioOptimisers.jl.
 
-All concrete types representing parsing results should subtype `AbstractParsingResult`. This enables a consistent interface for handling different types of parsed constraint equations.
+All concrete types representing parsing results should subtype `AbstractParsingResult`.
 
 # Related
 
@@ -186,57 +186,6 @@ end
 const VecPR = AbstractVector{<:ParsingResult}
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
-    struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
-        vars::T1
-        coef::T2
-        op::T3
-        rhs::T4
-        eqn::T5
-        ij::T6
-    end
-
-Structured result for correlation view constraint equation parsing.
-
-`RhoParsingResult` is produced when parsing correlation view constraints, such as those used in entropy pooling prior models. It extends the standard [`ParsingResult`](@ref) by including an `ij` field, which stores the tuple of asset pairs (indices) relevant for the correlation view.
-
-# Fields
-
-  - `vars`: Vector of variable names as strings.
-  - `coef`: Vector of coefficients.
-  - `op`: The comparison operator as a string.
-  - `rhs`: The right-hand side value.
-  - `eqn`: The formatted equation string.
-  - `ij`: Tuple or vector of asset index pairs for correlation views.
-
-# Details
-
-  - Produced by correlation view parsing routines, typically when the constraint involves asset pairs (e.g., `"(A, B) == 0.5"`).
-  - The `ij` field enables downstream routines to map parsed correlation views to the appropriate entries in the correlation matrix.
-  - Used internally for entropy pooling, Black-Litterman, and other advanced portfolio models that support correlation views.
-
-# Related
-
-  - [`AbstractParsingResult`](@ref)
-  - [`ParsingResult`](@ref)
-  - [`replace_prior_views`](@ref)
-"""
-struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
-    vars::T1
-    coef::T2
-    op::T3
-    rhs::T4
-    eqn::T5
-    ij::T6
-    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
-                              eqn::AbstractString,
-                              ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                                         <:Tuple{<:VecInt, <:VecInt}}})
-        @argcheck(length(vars) == length(coef), DimensionMismatch)
-        return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
-                   typeof(ij)}(vars, coef, op, rhs, eqn, ij)
-    end
-end
-"""
     struct AssetSets{T1, T2, T3} <: AbstractEstimator
         key::T1
         ukey::T2
@@ -247,7 +196,7 @@ Container for asset set and group information used in constraint generation.
 
 `AssetSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
 
-If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
+If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`]-(@ref) with [`NestedClustered`]-(@ref).
 
 # Fields
 
@@ -525,6 +474,34 @@ function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
     @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
               DimensionMismatch)
     return val
+end
+"""
+    struct UniformValues <: AbstractEstimatorValueAlgorithm end
+
+Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
+
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+
+julia> PortfolioOptimisers.estimator_to_val(UniformValues(), sets)
+StepRangeLen(0.3333333333333333, 0.0, 3)
+```
+
+# Related
+
+  - [`AbstractEstimatorValueAlgorithm`](@ref)
+  - [`WeightBoundsEstimator`](@ref)
+  - [`WeightBounds`](@ref)
+"""
+struct UniformValues <: AbstractEstimatorValueAlgorithm end
+function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
+                          key::Option{<:AbstractString} = nothing;
+                          datatype::DataType = Float64, kwargs...)
+    N = length(sets.dict[ifelse(isnothing(key), sets.key, key)])
+    iN = datatype(inv(N))
+    return range(; start = iN, stop = iN, length = N)
 end
 """
     _eval_numeric_functions(expr)
@@ -814,7 +791,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     varmap = Dict{String, Float64}()
     constant::datatype = 0.0
     for (coeff, var) in terms
-        if var === nothing
+        if isnothing(var)
             constant += coeff
         else
             varmap[var] = get(varmap, var, 0.0) + coeff
@@ -1399,448 +1376,7 @@ function linear_constraints(lcs::VecLcE, sets::AssetSets; datatype::DataType = F
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag) for lc in lcs]
 end
-"""
-    struct RiskBudgetResult{T1} <: AbstractConstraintResult
-        val::T1
-    end
-
-Container for the result of a risk budget constraint.
-
-`RiskBudgetResult` stores the vector of risk budget allocations resulting from risk budget constraint generation or normalisation. This type is used to encapsulate the output of risk budgeting routines in a consistent, composable format for downstream processing and reporting.
-
-# Fields
-
-  - `val`: Vector of risk budget allocations (typically `VecNum`).
-
-# Constructor
-
-    RiskBudgetResult(; val::VecNum)
-
-Keyword arguments correspond to the fields above.
-
-## Validation
-
-  - `!isempty(val)`.
-  - `all(x -> zero(x) <= x, val)`.
-
-# Examples
-
-```jldoctest
-julia> RiskBudgetResult(; val = [0.2, 0.3, 0.5])
-RiskBudgetResult
-  val ┴ Vector{Float64}: [0.2, 0.3, 0.5]
-```
-
-# Related
-
-  - [`RiskBudgetEstimator`](@ref)
-  - [`risk_budget_constraints`](@ref)
-  - [`AbstractConstraintResult`](@ref)
-"""
-struct RiskBudgetResult{T1} <: AbstractConstraintResult
-    val::T1
-    function RiskBudgetResult(val::VecNum)
-        @argcheck(!isempty(val))
-        @argcheck(all(x -> zero(x) <= x, val))
-        return new{typeof(val)}(val)
-    end
-end
-function RiskBudgetResult(; val::Num_VecNum)
-    return RiskBudgetResult(val)
-end
-function risk_budget_view(::Nothing, args...)
-    return nothing
-end
-function risk_budget_view(rb::RiskBudgetResult, i)
-    val = nothing_scalar_array_view(rb.val, i)
-    return RiskBudgetResult(; val = val)
-end
-"""
-    struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
-
-Container for a risk budget allocation mapping or vector.
-
-`RiskBudgetEstimator` stores a mapping from asset or group names to risk budget values, or a vector of such pairs, for use in risk budgeting constraint generation. This type enables composable and validated workflows for specifying risk budgets in portfolio optimisation routines.
-
-# Fields
-
-  - `val`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
-
-# Constructor
-
-    RiskBudgetEstimator(; val::EstValType)
-
-Keyword arguments correspond to the fields above.
-
-## Validation
-
-  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
-
-# Examples
-
-```jldoctest
-julia> RiskBudgetEstimator(; val = Dict("A" => 0.2, "B" => 0.3, "C" => 0.5))
-RiskBudgetEstimator
-  val ┴ Dict{String, Float64}: Dict("B" => 0.3, "A" => 0.2, "C" => 0.5)
-
-julia> RiskBudgetEstimator(; val = ["A" => 0.2, "B" => 0.3, "C" => 0.5])
-RiskBudgetEstimator
-  val ┴ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
-```
-
-# Related
-
-  - [`RiskBudgetResult`](@ref)
-  - [`risk_budget_constraints`](@ref)
-  - [`AssetSets`](@ref)
-"""
-struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
-    val::T1
-    function RiskBudgetEstimator(val::EstValType)
-        assert_nonempty_nonneg_finite_val(val)
-        return new{typeof(val)}(val)
-    end
-end
-function RiskBudgetEstimator(; val::EstValType)
-    return RiskBudgetEstimator(val)
-end
-const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
-const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudgetResult}
-function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
-    return rb
-end
-"""
-    risk_budget_constraints(::Nothing, args...; N::Number, datatype::DataType = Float64,
-                            kwargs...)
-
-No-op fallback for risk budget constraint generation.
-
-This method returns a uniform risk budget allocation when no explicit risk budget is not `nothing`. It creates a [`RiskBudgetResult`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
-
-# Arguments
-
-  - `::Nothing`: Indicates that no risk budget is not `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-  - `N::Number`: Number of assets (required).
-  - `datatype::DataType`: Numeric type for the risk budget vector.
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `rb::RiskBudgetResult`: A result object containing a uniform risk budget vector of length `N`, with each entry equal to `1/N`.
-
-# Examples
-
-```jldoctest
-julia> risk_budget_constraints(nothing; N = 3)
-RiskBudgetResult
-  val ┴ StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}: StepRangeLen(0.3333333333333333, 0.0, 3)
-```
-
-# Related
-
-  - [`RiskBudgetResult`](@ref)
-  - [`risk_budget_constraints`](@ref)
-"""
-function risk_budget_constraints(::Nothing, args...; N::Number, kwargs...)
-    iN = inv(N)
-    return RiskBudgetResult(; val = range(iN, iN; length = N))
-end
-"""
-    risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
-
-No-op fallback for risk budget constraint propagation.
-
-This method returns the input [`RiskBudgetResult`](@ref) object unchanged. It is used to pass through an already constructed risk budget allocation result, enabling composability and uniform interface handling in risk budgeting workflows.
-
-# Arguments
-
-  - `rb`: An existing [`RiskBudgetResult`](@ref) object.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `rb::RiskBudgetResult`: The input `RiskBudgetResult` object, unchanged.
-
-# Examples
-
-```jldoctest
-julia> RiskBudgetResult(; val = [0.2, 0.3, 0.5])
-RiskBudgetResult
-  val ┴ Vector{Float64}: [0.2, 0.3, 0.5]
-```
-
-# Related
-
-  - [`RiskBudgetResult`](@ref)
-  - [`risk_budget_constraints`](@ref)
-"""
-function risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
-    return rb
-end
-"""
-    risk_budget_constraints(rb::EstValType, sets::AssetSets;
-                            N::Number = length(sets.dict[sets.key]), strict::Bool = false)
-
-Generate a risk budget allocation from asset/group mappings and asset sets.
-
-This method constructs a [`RiskBudgetResult`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`AssetSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Asset and group names are resolved using `sets`, and the resulting risk budget vector is normalised to sum to one.
-
-# Arguments
-
-  - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
-  - `N`: Number of assets in the universe.
-  - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
-
-# Details
-
-  - Asset and group names in `rb` are mapped to indices in the asset universe using `sets`.
-  - If a key is a group, all assets in the group are assigned the specified value.
-  - The resulting vector is normalised to sum to one.
-  - If `strict` is `true`, missing keys cause an error; otherwise, a warning is issued.
-
-# Returns
-
-  - `rb::RiskBudgetResult`: A result object containing the normalised risk budget vector.
-
-# Examples
-
-```jldoctest
-julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]));
-
-julia> risk_budget_constraints(Dict("A" => 0.2, "group1" => 0.8), sets)
-RiskBudgetResult
-  val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
-```
-
-# Related
-
-  - [`RiskBudgetResult`](@ref)
-  - [`AssetSets`](@ref)
-  - [`estimator_to_val`](@ref)
-  - [`risk_budget_constraints`](@ref)
-"""
-function risk_budget_constraints(rb::EstValType, sets::AssetSets;
-                                 N::Number = length(sets.dict[sets.key]),
-                                 strict::Bool = false)
-    val = estimator_to_val(rb, sets, inv(N); strict = strict)
-    return RiskBudgetResult(; val = val / sum(val))
-end
-"""
-    risk_budget_constraints(rb::Union{<:RiskBudgetEstimator,
-                                      <:VecRkbE}, sets::AssetSets;
-                            strict::Bool = false, kwargs...)
-
-If `rb` is a vector of [`RiskBudgetEstimator`](@ref) objects, this function is broadcast over the vector.
-
-This method is a wrapper calling:
-
-    risk_budget_constraints(rb.val, sets; strict = strict)
-
-It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
-
-# Related
-
-  - [`risk_budget_constraints`](@ref)
-"""
-function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
-                                 strict::Bool = false, kwargs...)
-    return risk_budget_constraints(rb.val, sets; strict = strict)
-end
-function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
-                                 kwargs...)
-    return [risk_budget_constraints(rbi, sets; strict = strict) for rbi in rb]
-end
-"""
-    struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
-
-Estimator for constructing asset set membership matrices from asset groupings.
-
-`AssetSetsMatrixEstimator` is a container type for specifying the key or group name used to generate a binary asset-group membership matrix from an [`AssetSets`](@ref) object. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
-
-# Fields
-
-  - `val`: The key or group name to extract from the asset sets.
-
-# Constructor
-
-    AssetSetsMatrixEstimator(; val::AbstractString)
-
-Keyword arguments correspond to the fields above.
-
-## Validation
-
-  - `!isempty(val)`.
-
-# Examples
-
-```jldoctest
-julia> sets = AssetSets(; key = "nx",
-                        dict = Dict("nx" => ["A", "B", "C"],
-                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
-
-julia> est = AssetSetsMatrixEstimator(; val = "nx_sector")
-AssetSetsMatrixEstimator
-  val ┴ String: "nx_sector"
-
-julia> asset_sets_matrix(est, sets)
-2×3 transpose(::BitMatrix) with eltype Bool:
- 1  1  0
- 0  0  1
-```
-
-# Related
-
-  - [`AssetSets`](@ref)
-  - [`asset_sets_matrix`](@ref)
-  - [`AbstractConstraintEstimator`](@ref)
-"""
-struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
-    val::T1
-    function AssetSetsMatrixEstimator(val::AbstractString)
-        @argcheck(!isempty(val))
-        return new{typeof(val)}(val)
-    end
-end
-function AssetSetsMatrixEstimator(; val::AbstractString)
-    return AssetSetsMatrixEstimator(val)
-end
-const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
-const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
-const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
-"""
-    asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
-
-Construct a binary asset-group membership matrix from asset set groupings.
-
-`asset_sets_matrix` generates a binary (0/1) matrix indicating asset membership in groups or categories, based on the key or group name `smtx` in the provided [`AssetSets`](@ref). Each row corresponds to a unique group value, and each column to an asset in the universe. This is used in constraint generation and portfolio construction workflows that require mapping assets to groups or categories.
-
-# Arguments
-
-  - `smtx`: The key or group name to extract from the asset sets.
-  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
-
-# Returns
-
-  - `A::BitMatrix`: A binary matrix of size (number of groups) × (number of assets), where `A[i, j] == 1` if asset `j` belongs to group `i`.
-
-# Details
-
-  - The function checks that `smtx` exists in `sets.dict` and that its length matches the asset universe.
-  - Each unique value in `sets.dict[smtx]` defines a group.
-  - The output matrix is transposed so that rows correspond to groups and columns to assets.
-
-# Validation
-
-  - `haskey(sets.dict, smtx)`.
-  - Throws an `AssertionError` if the length of `sets.dict[smtx]` does not match the asset universe.
-
-# Examples
-
-```jldoctest
-julia> sets = AssetSets(; key = "nx",
-                        dict = Dict("nx" => ["A", "B", "C"],
-                                    "nx_sector" => ["Tech", "Tech", "Finance"]));
-
-julia> asset_sets_matrix("nx_sector", sets)
-2×3 transpose(::BitMatrix) with eltype Bool:
- 1  1  0
- 0  0  1
-```
-
-# Related
-
-  - [`AssetSets`](@ref)
-  - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix_view`](@ref)
-"""
-function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
-    @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
-    all_sets = sets.dict[smtx]
-    @argcheck(length(sets.dict[sets.key]) == length(all_sets),
-              AssertionError("The following conditions must be met:\n`sets.dict` must contain key $smtx => haskey(sets.dict, smtx) = $(haskey(sets.dict, smtx))\nlengths of sets.dict[sets.key] and `all_sets` must be equal:\nlength(sets.dict[sets.key]) => length(sets.dict[$(sets.key)]) => $(length(sets.dict[sets.key]))\nlength(all_sets) => $(length(all_sets))"))
-    unique_sets = unique(all_sets)
-    A = BitMatrix(undef, length(all_sets), length(unique_sets))
-    for (i, val) in pairs(unique_sets)
-        A[:, i] = all_sets .== val
-    end
-    return transpose(A)
-end
-"""
-    asset_sets_matrix(smtx::Option{<:MatNum}, args...)
-
-No-op fallback for asset set membership matrix construction.
-
-This method returns the input matrix `smtx` unchanged. It is used as a fallback when the asset set membership matrix is already provided as an `MatNum` or is `nothing`, enabling composability and uniform interface handling in constraint generation workflows.
-
-# Arguments
-
-  - `smtx`: An existing asset set membership matrix (`MatNum`) or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-
-# Returns
-
-  - `smtx::Option{<:MatNum}`: The input matrix or `nothing`, unchanged.
-
-# Related
-
-  - [`AssetSets`](@ref)
-  - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix`](@ref)
-"""
-function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
-    return smtx
-end
-"""
-    asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
-
-This method is a wrapper calling:
-
-    asset_sets_matrix(smtx.val, sets)
-
-It is used for type stability and to provide a uniform interface for processing constraint estimators, as well as simplifying the use of multiple estimators simulatneously.
-
-# Related
-
-  - [`asset_sets_matrix`](@ref)
-"""
-function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
-    return asset_sets_matrix(smtx.val, sets)
-end
-"""
-    asset_sets_matrix(smtx::VecMatNum_ASetMatE,
-                      sets::AssetSets)
-
-Broadcasts [`asset_sets_matrix`](@ref) over the vector.
-
-Provides a uniform interface for processing multiple constraint estimators simulatneously.
-"""
-function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
-    return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
-end
-"""
-"""
-function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
-    return view(smtx, :, i)
-end
-function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
-    return smtx
-end
-function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)
-    val = [asset_sets_matrix_view(smtxi, i; kwargs...) for smtxi in smtx]
-    if isabstracttype(eltype(val))
-        val = concrete_typed_array(val)
-    end
-    return val
-end
 
 export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
-       AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
-       RhoParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
-       linear_constraints, risk_budget_constraints, asset_sets_matrix
+       ParsingResult, parse_equation, replace_group_by_assets, estimator_to_val,
+       linear_constraints, UniformValues

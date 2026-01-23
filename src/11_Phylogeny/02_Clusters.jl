@@ -3,7 +3,7 @@
 
 Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClustersEstimator`. This enables a consistent interface for clustering estimators throughout the package.
+All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClustersEstimator`.
 
 # Related
 
@@ -27,18 +27,14 @@ abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
 function factory(alg::AbstractClustersAlgorithm, args...)
     return alg
 end
-"""
-"""
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
-"""
-"""
 abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
     abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 
 Abstract supertype for all optimal number of clusters estimator types in PortfolioOptimisers.jl.
 
-All concrete types implementing algorithms to estimate the optimal number of clusters should subtype `AbstractOptimalNumberClustersEstimator`. This enables a consistent interface for cluster number estimation.
+All concrete types implementing algorithms to estimate the optimal number of clusters should subtype `AbstractOptimalNumberClustersEstimator`.
 
 # Related
 
@@ -63,7 +59,7 @@ const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 
 Abstract supertype for all clustering result types in PortfolioOptimisers.jl.
 
-All concrete types representing the result of a clustering estimation should subtype `AbstractClusteringResult`. This enables a consistent interface for clustering results throughout the package.
+All concrete types representing the result of a clustering estimation should subtype `AbstractClusteringResult`.
 
 # Related
 
@@ -197,13 +193,8 @@ end
 function SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
     return SecondOrderDifference(alg)
 end
-function factory(alg::SecondOrderDifference,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        alg
-    else
-        SecondOrderDifference(; alg = factory(alg.alg, w))
-    end
+function factory(alg::SecondOrderDifference, w::StatsBase.AbstractWeights)
+    return SecondOrderDifference(; alg = factory(alg.alg, w))
 end
 """
     struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
@@ -260,12 +251,8 @@ function SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
                          metric::Option{<:Distances.SemiMetric} = nothing)
     return SilhouetteScore(alg, metric)
 end
-function factory(alg::SilhouetteScore, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        alg
-    else
-        SilhouetteScore(; alg = factory(alg.alg, w), metric = alg.metric)
-    end
+function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)
+    return SilhouetteScore(; alg = factory(alg.alg, w), metric = alg.metric)
 end
 """
     struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
@@ -331,13 +318,8 @@ function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
                                alg::Int_ONC = SecondOrderDifference())
     return OptimalNumberClusters(max_k, alg)
 end
-function factory(onc::OptimalNumberClusters,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        onc
-    else
-        OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
-    end
+function factory(onc::OptimalNumberClusters, w::StatsBase.AbstractWeights)
+    return OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
 end
 """
     struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
@@ -368,7 +350,7 @@ HClustAlgorithm
 
 # Related
 
-  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
   - [`ClustersEstimator`](@ref)
 """
 struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
@@ -418,17 +400,17 @@ ClustersEstimator
       │      │    me ┼ SimpleExpectedReturns
       │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
       │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │      │       pdm ┼ Posdef
-      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      │   denoise ┼ nothing
-      │      │    detone ┼ nothing
-      │      │       alg ┼ nothing
-      │      │     order ┴ DenoiseDetoneAlg()
+      │      │     pdm ┼ Posdef
+      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      │      dn ┼ nothing
+      │      │      dt ┼ nothing
+      │      │     alg ┼ nothing
+      │      │   order ┴ DenoiseDetoneAlg()
    de ┼ Distance
       │   power ┼ nothing
       │     alg ┴ CanonicalDistance()
@@ -448,7 +430,7 @@ ClustersEstimator
 # Related
 
   - [`AbstractClustersEstimator`](@ref)
-  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
@@ -471,13 +453,9 @@ function ClustersEstimator(;
                            onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
     return ClustersEstimator(ce, de, alg, onc)
 end
-function factory(cle::ClustersEstimator, w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return if isnothing(w)
-        cle
-    else
-        ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
-                          onc = cle.onc)
-    end
+function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)
+    return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
+                             onc = cle.onc)
 end
 const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
                                            <:AbstractHierarchicalClusteringAlgorithm,

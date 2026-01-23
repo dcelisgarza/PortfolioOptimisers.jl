@@ -347,17 +347,17 @@ HighOrderPriorEstimator
       │           │      │    me ┼ SimpleExpectedReturns
       │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │           │      │       pdm ┼ Posdef
-      │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │           │      │   denoise ┼ nothing
-      │           │      │    detone ┼ nothing
-      │           │      │       alg ┼ nothing
-      │           │      │     order ┴ DenoiseDetoneAlg()
+      │           │      │     pdm ┼ Posdef
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton    
+      │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │      │      dn ┼ nothing
+      │           │      │      dt ┼ nothing
+      │           │      │     alg ┼ nothing
+      │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing
@@ -365,25 +365,25 @@ HighOrderPriorEstimator
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
       │    mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │       │       pdm ┼ Posdef
-      │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │       │   denoise ┼ nothing
-      │       │    detone ┼ nothing
-      │       │       alg ┼ nothing
-      │       │     order ┴ DenoiseDetoneAlg()
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
       │   alg ┴ Full()
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
       │    mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │       │       pdm ┼ Posdef
-      │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │       │   denoise ┼ nothing
-      │       │    detone ┼ nothing
-      │       │       alg ┼ nothing
-      │       │     order ┴ DenoiseDetoneAlg()
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
       │   alg ┴ Full()
 ```
 
@@ -417,8 +417,7 @@ function HighOrderPriorEstimator(;
                                                                                  alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::HighOrderPriorEstimator, w::StatsBase.AbstractWeights)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end

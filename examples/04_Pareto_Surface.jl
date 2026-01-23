@@ -77,7 +77,7 @@ Note how many options this estimator contains.
 =#
 
 de = Denoise(; alg = SpectralDenoise(;))
-mp = DenoiseDetoneAlgMatrixProcessing(; denoise = de)
+mp = DenoiseDetoneAlgMatrixProcessing(; dn = de)
 pe = HighOrderPriorEstimator(;
                              ## Prior estimator for low order moments
                              pe = EmpiricalPrior(;
@@ -118,7 +118,7 @@ The `NearOptimalCentering` estimator will not return the portfolio which satisfi
 
 ## Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
-opt = JuMPOptimiser(; pe = pr, slv = slv)
+opt = JuMPOptimiser(; pr = pr, slv = slv)
 obj = MaximumRatio(; rf = rf)
 opt1 = NearOptimalCentering(; r = r1, obj = obj, opt = opt)
 opt2 = NearOptimalCentering(; r = r2, obj = obj, opt = opt)
@@ -205,10 +205,10 @@ Now we can view the pareto surface. For the z-axis and colourbar, we will use th
 =#
 
 plot_measures(res3.w, pr; x = r1, y = r2,
-              z = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                   rt = ArithmeticReturn(), rf = rf),
-              c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                   rt = ArithmeticReturn(), rf = rf),
+              z = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+                                             rt = ArithmeticReturn(), rf = rf),
+              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+                                             rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               zlabel = "CDaR/Return")
 
@@ -218,7 +218,7 @@ We can view it in 2D as well.
 
 gr()
 plot_measures(res3.w, pr; x = r1, y = r2,
-              c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                   rt = ArithmeticReturn(), rf = rf),
+              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+                                             rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)

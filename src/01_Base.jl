@@ -3,11 +3,9 @@
 
 Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
 
-All custom estimators (e.g., for moments, risk, or priors) should subtype `AbstractEstimator`.
+All custom estimators should subtype `AbstractEstimator`.
 
-This enables a consistent interface for estimation routines throughout the package.
-
-Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different characteristics, to entirely different methodologies or algorithms yielding different results. Results are often encapsulated in result types, this simplifies dispatch and usage.
+Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different numerical characteristics, to entirely different methodologies or algorithms yielding different results.
 
 # Related
 
@@ -20,11 +18,9 @@ abstract type AbstractEstimator end
 
 Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
 
-All algorithms (e.g., solvers, metaheuristics) should subtype `AbstractAlgorithm`.
+All algorithms should subtype `AbstractAlgorithm`.
 
-This allows for flexible extension and dispatch of routines.
-
-Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details or entirely different procedures.
+Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details to entirely different procedures for estimating a quantity.
 
 # Related
 
@@ -35,13 +31,11 @@ abstract type AbstractAlgorithm end
 """
     abstract type AbstractResult end
 
-Abstract supertype for all result types returned by optimizers in `PortfolioOptimisers.jl`.
+Abstract supertype for all result types in `PortfolioOptimisers.jl`.
 
-All result objects (e.g., optimization outputs, solution summaries) should subtype `AbstractResult`.
+All result objects should subtype `AbstractResult`.
 
-This ensures a unified interface for accessing results across different estimators and algorithms.
-
-Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a variety of information.
+Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a wide range of information.
 
 # Related
 
@@ -80,61 +74,66 @@ This macro generates a `show` method that displays the type name and all fields 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Base.show`](https://docs.julialang.org/en/v1/base/io/#Base.show)
 """
-macro define_pretty_show(T)
-    quote
-        function Base.show(io::IO, obj::$T)
-            fields = propertynames(obj)
-            if isempty(fields)
-                return print(io, string(typeof(obj), "()"), '\n')
+macro define_pretty_show(T, flag::Bool = true)
+    esc(quote
+            if $flag
+                has_pretty_show_method(::$T) = true
             end
-            if get(io, :compact, false) || get(io, :multiline, false)
-                return print(io, string(typeof(obj)), '\n')
-            end
-            name = Base.typename(typeof(obj)).wrapper
-            print(io, name, '\n')
-            padding = maximum(map(length, map(string, fields))) + 2
-            for (i, field) in enumerate(fields)
-                if hasproperty(obj, field)
-                    val = getproperty(obj, field)
-                else
-                    continue
+            function Base.show(io::IO, obj::$T)
+                fields = propertynames(obj)
+                if isempty(fields)
+                    return print(io, string(typeof(obj), "()"), '\n')
                 end
-                flag = has_pretty_show_method(val)
-                sym1 = ifelse(i == length(fields) &&
-                              (!flag || (flag && isempty(propertynames(val)))), '┴', '┼')
-                print(io, lpad(string(field), padding), " ")
-                if isnothing(val)
-                    print(io, "$(sym1) nothing", '\n')
-                elseif flag || (isa(val, AbstractVector) &&
-                                length(val) <= 6 &&
-                                all(has_pretty_show_method, val))
-                    ioalg = IOBuffer()
-                    show(ioalg, val)
-                    algstr = String(take!(ioalg))
-                    alglines = split(algstr, '\n')
-                    print(io, "$(sym1) ", alglines[1], '\n')
-                    for l in alglines[2:end]
-                        if isempty(l) || l == '\n'
-                            continue
-                        end
-                        sym2 = '│'
-                        print(io, lpad("$sym2 ", padding + 3), l, '\n')
+                if get(io, :compact, false) || get(io, :multiline, false)
+                    return print(io, string(typeof(obj)), '\n')
+                end
+                name = Base.typename(typeof(obj)).wrapper
+                print(io, name, '\n')
+                padding = maximum(map(length, map(string, fields))) + 2
+                for (i, field) in enumerate(fields)
+                    if hasproperty(obj, field)
+                        val = getproperty(obj, field)
+                    else
+                        continue
                     end
-                elseif isa(val, AbstractMatrix)
-                    print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))", '\n')
-                elseif isa(val, AbstractVector) && length(val) > 6
-                    print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
-                elseif isa(val, DataType)
-                    tval = typeof(val)
-                    valstr = Base.typename(tval).wrapper
-                    print(io, "$(sym1) $(tval): ", valstr, '\n')
-                else
-                    print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
+                    flag = has_pretty_show_method(val)
+                    sym1 = ifelse(i == length(fields) &&
+                                  (!flag || (flag && isempty(propertynames(val)))), '┴',
+                                  '┼')
+                    print(io, lpad(string(field), padding), " ")
+                    if isnothing(val)
+                        print(io, "$(sym1) nothing", '\n')
+                    elseif flag || (isa(val, AbstractVector) &&
+                                    length(val) <= 6 &&
+                                    all(has_pretty_show_method, val))
+                        ioalg = IOBuffer()
+                        show(ioalg, val)
+                        algstr = String(take!(ioalg))
+                        alglines = split(algstr, '\n')
+                        print(io, "$(sym1) ", alglines[1], '\n')
+                        for l in alglines[2:end]
+                            if isempty(l) || l == '\n'
+                                continue
+                            end
+                            sym2 = '│'
+                            print(io, lpad("$sym2 ", padding + 3), l, '\n')
+                        end
+                    elseif isa(val, AbstractMatrix)
+                        print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))",
+                              '\n')
+                    elseif isa(val, AbstractVector) && length(val) > 6
+                        print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
+                    elseif isa(val, DataType)
+                        tval = typeof(val)
+                        valstr = Base.typename(tval).wrapper
+                        print(io, "$(sym1) $(tval): ", valstr, '\n')
+                    else
+                        print(io, "$(sym1) $(typeof(val)): ", repr(val), '\n')
+                    end
                 end
+                return nothing
             end
-            return nothing
-        end
-    end
+        end)
 end
 """
     has_pretty_show_method(::Any)
@@ -159,10 +158,6 @@ has_pretty_show_method(::Any) = false
 has_pretty_show_method(::JuMP.Model) = true
 has_pretty_show_method(::Clustering.Hclust) = true
 has_pretty_show_method(::Clustering.KmeansResult) = true
-function has_pretty_show_method(::Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                        <:AbstractResult})
-    return true
-end
 @define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
 """
     abstract type PortfolioOptimisersError <: Exception end
@@ -298,7 +293,7 @@ end
 Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
 function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
-    return i == 1 ? obj : throw(BoundsError())
+    return i == 1 ? obj : throw(BoundsError(obj, i))
 end
 """
     const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
@@ -684,5 +679,147 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
   - [`VecScalar`](@ref)
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+
+"""
+    glossary = Dict(
+                 # Weight vectors.
+                 :pw => "`w`: Portfolio weights vector.",
+                 :ow => "`w`: Observation weights vector.",
+                 :oow => "`w`: Optional observation weights vector.",
+                 # Matrix processing.
+                 :pdm => "`pdm`: Positive definite matrix estimator.",
+                 :dn => "`dn`: Matrix denoising estimator.",
+                 :dt => "`dt`: Matrix detoning estimator.",
+                 :mp => "`mp`: Matrix processing estimator.",
+                 # Moments.
+                 :me => "`me`: Expected returns estimator.",
+                 :ce => "`ce`: Covariance estimator.",
+                 :ve => "`ve`: Variance estimator.",
+                 :ske => "`ske`: Coskewness estimator.",
+                 :kte => "`kte`: Cokurtosis estimator.",
+                 :de => "`de`: Distance matrix estimator.",
+                 # Priors.
+                 :pe => "`pe`: Prior estimator.",
+                 :pr => "`pr`: Prior result.",
+                 :per => "`pe`: Prior estimator or result.",
+                 # Phylogeny.
+                 :cle => "`cle`: Clusters estimator.",
+                 :clr => "`clr`: Clusters result.",
+                 :cler => "`cle`: Clusters estimator or result.",
+                 :ple => "`pl`: Phylogeny estimator.", 
+                 :plr => "`pl`: Phylogeny result.",
+                 :pler => "`pl`: Phylogeny estimator or result.",
+                 :nte => "`pl`: Network estimator.",
+                 :ntr => "`pl`: Network result.",
+                 :nter => "`pl`: Network estimator or result.",
+                 :cte => "`cte`: Centrality estimator.",
+                 :cta => "`ct`: Centrality algorithm.",
+                 :ctr => "`ct`: Centrality result.",
+                 :cter => "`ct`: Centrality estimator or result.",
+                 # Turnover.
+                 :tne => "`tn`: Turnover estimator.",
+                 :tnr => "`tn`: Turnover result.",
+                 :tner => "`tn`: Turnover estimator or result.",
+                 :tnes => "`tn`: Turnover estimator(s).",
+                 :tnrs => "`tn`: Turnover result(s).",
+                 :tners => "`tn`: Turnover estimator(s) or result(s).",
+                 # Tracking.
+                 :tre => "`tr`: Tracking error estimator.",
+                 :trr => "`tr`: Tracking error result.",
+                 :trer => "`tr`: Tracking error estimator or result.",
+                 :tres => "`tr`: Tracking error estimator(s).",
+                 :trrs => "`tr`: Tracking error result(s).",
+                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                 # Weight bounds.
+                 :wbe => "`wb`: Weight bounds estimator.",
+                 :wbr => "`wb`: Weight bounds result.",
+                 :wber => "`wb`: Weight bounds estimator or result.",
+                 # Fees.
+                 :feese => "`fees`: Fees estimator.",
+                 :feesr => "`fees`: Fees result.",
+                 :feeser => "`fees`: Fees estimator or result.")
+
+This dictionary contains the glossary terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+"""
+const glossary = Dict(
+                      # Weight vectors.
+                      :pw => "`w`: Portfolio weights vector.",
+                      :ow => "`w`: Observation weights vector.",
+                      :oow => "`w`: Optional observation weights vector.",
+                      # Matrix processing.
+                      :pdm => "`pdm`: Positive definite matrix estimator.",
+                      :dn => "`dn`: Matrix denoising estimator.",
+                      :dna => "`dna`: Matrix denoising algorithm.",
+                      :dt => "`dt`: Matrix detoning estimator.",
+                      :mp => "`mp`: Matrix processing estimator.",
+                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
+                      :odn => "`dn`: Optional matrix denoising estimator.",
+                      :odt => "`dt`: Optional matrix detoning estimator.",
+                      :omp => "`mp`: Optional matrix processing estimator.",
+                      # Moments.
+                      :me => "`me`: Expected returns estimator.",
+                      :ce => "`ce`: Covariance estimator.",#
+                      :ve => "`ve`: Variance estimator.",#
+                      :ske => "`ske`: Coskewness estimator.",
+                      :kte => "`kte`: Cokurtosis estimator.",
+                      :de => "`de`: Distance matrix estimator.",
+                      # Priors.
+                      :pe => "`pe`: Prior estimator.",#
+                      :pr => "`pr`: Prior result.",#
+                      :per => "`pr`: Prior estimator or result.",
+                      # Phylogeny.
+                      :cle => "`cle`: Clusters estimator.",#
+                      :clr => "`clr`: Clusters result.",#
+                      :cler => "`clr`: Clusters estimator or result.",#
+                      :ple => "`ple`: Phylogeny estimator.",# 
+                      :plr => "`plr`: Phylogeny result.",
+                      :pler => "`pl`: Phylogeny estimator or result.",
+                      :nte => "`nte`: Network estimator.",#
+                      :ntr => "`pl`: Network result.",
+                      :nter => "`pl`: Network estimator or result.",
+                      :cte => "`cte`: Centrality estimator.",#
+                      :cta => "`ct`: Centrality algorithm.",
+                      :ctr => "`ct`: Centrality result.",
+                      :cter => "`ct`: Centrality estimator or result.",
+                      # Turnover.
+                      :tne => "`tn`: Turnover estimator.",#
+                      :tnr => "`tn`: Turnover result.",
+                      :tner => "`tn`: Turnover estimator or result.",
+                      :tnes => "`tn`: Turnover estimator(s).",
+                      :tnrs => "`tn`: Turnover result(s).",
+                      :tners => "`tn`: Turnover estimator(s) or result(s).",
+                      # Tracking.
+                      :tre => "`tr`: Tracking error estimator.",
+                      :trr => "`tr`: Tracking error result.",
+                      :trer => "`tr`: Tracking error estimator or result.",
+                      :tres => "`tr`: Tracking error estimator(s).",
+                      :trrs => "`tr`: Tracking error result(s).",
+                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                      # Weight bounds.
+                      :wbe => "`wb`: Weight bounds estimator.",
+                      :wbr => "`wb`: Weight bounds result.",
+                      :wber => "`wb`: Weight bounds estimator or result.",
+                      # Fees.
+                      :feese => "`fees`: Fees estimator.",#
+                      :feesr => "`fees`: Fees result.",
+                      :feeser => "`fees`: Fees estimator or result.",
+                      # Stats.
+                      :sigma => "`sigma`: Covariance matrix.",#
+                      :mu => "`mu`: Expected returns vector.",#
+                      :rho => "`rho`: Correlation matrix.",
+                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
+                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
+                      :kt => "`kt`: Cokurtosis matrix.",# 
+                      :sk => "`sk`: Coskewness matrix.",#
+                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
+                      :X => "`X`: Data matrix.",#
+                      :F => "`F`: Data matrix.")
+
+"""
+    validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+
+Validation rules for certain glossary terms used in the documentation of `PortfolioOptimisers.jl`.
+"""
+validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

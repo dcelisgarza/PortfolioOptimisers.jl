@@ -4,7 +4,7 @@ using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, 
       Clustering, Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
-                            MatNum_Pr, PrE_Pr, HClE_HCl, VecVecNum
+                            MatNum_Pr, PrE_Pr, HClE_HCl, VecVecNum, RegE_Reg
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
                                                          fees::Option{<:Fees} = nothing;
@@ -49,7 +49,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            ekwargs...)
     ret = cumulative_returns(calc_net_asset_returns(w, X, fees), compound)
     M = size(X, 2)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? number_effective_assets(w) : N)
     ret = view(ret, :, idx)
     nx = view(nx, idx)
     f = plot(; f_kwargs...)
@@ -78,7 +78,7 @@ function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:
                                                                     legend = false),
                                               ekwargs...)
     M = length(w)
-    N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(LinearAlgebra.dot(w, w)) : N)
+    N, idx = compute_relevant_assets(w, M, isnothing(N) ? number_effective_assets(w) : N)
     return if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
@@ -87,26 +87,6 @@ function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:
     else
         bar(w; xticks = (1:M, nx), kwargs..., ekwargs...)
     end
-end
-function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                    w::VecNum, X::MatNum_Pr,
-                                                    fees::Option{<:Fees} = nothing;
-                                                    nx::AbstractVector = 1:length(w),
-                                                    N::Option{<:Number} = nothing,
-                                                    percentage::Bool = false,
-                                                    delta::Number = 1e-6,
-                                                    marginal::Bool = false,
-                                                    kwargs::NamedTuple = (title = "Risk Contribution",
-                                                                          xlabel = "Asset",
-                                                                          ylabel = "Risk Contribution",
-                                                                          xrotation = 90,
-                                                                          legend = false),
-                                                    ekwargs...)
-    rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
-    if percentage
-        rc /= sum(rc)
-    end
-    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
                                                           nx::AbstractVector = 1:size(w, 1);
@@ -138,6 +118,48 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
     M = size(w, 2)
     return areaplot(transpose(w); xticks = (1:M, 1:M), label = permutedims(nx), kwargs...,
                     ekwargs...)
+end
+function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
+                                                    w::VecNum, X::MatNum_Pr,
+                                                    fees::Option{<:Fees} = nothing;
+                                                    nx::AbstractVector = 1:length(w),
+                                                    N::Option{<:Number} = nothing,
+                                                    percentage::Bool = false,
+                                                    delta::Number = 1e-6,
+                                                    marginal::Bool = false,
+                                                    kwargs::NamedTuple = (title = "Risk Contribution",
+                                                                          xlabel = "Asset",
+                                                                          ylabel = "Risk Contribution",
+                                                                          xrotation = 90,
+                                                                          legend = false),
+                                                    ekwargs...)
+    rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
+    if percentage
+        rc /= sum(rc)
+    end
+    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
+end
+function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
+                                                           w::VecNum, X::MatNum_Pr,
+                                                           fees::Option{<:Fees} = nothing;
+                                                           re::RegE_Reg = StepwiseRegression(),
+                                                           rd::ReturnsResult = ReturnsResult(),
+                                                           nf::Option{<:AbstractVector} = nothing,
+                                                           N::Option{<:Number} = nothing,
+                                                           delta::Number = 1e-6,
+                                                           kwargs::NamedTuple = (title = "Factor Risk Contribution",
+                                                                                 xlabel = "Factor",
+                                                                                 ylabel = "Risk Contribution",
+                                                                                 xrotation = 90,
+                                                                                 legend = false),
+                                                           ekwargs...)
+    rc = factor_risk_contribution(r, w, X, fees; re = re, rd = rd, delta = delta)
+    if isnothing(rd.nf) && isnothing(nf) || !isnothing(rd.nf) && length(rc) <= length(rd.nf)
+        nf = [string.(1:(length(rc) - 1)); "Constant"]
+    elseif !isnothing(rd.nf) && isnothing(nf)
+        nf = [rd.nf; "Constant"]
+    end
+    return PortfolioOptimisers.plot_composition(rc, nf; N = N, kwargs = kwargs, ekwargs...)
 end
 function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractClusteringResult,
                                              nx::AbstractVector = 1:length(clr.res.order);
@@ -304,10 +326,10 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum,
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
                                            z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
-                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = RatioRiskMeasure(;
-                                                                                                             rk = x,
-                                                                                                             rt = ArithmeticReturn(),
-                                                                                                             rf = 0),
+                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskRatioRiskMeasure(;
+                                                                                                                       rk = x,
+                                                                                                                       rt = ArithmeticReturn(),
+                                                                                                                       rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            flag::Bool = true,
                                            kwargs::NamedTuple = (title = "Pareto Frontier",

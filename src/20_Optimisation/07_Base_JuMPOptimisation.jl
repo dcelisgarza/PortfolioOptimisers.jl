@@ -1,12 +1,8 @@
 abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
-abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
+abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
-"""
-"""
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
-"""
-"""
 function factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
@@ -14,11 +10,7 @@ function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
-"""
-"""
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
-"""
-"""
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
 function custom_constraint_view(::Nothing, args...; kwargs...)
     return nothing

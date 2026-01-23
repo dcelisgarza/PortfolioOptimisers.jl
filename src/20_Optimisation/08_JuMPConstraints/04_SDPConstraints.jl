@@ -24,23 +24,23 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     JuMP.@constraint(model, frc_M_PSD, sc * frc_M in JuMP.PSDCone())
     return frc_W
 end
-function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhC_VecPhC})
+function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
     sc = model[:sc]
     W = set_sdp_constraints!(model)
-    for (i, plg) in enumerate(plgs)
-        if !isa(plg, SemiDefinitePhylogeny)
+    for (i, pl) in enumerate(plgs)
+        if !isa(pl, SemiDefinitePhylogeny)
             continue
         end
         key = Symbol(:sdp_plg_, i)
-        A = plg.A
+        A = pl.A
         model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
         if !haskey(model, :variance_flag)
             key = Symbol(key, :_p)
-            p = plg.p
+            p = pl.p
             plp = model[key] = JuMP.@expression(model, p * LinearAlgebra.tr(W))
             add_to_objective_penalty!(model, plp)
         end
@@ -48,23 +48,23 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PhC_Ve
     return nothing
 end
 function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
-                                            plgs::Option{<:PhCE_PhC_VecPhCE_PhC})
+                                            plgs::Option{<:PlCE_PhC_VecPlCE_PlC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
     sc = model[:sc]
     W = set_sdp_frc_constraints!(model)
-    for (i, plg) in enumerate(plgs)
-        if !isa(plg, SemiDefinitePhylogeny)
+    for (i, pl) in enumerate(plgs)
+        if !isa(pl, SemiDefinitePhylogeny)
             continue
         end
         key = Symbol(:frc_sdp_plg_, i)
-        A = plg.A
+        A = pl.A
         model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
         if !haskey(model, :variance_flag)
             key = Symbol(key, :_p)
-            p = plg.p
+            p = pl.p
             plp = model[key] = JuMP.@expression(model, p * LinearAlgebra.tr(W))
             add_to_objective_penalty!(model, plp)
         end

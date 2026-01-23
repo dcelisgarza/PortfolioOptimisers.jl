@@ -50,11 +50,11 @@ end
 function sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::LinearConstraint)
     return true
 end
-function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, plg::Option{<:PhC_VecPhC})
+function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, pl::Option{<:PlC_VecPlC})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
-              isa(plg, SemiDefinitePhylogeny) ||
-              isa(plg, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plg)
+              isa(pl, SemiDefinitePhylogeny) ||
+              isa(pl, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), pl)
         true
     else
         false
@@ -110,8 +110,6 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
         model[key], key
     end
 end
-"""
-"""
 function variance_risk_bounds_val(flag::Bool, ub::Frontier)
     return _Frontier(; N = ub.N, factor = 1, flag = flag)
 end
@@ -150,23 +148,23 @@ function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstrain
     return nothing
 end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
-                   pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC}, args...; kwargs...)
+                   pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
-    sdp_flag = sdp_variance_flag!(model, rc_flag, plg)
+    sdp_flag = sdp_variance_flag!(model, rc_flag, pl)
     key = Symbol(:variance_risk_, i)
     variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag, key)
     rc_variance_constraints!(model, i, rc, variance_risk)
     return variance_risk, sdp_flag
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
-                               pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC}, args...;
+                               pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...;
                                kwargs...)
     if !haskey(model, :variance_flag)
         JuMP.@expression(model, variance_flag, true)
     end
-    variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, plg, args...; kwargs...)
+    variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; kwargs...)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, sdp_flag)
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
     set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_key,

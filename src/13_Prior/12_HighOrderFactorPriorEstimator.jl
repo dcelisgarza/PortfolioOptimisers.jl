@@ -62,8 +62,6 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     end
     return kt_res
 end
-"""
-"""
 struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5} <:
        AbstractHighOrderPriorEstimator_F
     pe::T1
@@ -90,8 +88,7 @@ function HighOrderFactorPriorEstimator(;
                                        rsd::Bool = true)
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
 end
-function factory(pe::HighOrderFactorPriorEstimator,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::HighOrderFactorPriorEstimator, w::StatsBase.AbstractWeights)
     return HighOrderFactorPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                          ske = factory(pe.ske, w), ex = pe.ex, rsd = pe.rsd)
 end

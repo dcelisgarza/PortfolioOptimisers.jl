@@ -3,7 +3,7 @@
 
 Abstract supertype for all coskewness estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing coskewness estimation algorithms should subtype `CoskewnessEstimator`. This enables a consistent interface for coskewness-based higher moment estimators throughout the package.
+All concrete types implementing coskewness estimation algorithms should subtype `CoskewnessEstimator`.
 
 # Related
 
@@ -44,13 +44,13 @@ Coskewness
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │       pdm ┼ Posdef
-      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │   denoise ┼ nothing
-      │    detone ┼ nothing
-      │       alg ┼ nothing
-      │     order ┴ DenoiseDetoneAlg()
+      │     pdm ┼ Posdef
+      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      dn ┼ nothing
+      │      dt ┼ nothing
+      │     alg ┼ nothing
+      │   order ┴ DenoiseDetoneAlg()
   alg ┴ Full()
 ```
 
@@ -75,7 +75,7 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
-function factory(ce::Coskewness, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::Coskewness, w::StatsBase.AbstractWeights)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 """

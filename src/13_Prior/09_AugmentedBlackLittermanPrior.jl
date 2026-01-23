@@ -90,13 +90,13 @@ AugmentedBlackLittermanPrior
                │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-               │           │      │       pdm ┼ Posdef
-               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-               │           │      │   denoise ┼ nothing
-               │           │      │    detone ┼ nothing
-               │           │      │       alg ┼ nothing
-               │           │      │     order ┴ DenoiseDetoneAlg()
+               │           │      │     pdm ┼ Posdef
+               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │           │      │      dn ┼ nothing
+               │           │      │      dt ┼ nothing
+               │           │      │     alg ┼ nothing
+               │           │      │   order ┴ DenoiseDetoneAlg()
                │        me ┼ SimpleExpectedReturns
                │           │   w ┴ nothing
                │   horizon ┴ nothing
@@ -110,24 +110,24 @@ AugmentedBlackLittermanPrior
                │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-               │           │      │       pdm ┼ Posdef
-               │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-               │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-               │           │      │   denoise ┼ nothing
-               │           │      │    detone ┼ nothing
-               │           │      │       alg ┼ nothing
-               │           │      │     order ┴ DenoiseDetoneAlg()
+               │           │      │     pdm ┼ Posdef
+               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │           │      │      dn ┼ nothing
+               │           │      │      dt ┼ nothing
+               │           │      │     alg ┼ nothing
+               │           │      │   order ┴ DenoiseDetoneAlg()
                │        me ┼ SimpleExpectedReturns
                │           │   w ┴ nothing
                │   horizon ┴ nothing
             mp ┼ DenoiseDetoneAlgMatrixProcessing
-               │       pdm ┼ Posdef
-               │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-               │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-               │   denoise ┼ nothing
-               │    detone ┼ nothing
-               │       alg ┼ nothing
-               │     order ┴ DenoiseDetoneAlg()
+               │     pdm ┼ Posdef
+               │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+               │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │      dn ┼ nothing
+               │      dt ┼ nothing
+               │     alg ┼ nothing
+               │   order ┴ DenoiseDetoneAlg()
             re ┼ StepwiseRegression
                │   crit ┼ PValue
                │        │   t ┴ Float64: 0.05
@@ -143,7 +143,7 @@ AugmentedBlackLittermanPrior
         a_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   ukey ┼ String: "ux"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
+               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])        
         f_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   ukey ┼ String: "ux"
@@ -239,8 +239,7 @@ function AugmentedBlackLittermanPrior(;
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::AugmentedBlackLittermanPrior, w::StatsBase.AbstractWeights)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), a_views = pe.a_views,

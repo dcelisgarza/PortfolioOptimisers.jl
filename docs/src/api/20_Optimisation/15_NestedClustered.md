@@ -1,5 +1,1 @@
 # Nested Clustered
-
-```@docs
-NestedClustered
-```

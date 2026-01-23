@@ -192,15 +192,15 @@
         @test_throws DomainError TurnoverEstimator(; w = [1], val =  val = "a" => 1 ,
                                                    dval = -eps())
 
-        te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
-        @test te.w === w
-        @test te.val == Dict("A" => 0.1, "B" => 0.2)
-        @test isnothing(te.dval)
+        tn = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2))
+        @test tn.w === w
+        @test tn.val == Dict("A" => 0.1, "B" => 0.2)
+        @test isnothing(tn.dval)
 
-        te = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.2)
-        @test te.w === w
-        @test te.val == Dict("A" => 0.1, "B" => 0.2)
-        @test te.dval == 0.2
+        tn = TurnoverEstimator(; w = w, val = Dict("A" => 0.1, "B" => 0.2), dval = 0.2)
+        @test tn.w === w
+        @test tn.val == Dict("A" => 0.1, "B" => 0.2)
+        @test tn.dval == 0.2
 
         @test_throws IsEmptyError Turnover(; w = Float64[], val = 0)
 

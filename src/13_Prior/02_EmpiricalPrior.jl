@@ -41,13 +41,13 @@ EmpiricalPrior
           │      │       │    w ┴ nothing
           │      │   alg ┴ Full()
           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-          │      │       pdm ┼ Posdef
-          │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-          │      │   denoise ┼ nothing
-          │      │    detone ┼ nothing
-          │      │       alg ┼ nothing
-          │      │     order ┴ DenoiseDetoneAlg()
+          │      │     pdm ┼ Posdef
+          │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+          │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+          │      │      dn ┼ nothing
+          │      │      dt ┼ nothing
+          │      │     alg ┼ nothing
+          │      │   order ┴ DenoiseDetoneAlg()
        me ┼ SimpleExpectedReturns
           │   w ┴ nothing
   horizon ┴ nothing
@@ -80,7 +80,7 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing)
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::EmpiricalPrior, w::StatsBase.AbstractWeights)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end

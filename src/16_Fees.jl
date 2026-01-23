@@ -556,12 +556,7 @@ Create a new `Fees` constraint with updated portfolio weights.
 # Arguments
 
   - `fees`: Existing `Fees` constraint object.
-
-      + Contains turnover, proportional, and fixed fee values.
-
-  - `w`: Portfolio weights vector.
-
-      + New weights to assign to the constraint.
+  - `w`: New weights to assign to the constraint.
 
 # Returns
 

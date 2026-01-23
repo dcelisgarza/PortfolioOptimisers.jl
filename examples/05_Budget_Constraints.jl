@@ -90,7 +90,7 @@ Here we will showcase various budget constraints. We will start simple, with a s
 First the default case, where the budget is equal to 1, `bgt = 1`. This means the portfolio will be fully invested.
 =#
 
-opt1 = JuMPOptimiser(; pe = pr, slv = slv)
+opt1 = JuMPOptimiser(; pr = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)
 
 #=
@@ -131,7 +131,7 @@ Minimising the risk under without additional constraints often yields all zeros.
 =#
 
 rf = 4.2 / 100 / 252
-opt2 = JuMPOptimiser(; pe = pr, slv = slv,
+opt2 = JuMPOptimiser(; pr = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = 0, sbgt = 1,
                      ## Weight bounds.
@@ -165,7 +165,7 @@ println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip
 We will now create and discretely allocate a short-only portfolio. This is in general an anti-pattern but one can use various combinations of budget, weight bounds and short budget constraints to create hedging portfolios.
 =#
 
-opt3 = JuMPOptimiser(; pe = pr, slv = slv,
+opt3 = JuMPOptimiser(; pr = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = -1, sbgt = 1,
                      ## Weight bounds.
@@ -197,7 +197,7 @@ println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.
 Let's try a leveraged long-only portfolio.
 =#
 
-opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
+opt4 = JuMPOptimiser(; pr = pr, slv = slv, bgt = 1.3)
 mr4 = MeanRisk(; r = r, opt = opt4)
 res4 = optimise(mr4)
 println("budget: $(sum(res4.w))")
@@ -227,7 +227,7 @@ Note that the short budget is not satisfied, this is because it is implemented a
 It is also possible to set budget bounds for the short and portfolio budgets. They are implemented in the same way as the equality constraints. We will explore them in the next section.
 =#
 
-opt5 = JuMPOptimiser(; pe = pr, slv = slv,
+opt5 = JuMPOptimiser(; pr = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = 0.5, sbgt = 1,
                      ## Weight bounds.
@@ -261,7 +261,7 @@ The other type of budget constraint we will explore in this example is the budge
 We mentioned at the start of this example that the interaction between budget and short budget constraints might be unintuitive due to how the constraints are implemented. The following example will illustrate this.
 =#
 
-opt6 = JuMPOptimiser(; pe = pr, slv = slv,
+opt6 = JuMPOptimiser(; pr = pr, slv = slv,
                      ## Budget range.
                      bgt = BudgetRange(; lb = 0.3, ub = 0.8),
                      ## Exact short budget
@@ -281,7 +281,7 @@ As you can see, the budget and weight constraints are satisfied, but not the sho
 In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value is greater than or equal to the short budget constraint. 
 =#
 
-opt7 = JuMPOptimiser(; pe = pr, slv = slv,
+opt7 = JuMPOptimiser(; pr = pr, slv = slv,
                      ## Budget range.
                      bgt = BudgetRange(; lb = 0.3, ub = 0.8),
                      ## Remove the slack from the short budget.

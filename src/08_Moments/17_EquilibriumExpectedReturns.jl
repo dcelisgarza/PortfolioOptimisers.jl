@@ -37,17 +37,17 @@ EquilibriumExpectedReturns
      │      │    me ┼ SimpleExpectedReturns
      │      │       │   w ┴ nothing
      │      │    ce ┼ GeneralCovariance
-     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)    
      │      │       │    w ┴ nothing
      │      │   alg ┴ Full()
      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-     │      │       pdm ┼ Posdef
-     │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │      │   denoise ┼ nothing
-     │      │    detone ┼ nothing
-     │      │       alg ┼ nothing
-     │      │     order ┴ DenoiseDetoneAlg()
+     │      │     pdm ┼ Posdef
+     │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │      │      dn ┼ nothing
+     │      │      dt ┼ nothing
+     │      │     alg ┼ nothing
+     │      │   order ┴ DenoiseDetoneAlg()
    w ┼ nothing
    l ┴ Int64: 1
 ```
@@ -73,8 +73,7 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::EquilibriumExpectedReturns, w::StatsBase.AbstractWeights)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """

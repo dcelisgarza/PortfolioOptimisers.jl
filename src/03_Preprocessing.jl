@@ -3,7 +3,7 @@
 
 Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing the result of returns calculations (e.g., asset returns, factor returns) should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis and optimization routines.
+All concrete types representing the result of returns calculations should subtype `AbstractReturnsResult`.
 
 # Related
 
@@ -70,7 +70,8 @@ end
 A flexible container type for storing the results of asset and factor returns calculations in `PortfolioOptimisers.jl`.
 
 `ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
-It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimization and analysis routines.
+
+It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimisation and analysis routines.
 
 # Fields
 
@@ -183,7 +184,7 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `i`
 
 # Details
 
-  - Extracts the asset/factor name, returns, implied volatility, and risk premium adjustment for index `i`.
+  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for index `i`.
   - Preserves factor, timestamp, and other fields from the original object.
   - Returns `nothing` for fields that are not present.
 
@@ -257,7 +258,7 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 
 # Returns
 
-  - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
+  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
 # Validation
 
@@ -463,7 +464,7 @@ Int64[]
 
 # Related
 
-  - [`find_uncorrelated_indices`](@ref)
+  - [`find_uncorrelated_indices`]-(@ref)
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)

@@ -62,7 +62,7 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
                               bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true)
     return MutualInfoCovariance(ve, bins, normalise)
 end
-function factory(ce::MutualInfoCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::MutualInfoCovariance, w::StatsBase.AbstractWeights)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end
@@ -137,7 +137,8 @@ function Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwar
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return mutual_info(X, ce.bins, ce.normalise) ⊙ (std_vec ⊗ std_vec)
+    sigma = mutual_info(X, ce.bins, ce.normalise)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 
 export MutualInfoCovariance

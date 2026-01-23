@@ -3,12 +3,16 @@
 
 Abstract supertype for all Gerber covariance estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing Gerber covariance estimation algorithms should subtype `BaseGerberCovariance`. This enables a consistent interface for Gerber-based covariance estimators throughout the package.
+All concrete types implementing Gerber covariance estimation algorithms should subtype `BaseGerberCovariance`.
 
 # Related
 
   - [`GerberCovariance`](@ref)
   - [`GerberCovarianceAlgorithm`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
@@ -26,6 +30,10 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
   - [`UnstandardisedGerberCovarianceAlgorithm`](@ref)
   - [`StandardisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
@@ -42,6 +50,10 @@ Concrete types implementing unstandardised Gerber covariance algorithms should s
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
   - [`GerberCovariance`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 abstract type UnstandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 """
@@ -58,6 +70,10 @@ Concrete types implementing standardised Gerber covariance algorithms should sub
   - [`StandardisedGerber1`](@ref)
   - [`StandardisedGerber2`](@ref)
   - [`GerberCovariance`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 """
@@ -71,6 +87,10 @@ Implements the original Gerber covariance algorithm.
   - [`GerberCovariance`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct Gerber0 <: UnstandardisedGerberCovarianceAlgorithm end
 """
@@ -84,6 +104,10 @@ Implements the first variant of the Gerber covariance algorithm.
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber2`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct Gerber1 <: UnstandardisedGerberCovarianceAlgorithm end
 """
@@ -97,6 +121,10 @@ Implements the second variant of the Gerber covariance algorithm.
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct Gerber2 <: UnstandardisedGerberCovarianceAlgorithm end
 """
@@ -133,6 +161,10 @@ StandardisedGerber0
   - [`SimpleExpectedReturns`](@ref)
   - [`StandardisedGerber1`](@ref)
   - [`StandardisedGerber2`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct StandardisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
@@ -178,6 +210,10 @@ StandardisedGerber1
   - [`SimpleExpectedReturns`](@ref)
   - [`StandardisedGerber0`](@ref)
   - [`StandardisedGerber2`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct StandardisedGerber1{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
@@ -223,6 +259,10 @@ StandardisedGerber2
   - [`SimpleExpectedReturns`](@ref)
   - [`StandardisedGerber0`](@ref)
   - [`StandardisedGerber1`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct StandardisedGerber2{T1} <: StandardisedGerberCovarianceAlgorithm
     me::T1
@@ -234,17 +274,93 @@ function StandardisedGerber2(;
                              me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return StandardisedGerber2(me)
 end
-for alg in (Gerber0, Gerber1, Gerber2)
+for (i, alg) in enumerate((Gerber0, Gerber1, Gerber2))
+    doc_str = if i == 1
+        """
+          factory(alg::Gerber0, ::Any)
+          factory(alg::Gerber1, ::Any)
+          factory(alg::Gerber2, ::Any)
+
+      Return the provided Gerber covariance algorithm instance unchanged.
+
+      These methods are used to support the `factory` interface for Gerber covariance algorithm types that do not require weights or additional configuration. They enable consistent construction and dispatch for Gerber algorithm variants.
+
+      # Arguments
+
+        - `alg`: Gerber covariance algorithm instance.
+        - Unused for API compatibility.
+
+      # Returns
+
+        - `alg`: The input.
+
+      # Details
+
+        - These methods allow the `factory` interface to return the algorithm instance directly for unweighted Gerber algorithms.
+        - Used internally when constructing Gerber covariance estimators.
+
+      # Related
+
+        - [`UnstandardisedGerberCovarianceAlgorithm`](@ref)
+        - [`factory`](@ref)
+      """
+    else
+        nothing
+    end
     eval(quote
-             function factory(alg::$(alg), ::Any)
+             @doc $(doc_str) function factory(alg::$(alg), ::Any)
                  return alg
              end
          end)
 end
-for alg in (StandardisedGerber0, StandardisedGerber1, StandardisedGerber2)
+for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, StandardisedGerber2))
+    doc_str = if i == 1
+        """
+        factory(alg::StandardisedGerber0, w::StatsBase.AbstractWeights)
+        factory(alg::StandardisedGerber1, w::StatsBase.AbstractWeights)
+        factory(alg::StandardisedGerber2, w::StatsBase.AbstractWeights)
+
+    Construct a new standardised Gerber covariance algorithm instance with the expected returns estimator adapted for the provided weights.
+
+    # Arguments
+
+      - `alg`: Standardised Gerber covariance algorithm instance (`StandardisedGerber0`, `StandardisedGerber1`, or `StandardisedGerber2`).
+      - `w`: Weights vector.
+
+    # Returns
+
+      - A new instance of the same algorithm type, with the `me` field replaced by the result of `factory(alg.me, w)`.
+
+    # Details
+
+      - These methods enable the `factory` interface for standardised Gerber covariance algorithms to support weighted expected returns estimators.
+      - The returned algorithm instance is configured for weighted or unweighted mean estimation as appropriate.
+      - Used internally when constructing weighted Gerber covariance estimators.
+
+    # Related
+
+      - [`StandardisedGerberAlgorithm`](@ref)
+      - [`factory`](@ref)
+
+    # Examples
+
+    ```jldoctest
+    julia> alg = StandardisedGerber0()
+    StandardisedGerber0
+      me ┼ SimpleExpectedReturns
+         │   w ┴ nothing
+
+    julia> factory(alg, StatsBase.Weights([0.2, 0.3, 0.5]))
+    StandardisedGerber0
+      me ┼ SimpleExpectedReturns
+         │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+    ```
+    """
+    else
+        nothing
+    end
     eval(quote
-             function factory(alg::$(alg),
-                              w::Option{<:StatsBase.AbstractWeights} = nothing)
+             @doc $(doc_str) function factory(alg::$(alg), w::StatsBase.AbstractWeights)
                  return $(alg)(; me = factory(alg.me, w))
              end
          end)
@@ -293,6 +409,10 @@ Keyword arguments correspond to the fields above.
   - [`StandardisedGerber0`](@ref)
   - [`StandardisedGerber1`](@ref)
   - [`StandardisedGerber2`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     ve::T1
@@ -346,6 +466,10 @@ The algorithm proceeds as follows:
   - [`GerberCovariance`](@ref)
   - [`Gerber0`](@ref)
   - [`posdef!`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
                 std_vec::ArrNum)
@@ -398,6 +522,10 @@ The algorithm proceeds as follows:
   - [`GerberCovariance`](@ref)
   - [`StandardisedGerber0`](@ref)
   - [`posdef!`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::MatNum)
     T, N = size(X)
@@ -445,6 +573,16 @@ The algorithm proceeds as follows:
  2. Compute `UmD = U - D`.
  3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+  - [`Gerber1`](@ref)
+  - [`posdef!`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
                 std_vec::ArrNum)
@@ -499,6 +637,10 @@ The algorithm proceeds as follows:
   - [`GerberCovariance`](@ref)
   - [`StandardisedGerber1`](@ref)
   - [`posdef!`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)
     T, N = size(X)
@@ -553,6 +695,10 @@ The algorithm proceeds as follows:
   - [`GerberCovariance`](@ref)
   - [`Gerber2`](@ref)
   - [`posdef!`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
                 std_vec::ArrNum)
@@ -607,6 +753,10 @@ The algorithm proceeds as follows:
   - [`GerberCovariance`](@ref)
   - [`StandardisedGerber2`](@ref)
   - [`posdef!`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)
     T, N = size(X)
@@ -629,8 +779,6 @@ end
 
 Compute the Gerber correlation matrix using an unstandardised Gerber covariance estimator.
 
-This method computes the Gerber correlation matrix for the input data matrix `X` using the specified unstandardised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is then computed via [`gerber`](@ref).
-
 # Arguments
 
   - `ce::GerberCovariance`: Gerber covariance estimator.
@@ -650,6 +798,12 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
   - `dims` is either `1` or `2`.
 
+# Details
+
+ 1. Computes the standard deviation vector for each asset using the estimator's variance estimator.
+ 2. If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+ 3. Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+
 # Related
 
   - [`GerberCovariance`](@ref)
@@ -660,6 +814,10 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)`](@ref)
   - [`cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:UnstandardisedGerberCovarianceAlgorithm},
@@ -688,9 +846,7 @@ end
 """
     Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the Gerber covariance matrix using an unstandardised Gerber covariance estimator.
-
-This method computes the Gerber covariance matrix for the input data matrix `X` using the specified unstandardised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
+Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
 # Arguments
 
@@ -711,6 +867,13 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
   - `dims` is either `1` or `2`.
 
+# Details
+
+ 1. Computes the standard deviation vector for each asset using the estimator's variance estimator.
+ 2. If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+ 3. Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+ 4. Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
+
 # Related
 
   - [`GerberCovariance`](@ref)
@@ -721,6 +884,10 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)`](@ref)
   - [`cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+
+# References
+
+  - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:UnstandardisedGerberCovarianceAlgorithm},
@@ -730,7 +897,8 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
+    sigma = gerber(ce, X, std_vec)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:StandardisedGerberCovarianceAlgorithm},
@@ -744,9 +912,10 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
-    return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
+    sigma = gerber(ce, X)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
-function factory(ce::GerberCovariance, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
                             pdm = ce.pdm, t = ce.t)
 end

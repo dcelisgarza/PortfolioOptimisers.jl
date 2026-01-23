@@ -58,7 +58,7 @@
     clr = clusterise(ClustersEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
+    opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv)
     rs = [EqualRiskMeasure(), Variance(), StandardDeviation(), UncertaintySetVariance(),
           LowOrderMoment(), HighOrderMoment(), Kurtosis(), NegativeSkewness(),
           ValueatRisk(), ValueatRiskRange(), ConditionalValueatRisk(),
@@ -90,11 +90,9 @@
             @test success
         end
     end
-    df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"), DataFrame)
-
     @testset "HierarchicalRiskParity vector rm" begin
         sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1.2e2),
-                LogSumExpScalariser(; gamma = 1e6)]
+                LogSumExpScalariser(; gamma = 1e6), MinScalariser()]
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity2.csv.gz"),
                       DataFrame)
         for (i, sca) in pairs(sces)
@@ -177,7 +175,7 @@
     end
     @testset "HierarchicalEqualRiskContribution scalarisers" begin
         sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
-                LogSumExpScalariser(; gamma = 1e2)]
+                LogSumExpScalariser(; gamma = 1e2), MinScalariser()]
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/HierarchicalEqualRiskContribution2.csv.gz"),
                       DataFrame)
@@ -215,7 +213,7 @@
         sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
         eqn = WeightBoundsEstimator(; lb = ["JNJ" => 0.03, "group1" => 0.035],
                                     ub = Dict("PEP" => 0.08, "JNJ" => 0.03))
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn)
+        opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn)
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
@@ -224,7 +222,7 @@
                          for i in sets.dict["group1"]]] .>= 0.035)
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+        opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn,
                                     wf = JuMPWeightFinaliser(;
                                                              alg = RelativeErrorWeightFinaliser(),
                                                              slv = slv))
@@ -235,9 +233,9 @@
                               for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+        opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn,
                                     wf = JuMPWeightFinaliser(;
-                                                             alg = SquareRelativeErrorWeightFinaliser(),
+                                                             alg = SquaredRelativeErrorWeightFinaliser(),
                                                              slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
@@ -246,7 +244,7 @@
                               for i in sets.dict["group1"]]] .- 0.035) .<= 1e-10)
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+        opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn,
                                     wf = JuMPWeightFinaliser(;
                                                              alg = AbsoluteErrorWeightFinaliser(),
                                                              slv = slv))
@@ -257,9 +255,9 @@
                          for i in sets.dict["group1"]]] .>= 0.035)
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+        opt = HierarchicalOptimiser(; pr = pr, clr = clr, slv = slv, sets = sets, wb = eqn,
                                     wf = JuMPWeightFinaliser(;
-                                                             alg = SquareAbsoluteErrorWeightFinaliser(),
+                                                             alg = SquaredAbsoluteErrorWeightFinaliser(),
                                                              slv = slv))
         res = optimise(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)

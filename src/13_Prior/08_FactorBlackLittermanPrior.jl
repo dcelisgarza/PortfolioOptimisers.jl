@@ -79,32 +79,32 @@ FactorBlackLittermanPrior
              │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │           │      │       pdm ┼ Posdef
-             │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │           │      │   denoise ┼ nothing
-             │           │      │    detone ┼ nothing
-             │           │      │       alg ┼ nothing
-             │           │      │     order ┴ DenoiseDetoneAlg()
+             │           │      │     pdm ┼ Posdef
+             │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │           │      │      dn ┼ nothing
+             │           │      │      dt ┼ nothing
+             │           │      │     alg ┼ nothing
+             │           │      │   order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
              │           │   w ┴ nothing
              │   horizon ┴ nothing
         f_mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │       pdm ┼ Posdef
-             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │   denoise ┼ nothing
-             │    detone ┼ nothing
-             │       alg ┼ nothing
-             │     order ┴ DenoiseDetoneAlg()
+             │     pdm ┼ Posdef
+             │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │      dn ┼ nothing
+             │      dt ┼ nothing
+             │     alg ┼ nothing
+             │   order ┴ DenoiseDetoneAlg()
           mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │       pdm ┼ Posdef
-             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │   denoise ┼ nothing
-             │    detone ┼ nothing
-             │       alg ┼ nothing
-             │     order ┴ DenoiseDetoneAlg()
+             │     pdm ┼ Posdef
+             │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │      dn ┼ nothing
+             │      dt ┼ nothing
+             │     alg ┼ nothing
+             │   order ┴ DenoiseDetoneAlg()
           re ┼ StepwiseRegression
              │   crit ┼ PValue
              │        │   t ┴ Float64: 0.05
@@ -191,8 +191,7 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::FactorBlackLittermanPrior, w::StatsBase.AbstractWeights)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,

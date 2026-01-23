@@ -1,5 +1,1 @@
 # Base optimisation
-
-```@docs
-optimise
-```

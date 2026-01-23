@@ -1,6 +1,4 @@
-"""
-"""
-struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: NonFiniteAllocationOptimisationResult
     oe::T1
     pa::T2
     retcode::T3
@@ -22,8 +20,6 @@ function Base.getproperty(r::MeanRiskResult, sym::Symbol)
         getfield(r, sym)
     end
 end
-"""
-"""
 struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
     r::T2
@@ -31,7 +27,8 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     wi::T4
     fb::T5
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
-                      wi::Option{<:VecNum}, fb::Option{<:OptimisationEstimator})
+                      wi::Option{<:VecNum},
+                      fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -44,11 +41,11 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
-                  fb::Option{<:OptimisationEstimator} = nothing)
+                  fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
 end
 function opt_view(mr::MeanRisk, i, X::MatNum)
-    X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
+    X = isa(mr.opt.pr, AbstractPriorResult) ? mr.opt.pr.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
@@ -146,7 +143,7 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     @argcheck(isa(retcode, OptimisationSuccess))
     JuMP.unregister(model, :obj_expr)
     r = factory(mr.r, pr, mr.opt.slv)
-    return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w)]
+    return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)
 end
 function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, fees::Option{<:Fees})
@@ -234,9 +231,9 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
 end
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
-                                                                                                                                              rd;
-                                                                                                                                              dims = dims)
+    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
+                                                                                                                                           rd;
+                                                                                                                                           dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -244,27 +241,27 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_w!(model, pr.X, mr.wi)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, mr.opt.card, gcard, plg, lt, st, fees, mr.opt.ss)
+    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, wb, mr.opt.card, gcard, pl, lt, st, fees, mr.opt.ss)
     set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, mr.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, mr.opt.te, mr, plg, fees; rd = rd)
+    set_tracking_error_constraints!(model, pr, mr.opt.tr, mr, pl, fees; rd = rd)
     set_number_effective_assets!(model, mr.opt.nea)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, mr.r, mr, pr, plg, fees; rd = rd)
+    set_risk_constraints!(model, mr.r, mr, pr, pl, fees; rd = rd)
     scalarise_risk_expression!(model, mr.opt.sca)
     set_return_constraints!(model, ret, mr.obj, pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, plg)
+    set_sdp_phylogeny_constraints!(model, pl)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
     return MeanRiskResult(typeof(mr),
-                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard,
+                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard,
                                                            sgcard, smtx, sgmtx, slt, sst,
-                                                           sglt, sgst, plg, tn, fees, ret),
+                                                           sglt, sgst, tn, fees, pl, ret),
                           retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},

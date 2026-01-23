@@ -1,18 +1,17 @@
-struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
+struct GreedyAllocationResult{T1, T2, T3, T4, T5, T6, T7} <:
+       FiniteAllocationOptimisationResult
     oe::T1
-    shares::T2
-    cost::T3
-    w::T4
-    retcode::T5
+    retcode::T2
+    shares::T3
+    cost::T4
+    w::T5
     cash::T6
     fb::T7
 end
-function factory(res::GreedyAllocationOptimisation, fb)
-    return GreedyAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
-                                        res.cash, fb)
+function factory(res::GreedyAllocationResult, fb)
+    return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
+                                  res.cash, fb)
 end
-"""
-"""
 struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
@@ -118,9 +117,8 @@ function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationOptimisation(typeof(ga), view(res, :, 1), view(res, :, 2),
-                                        view(res, :, 3), OptimisationSuccess(nothing),
-                                        lcash, nothing)
+    return GreedyAllocationResult(typeof(ga), OptimisationSuccess(nothing), view(res, :, 1),
+                                  view(res, :, 2), view(res, :, 3), lcash, nothing)
 end
 function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
                   cash::Number = 1e6, T::Option{<:Number} = nothing,
@@ -128,4 +126,4 @@ function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
     return _optimise(ga, w, p, cash, T, fees; kwargs...)
 end
 
-export GreedyAllocationOptimisation, GreedyAllocation
+export GreedyAllocationResult, GreedyAllocation

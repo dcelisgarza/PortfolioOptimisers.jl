@@ -72,7 +72,7 @@
                       DataFrame)
         r = factory(StandardDeviation(), pr, slv)
         for (i, alg) in enumerate(algs)
-            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            opt = JuMPOptimiser(; pr = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
             res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
@@ -109,11 +109,11 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedAssetRiskBudgeting2.csv.gz"),
                       DataFrame)
         for (i, alg) in enumerate(algs)
-            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            opt = JuMPOptimiser(; pr = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt,
                                       rba = AssetRiskBudgeting(;
-                                                               rkb = RiskBudgetResult(;
-                                                                                      val = 20:-1:1)),
+                                                               rkb = RiskBudget(;
+                                                                                val = 20:-1:1)),
                                       alg = alg)
             res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
@@ -136,19 +136,19 @@
         end
 
         res = optimise(RelaxedRiskBudgeting(; wi = w0,
-                                            opt = JuMPOptimiser(; pe = pr,
+                                            opt = JuMPOptimiser(; pr = pr,
                                                                 slv = Solver(;
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+                                            fb = InverseVolatility(; pr = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         r = factory(StandardDeviation(), pr, slv)
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedFactorRiskBudgeting1.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
+        opt = JuMPOptimiser(; pr = pr, slv = slv,
                             sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
                             wb = WeightBounds(; lb = nothing, ub = nothing))
         rr = regression(StepwiseRegression(), rd)
@@ -180,8 +180,8 @@
         for (i, alg) in enumerate(algs)
             rb = RelaxedRiskBudgeting(; opt = opt,
                                       rba = FactorRiskBudgeting(; re = rr,
-                                                                rkb = RiskBudgetResult(;
-                                                                                       val = 1:5)))
+                                                                rkb = RiskBudget(;
+                                                                                 val = 1:5)))
             res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)

@@ -3,7 +3,7 @@
 
 Abstract supertype for all rank-based covariance estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing rank-based covariance estimation algorithms (such as Kendall's tau or Spearman's rho) should subtype `RankCovarianceEstimator`. This enables a consistent interface for rank-based covariance estimators throughout the package and allows for flexible extension and dispatch.
+All concrete types implementing rank-based covariance estimation algorithms should subtype `RankCovarianceEstimator`.
 
 # Related
 
@@ -126,7 +126,8 @@ function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs.
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return StatsBase.corkendall(X) ⊙ (std_vec ⊗ std_vec)
+    sigma = StatsBase.corkendall(X)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 """
     struct SpearmanCovariance{T1} <: RankCovarianceEstimator
@@ -242,11 +243,12 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return StatsBase.corspearman(X) ⊙ (std_vec ⊗ std_vec)
+    sigma = StatsBase.corspearman(X)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote
-             function factory(ce::$(ce), w::Option{<:StatsBase.AbstractWeights} = nothing)
+             function factory(ce::$(ce), w::StatsBase.AbstractWeights)
                  return $(ce)(; ve = factory(ce.ve, w))
              end
          end)

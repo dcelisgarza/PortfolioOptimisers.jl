@@ -38,7 +38,7 @@ dot_scalar
 
 ## View functions
 
-[`NestedClustered`](@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views, indexing, and custom index generators.
+[`NestedClustered`]-(@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views, indexing, and custom index generators.
 
 ```@docs
 nothing_scalar_array_view
@@ -57,17 +57,17 @@ VectorToScalarMeasure
 Num_VecToScaM
 MinValue
 MeanValue
-factory(mv::MeanValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+factory(mv::MeanValue, w::StatsBase.AbstractWeights)
 MedianValue
-factory(mdv::MedianValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+factory(mdv::MedianValue, w::StatsBase.AbstractWeights)
 MaxValue
 StdValue
-factory(sv::StdValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+factory(sv::StdValue, w::StatsBase.AbstractWeights)
 VarValue
-factory(vv::VarValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+factory(vv::VarValue, w::StatsBase.AbstractWeights)
 SumValue
 ProdValue
 ModeValue
 StandardisedValue
-factory(msv::StandardisedValue, w::Option{<:StatsBase.AbstractWeights} = nothing)
+factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
 ```

@@ -394,7 +394,7 @@ This function creates a new [`WeightsTracking`](@ref) instance by copying the fe
 # Arguments
 
   - `tr`: A [`WeightsTracking`](@ref) object to copy fees from.
-  - `w`: Portfolio weights (vector of real numbers).
+  - `w`: Portfolio weights.
 
 # Returns
 
@@ -438,7 +438,7 @@ WeightsTracking
   - [`factory`](@ref)
 """
 function factory(tr::WeightsTracking, w::VecNum)
-    return WeightsTracking(; fees = factory(tr.fees, tr.w), w = w)
+    return WeightsTracking(; fees = factory(tr.fees, w), w = w)
 end
 """
     tracking_view(tr::WeightsTracking, i)

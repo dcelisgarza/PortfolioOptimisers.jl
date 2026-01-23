@@ -1,9 +1,32 @@
 """
+    factory(ce::StatsBase.CovarianceEstimator, args...)
+
+Fallback for covariance estimator factory methods.
+
+# Arguments
+
+  - $(glossary[:ce])
+  - `args...`: Optional arguments (ignored for base covariance estimators).
+
+# Returns
+
+  - `ce::StatsBase.CovarianceEstimator`: The original covariance estimator.
+
+# Related
+
+  - [`factory`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function factory(ce::StatsBase.CovarianceEstimator, args...)
+    return ce
+end
+"""
     abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 
 Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement covariance estimation (e.g., sample covariance, shrinkage estimators) should subtype `AbstractCovarianceEstimator`. This enables a consistent interface for covariance estimation routines throughout the package.
+All concrete types that implement covariance estimation should subtype `AbstractCovarianceEstimator`.
 
 # Related
 
@@ -16,23 +39,20 @@ abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 
 Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement variance estimation (e.g., sample variance, robust variance estimators) should subtype `AbstractVarianceEstimator`. This enables a consistent interface for variance estimation routines and allows for flexible extension and dispatch within the package.
+All concrete types that implement variance estimation should subtype `AbstractVarianceEstimator`.
 
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-function has_pretty_show_method(::AbstractCovarianceEstimator)
-    return true
-end
 @define_pretty_show(AbstractCovarianceEstimator)
 """
     abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 
 Abstract supertype for all expected returns estimator types in PortfolioOptimisers.jl.
 
-All concrete types that implement expected returns estimation (e.g., sample mean, Bayesian estimators) should subtype `AbstractExpectedReturnsEstimator`. This enables a consistent interface for expected returns estimation routines throughout the package.
+All concrete types that implement expected returns estimation should subtype `AbstractExpectedReturnsEstimator`.
 
 # Related
 

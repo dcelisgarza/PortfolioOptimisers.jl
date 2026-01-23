@@ -22,17 +22,11 @@ const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasu
                         <:Skewness, <:MedianAbsoluteDeviation}
 const ERkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
                    <:Variance, <:UncertaintySetVariance, <:EqualRiskMeasure}
-"""
-"""
 const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
-"""
-"""
 const SlvRM = Union{<:EntropicValueatRisk, <:EntropicValueatRiskRange,
                     <:EntropicDrawdownatRisk, <:RelativeEntropicDrawdownatRisk,
                     <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
                     <:RelativisticDrawdownatRisk, <:RelativeRelativisticDrawdownatRisk}
-"""
-"""
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return r(calc_net_returns(w, X, fees))
@@ -99,7 +93,7 @@ function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatN
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
-    rr = regression(re, rd.X, rd.F)
+    rr = regression(re, rd)
     Bt = transpose(rr.L)
     b2t = transpose(LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt))))
     b3t = transpose(LinearAlgebra.pinv(b2t))

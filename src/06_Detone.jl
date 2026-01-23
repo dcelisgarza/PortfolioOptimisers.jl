@@ -3,7 +3,41 @@
 
 Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
-All concrete types representing detoning estimators (such as [`Detone`](@ref)) should subtype `AbstractDetoneEstimator`. This enables a consistent interface for detoning routines and downstream analysis.
+All concrete types representing detoning estimators should subtype `AbstractDetoneEstimator`.
+
+# Interfaces
+
+In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`detone!`](@ref): In-place detoning.
+  - [`detone`](@ref): Optional out-of-place detoning.
+
+For example, we can create a dummy detoning estimator as follows:
+
+```jldoctest
+julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator end
+
+julia> function PortfolioOptimisers.detone!(est::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
+           # Implement your in-place detoning estimator here.
+           println("Detoning matrix in-place...")
+           return nothing
+       end
+
+julia> function PortfolioOptimisers.detone(est::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
+           X = copy(X)
+           detone!(est, X)
+           return X
+       end
+
+julia> detone!(MyDetoneEstimator(), [1.0 2.0; 2.0 1.0])
+Detoning matrix in-place...
+
+julia> detone(MyDetoneEstimator(), [1.0 2.0; 2.0 1.0])
+Detoning matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
+```
 
 # Related
 
@@ -27,7 +61,7 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 # Fields
 
   - `n`: Number of leading principal components to remove.
-  - `pdm`:  Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - $(glossary[:opdm])
 
 # Constructor
 
@@ -80,12 +114,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - `dt`: The estimator specifying the detoning algorithm.
+  - $(glossary[:odt])
 
-      + `dt::Detone`: The top `n` principal components are removed from `X` in-place.
-      + `dt::Nothing`: No-op and returns `nothing`.
+      + `::Detone`: The top `n` principal components are removed from `X` in-place.
+      + `::Nothing`: No-op and returns `nothing`.
 
-  - `X`: The covariance or correlation matrix to be detoned (modified in-place).
+  - $(glossary[:sigrhoX])
 
 # Returns
 

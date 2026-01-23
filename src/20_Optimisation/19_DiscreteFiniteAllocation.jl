@@ -1,24 +1,22 @@
-struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
-       OptimisationResult
+struct DiscreteAllocationResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
+       FiniteAllocationOptimisationResult
     oe::T1
-    shares::T2
-    cost::T3
-    w::T4
-    retcode::T5
-    s_retcode::T6
-    l_retcode::T7
-    s_model::T8
-    l_model::T9
-    cash::T10
+    retcode::T2
+    s_retcode::T3
+    l_retcode::T4
+    shares::T5
+    cost::T6
+    w::T7
+    cash::T8
+    s_model::T9
+    l_model::T10
     fb::T11
 end
-function factory(res::DiscreteAllocationOptimisation, fb)
-    return DiscreteAllocationOptimisation(res.oe, res.shares, res.cost, res.w, res.retcode,
-                                          res.s_retcode, res.l_retcode, res.s_model,
-                                          res.l_model, res.cash, fb)
+function factory(res::DiscreteAllocationResult, fb)
+    return DiscreteAllocationResult(res.oe, res.retcode, res.s_retcode, res.l_retcode,
+                                    res.shares, res.cost, res.w, res.cash, res.s_model,
+                                    res.l_model, fb)
 end
-"""
-"""
 struct DiscreteAllocation{T1, T2, T3, T4, T5} <: FiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
@@ -60,7 +58,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::SquareRelativeErrorWeightFinaliser)
+                             ::SquaredRelativeErrorWeightFinaliser)
     mask = iszero.(w)
     if any(mask)
         w = copy(w)
@@ -87,7 +85,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     return nothing
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
-                             ::SquareAbsoluteErrorWeightFinaliser)
+                             ::SquaredAbsoluteErrorWeightFinaliser)
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
@@ -174,10 +172,10 @@ function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 
     else
         OptimisationSuccess(nothing)
     end
-    return DiscreteAllocationOptimisation(typeof(da), view(res, :, 1), view(res, :, 2),
-                                          view(res, :, 3), retcode, sretcode, lretcode,
-                                          ifelse(save, smodel, nothing),
-                                          ifelse(save, lmodel, nothing), lcash, nothing)
+    return DiscreteAllocationResult(typeof(da), retcode, sretcode, lretcode,
+                                    view(res, :, 1), view(res, :, 2), view(res, :, 3),
+                                    lcash, ifelse(save, smodel, nothing),
+                                    ifelse(save, lmodel, nothing), nothing)
 end
 function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
                   p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,
@@ -186,4 +184,4 @@ function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNu
     return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)
 end
 
-export DiscreteAllocationOptimisation, DiscreteAllocation
+export DiscreteAllocationResult, DiscreteAllocation

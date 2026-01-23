@@ -63,8 +63,7 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
-function factory(ce::LowerTailDependenceCovariance,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::LowerTailDependenceCovariance, w::StatsBase.AbstractWeights)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          ex = ce.ex)
 end
@@ -188,7 +187,8 @@ function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
         X = transpose(X)
     end
     std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return lower_tail_dependence(X, ce.alpha, ce.ex) ⊙ (std_vec ⊗ std_vec)
+    sigma = lower_tail_dependence(X, ce.alpha, ce.ex)
+    return StatsBase.cor2cov!(sigma, std_vec)
 end
 
 export LowerTailDependenceCovariance

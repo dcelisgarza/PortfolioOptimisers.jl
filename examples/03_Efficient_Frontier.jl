@@ -62,7 +62,7 @@ pr = prior(EmpiricalPrior(), rd)
 Let's create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
 =#
 
-opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+opt = JuMPOptimiser(; pr = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
 
 #=
 We can now use `opt` to create the `MeanRisk` estimator. In order to get the entire frontier, we need to minimise the risk (which is the default value).
@@ -100,7 +100,7 @@ The efficient frontier is just a special case of a pareto front, we have a funct
 
 ## Risk-free rate of 4.2/100/252
 plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
-              c = RatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
+              c = ReturnRiskRatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 

@@ -28,8 +28,8 @@ PrecompileTools.@setup_workload begin
                                                                                                                                              w = ew),
                                                                                                               alg = Semi()),
                                                                                               mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                                           denoise = Denoise(),
-                                                                                                                           detone = Detone(),
+                                                                                                                           dn = Denoise(),
+                                                                                                                           dt = Detone(),
                                                                                                                            alg = LoGo())),
                                                            horizon = 252)),
                FactorPrior(; re = StepwiseRegression(; crit = PValue(; t =  0.8)),
@@ -39,7 +39,7 @@ PrecompileTools.@setup_workload begin
                                                                                                         ve = SimpleVariance(;
                                                                                                                             me = ShrunkExpectedReturns())),
                                                                                   mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                               denoise = Denoise(;
+                                                                                                               dn = Denoise(;
                                                                                                                                  alg = SpectralDenoise()))))),
                FactorPrior(;
                            pe = EmpiricalPrior(;
@@ -51,7 +51,7 @@ PrecompileTools.@setup_workload begin
                                                                                                                                                        alg = BayesStein(;
                                                                                                                                                                         tgt = VolatilityWeighted())))),
                                                                                   mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                               denoise = Denoise(;
+                                                                                                               dn = Denoise(;
                                                                                                                                  alg = FixedDenoise())))),
                            re = StepwiseRegression(; tgt = GeneralisedLinearModel(),
                                                    crit = AIC(), alg = Backward()),

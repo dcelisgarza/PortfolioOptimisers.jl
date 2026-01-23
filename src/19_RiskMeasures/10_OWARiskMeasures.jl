@@ -3,7 +3,7 @@
 
 Abstract supertype for all Ordered Weights Array (OWA) estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing OWA estimation algorithms should subtype `AbstractOrderedWeightsArrayEstimator`. This enables a consistent interface for OWA-based estimators throughout the package.
+All concrete types implementing OWA estimation algorithms should subtype `AbstractOrderedWeightsArrayEstimator`.
 
 # Related
 
@@ -107,18 +107,10 @@ end
 function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
     return MaximumEntropy(alg)
 end
-"""
-"""
 abstract type SquaredOrderedWeightsArrayAlgorithm{T1} <:
               AbstractOrderedWeightsArrayAlgorithm end
-"""
-"""
 const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
-"""
-"""
 const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
-"""
-"""
 const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
 """
     struct MinimumSquaredDistance{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
@@ -248,7 +240,7 @@ The `MinimumSumSquares` algorithm can be configured to use different second-orde
 
 # Related
 
-  - [`SquaredOrderedWeightsArrayAlgorithm`](@ref)
+  - [`SquaredOrderedWeightsArrayAlgorithm`]-(@ref)
   - [`OWAJuMP`](@ref)
 
 # References

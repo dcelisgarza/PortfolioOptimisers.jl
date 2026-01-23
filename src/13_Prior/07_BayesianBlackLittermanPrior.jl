@@ -65,13 +65,13 @@ BayesianBlackLittermanPrior
              │       │           │      │       │    w ┴ nothing
              │       │           │      │   alg ┴ Full()
              │       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │       │           │      │       pdm ┼ Posdef
-             │       │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │           │      │   denoise ┼ nothing
-             │       │           │      │    detone ┼ nothing
-             │       │           │      │       alg ┼ nothing
-             │       │           │      │     order ┴ DenoiseDetoneAlg()
+             │       │           │      │     pdm ┼ Posdef
+             │       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()   
+             │       │           │      │      dn ┼ nothing
+             │       │           │      │      dt ┼ nothing
+             │       │           │      │     alg ┼ nothing
+             │       │           │      │   order ┴ DenoiseDetoneAlg()
              │       │        me ┼ EquilibriumExpectedReturns
              │       │           │   ce ┼ PortfolioOptimisersCovariance
              │       │           │      │   ce ┼ Covariance
@@ -82,24 +82,24 @@ BayesianBlackLittermanPrior
              │       │           │      │      │       │    w ┴ nothing
              │       │           │      │      │   alg ┴ Full()
              │       │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │       │           │      │      │       pdm ┼ Posdef
-             │       │           │      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │           │      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │           │      │      │   denoise ┼ nothing
-             │       │           │      │      │    detone ┼ nothing
-             │       │           │      │      │       alg ┼ nothing
-             │       │           │      │      │     order ┴ DenoiseDetoneAlg()
+             │       │           │      │      │     pdm ┼ Posdef
+             │       │           │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │       │           │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       │           │      │      │      dn ┼ nothing
+             │       │           │      │      │      dt ┼ nothing
+             │       │           │      │      │     alg ┼ nothing
+             │       │           │      │      │   order ┴ DenoiseDetoneAlg()
              │       │           │    w ┼ nothing
              │       │           │    l ┴ Int64: 1
              │       │   horizon ┴ nothing
              │    mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │       │       pdm ┼ Posdef
-             │       │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │   denoise ┼ nothing
-             │       │    detone ┼ nothing
-             │       │       alg ┼ nothing
-             │       │     order ┴ DenoiseDetoneAlg()
+             │       │     pdm ┼ Posdef
+             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton        
+             │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       │      dn ┼ nothing
+             │       │      dt ┼ nothing
+             │       │     alg ┼ nothing
+             │       │   order ┴ DenoiseDetoneAlg()
              │    re ┼ StepwiseRegression
              │       │   crit ┼ PValue
              │       │        │   t ┴ Float64: 0.05
@@ -113,13 +113,13 @@ BayesianBlackLittermanPrior
              │       │   corrected ┴ Bool: true
              │   rsd ┴ Bool: true
           mp ┼ DenoiseDetoneAlgMatrixProcessing
-             │       pdm ┼ Posdef
-             │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │   denoise ┼ nothing
-             │    detone ┼ nothing
-             │       alg ┼ nothing
-             │     order ┴ DenoiseDetoneAlg()
+             │     pdm ┼ Posdef
+             │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │      dn ┼ nothing
+             │      dt ┼ nothing
+             │     alg ┼ nothing
+             │   order ┴ DenoiseDetoneAlg()
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
              │   key ┴ nothing
@@ -176,8 +176,7 @@ function BayesianBlackLittermanPrior(;
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing)
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPrior,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::BayesianBlackLittermanPrior, w::StatsBase.AbstractWeights)
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)

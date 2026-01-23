@@ -1,4 +1,4 @@
-struct MeanReturn{T1} <: NoOptimisationRiskMeasure
+struct MeanReturn{T1} <: NonOptimisationRiskMeasure
     w::T1
     function MeanReturn(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
@@ -20,7 +20,7 @@ end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
     return r
 end
-struct ThirdCentralMoment{T1, T2} <: NoOptimisationRiskMeasure
+struct ThirdCentralMoment{T1, T2} <: NonOptimisationRiskMeasure
     w::T1
     mu::T2
     function ThirdCentralMoment(w::Option{<:StatsBase.AbstractWeights},
@@ -38,7 +38,7 @@ function ThirdCentralMoment(; w::Option{<:StatsBase.AbstractWeights} = nothing,
                             mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
-struct Skewness{T1, T2, T3} <: NoOptimisationRiskMeasure
+struct Skewness{T1, T2, T3} <: NonOptimisationRiskMeasure
     ve::T1
     w::T2
     mu::T3

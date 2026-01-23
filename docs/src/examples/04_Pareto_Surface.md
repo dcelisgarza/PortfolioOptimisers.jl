@@ -84,7 +84,7 @@ Note how many options this estimator contains.
 
 ````@example 04_Pareto_Surface
 de = Denoise(; alg = SpectralDenoise(;))
-mp = DenoiseDetoneAlgMatrixProcessing(; denoise = de)
+mp = DenoiseDetoneAlgMatrixProcessing(; dn = de)
 pe = HighOrderPriorEstimator(;
                              # Prior estimator for low order moments
                              pe = EmpiricalPrior(;
@@ -115,8 +115,8 @@ r2 = Kurtosis()
 
 First we need to get the bounds of our pareto surface. We can do this in many different ways, the simplest are:
 
-  - Minimise the risk using both risk measures simultaneously subject to optional constraints.
-  - Maximise the return, utility or ratio subject to optional constraints.
+- Minimise the risk using both risk measures simultaneously subject to optional constraints.
+- Maximise the return, utility or ratio subject to optional constraints.
 
 We will simply maximise the risk-return ratio for both risk measures on their own with no added constraints. This will not give a complete surface, but it will give us a reasonable range of values.
 
@@ -125,7 +125,7 @@ The `NearOptimalCentering` estimator will not return the portfolio which satisfi
 ````@example 04_Pareto_Surface
 # Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
-opt = JuMPOptimiser(; pe = pr, slv = slv)
+opt = JuMPOptimiser(; pr = pr, slv = slv)
 obj = MaximumRatio(; rf = rf)
 opt1 = NearOptimalCentering(; r = r1, obj = obj, opt = opt)
 opt2 = NearOptimalCentering(; r = r2, obj = obj, opt = opt)
@@ -215,10 +215,10 @@ Now we can view the pareto surface. For the z-axis and colourbar, we will use th
 
 ````@example 04_Pareto_Surface
 plot_measures(res3.w, pr; x = r1, y = r2,
-              z = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                   rt = ArithmeticReturn(), rf = rf),
-              c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                   rt = ArithmeticReturn(), rf = rf),
+              z = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+                                             rt = ArithmeticReturn(), rf = rf),
+              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+                                             rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               zlabel = "CDaR/Return")
 ````
@@ -228,12 +228,12 @@ We can view it in 2D as well.
 ````@example 04_Pareto_Surface
 gr()
 plot_measures(res3.w, pr; x = r1, y = r2,
-              c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                   rt = ArithmeticReturn(), rf = rf),
+              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
+                                             rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
 ````
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

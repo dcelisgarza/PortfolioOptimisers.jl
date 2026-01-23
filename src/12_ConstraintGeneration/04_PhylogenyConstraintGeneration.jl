@@ -28,15 +28,15 @@ All concrete types representing the results of phylogeny-based constraint genera
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
-const PhCE_PhC = Union{<:AbstractPhylogenyConstraintEstimator,
+const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
-const VecPhCE_PhC = AbstractVector{<:PhCE_PhC}
-const PhCE_PhC_VecPhCE_PhC = Union{<:PhCE_PhC, <:VecPhCE_PhC}
-const VecPhC = AbstractVector{<:AbstractPhylogenyConstraintResult}
-const PhC_VecPhC = Union{<:AbstractPhylogenyConstraintResult, <:VecPhC}
+const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
+const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
     struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-        pe::T1
+        pl::T1
         p::T2
     end
 
@@ -46,13 +46,13 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 
 # Fields
 
-  - `pe`: Phylogeny or clustering estimator.
+  - `pl`: Phylogeny or clustering estimator.
   - `p`: Non-negative penalty parameter for the constraint.
 
 # Constructor
 
     SemiDefinitePhylogenyEstimator(;
-                                   pe::NwE_ClE_Cl = NetworkEstimator(),
+                                   pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
                                    p::Number = 0.05)
 
 ## Validation
@@ -64,7 +64,7 @@ Estimator for generating semi-definite phylogeny-based constraints in PortfolioO
 ```jldoctest
 julia> SemiDefinitePhylogenyEstimator()
 SemiDefinitePhylogenyEstimator
-  pe ┼ NetworkEstimator
+  pl ┼ NetworkEstimator
      │    ce ┼ PortfolioOptimisersCovariance
      │       │   ce ┼ Covariance
      │       │      │    me ┼ SimpleExpectedReturns
@@ -74,13 +74,13 @@ SemiDefinitePhylogenyEstimator
      │       │      │       │    w ┴ nothing
      │       │      │   alg ┴ Full()
      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-     │       │      │       pdm ┼ Posdef
-     │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │       │      │   denoise ┼ nothing
-     │       │      │    detone ┼ nothing
-     │       │      │       alg ┼ nothing
-     │       │      │     order ┴ DenoiseDetoneAlg()
+     │       │      │     pdm ┼ Posdef
+     │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │       │      │      dn ┼ nothing
+     │       │      │      dt ┼ nothing
+     │       │      │     alg ┼ nothing
+     │       │      │   order ┴ DenoiseDetoneAlg()
      │    de ┼ Distance
      │       │   power ┼ nothing
      │       │     alg ┴ CanonicalDistance()
@@ -99,16 +99,16 @@ SemiDefinitePhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
+    pl::T1
     p::T2
-    function SemiDefinitePhylogenyEstimator(pe::NwE_ClE_Cl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
-        return new{typeof(pe), typeof(p)}(pe, p)
+        return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
-function SemiDefinitePhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(),
+function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
                                         p::Number = 0.05)
-    return SemiDefinitePhylogenyEstimator(pe, p)
+    return SemiDefinitePhylogenyEstimator(pl, p)
 end
 const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
@@ -211,14 +211,14 @@ function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
+    validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
-Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `pe`.
+Validate that the length of the vector `B` does not exceed the maximum allowed by the clustering estimator `cle`.
 
 # Arguments
 
-  - `pe`: Clustering estimator containing algorithm and maximum group information.
+  - `cle`: Clustering estimator containing algorithm and maximum group information.
   - `B`: Vector of integers representing group sizes or allocations.
   - `args...`: No validation is performed.
 
@@ -228,12 +228,12 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
 
 # Validation
 
-  - Throws `DomainError` if `length(B) > pe.onc.max_k` (when `max_k` is set).
+  - Throws `DomainError` if `length(B) > cle.onc.max_k` (when `max_k` is set).
   - Calls internal [`_validate_length_integer_phylogeny_constraint_B`](@ref) for further checks.
 
 # Details
 
-  - Checks if `pe.onc.max_k` is set and validates `length(B)` accordingly.
+  - Checks if `cle.onc.max_k` is set and validates `length(B)` accordingly.
   - Delegates to `_validate_length_integer_phylogeny_constraint_B` for algorithm-specific validation.
   - Used in the construction and validation of integer phylogeny constraints.
 
@@ -242,12 +242,12 @@ Validate that the length of the vector `B` does not exceed the maximum allowed b
   - [`_validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function validate_length_integer_phylogeny_constraint_B(pe::ClustersEstimator, B::VecNum)
-    if !isnothing(pe.onc.max_k)
-        @argcheck(length(B) <= pe.onc.max_k,
-                  DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
+function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
+    if !isnothing(cle.onc.max_k)
+        @argcheck(length(B) <= cle.onc.max_k,
+                  DomainError("`length(B) <= cle.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(cle.onc.max_k)"))
     end
-    _validate_length_integer_phylogeny_constraint_B(pe.onc.alg, B)
+    _validate_length_integer_phylogeny_constraint_B(cle.onc.alg, B)
     return nothing
 end
 function validate_length_integer_phylogeny_constraint_B(args...)
@@ -255,7 +255,7 @@ function validate_length_integer_phylogeny_constraint_B(args...)
 end
 """
     struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-        pe::T1
+        pl::T1
         B::T2
         scale::T3
     end
@@ -266,14 +266,14 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 
 # Fields
 
-  - `pe`: Phylogeny or clustering estimator.
+  - `pl`: Phylogeny or clustering estimator.
   - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
   - `scale`: Non-negative big-M parameter for the MIP formulation.
 
 # Constructor
 
     IntegerPhylogenyEstimator(;
-                              pe::NwE_ClE_Cl = NetworkEstimator(),
+                              pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
                               B::Int_VecInt = 1,
                               scale::Number = 100_000.0)
 
@@ -288,7 +288,7 @@ Estimator for generating integer phylogeny-based constraints in PortfolioOptimis
 ```jldoctest
 julia> IntegerPhylogenyEstimator()
 IntegerPhylogenyEstimator
-     pe ┼ NetworkEstimator
+     pl ┼ NetworkEstimator
         │    ce ┼ PortfolioOptimisersCovariance
         │       │   ce ┼ Covariance
         │       │      │    me ┼ SimpleExpectedReturns
@@ -298,13 +298,13 @@ IntegerPhylogenyEstimator
         │       │      │       │    w ┴ nothing
         │       │      │   alg ┴ Full()
         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-        │       │      │       pdm ┼ Posdef
-        │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │       │      │   denoise ┼ nothing
-        │       │      │    detone ┼ nothing
-        │       │      │       alg ┼ nothing
-        │       │      │     order ┴ DenoiseDetoneAlg()
+        │       │      │     pdm ┼ Posdef
+        │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │       │      │      dn ┼ nothing
+        │       │      │      dt ┼ nothing
+        │       │      │     alg ┼ nothing
+        │       │      │   order ┴ DenoiseDetoneAlg()
         │    de ┼ Distance
         │       │   power ┼ nothing
         │       │     alg ┴ CanonicalDistance()
@@ -324,20 +324,20 @@ IntegerPhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
+    pl::T1
     B::T2
     scale::T3
-    function IntegerPhylogenyEstimator(pe::NwE_ClE_Cl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
-            validate_length_integer_phylogeny_constraint_B(pe, B)
+            validate_length_integer_phylogeny_constraint_B(pl, B)
         end
-        return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
+        return new{typeof(pl), typeof(B), typeof(scale)}(pl, B, scale)
     end
 end
-function IntegerPhylogenyEstimator(; pe::NwE_ClE_Cl = NetworkEstimator(), B::Int_VecInt = 1,
-                                   scale::Number = 100_000.0)
-    return IntegerPhylogenyEstimator(pe, B, scale)
+function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+                                   B::Int_VecInt = 1, scale::Number = 100_000.0)
+    return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
     struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
@@ -410,8 +410,8 @@ function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
     return IntegerPhylogeny(A, B, scale)
 end
 """
-    phylogeny_constraints(plc::Option{<:PhCE_PhC}, X::MatNum; dims::Int = 1, kwargs...)
-    phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
+    phylogeny_constraints(plc::Option{<:PlCE_PlC}, X::MatNum; dims::Int = 1, kwargs...)
+    phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
 
 Generate phylogeny-based portfolio constraints from an estimator or result.
 
@@ -446,19 +446,19 @@ If a vector broadcasts the function over each element, returning a vector of con
 """
 function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::MatNum;
                                dims::Int = 1, kwargs...)
-    return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+    return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pl, X; dims = dims, kwargs...),
                                  p = plc.p)
 end
 function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::MatNum; dims::Int = 1,
                                kwargs...)
-    return IntegerPhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+    return IntegerPhylogeny(; A = phylogeny_matrix(plc.pl, X; dims = dims, kwargs...),
                             B = plc.B, scale = plc.scale)
 end
 function phylogeny_constraints(plc::Option{<:AbstractPhylogenyConstraintResult}, args...;
                                kwargs...)
     return plc
 end
-function phylogeny_constraints(plcs::VecPhCE_PhC, args...; kwargs...)
+function phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
@@ -483,7 +483,7 @@ Estimator for generating centrality-based portfolio constraints.
 
     CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
                          B::Num_VecToScaM = MinValue(),
-                         comp::ComparisonOperator = LEQ())
+                         comp::ComparisonOperator = <=)
 
 # Examples
 
@@ -491,35 +491,35 @@ Estimator for generating centrality-based portfolio constraints.
 julia> CentralityConstraint()
 CentralityConstraint
      A ┼ CentralityEstimator
-       │     ne ┼ NetworkEstimator
-       │        │    ce ┼ PortfolioOptimisersCovariance
-       │        │       │   ce ┼ Covariance
-       │        │       │      │    me ┼ SimpleExpectedReturns
-       │        │       │      │       │   w ┴ nothing
-       │        │       │      │    ce ┼ GeneralCovariance
-       │        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │        │       │      │       │    w ┴ nothing
-       │        │       │      │   alg ┴ Full()
-       │        │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-       │        │       │      │       pdm ┼ Posdef
-       │        │       │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │        │       │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │        │       │      │   denoise ┼ nothing
-       │        │       │      │    detone ┼ nothing
-       │        │       │      │       alg ┼ nothing
-       │        │       │      │     order ┴ DenoiseDetoneAlg()
-       │        │    de ┼ Distance
-       │        │       │   power ┼ nothing
-       │        │       │     alg ┴ CanonicalDistance()
-       │        │   alg ┼ KruskalTree
-       │        │       │     args ┼ Tuple{}: ()
-       │        │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │        │     n ┴ Int64: 1
-       │   cent ┼ DegreeCentrality
-       │        │     kind ┼ Int64: 0
-       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │   pl ┼ NetworkEstimator
+       │      │    ce ┼ PortfolioOptimisersCovariance
+       │      │       │   ce ┼ Covariance
+       │      │       │      │    me ┼ SimpleExpectedReturns
+       │      │       │      │       │   w ┴ nothing
+       │      │       │      │    ce ┼ GeneralCovariance
+       │      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │      │       │      │       │    w ┴ nothing
+       │      │       │      │   alg ┴ Full()
+       │      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+       │      │       │      │     pdm ┼ Posdef
+       │      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │      │       │      │      dn ┼ nothing
+       │      │       │      │      dt ┼ nothing
+       │      │       │      │     alg ┼ nothing
+       │      │       │      │   order ┴ DenoiseDetoneAlg()
+       │      │    de ┼ Distance
+       │      │       │   power ┼ nothing
+       │      │       │     alg ┴ CanonicalDistance()
+       │      │   alg ┼ KruskalTree
+       │      │       │     args ┼ Tuple{}: ()
+       │      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │      │     n ┴ Int64: 1
+       │   ct ┼ DegreeCentrality
+       │      │     kind ┼ Int64: 0
+       │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
      B ┼ MinValue()
-  comp ┴ LEQ: LEQ()
+  comp ┴ typeof(<=): <=
 ```
 
 # Related
@@ -539,8 +539,7 @@ struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
     end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                              B::Num_VecToScaM = MinValue(),
-                              comp::ComparisonOperator = LEQ())
+                              B::Num_VecToScaM = MinValue(), comp::ComparisonOperator = <=)
     return CentralityConstraint(A, B, comp)
 end
 const VecCC = AbstractVector{<:CentralityConstraint}

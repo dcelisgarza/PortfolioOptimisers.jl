@@ -64,24 +64,24 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees}, args...;
+                                  pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                   kwargs...)
-    return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, plg, fees, args...;
+    return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, pl, fees, args...;
                                  kwargs...)
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::VecRM,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees}, args...;
+                                  pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                   kwargs...)
     for (i, r) in enumerate(rs)
-        set_risk_constraints!(model, Symbol(key, i), r, opt, pr, plg, fees, args...;
+        set_risk_constraints!(model, Symbol(key, i), r, opt, pr, pl, fees, args...;
                               kwargs...)
     end
     return nothing
 end
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC},
+                                    pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                     fees::Option{<:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
@@ -200,8 +200,8 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         JuMP.unregister(model, :bdvariance_risk)
     end
 
-    risk_expr = set_risk_tr_constraints!(Symbol(:triv_, i, :_), model, r, opt, pr, plg,
-                                         fees, args...; kwargs...)
+    risk_expr = set_risk_tr_constraints!(Symbol(:triv_, i, :_), model, r, opt, pr, pl, fees,
+                                         args...; kwargs...)
 
     if (!variance_flag && haskey(model, :variance_flag)) || haskey(model, :oldvariance_flag)
         model[Symbol(:triv_, i, :_variance_flag)] = model[:variance_flag]
@@ -426,7 +426,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees}, args...;
+                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
@@ -436,7 +436,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     model[:oldw] = model[:w]
     JuMP.unregister(model, :w)
     model[:w] = JuMP.@expression(model, w - wb * k)
-    tracking_risk = set_triv_risk_constraints!(model, i, ri, opt, pr, plg, fees, args...;
+    tracking_risk = set_triv_risk_constraints!(model, i, ri, opt, pr, pl, fees, args...;
                                                kwargs...)
     model[Symbol(:triv_, i, :_w)] = model[:w]
     model[:w] = model[:oldw]
@@ -446,7 +446,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult, plg::Option{<:PhC_VecPhC},
+                                    pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
                                     fees::Option{<:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
@@ -486,8 +486,8 @@ function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         JuMP.unregister(model, :ceucs_variance)
     end
 
-    risk_expr = set_risk_tr_constraints!(Symbol(:trdv_, i, :_), model, r, opt, pr, plg,
-                                         fees, args...; kwargs...)
+    risk_expr = set_risk_tr_constraints!(Symbol(:trdv_, i, :_), model, r, opt, pr, pl, fees,
+                                         args...; kwargs...)
 
     if (!variance_flag && haskey(model, :variance_flag)) || haskey(model, :oldvariance_flag)
         model[Symbol(:trdv_, i, :_variance_flag)] = model[:variance_flag]
@@ -564,7 +564,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:DependentVariableTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               plg::Option{<:PhC_VecPhC}, fees::Option{<:Fees}, args...;
+                               pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
                                kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
@@ -573,7 +573,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     k = model[:k]
     sc = model[:sc]
     tracking_risk = model[key] = JuMP.@variable(model)
-    risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, plg, fees, args...;
+    risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, pl, fees, args...;
                                            kwargs...)
     dr = model[Symbol(:rdr_, i)] = JuMP.@expression(model, risk_expr - rb * k)
     model[Symbol(:crtr_noc_, i)] = JuMP.@constraint(model,

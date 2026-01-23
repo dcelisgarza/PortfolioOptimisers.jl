@@ -47,8 +47,7 @@ function ExcessExpectedReturns(;
                                rf::Number = 0.0)
     return ExcessExpectedReturns(me, rf)
 end
-function factory(me::ExcessExpectedReturns,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(me::ExcessExpectedReturns, w::StatsBase.AbstractWeights)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """

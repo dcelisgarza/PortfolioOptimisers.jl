@@ -59,8 +59,6 @@ This method computes the expected returns as the sample mean of the input data `
 # Examples
 
 ```jldoctest
-julia> using StatsBase
-
 julia> X = [0.01 0.02; 0.03 0.04];
 
 julia> ser = SimpleExpectedReturns()
@@ -71,9 +69,7 @@ julia> mean(ser, X)
 1×2 Matrix{Float64}:
  0.02  0.03
 
-julia> w = Weights([0.2, 0.8]);
-
-julia> serw = SimpleExpectedReturns(; w = w)
+julia> serw = SimpleExpectedReturns(; w = StatsBase.Weights([0.2, 0.8]))
 SimpleExpectedReturns
   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
 
@@ -97,26 +93,20 @@ function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kw
     end
 end
 """
-    factory(me::SimpleExpectedReturns, w::Option{<:StatsBase.AbstractWeights} = nothing)
+    factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
 
-Create a new `SimpleExpectedReturns` estimator with updated observation weights.
+Create a new `SimpleExpectedReturns` estimator with observation weights `w`.
 
-This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionally replacing the weights stored in the input estimator with the provided weights. If `w` is `nothing`, the weights from `me` are used.
+This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing the weights stored in the input estimator with the provided weights.
 
 # Arguments
 
-  - `me`: Existing `SimpleExpectedReturns` estimator.
-  - `w`: Optional observation weights to use in the new estimator. If `nothing`, uses `me.w`.
+  - $(glossary[:me])
+  - $(glossary[:ow])
 
 # Returns
 
-  - `me::SimpleExpectedReturns`: New estimator with updated weights.
-
-# Details
-
-  - Returns a new estimator, preserving the type and updating weights as specified.
-  - If `w` is not `nothing`, the weights from `me` are used.
-  - Validates that weights are non-empty and finite.
+  - `me::SimpleExpectedReturns`: New estimator with observation weights `w`.
 
 # Related
 
@@ -124,9 +114,8 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, optionall
   - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function factory(me::SimpleExpectedReturns,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return SimpleExpectedReturns(; w = ifelse(isnothing(w), me.w, w))
+function factory(::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
+    return SimpleExpectedReturns(; w = w)
 end
 
 export SimpleExpectedReturns, mean

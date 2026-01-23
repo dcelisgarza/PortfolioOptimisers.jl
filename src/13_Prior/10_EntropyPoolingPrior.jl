@@ -1,4 +1,55 @@
 """
+    struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
+        vars::T1
+        coef::T2
+        op::T3
+        rhs::T4
+        eqn::T5
+        ij::T6
+    end
+
+Structured result for correlation view constraint equation parsing.
+
+`RhoParsingResult` is produced when parsing correlation view constraints, such as those used in entropy pooling prior models. It extends the standard [`ParsingResult`](@ref) by including an `ij` field, which stores the tuple of asset pairs (indices) relevant for the correlation view.
+
+# Fields
+
+  - `vars`: Vector of variable names as strings.
+  - `coef`: Vector of coefficients.
+  - `op`: The comparison operator as a string.
+  - `rhs`: The right-hand side value.
+  - `eqn`: The formatted equation string.
+  - `ij`: Tuple or vector of asset index pairs for correlation views.
+
+# Details
+
+  - Produced by correlation view parsing routines, typically when the constraint involves asset pairs (e.g., `"(A, B) == 0.5"`).
+  - The `ij` field enables downstream routines to map parsed correlation views to the appropriate entries in the correlation matrix.
+  - Used internally for entropy pooling, Black-Litterman, and other advanced portfolio models that support correlation views.
+
+# Related
+
+  - [`AbstractParsingResult`](@ref)
+  - [`ParsingResult`](@ref)
+  - [`replace_prior_views`](@ref)
+"""
+struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
+    vars::T1
+    coef::T2
+    op::T3
+    rhs::T4
+    eqn::T5
+    ij::T6
+    function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
+                              eqn::AbstractString,
+                              ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
+                                                         <:Tuple{<:VecInt, <:VecInt}}})
+        @argcheck(length(vars) == length(coef), DimensionMismatch)
+        return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
+                   typeof(ij)}(vars, coef, op, rhs, eqn, ij)
+    end
+end
+"""
     abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
 
 Abstract supertype for entropy pooling optimisers.
@@ -419,13 +470,13 @@ EntropyPoolingPrior
               │           │      │       │    w ┴ nothing
               │           │      │   alg ┴ Full()
               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-              │           │      │       pdm ┼ Posdef
-              │           │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton      
-              │           │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-              │           │      │   denoise ┼ nothing
-              │           │      │    detone ┼ nothing
-              │           │      │       alg ┼ nothing
-              │           │      │     order ┴ DenoiseDetoneAlg()
+              │           │      │     pdm ┼ Posdef
+              │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+              │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+              │           │      │      dn ┼ nothing
+              │           │      │      dt ┼ nothing
+              │           │      │     alg ┼ nothing
+              │           │      │   order ┴ DenoiseDetoneAlg()
               │        me ┼ SimpleExpectedReturns
               │           │   w ┴ nothing
               │   horizon ┴ nothing
@@ -583,15 +634,14 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     end
 end
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(pe::EntropyPoolingPrior, w::StatsBase.AbstractWeights)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
                                kt_views = pe.kt_views, rho_views = pe.rho_views,
                                var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
-                               opt = pe.opt, w = nothing_scalar_array_selector(pe.w, w),
-                               alg = pe.alg)
+                               opt = pe.opt, w = w, alg = pe.alg)
 end
 """
     add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Symbol)
@@ -2192,6 +2242,6 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                          f_w = !isnothing(rr) ? w1 : nothing)
 end
 
-export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior, H0_EntropyPooling,
-       H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling,
-       CVaREntropyPooling
+export RhoParsingResult, LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior,
+       H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling,
+       OptimEntropyPooling, CVaREntropyPooling

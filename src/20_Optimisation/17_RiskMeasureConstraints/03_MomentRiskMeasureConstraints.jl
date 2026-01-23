@@ -89,8 +89,6 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, facto
     factor = sqrt(factor)
     return model[key] = JuMP.@expression(model, factor * tsecond_moment), factor
 end
-"""
-"""
 function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Number)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end

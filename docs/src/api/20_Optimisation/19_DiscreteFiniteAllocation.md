@@ -1,5 +1,1 @@
 # Discrete allocation
-
-```@docs
-DiscreteAllocation
-```

@@ -68,7 +68,7 @@ pr = prior(EmpiricalPrior(), rd)
 Let's create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
 
 ````@example 03_Efficient_Frontier
-opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+opt = JuMPOptimiser(; pr = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
 ````
 
 We can now use `opt` to create the `MeanRisk` estimator. In order to get the entire frontier, we need to minimise the risk (which is the default value).
@@ -106,7 +106,7 @@ The efficient frontier is just a special case of a pareto front, we have a funct
 ````@example 03_Efficient_Frontier
 # Risk-free rate of 4.2/100/252
 plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
-              c = RatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
+              c = ReturnRiskRatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 ````
@@ -120,6 +120,6 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 ````
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

@@ -3,7 +3,7 @@
 
 Abstract supertype for all shrunk expected returns estimators in PortfolioOptimisers.jl.
 
-All concrete types implementing shrinkage-based expected returns estimation algorithms should subtype `AbstractShrunkExpectedReturnsEstimator`. This enables a consistent interface for shrinkage estimators throughout the package.
+All concrete types implementing shrinkage-based expected returns estimation algorithms should subtype `AbstractShrunkExpectedReturnsEstimator`.
 
 # Related
 
@@ -245,17 +245,17 @@ ShrunkExpectedReturns
       │      │    me ┼ SimpleExpectedReturns
       │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
       │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │      │       pdm ┼ Posdef
-      │      │           │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │      │           │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      │   denoise ┼ nothing
-      │      │    detone ┼ nothing
-      │      │       alg ┼ nothing
-      │      │     order ┴ DenoiseDetoneAlg()
+      │      │     pdm ┼ Posdef
+      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      │      dn ┼ nothing
+      │      │      dt ┼ nothing
+      │      │     alg ┼ nothing
+      │      │   order ┴ DenoiseDetoneAlg()
   alg ┼ JamesStein
       │   tgt ┴ GrandMean()
 ```
@@ -441,8 +441,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns,
-                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+function factory(ce::ShrunkExpectedReturns, w::StatsBase.AbstractWeights)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)
 end

@@ -7,10 +7,6 @@ These types and functions implement the various existing formulations and risk m
 ```@docs
 AbstractOrderedWeightsArrayEstimator
 AbstractOrderedWeightsArrayAlgorithm
-SquaredOrderedWeightsArrayAlgorithm
-UnionAllSOCRiskExpr
-UnionSOCRiskExpr
-UnionRSOCSOCRiskExpr
 MaximumEntropy
 MinimumSquaredDistance
 MinimumSumSquares
