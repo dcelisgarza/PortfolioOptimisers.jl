@@ -1,5 +1,5 @@
 abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
-abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
+abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end

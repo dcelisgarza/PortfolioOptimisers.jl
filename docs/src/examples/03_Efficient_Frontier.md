@@ -120,6 +120,6 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 ````
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

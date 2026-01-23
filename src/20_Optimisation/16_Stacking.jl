@@ -1,5 +1,6 @@
-abstract type BaseStackingOptimisationEstimator <: OptimisationEstimator end
-struct StackingResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: OptimisationResult
+abstract type BaseStackingOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+struct StackingResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
+       NonFiniteAllocationOptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -27,10 +28,10 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     ex::T9
     fb::T10
     function Stacking(pr::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                      opti::VecOptE_Opt, opto::OptimisationEstimator,
+                      opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
                       cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
                       strict::Bool, ex::FLoops.Transducers.Executor,
-                      fb::Option{<:OptimisationEstimator})
+                      fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         assert_external_optimiser(opto)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -47,11 +48,11 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
 end
 function Stacking(; pr::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   sets::Option{<:AssetSets} = nothing, opti::VecOptE_Opt,
-                  opto::OptimisationEstimator,
+                  opto::NonFiniteAllocationOptimisationEstimator,
                   cv::Option{<:CrossValidationEstimator} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                  fb::Option{<:OptimisationEstimator} = nothing)
+                  fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return Stacking(pr, wb, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_external_optimiser(opt::Stacking)
@@ -87,7 +88,7 @@ function _optimise(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
-    resi = Vector{OptimisationResult}(undef, Ni)
+    resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
         res = optimise(opt, rd; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)

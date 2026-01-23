@@ -2,12 +2,15 @@ abstract type AbstractOptimisationEstimator <: AbstractEstimator end
 const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
+abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
-const VecOpt = AbstractVector{<:OptimisationResult}
+abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
+const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
-const OptE_Opt = Union{<:OptimisationEstimator, <:OptimisationResult}
+const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
+                       <:NonFiniteAllocationOptimisationResult}
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
@@ -173,7 +176,7 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
-struct SingletonOptimisation{T1} <: OptimisationResult
+struct SingletonOptimisation{T1} <: NonFiniteAllocationOptimisationResult
     retcode::T1
     function SingletonOptimisation(retcode::OptimisationReturnCode)
         return new{typeof(retcode)}(retcode)
@@ -208,10 +211,10 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)
 end
-function assert_internal_optimiser(::OptimisationResult)
+function assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
     return nothing
 end
-function assert_external_optimiser(::OptimisationResult)
+function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
     return nothing
 end
 function generate_grouped_returns_result(rd::ReturnsResult, pr::AbstractPriorResult,
@@ -221,11 +224,12 @@ function generate_grouped_returns_result(rd::ReturnsResult, pr::AbstractPriorRes
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = pr.X * wi, nf = rd.nf,
                          F = rd.F, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
-function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
-                                         pr::AbstractPriorResult, wi::MatNum, resi::VecOpt;
-                                         kwargs...)
+function predict_outer_estimator_returns(opt::NonFiniteAllocationOptimisationEstimator,
+                                         rd::ReturnsResult, pr::AbstractPriorResult,
+                                         wi::MatNum, resi::VecOpt; kwargs...)
     return generate_grouped_returns_result(rd, pr, wi)
 end
+# function validate_prior()
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,

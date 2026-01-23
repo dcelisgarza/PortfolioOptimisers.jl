@@ -22,3 +22,5 @@ sparsification
 Gini
 Distributionally
 Brinson
+scalarisation
+JuMP

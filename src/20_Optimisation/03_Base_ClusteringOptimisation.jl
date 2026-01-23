@@ -1,6 +1,7 @@
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
-abstract type ClusteringOptimisationEstimator <: OptimisationEstimator end
-struct HierarchicalResult{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
+abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+struct HierarchicalResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
+       NonFiniteAllocationOptimisationResult
     oe::T1
     pr::T2
     clr::T3

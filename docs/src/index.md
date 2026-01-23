@@ -764,17 +764,25 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 ##### Objective function optimisations
 
+These optimisations support a variety of objective functions.
+
 - Objective functions
   - Minimum risk [`MinimumRisk`]-(@ref)
   - Maximum utility [`MaximumUtility`]-(@ref)
   - Maximum return over risk ratio [`MaximumRatio`]-(@ref)
   - Maximum return [`MaximumReturn`]-(@ref)
+- Exclusive to [`MeanRisk`]-(@ref) and [`NearOptimalCentering`]-(@ref)
+  - N-dimensional Pareto fronts [`Frontier`](@ref)
+    - Return based
+    - Risk based
 - Optimisation estimators
   - Mean-Risk [`MeanRisk`]-(@ref) returns a [`MeanRiskResult`]-(@ref)
-  - Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
   - Near Optimal Centering [`NearOptimalCentering`]-(@ref) returns a [`NearOptimalCenteringResult`]-(@ref)
+  - Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
 
 ##### Risk budgeting optimisations
+
+These optimisations attempt to achieve weight values according to a risk budget vector. This vector can be provided on a per asset or per factor basis.
 
 - Budget targets
   - Asset risk budgeting [`AssetRiskBudgeting`]-(@ref)
@@ -782,7 +790,7 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 - Optimisation estimators
   - Risk Budgeting [`RiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
   - Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
-    - Relaxed risk budgetting types
+    - Relaxed risk budgeting types
       - Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
       - Regularised [`RegularisedRelaxedRiskBudgeting`]-(@ref)
       - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(@ref)
@@ -830,16 +838,17 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 - Regularisation penalty
   - L1
   - L2
-- N-dimensional Pareto fronts [`Frontier`](@ref)
-  - Return based
-  - Risk based
 
 #### [Clustering](@id readme-clustering-opt)
 
+Clustering optimisations make use of asset relationships to either minimise the risk exposure by breaking the asset universe into subsets which are hierarchically or individually optimised.
+
 ##### Hierarchical clustering optimisations
 
-- Hierarchical Risk Parity [`HierarchicalRiskParity`]-(@ref)
-- Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`]-(@ref)
+These optimisations minimise risk by hierarchically splitting the asset universe into subsets, computing the risk of each subset, and combining them according to their hierarchy.
+
+- Hierarchical Risk Parity [`HierarchicalRiskParity`]-(@ref) returns a [`HierarchicalResult`]-(@ref)
+- Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`]-(@ref) returns a [`HierarchicalResult`]-(@ref)
 
 ###### Hierarchical clustering optimisation features
 
@@ -860,7 +869,9 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 ##### Schur complementary optimisation
 
-- Schur Complementary Hierarchical Risk Parity [`SchurComplementHierarchicalRiskParity`]-(@ref)
+Schur complementary hierarchical risk parity provides a bridge between mean variance optimisation and hierarchical risk parity by using an interpolation parameter. It converges to hierarchical risk parity, and approximates mean variance by adjusting this parameter. It uses the Schur complement to adjust the weights of a portfolio according to how much more useful information is gained by assigning more weight to a group of assets.
+
+- Schur Complementary Hierarchical Risk Parity [`SchurComplementHierarchicalRiskParity`]-(@ref) returns a [`SchurComplementHierarchicalRiskParityResult`]-(@ref)
 
 ###### Schur complementary optimisation features
 
@@ -877,7 +888,9 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 ##### Clustering optimisation
 
-- Nested Clustered [`NestedClustered`]-(@ref)
+Nested clustered optimisation breaks the asset universe into smaller subsets and treats every subset as an individual portfolio. Then it creates a synthetic asset out of each portfolio, optimises the portfolio of synthetic assets. The final weights are the inner product between the individual portfolio weights and outer portfolio.
+
+- Nested Clustered [`NestedClustered`]-(@ref) returns a [`NestedClusteredResult`]-(@ref)
 
 ##### Clustering optimisation features
 
@@ -895,7 +908,9 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 #### Ensemble optimisation
 
-- Stacking
+These work similar to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided, all of which are optimised, and each result is treated as a synthetic asset from which a synthetic portfolio is created and optimised according to an outer estimator. The final weights are the inner product between the individual portfolio weights and outer portfolio.
+
+- Stacking [`Stacking`]-(@ref) returns a [`StackingResult`]-(@ref)
 
 ##### Ensemble optimisation features
 
@@ -913,8 +928,18 @@ These optimisations are implemented as `JuMP` problems and make use of [`JuMPOpt
 
 #### Finite allocation optimisation
 
-- Discrete
-- Greedy
+Unlike all other estimators, finite allocation does not yield an "optimal" value, but rather the optimal attainable solution based on a finite amount of capital. They use the result of other estimations, the latest prices, and a cash amount.
+
+- Discrete (MIP) [`DiscreteAllocation`]-(@ref)
+  - Weight finalisers
+    - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+    - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+      - Error formulations
+        - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+        - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+        - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+        - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+- Greedy [`GreedyAllocation`]
 
 ### Plotting
 

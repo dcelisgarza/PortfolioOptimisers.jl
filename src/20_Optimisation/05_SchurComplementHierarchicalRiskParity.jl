@@ -1,6 +1,6 @@
 const Sd_Var = Union{<:StandardDeviation, <:Variance}
 struct SchurComplementHierarchicalRiskParityResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
-       OptimisationResult
+       NonFiniteAllocationOptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -67,7 +67,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
     fb::T3
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
-                                                   fb::Option{<:OptimisationEstimator})
+                                                   fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params))
         end
@@ -77,7 +77,7 @@ end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),
-                                               fb::Option{<:OptimisationEstimator} = nothing)
+                                               fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)

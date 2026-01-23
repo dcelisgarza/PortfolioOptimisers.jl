@@ -2,7 +2,7 @@ abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct NearOptimalCenteringResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       OptimisationResult
+       NonFiniteAllocationOptimisationResult
     oe::T1
     pa::T2
     w_min_retcode::T3
@@ -50,7 +50,7 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                                   w_opt_ini::Option{<:VecNum_VecVecNum},
                                   w_max::Option{<:VecNum}, w_max_ini::Option{<:VecNum},
                                   ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
-                                  fb::Option{<:OptimisationEstimator})
+                                  fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
@@ -107,7 +107,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               w_max::Option{<:VecNum} = nothing,
                               w_max_ini::Option{<:VecNum} = nothing, ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
-                              fb::Option{<:OptimisationEstimator} = nothing)
+                              fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
@@ -380,8 +380,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:UnconstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
                     opt::BaseJuMPOptimisationEstimator)
-    retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
-    sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
+    retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
+    sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
     for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
         unregister_noc_variables!(model)
         set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
@@ -476,8 +476,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
              Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
-    retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
-    sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
+    retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
+    sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
     sc = model[:sc]
     for (keys, r_exprs, ubs, rk_opt, rt_opt) in
         zip(pitrs[1], pitrs[2], pitrs[3], rk_opts, rt_opts)

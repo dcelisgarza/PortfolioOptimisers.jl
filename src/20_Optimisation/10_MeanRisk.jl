@@ -1,4 +1,4 @@
-struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: NonFiniteAllocationOptimisationResult
     oe::T1
     pa::T2
     retcode::T3
@@ -27,7 +27,8 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     wi::T4
     fb::T5
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
-                      wi::Option{<:VecNum}, fb::Option{<:OptimisationEstimator})
+                      wi::Option{<:VecNum},
+                      fb::Option{<:NonFiniteAllocationOptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -40,7 +41,7 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
-                  fb::Option{<:OptimisationEstimator} = nothing)
+                  fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
 end
 function opt_view(mr::MeanRisk, i, X::MatNum)
