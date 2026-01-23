@@ -14,10 +14,10 @@
 
 ## Welcome to PortfolioOptimisers.jl
 
-[`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
+ [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
 
-> [!CAUTION]
-> Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
+!!! Danger
+    Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
 Portfolio optimisation is the science of either:
 
@@ -30,7 +30,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/01_Getting_Started) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs.
+For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs.
 
 ## Caveat emptor
 
@@ -44,13 +44,21 @@ For more information on the package's *vast* feature list, please check out the 
 `PortfolioOptimisers.jl` is a registered package, so installation is as simple as:
 
 ```julia
+julia> using Pkg
+
 julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
-using Pkg
 ```
 
-## Quickstart
+## Quick-start
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/01_Getting_Started) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) contains toy examples of the many, many features.
+The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs contain toy examples of the many, many features.
+
+First we import the packages we will need for the example.
+
+- `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
+- `Clarabel` and `HiGHS` are the optimisers we will use.
+- `YFinance` and `TimeSeries` for downloading and preprocessing price data.
+- `PrettyTables` and `DataFrames` for displaying the results.
 
 ```julia
 # Import module and plotting extension.
@@ -119,30 +127,232 @@ pretty_table(prices[(end - 5):end]; formatters = [fmt1])
 
 # Compute the returns.
 rd = prices_to_returns(prices)
+#=
+ReturnsResult
+    nx ┼ 20-element Vector{String}
+     X ┼ 440×20 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    ts ┼ 440-element Vector{DateTime}
+    iv ┼ nothing
+  ivpa ┴ nothing
+=#
 
 # Define the continuous solver.
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false, "max_step_fraction" => 0.9),
              check_sol = (; allow_local = true, allow_almost = true))
+#=
+Solver
+         name ┼ Symbol: :clarabel1
+       solver ┼ UnionAll: Clarabel.MOIwrapper.Optimizer
+     settings ┼ Dict{String, Real}: Dict{String, Real}("verbose" => false, "max_step_fraction" => 0.9)
+    check_sol ┼ @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+  add_bridges ┴ Bool: true
+=#
 
-# Vanilla (Markowitz) mean risk optimisation.
-mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+# `PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a `JuMPOptimiser` structure which defines general solver constraints. This structure in turn requires an instance (or vector) of `Solver`.
+opt = JuMPOptimiser(; slv = slv);
+
+# Vanilla (Markowitz) mean risk optimisation, i.e. minimum variance portfolio
+mr = MeanRisk(; opt = opt)
+#=
+MeanRisk
+  opt ┼ JuMPOptimiser
+      │       pr ┼ EmpiricalPrior
+      │          │        ce ┼ PortfolioOptimisersCovariance
+      │          │           │   ce ┼ Covariance
+      │          │           │      │    me ┼ SimpleExpectedReturns
+      │          │           │      │       │   w ┴ nothing
+      │          │           │      │    ce ┼ GeneralCovariance
+      │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │          │           │      │       │    w ┴ nothing
+      │          │           │      │   alg ┴ Full()
+      │          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │          │           │      │     pdm ┼ Posdef
+      │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │          │           │      │      dn ┼ nothing
+      │          │           │      │      dt ┼ nothing
+      │          │           │      │     alg ┼ nothing
+      │          │           │      │   order ┴ DenoiseDetoneAlg()
+      │          │        me ┼ SimpleExpectedReturns
+      │          │           │   w ┴ nothing
+      │          │   horizon ┴ nothing
+      │      slv ┼ Solver
+      │          │          name ┼ Symbol: :clarabel1
+      │          │        solver ┼ UnionAll: Clarabel.MOIwrapper.Optimizer
+      │          │      settings ┼ Dict{String, Real}: Dict{String, Real}("verbose" => false, "max_step_fraction" => 0.9)
+      │          │     check_sol ┼ @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+      │          │   add_bridges ┴ Bool: true
+      │       wb ┼ WeightBounds
+      │          │   lb ┼ Float64: 0.0
+      │          │   ub ┴ Float64: 1.0
+      │      bgt ┼ Float64: 1.0
+      │     sbgt ┼ nothing
+      │       lt ┼ nothing
+      │       st ┼ nothing
+      │      lcs ┼ nothing
+      │       ct ┼ nothing
+      │    gcard ┼ nothing
+      │   sgcard ┼ nothing
+      │     smtx ┼ nothing
+      │    sgmtx ┼ nothing
+      │      slt ┼ nothing
+      │      sst ┼ nothing
+      │     sglt ┼ nothing
+      │     sgst ┼ nothing
+      │       tn ┼ nothing
+      │     fees ┼ nothing
+      │     sets ┼ nothing
+      │       tr ┼ nothing
+      │       pl ┼ nothing
+      │      ret ┼ ArithmeticReturn
+      │          │   ucs ┼ nothing
+      │          │    lb ┼ nothing
+      │          │    mu ┴ nothing
+      │      sca ┼ SumScalariser()
+      │     ccnt ┼ nothing
+      │     cobj ┼ nothing
+      │       sc ┼ Int64: 1
+      │       so ┼ Int64: 1
+      │       ss ┼ nothing
+      │     card ┼ nothing
+      │    scard ┼ nothing
+      │      nea ┼ nothing
+      │       l1 ┼ nothing
+      │       l2 ┼ nothing
+      │   strict ┴ Bool: false
+    r ┼ Variance
+      │   settings ┼ RiskMeasureSettings
+      │            │   scale ┼ Float64: 1.0
+      │            │      ub ┼ nothing
+      │            │     rke ┴ Bool: true
+      │      sigma ┼ nothing
+      │       chol ┼ nothing
+      │         rc ┼ nothing
+      │        alg ┴ SquaredSOCRiskExpr()
+  obj ┼ MinimumRisk()
+   wi ┼ nothing
+   fb ┴ nothing
+=#
 
 # Perform the optimisation, res.w contains the optimal weights.
 res = optimise(mr, rd)
+#=
+MeanRiskResult
+       oe ┼ DataType: DataType
+       pa ┼ ProcessedJuMPOptimiserAttributes
+          │       pr ┼ LowOrderPrior
+          │          │         X ┼ 440×20 Matrix{Float64}
+          │          │        mu ┼ 20-element Vector{Float64}
+          │          │     sigma ┼ 20×20 Matrix{Float64}
+          │          │      chol ┼ nothing
+          │          │         w ┼ nothing
+          │          │       ens ┼ nothing
+          │          │       kld ┼ nothing
+          │          │        ow ┼ nothing
+          │          │        rr ┼ nothing
+          │          │      f_mu ┼ nothing
+          │          │   f_sigma ┼ nothing
+          │          │       f_w ┴ nothing
+          │       wb ┼ WeightBounds
+          │          │   lb ┼ 20-element StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+          │          │   ub ┴ 20-element StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+          │       lt ┼ nothing
+          │       st ┼ nothing
+          │      lcs ┼ nothing
+          │       ct ┼ nothing
+          │    gcard ┼ nothing
+          │   sgcard ┼ nothing
+          │     smtx ┼ nothing
+          │    sgmtx ┼ nothing
+          │      slt ┼ nothing
+          │      sst ┼ nothing
+          │     sglt ┼ nothing
+          │     sgst ┼ nothing
+          │       tn ┼ nothing
+          │     fees ┼ nothing
+          │       pl ┼ nothing
+          │      ret ┼ ArithmeticReturn
+          │          │   ucs ┼ nothing
+          │          │    lb ┼ nothing
+          │          │    mu ┴ nothing
+  retcode ┼ OptimisationSuccess
+          │   res ┴ Dict{Any, Any}: Dict{Any, Any}()
+      sol ┼ JuMPOptimisationSolution
+          │   w ┴ 20-element Vector{Float64}
+    model ┼ A JuMP Model
+          │ ├ solver: Clarabel
+          │ ├ objective_sense: MIN_SENSE
+          │ │ └ objective_function_type: JuMP.QuadExpr
+          │ ├ num_variables: 21
+          │ ├ num_constraints: 4
+          │ │ ├ JuMP.AffExpr in MOI.EqualTo{Float64}: 1
+          │ │ ├ Vector{JuMP.AffExpr} in MOI.Nonnegatives: 1
+          │ │ ├ Vector{JuMP.AffExpr} in MOI.Nonpositives: 1
+          │ │ └ Vector{JuMP.AffExpr} in MOI.SecondOrderCone: 1
+          │ └ Names registered in the model
+          │   └ :G, :bgt, :dev_1, :dev_1_soc, :k, :lw, :obj_expr, :ret, :risk, :risk_vec, :sc, :so, :variance_flag, :variance_risk_1, :w, :w_lb, :w_ub
+       fb ┴ nothing
+=#
 
 # Define the MIP solver for finite discrete allocation.
 mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false),
-                 check_sol = (; allow_local = true, allow_almost = true))
+                 check_sol = (; allow_local = true, allow_almost = true));
 
 # Discrete finite allocation.
 da = DiscreteAllocation(; slv = mip_slv)
+#=
+DiscreteAllocation
+  slv ┼ Solver
+      │          name ┼ Symbol: :highs1
+      │        solver ┼ DataType: DataType
+      │      settings ┼ Dict{String, Bool}: Dict{String, Bool}("log_to_console" => 0)
+      │     check_sol ┼ @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+      │   add_bridges ┴ Bool: true
+   sc ┼ Int64: 1
+   so ┼ Int64: 1
+   wf ┼ AbsoluteErrorWeightFinaliser()
+   fb ┼ GreedyAllocation
+      │     unit ┼ Int64: 1
+      │     args ┼ Tuple{}: ()
+      │   kwargs ┼ @NamedTuple{}: NamedTuple()
+      │       fb ┴ nothing
+=#
 
 # Perform the finite discrete allocation, uses the final asset
 # prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
 mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
+#=
+DiscreteAllocationResult
+         oe ┼ DataType: DataType
+    retcode ┼ OptimisationSuccess
+            │   res ┴ nothing
+  s_retcode ┼ nothing
+  l_retcode ┼ OptimisationSuccess
+            │   res ┴ Dict{Any, Any}: Dict{Any, Any}()
+     shares ┼ 20-element SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}
+       cost ┼ 20-element SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}
+          w ┼ 20-element SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}
+       cash ┼ Float64: 0.2000379800783776
+    s_model ┼ nothing
+    l_model ┼ A JuMP Model
+            │ ├ solver: HiGHS
+            │ ├ objective_sense: MIN_SENSE
+            │ │ └ objective_function_type: JuMP.AffExpr
+            │ ├ num_variables: 21
+            │ ├ num_constraints: 42
+            │ │ ├ JuMP.AffExpr in MOI.GreaterThan{Float64}: 1
+            │ │ ├ Vector{JuMP.AffExpr} in MOI.NormOneCone: 1
+            │ │ ├ JuMP.VariableRef in MOI.GreaterThan{Float64}: 20
+            │ │ └ JuMP.VariableRef in MOI.Integer: 20
+            │ └ Names registered in the model
+            │   └ :r, :sc, :so, :u, :x
+         fb ┴ nothing
+=#
 
 # View the results.
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
@@ -183,535 +393,745 @@ plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ![Fig. 1](./docs/src/assets/readme_1.svg)
 
 ```julia
-# Plot the risk contribution per asset.
+# Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the `factory` function (recommended when doing so programmatically), or manually set the quantities ourselves.
 plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
+
+# This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 ```
 
 ![Fig. 2](./docs/src/assets/readme_2.svg)
 
 ```julia
-# Plot histogram of returns.
+# We can also plot the returns' histogram and probability density.
 plot_histogram(mip_res.w, rd.X, slv)
 ```
 
 ![Fig. 3](./docs/src/assets/readme_3.svg)
 
 ```julia
-# Plot compounded drawdowns.
+# Plot compounded or uncompounded drawdowns. We use the former here.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
 ![Fig. 4](./docs/src/assets/readme_4.svg)
 
-## Caveats
+There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
-### Documentation
-
-- Mathematical formalism: I've got API documentation for a lot of features, but the mathematical formalisms aren't yet thoroughly explained. It's more of a high level view.
-- Citation needed: I haven't gone over all the citations for the docs because stabilising the API, adding new features, and writing the API docs has taken priority.
-- Docstring examples: some features require set up steps, and I haven't had the patience to do that. Mostly the examples are still mostly for doctesting my implementation of `Base.show` for my types, and showcasing low-hanging fruit of functionality.
-
-### API
-
-- Unstable: there will likely be breaking changes as I figure out better, more general ways to do things, or better naming conventions.
-
-### Internals
-
-- Dependencies: some deps are only used for certain small things, I may end up removing them in favour of having just the small bit of functionality the package needs. I'm very open to replacement suggestions.
+!!! Info
+    This section is under active development and any `<name>`-(TBA) lack docstrings. Some docstrings are also outdated, please refer to [Issue #58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
 
 ## Features
 
-The feature list is rather large, so I will attempt to summarise it ~~via interpretative dance~~ as best I can. There are also some experimental features (some tracking risk measures) that I'm not sure how well they'd perform, but they're interesting nonetheless, especially when used in clustering optimisations. Luckily, those haven't been documented yet, so I haven't had to reckon with the consequences of my actions just yet.
+### Preprocessing
 
-Without further ado, here is a summary of the features in this package.
+- Prices to returns [`prices_to_returns`] and [`ReturnsResult`]
+- Find complete indices [`find_complete_indices`]
+- Find uncorrelated indices [`find_uncorrelated_indices`]-(TBA)
 
-### Price data
+### Matrix Processing
 
-Every optimisation but the finite allocation work off of returns data. Some optimisations may use price data in the future.
-
-- Preprocessing to drop highly correlated and/or incomplete data. These are not well integrated yet, but the functions exist.
-- Computing them, validating and cleaning up data.
-
-### Co-moment matrix processing
-
-Price data is often noisy and follows general macroeconomic trends. Every optimisation model is at risk of overfitting the data. In particular, those which rely on summary statistics (moments) can be overly sensitive to the input data, for example a covariance matrix. It is therefore important to have methods that increase the robustness of their estimation.
-
-- Positive definite projection.
-
-- Matrix denoising.
-
-  - Spectral, shrunk, fixed.
-- Matrix detoning.
-
-### Moment estimation
-
-Many of these can be used in conjunction. For example, some covariance estimators use expected returns, or variance estimators in their calculation, and some expected returns use the covariance in turn. Also, some accept weight vectors.
-
-- Expected returns.
-
-  - Arithmetic expected returns.
-
-  - Shrunk expected returns.
-
-    - James-Stein, Bayes-Stein, Bodnar-Okhrin-Parolya. All of them with Grand Mean, Volatility Weighted, Mean Squared Error targets.
-  - Equilibrium expected returns.
-  - Excess expected returns.
-
-- Variance.
-- Covariance/Correlation matrix.
-
-  - Custom: estimator + processing pipeline.
-
-  - Pearson: weighted, unweighted, any `StatsBase.CovarianceEstimator`.
-
-    - Full.
-    - Semi.
-  - Gerber.
-
-    - Gerber 0, 1, 2. Standardised and unstandardised.
-  - Smyth-Broby.
-
-    - Smyth-Broby 0, 1, 2. Standardised and unstandardised.
-    - Smyth-Broby-Gerber 0, 1, 2. Standardised and unstandardised.
-  - Distance covariance.
-  - Lower tail dependence.
-  - Kendall.
-  - Spearman.
-  - Mutual information.
-
-    - Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-  - Denoised.
-  - Detoned.
-  - Custom algorithm.
-  - Coskewness.
-
-    - Full.
-    - Semi.
-  - Cokurtosis.
-
-    - Full.
-    - Semi.
-  - Implied volatility.
+- Positive definite projection [`Posdef`], [`posdef!`], [`posdef`]
+- Denoising [`Denoise`], [`denoise!`], [`denoise`]
+  - Spectral [`SpectralDenoise`]
+  - Fixed [`FixedDenoise`]
+  - Shrunk [`ShrunkDenoise`]
+- Detoning [`Detone`], [`detone!`], [`detone`]
+- Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`], [`matrix_processing!`], [`matrix_processing`], [`DenoiseDetoneAlg`], [`DenoiseAlgDetone`], [`DetoneDenoiseAlg`], [`DetoneAlgDenoise`], [`AlgDenoiseDetone`], [`AlgDetoneDenoise`]
 
 ### Regression Models
 
-Factor models and implied volatility use regression in their estimation.
+Factor prior models and implied volatility use [`regression`] in their estimation, which return a [`Regression`] object.
 
-- Stepwise.
+#### Regression targets
 
-  - Forward and Backward.
+- Linear model [`LinearModel`]
+- Generalised linear model [`GeneralisedLinearModel`]
 
-    - P-value, Corrected and "vanilla" Akaike info, Bayesian info, R-squared, and Adjusted R-squared criteria.
+#### Regression types
 
-- Dimensional reduction.
+- Stepwise [`StepwiseRegression`]
+  - Algorithms
+    - Forward [`Forward`]
+    - Backward [`Backward`]
+  - Selection criteria
+    - P-value [`PValue`]
+    - Akaike information criteria [`AIC`]
+    - Corrected Akaike information criteria [`AICC`]
+    - Bayesian information criteria [`BIC`]
+    - R-squared [`RSquared`]
+    - Adjusted R-squared criteria [`AdjustedRSquared`]
 
-  - Principal Component.
-  - Probabilistic Principal Component.
+- Dimensional reduction with custom mean and variance estimators [`DimensionReductionRegression`]
+  - Dimensional reduction targets
+    - Principal component [`PCA`]
+    - Probabilistic principal component [`PPCA`]
 
-### Ordered weights array and Linear moments
+### Moment Estimation
 
-- Ordered weights arrays.
+#### [Expected Returns](@id readme-expected-returns)
 
-  - Gini Mean Difference.
-  - Conditional Value at Risk.
-  - Weighted Conditional Value at Risk.
-  - Tail Gini.
-  - Worst Realisation.
-  - Range.
-  - Conditional Value at Risk Range.
-  - Weighted Conditional Value at Risk Range.
-  - Tail Gini Range.
+Overloads `Statistics.mean`.
 
-- Linear Moments Convex Risk Measure: linear moments can be combined using different minimisation targets.
+- Optionally weighted expected returns [`SimpleExpectedReturns`]
+- Equilibrium expected returns with custom covariance [`EquilibriumExpectedReturns`]
+- Excess expected returns with custom expected returns estimator [`ExcessExpectedReturns`]
+- Shrunk expected returns with custom expected returns and custom covariance estimators [`ShrunkExpectedReturns`]
+  - Algorithms
+    - James-Stein [`JamesStein`]
+    - Bayes-Stein [`BayesStein`]
+    - Bodnar-Okhrin-Parolya [`BodnarOkhrinParolya`]
+  - Targets: all algorithms can have any of the following targets
+    - Grand Mean [`GrandMean`]
+    - Volatility Weighted [`VolatilityWeighted`]
+    - Mean Squared Error [`MeanSquaredError`]
+- Standard deviation expected returns [`StandardDeviationExpectedReturns`]-(TBA)
 
-  - Normalised Constant Relative Risk Aversion.
-  - Minimum Squared Distance.
-  - Minimum Sum Squares.
+#### [Variance and Standard Deviation](@id readme-variance)
 
-### Distance Matrices
+Overloads `Statistics.var` and `Statistics.std`.
 
-Distance matrices are used for clustering. They are related to correlation distances, but all positive and with zero diagonal.
+- Optionally weighted variance with custom expected returns estimator [`SimpleVariance`]
 
-- Distance: these compare pairwise relationships.
-- Distance of distances: these are computed by applying a distance metric to every pair of columns/rows of the distance matrix. They compare the entire space and often give more stable clusters.
+#### [Covariance and Correlation](@id readme-covariance-correlation)
 
-Individual entries can be raised to an integer power and scaled according to whether that power is even or odd. The following methods can be used to compute distance matrices.
+Overloads `Statistics.cov` and `Statistics.cor`.
 
-- Simple.
+- Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`]
+- Covariance with custom covariance estimator [`Covariance`]
+  - Full covariance [`Full`]
+  - Semi (downside) covariance [`Semi`]
+- Gerber covariances with custom variance estimator [`GerberCovariance`]
+  - Unstandardised algorithms
+    - Gerber 0 [`Gerber0`]
+    - Gerber 1 [`Gerber1`]
+    - Gerber 2 [`Gerber2`]
+  - Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimator
+    - Gerber 0 [`StandardisedGerber0`]
+    - Gerber 1 [`StandardisedGerber1`]
+    - Gerber 2 [`StandardisedGerber2`]
+- Smyth-Broby extension of Gerber covariances with custom expected returns and variance estimators [`SmythBrobyCovariance`]
+  - Unstandardised algorithms
+    - Smyth-Broby 0 [`SmythBroby0`]
+    - Smyth-Broby 1 [`SmythBroby1`]
+    - Smyth-Broby 2 [`SmythBroby2`]
+    - Smyth-Broby-Gerber 0 [`SmythBrobyGerber0`]
+    - Smyth-Broby-Gerber 1 [`SmythBrobyGerber1`]
+    - Smyth-Broby-Gerber 2 [`SmythBrobyGerber2`]
+  - Standardised algorithms (Z-transforms the data beforehand)
+    - Smyth-Broby 0 [`StandardisedSmythBroby0`]
+    - Smyth-Broby 1 [`StandardisedSmythBroby1`]
+    - Smyth-Broby 2 [`StandardisedSmythBroby2`]
+    - Smyth-Broby-Gerber 0 [`StandardisedSmythBrobyGerber0`]
+    - Smyth-Broby-Gerber 1 [`StandardisedSmythBrobyGerber1`]
+    - Smyth-Broby-Gerber 2 [`StandardisedSmythBrobyGerber2`]
+- Distance covariance with custom distance estimator via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`]
+- Lower Tail Dependence covariance [`LowerTailDependenceCovariance`]
+- Rank covariances
+  - Kendall covariance [`KendallCovariance`]
+  - Spearman covariance [`SpearmanCovariance`]
+- Mutual information covariance with custom variance estimator and various binning algorithms [`MutualInfoCovariance`]
+  - [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
+    - Knuth's optimal bin width [`Knuth`]
+    - Freedman Diaconis bin width [`FreedmanDiaconis`]
+    - Scott's bin width [`Scott`]
+  - Hacine-Gharbi-Ravier bin width [`HacineGharbiRavier`]
+  - Predefined number of bins
+- Denoised covariance with custom covariance estimator [`DenoiseCovariance`]
+- Detoned covariance with custom covariance estimator [`DetoneCovariance`]
+- Custom processed covariance with custom covariance estimator [`ProcessedCovariance`]
+- Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`]-(TBA)
+  - Premium [`ImpliedVolatilityPremium`]-(TBA)
+  - Regression [`ImpliedVolatilityRegression`]-(TBA)
+- Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`]
+- Correlation covariance [`CorrelationCovariance`]-(TBA)
 
-- Absolute.
-- Logarithmic.
-- Correlation.
-- Variation of Information.
+#### [Coskewness](@id readme-coskewness)
 
-  - Predefined, Hacine-Gharbi-Ravier, Knuth, Scott, Freedman-Draconis bin widths.
-- Canonical: depends on the covariance/correlation estimator used.
+Implements [`coskewness`].
+
+- Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`]
+  - Full coskewness [`Full`]
+  - Semi (downside) coskewness [`Semi`]
+
+#### [Cokurtosis](@id readme-cokurtosis)
+
+Implements [`cokurtosis`].
+
+- Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`]
+  - Full cokurtosis [`Full`]
+  - Semi (downside) cokurtosis [`Semi`]
+
+### Distance matrices
+
+Implements [`distance`] and [`cor_and_dist`].
+
+- First order distance estimator with custom distance algorithm, and optional exponent [`Distance`]
+- Second order distance estimator with custom pairwise distance algorithm from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), custom distance algorithm, and optional exponent [`DistanceDistance`]
+
+The distance estimators are used together with various distance matrix algorithms.
+
+- Simple distance [`SimpleDistance`]
+- Simple absolute distance [`SimpleAbsoluteDistance`]
+- Logarithmic distance [`LogDistance`]
+- Correlation distance [`CorrelationDistance`]
+- Variation of Information distance with various binning algorithms [`VariationInfoDistance`]
+  - [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html) provided bins
+    - Knuth's optimal bin width [`Knuth`]
+    - Freedman Diaconis bin width [`FreedmanDiaconis`]
+    - Scott's bin width [`Scott`]
+  - Hacine-Gharbi-Ravier bin width [`HacineGharbiRavier`]
+  - Predefined number of bins
+- Canonical distance [`CanonicalDistance`]
 
 ### Phylogeny
 
-These define asset relationships. They can be used to set constraints on and/or compute the relatedness of assets in a portfolio.
+`PortfolioOptimisers.jl` can make use of asset relationships to perform optimisations, define constraints, and compute relatedness characteristics of portfolios.
 
-- Clustering.
+#### Clustering
 
-  - Optimal number of clusters:
+Phylogeny constraints and clustering optimisations make use of clustering algorithms via [`ClustersEstimator`], [`Clusters`], and [`clusterise`]. Most clustering algorithms come from [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
 
-    - Predefined, Second order difference, Standardised silhouette scores.
+- Automatic choice of number of clusters via [`OptimalNumberClusters`] and [`VectorToScalarMeasure`]
+  - Second order difference [`SecondOrderDifference`]
+  - Silhouette scores [`SilhouetteScore`]
+  - Predefined number of clusters.
 
-  - Hierarchical clustering.
-  - Direct Bubble Hierarchy Trees.
+##### Hierarchical
 
-    - Local Global sparsification of the inverse covariance/correlation matrix.
+- Hierarchical clustering [`HClustAlgorithm`]
+- Direct Bubble Hierarchical Trees [`DBHT`] and Local Global sparsification of the covariance matrix [`LoGo`], [`logo!`], and [`logo`]-(TBA)
 
-- Phylogeny matrices.
+##### Non-hierarchical
 
-  - Network (Minimum Spanning Tree) adjacency.
-  - Clustering adjacency.
-- Centrality vectors and average centrality.
+Non-hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`]-(TBA) optimisations.
 
-  - Betweenness, Closeness, Degree, Eigenvector, Katz, Pagerank, Radiality, Stress centrality measures.
-- Asset phylogeny score.
+- K-means clustering [`KMeansAlgorithm`]-(TBA)
 
-### Constraint generation
+#### Networks
 
-These let users easily manually or programatically define optimisation constraints.
+##### Adjacency matrices
 
-- Equation parsing.
+Adjacency matrices encode asset relationships either with clustering or graph theory via [`phylogeny_matrix`] and [`PhylogenyResult`].
 
-- Linear weights.
-- Risk budget.
-- Asset set matrices.
-- Phylogeny.
+- Network adjacency [`NetworkEstimator`] with custom tree algorithms, covariance, and distance estimators
+  - Minimum spanning trees [`KruskalTree`], [`BoruvkaTree`], [`PrimTree`]
+  - Triangulated Maximally Filtered Graph with various similarity matrix estimators
+    - Maximum distance similarity [`MaximumDistanceSimilarity`]
+    - Exponential similarity [`ExponentialSimilarity`]
+    - General exponential similarity [`GeneralExponentialSimilarity`]
+- Clustering adjacency [`ClustersEstimator`] and [`Clusters`]
 
-  - Phylogeny matrix.
+##### Centrality and phylogeny measures
 
-    - Semi definite.
-    - Mixed integer programming.
-
-  - Centrality.
-- Weight bounds.
-- Buy-in threshold.
-
-### Prior statistics
-
-As previously mentioned, every optimisation but the finite allocation work off of returns data. These returns can be adjusted and summarised using these estimators. Like the moment estimators, these can be mixed in various ways.
-
-- Empirical.
-
-- Factor model.
-- High order moments (coskewness and cokurtosis).
-- Black-Litterman.
-
-  - Vanilla.
-  - Bayesian.
-  - Factor model.
-  - Augmented.
-- Entropy pooling.
-- Opinion pooling.
-
-### Uncertainty sets
-
-These sets can be used to make some optimisations more robust. Namely, there exist uncertainty sets on expected returns and covariance. They can be used on any optimisation which uses any one of these quantities.
-
-- Box.
-
-  - Delta.
-
-  - Normally distributed returns.
-  - Autoregressive Conditional Heteroskedasticity.
-
-    - Circular, moving, stationary bootstrap.
-
-- Ellipsoidal uncertainty sets.
-
-  - Normally distributed returns.
-
-  - Autoregressive Conditional Heteroskedasticity.
-
-    - Circular, moving, stationary bootstrap.
-
-### Turnover (Rebalancing)
-
-These penalise moving away from a benchmark vector of weights.
-
-- Risk measure (experimental).
-- Constraints.
-- Fees.
-
-### Fees
-
-These encode various types of fees, which can be used in portfolio optimisation and analysis.
-
-- Relative long.
-- Relative short
-- Fixed long.
-- Fixed short.
-- Turnover (rebalance).
-
-### Tracking
-
-These can be used to track the performance of an index, indicator, or portfolio.
-
-- Risk measure (experimental).
-- Constraints.
-
-There are four things that can be tracked.
-
-- Returns via L1 or L2 norm.
-
-  - Asset weights.
-  - Returns vector.
-
-- Risk tracking via asset weights.
-
-  - Dependent variables (experimental).
-  - Independent variables.
-
-### Risk measures
-
-Different optimisations support different risk measures, most measures can also be used to quantify a portfolio's risk-return characteristics.
-
-- Variance.
-
-- Risk Contribution Variance.
-
-  - Asset risk contribution.
-  - Factor risk contribution.
-- Uncertainty set variance.
-- Standard deviation.
-- First lower moment.
-- Second lower moment.
-
-  - Semi variance.
-  - Semi deviation.
-- Second central moment (historical returns, no covariance matrix).
-
-  - Variance.
-  - Standard deviation.
-- Mean absolute deviation.
-- Third lower moment (historical returns, no coskewness matrix).
-
-  - Standardised (semi skewness).
-  - Unstandardised.
-- Fourth lower moment (historical returns, no cokurtosis matrix).
-
-  - Standardised (semi kurtosis).
-  - Unstandardised.
-- Third central moment (historical returns, no coskewness matrix).
-
-  - Standardised (skewness).
-  - Unstandardised.
-- Fourth central moment (historical returns, no cokurtosis matrix).
-
-  - Standardised (kurtosis).
-  - Unstandardised.
-- Square root kurtosis.
-
-  - Full.
-  - Semi.
-- Negative skewness.
-
-  - Full.
-  - Semi (experimental).
-- Negative quadratic skewness.
-
-  - Full.
-  - Semi (experimental).
-- Value at Risk.
-- Conditional Value at Risk.
-- Distributionally Robust Conditional Value at Risk.
-- Entropic Value at Risk.
-- Relativistic Value at Risk.
-- Value at Risk Range.
-- Conditional Value at Risk Range.
-- Distributionally Robust Conditional Value at Risk Range.
-- Entropic Value at Risk Range.
-- Relativistic Value at Risk Range.
-- Drawdown at Risk.
-
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Conditional Drawdown at Risk.
-
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Entropic Drawdown at Risk.
-
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Relativistic Drawdown at Risk.
-
-  - Absolute (simple returns).
-  - Relative (compounded returns).
-- Ordered Weights Array risk measure.
-- Ordered Weights Array range risk measure.
-- Average Drawdown.
-- Ulcer Index.
-- Maximum Drawdown.
-- Brownian Distance Variance.
-- Worst Realisation.
-- Range.
-- Equal risk.
-- Turnover risk.
-- Tracking risk.
-- Mean return risk.
-- Ratio of measures.
-
-### Portfolio statistics
-
-These are used to summarise a portfolio's risk and return characteristics.
-
-- Expected returns.
-
-  - Arithmetic.
-  - Logarithmic.
-
-- Risk-adjusted return ratio.
-
-  - Vanilla.
-  - Sharpe ratio information criterion.
-- Risk contribution.
-
-  - Asset risk contribution.
-  - Factor risk contribution.
-
-### Optimisation
-
-There are many different optimisation methods, each with different characteristics and configurable options, including exclusive constraint types and risk measures. Though all of them have an optional fallback method in case the optimisation fails.
-
-- Clustering.
-
-  - Hierarchical Risk Parity.
-  - Hierarchical Equal Risk Contribution.
-  - Nested Clustered Optimisation.
-  - Schur Complement Hierarchical Risk Parity.
-
-- `JuMP`-based.
-
-  - Mean Risk.
-
-  - Factor Risk Contribution.
-  - Near Optimal Centering.
-  - Risk Budgeting.
-
-    - Asset risk budgeting.
-    - Factor risk budgeting.
-  - Relaxed Risk Budgeting.
-- Stacking.
-- Naive.
-
-  - Inverse volatility.
-  - Equal weighted.
-  - Random weighted.
-- Finite Allocation.
-
-  - Discrete.
-  - Greedy.
+- Centrality estimator [`CentralityEstimator`] with custom adjacency matrix estimators (clustering and network) and centrality measures
+  - Centrality measures
+    - Betweenness [`BetweennessCentrality`]
+    - Closeness [`ClosenessCentrality`]
+    - Degree [`DegreeCentrality`]
+    - Eigenvector [`EigenvectorCentrality`]
+    - Katz [`KatzCentrality`]
+    - Pagerank [`Pagerank`]
+    - Radiality [`RadialityCentrality`]
+    - Stress [`StressCentrality`]
+- Centrality vector [`centrality_vector`]
+- Average centrality [`average_centrality`]
+- The asset phylogeny score [`asset_phylogeny`]
 
 ### Optimisation constraints
 
-Many of these use the various constraint generation mechanisms mentioned above. These constrain the optimisation so the results meet the user's requirements. Some have specific requirements like a Mixed Integer Programming capable solver, others cannot be used in conjunction with each other, and there exist combinations that make problems infeasible.
+Non clustering optimisers support a wide range of constraints, while naive and clustering optimisers only support weight bounds. Furthermore, entropy pooling prior supports a variety of views constraints. It is therefore important to provide users with the ability to generate constraints manually and/or programmatically. We therefore provide a wide, robust, and extensible range of types such as [`AbstractEstimatorValueAlgorithm`] and [`UniformValues`], and functions that make this easy, fast, and safe.
 
-- `JuMP`-based.
+Constraints can be defined via their estimators or directly by their result types. Some using estimators need to map key-value pairs to the asset universe, this is done by defining the assets and asset groups in [`AssetSets`]. Internally, `PortfolioOptimisers.jl` uses all the information and calls [`group_to_val!`], and [`replace_group_by_assets`] to produce the appropriate arrays.
 
-  - Risk constraints.
+- Equation parsing [`parse_equation`] and [`ParsingResult`].
+- Linear constraints [`linear_constraints`], [`LinearConstraintEstimator`], [`PartialLinearConstraint`], and [`LinearConstraint`]
+- Risk budgeting constraints [`risk_budget_constraints`], [`RiskBudgetEstimator`], and [`RiskBudget`]
+- Phylogeny constraints [`phylogeny_constraints`], [`centrality_constraints`], [`SemiDefinitePhylogenyEstimator`], [`SemiDefinitePhylogeny`], [`IntegerPhylogenyEstimator`], [`IntegerPhylogeny`], [`CentralityConstraint`]
+- Weight bounds constraints [`weight_bounds_constraints`], [`WeightBoundsEstimator`], [`WeightBounds`]
+- Asset set matrices [`asset_sets_matrix`] and [`AssetSetsMatrixEstimator`]
+- Threshold constraints [`threshold_constraints`], [`ThresholdEstimator`], and [`Threshold`]
 
-    - Maximum risk for all supported measures (can be simultaneously provided).
+### Prior statistics
 
-  - Return constraints.
+Many optimisations and constraints use prior statistics computed via [`prior`].
 
-    - Minimum return.
-    - Expected return uncertainty set.
-  - Pareto front/surface/hypersurface (efficient frontier 2D, 3D, ND).
+- Low order prior [`LowOrderPrior`]
+  - Empirical [`EmpiricalPrior`]
+  - Factor model [`FactorPrior`]
+  - Black-Litterman
+    - Vanilla [`BlackLittermanPrior`]
+    - Bayesian [`BayesianBlackLittermanPrior`]
+    - Factor model [`FactorBlackLittermanPrior`]
+    - Augmented [`AugmentedBlackLittermanPrior`]
+  - Entropy pooling [`EntropyPoolingPrior`]
+  - Opinion pooling [`OpinionPoolingPrior`]
+- High order prior [`HighOrderPrior`]
+  - High order [`HighOrderPriorEstimator`]
+  - High order factor model [`HighOrderFactorPriorEstimator`]-(TBA)
 
-    - Via risk constraints.
-    - Via return constraints.
-  - Objective functions.
+### Uncertainty sets
 
-    - Minimum risk.
-    - Maximum utility.
-    - Maximum risk-adjusted return ratio.
-    - Maximum return.
-  - Budget constraints.
+In order to make optimisations more robust to noise and measurement error, it is possible to define uncertainty sets on the expected returns and covariance. These can be used in optimisations which use either of these two quantities. These are implemented via [`ucs`], [`mu_ucs`], and [`sigma_ucs`].
 
-    - Long and/or short budget.
+`PortfolioOptimisers.jl` implements two types of uncertainty sets.
 
-      - Exact.
-      - Upper and lower bounds.
+- [`BoxUncertaintySet`] and [`BoxUncertaintySetAlgorithm`]
+- [`EllipsoidalUncertaintySet`] and [`EllipsoidalUncertaintySetAlgorithm`] with various algorithms for computing the scaling parameter via [`k_ucs`]
+  - [`NormalKUncertaintyAlgorithm`]
+  - [`GeneralKUncertaintyAlgorithm`]
+  - [`ChiSqKUncertaintyAlgorithm`]
+  - Predefined scaling parameter
 
-    - Cost budget.
-    - Market impact budget.
-  - Weight bounds.
-  - Linear weights.
-  - Cardinality.
+It also implements various estimators for the uncertainty sets, the following two can generate box and ellipsoidal sets.
 
-    - Asset.
-    - Set.
-  - Group cardinality.
+- Normally distributed returns [`NormalUncertaintySet`]
+- Bootstrapping via Autoregressive Conditional Heteroscedasticity [`ARCHUncertaintySet`] via [`arch`](https://arch.readthedocs.io/en/latest/bootstrap/timeseries-bootstraps.html)
+  - Circular [`CircularBootstrap`]
+  - Moving [`MovingBootstrap`]
+  - Stationary [`StationaryBootstrap`]
 
-    - Asset.
-    - Set.
-  - Long and short buy-in threshold.
-  - Turnover.
-  - Fees.
-  - Tracking.
-  - Phylogeny.
-  - Centrality.
-  - Regularisation.
+The following estimator can only generate box sets.
 
-    - L1.
-    - L2.
-  - Custom: via subtyping and multiple dispatch.
+- [`DeltaUncertaintySet`]
 
-    - Constraint.
-    - Objective.
-    - Objective penalty.
+### [Turnover](@id readme-turnover)
 
-- Non-`JuMP`-based.
+The turnover is defined as the element-wise absolute difference between the vector of current weights and a vector of benchmark weights. It can be used as a constraint, method for fee calculation, and risk measure. These are all implemented using [`turnover_constraints`], [`TurnoverEstimator`], and [`Turnover`].
 
-  - Weight bounds.
+### Fees
 
-    - Upper.
-    - Lower.
+Fees are a non-negligible aspect of active investing. As such `PortfolioOptimiser.jl` has the ability to account for them in all optimisations but the naive ones. They can also be used to adjust expected returns calculations via [`calc_fees`] and [`calc_asset_fees`].
 
-  - Weight finaliser.
-- Optimisers without a fixed risk measure.
+- Fees [`FeesEstimator`] and [`Fees`]
+  - Proportional long
+  - Proportional short
+  - Fixed long
+  - Fixed short
+  - Turnover
 
-  - Scalarisers for multiple simultaneous risk measures.
+### Portfolio returns and drawdowns
 
-    - Weighted sum.
-    - Max risk.
-    - LogSumExp.
+Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`], [`calc_net_asset_returns`], [`cumulative_returns`], [`drawdowns`].
+
+### [Tracking](@id readme-tracking)
+
+It is often useful to create portfolios that track the performance of an index, indicator, or another portfolio.
+
+- Tracking error [`tracking_benchmark`], [`TrackingError`]
+  - Returns tracking [`ReturnsTracking`]
+  - Weights tracking [`WeightsTracking`]
+
+The error can be computed using different algorithms using [`norm_tracking`].
+
+- L1-norm [`NOCTracking`]
+- L2-norm [`SOCTracking`]
+- L2-norm squared [`SquaredSOCTracking`]
+
+It is also possible to track the error in with risk measures [`RiskTrackingError`]-(TBA) using [`WeightsTracking`], which allows for two approaches.
+
+- Dependent variable tracking [`DependentVariableTracking`]
+- Independent variable tracking [`IndependentVariableTracking`]
+
+### Risk measures
+
+`PortfolioOptimisers.jl` provides a wide range of risk measures. These are broadly categorised into two types based on the type of optimisations that support them.
+
+#### Risk measures for traditional optimisation
+
+These are all subtypes of [`RiskMeasure`], and are supported by all optimisation estimators.
+
+- Variance [`Variance`]
+  - Traditional optimisations also support:
+    - Risk contribution
+    - Formulations
+      - Quadratic risk expression [`QuadRiskExpr`]
+      - Squared second order cone [`SquaredSOCRiskExpr`]
+- Standard deviation [`StandardDeviation`]
+- Uncertainty set variance [`UncertaintySetVariance`] (same as variance when used in non-traditional optimisation)
+- Low order moments [`LowOrderMoment`]
+  - First lower moment [`FirstLowerMoment`]
+  - Mean absolute deviation [`MeanAbsoluteDeviation`]
+  - Second moment [`SecondMoment`]
+    - Second squared moments
+      - Scenario variance [`Full`]
+      - Scenario semi-variance [`Semi`]
+      - Traditional optimisation formulations
+        - Quadratic risk expression [`QuadRiskExpr`]
+        - Squared second order cone [`SquaredSOCRiskExpr`]
+        - Rotated second order cone [`RSOCRiskExpr`]
+    - Second moments [`SOCRiskExpr`]
+      - Scenario standard deviation [`Full`]
+      - Scenario semi-standard deviation [`Semi`]
+- Kurtosis [`Kurtosis`]
+  - Actual kurtosis
+    - Full and semi-kurtosis are supported in traditional optimisers via the `kt` field. Risk calculation uses
+      - Kurtosis [`Full`]
+      - Semi-kurtosis [`Semi`]
+    - Traditional optimisation formulations
+      - Quadratic risk expression [`QuadRiskExpr`]
+      - Squared second order cone [`SquaredSOCRiskExpr`]
+      - Rotated second order cone [`RSOCRiskExpr`]
+  - Square root kurtosis [`SOCRiskExpr`]
+    - Full [`Full`]
+    - Semi [`Semi`]
+- Negative skewness [`NegativeSkewness`]-(TBA)
+  - Squared negative skewness
+    - Full and semi-skewness are supported in traditional optimisers via the `sk` and `V` fields. Risk calculation uses
+      - Negative skewness [`Full`]
+      - Negative semi-skewness [`Semi`]
+    - Traditional optimisation formulations
+      - Quadratic risk expression [`QuadRiskExpr`]
+      - Squared second order cone [`SquaredSOCRiskExpr`]
+    - Square root negative skewness [`SOCRiskExpr`]
+- Value at Risk [`ValueatRisk`]-(TBA)
+  - Traditional optimisation formulations
+    - Exact MIP formulation [`MIPValueatRisk`]-(TBA)
+    - Approximate distribution based [`DistributionValueatRisk`]-(TBA)
+- Value at Risk Range [`ValueatRiskRange`]-(TBA)
+  - Traditional optimisation formulations
+    - Exact MIP formulation [`MIPValueatRisk`]-(TBA)
+    - Approximate distribution based [`DistributionValueatRisk`]-(TBA)
+- Drawdown at Risk [`DrawdownatRisk`]-(TBA)
+- Conditional Value at Risk [`ConditionalValueatRisk`]-(TBA)
+- Distributionally Robust Conditional Value at Risk [`DistributionallyRobustConditionalValueatRisk`]-(TBA) (same as conditional value at risk when used in non-traditional optimisation)
+- Conditional Value at Risk Range [`ConditionalValueatRiskRange`]-(TBA)
+- Distributionally Robust Conditional Value at Risk Range [`DistributionallyRobustConditionalValueatRiskRange`]-(TBA) (same as conditional value at risk range when used in non-traditional optimisation)
+- Conditional Drawdown at Risk [`ConditionalDrawdownatRisk`]-(TBA)
+- Distributionally Robust Conditional Drawdown at Risk [`DistributionallyRobustConditionalDrawdownatRisk`]-(TBA)(same as conditional drawdown at risk when used in non-traditional optimisation)
+- Entropic Value at Risk [`EntropicValueatRisk`]-(TBA)
+- Entropic Value at Risk Range [`EntropicValueatRiskRange`]-(TBA)
+- Entropic Drawdown at Risk [`EntropicDrawdownatRisk`]-(TBA)
+- Relativistic Value at Risk [`RelativisticValueatRisk`]-(TBA)
+- Relativistic Value at Risk Range [`RelativisticValueatRiskRange`]-(TBA)
+- Relativistic Drawdown at Risk [`RelativisticDrawdownatRisk`]-(TBA)
+- Ordered Weights Array
+  - Risk measures
+    - Ordered Weights Array risk measure [`OrderedWeightsArray`]-(TBA)
+    - Ordered Weights Array range risk measure [`OrderedWeightsArrayRange`]-(TBA)
+  - Traditional optimisation formulations
+    - Exact [`ExactOrderedWeightsArray`]-(TBA)
+    - Approximate [`ApproxOrderedWeightsArray`]-(TBA)
+  - Array functions
+    - Gini Mean Difference [`owa_gmd`]
+    - Worst Realisation [`owa_wr`]
+    - Range [`owa_rg`]
+    - Conditional Value at Risk [`owa_cvar`]
+    - Weighted Conditional Value at Risk [`owa_wcvar`]
+    - Conditional Value at Risk Range [`owa_cvarrg`]
+    - Weighted Conditional Value at Risk Range [`owa_wcvarrg`]
+    - Tail Gini [`owa_tg`]
+    - Tail Gini Range [`owa_tgrg`]
+    - Linear moments (L-moments)
+      - Linear Moment [`owa_l_moment`]
+      - Linear Moment Convex Risk Measure [`owa_l_moment_crm`]
+        - L-moment combination formulations
+          - Maximum Entropy [`MaximumEntropy`]-(TBA)
+            - Entropy formulations
+              - Exponential Cone Entropy [`ExponentialConeEntropy`]-(TBA)
+              - Relative Entropy [`RelativeEntropy`]-(TBA)
+          - Minimum Squared Distance [`MinimumSquaredDistance`]-(TBA)
+          - Minimum Sum Squares [`MinimumSumSquares`]-(TBA)
+- Average Drawdown [`AverageDrawdown`]-(TBA)
+- Ulcer Index [`UlcerIndex`]-(TBA)
+- Maximum Drawdown [`MaximumDrawdown`]-(TBA)
+- Brownian Distance Variance [`BrownianDistanceVariance`]-(TBA)
+  - Traditional optimisation formulations
+    - Distance matrix constraint formulations
+      - Norm one cone Brownian distance variance [`NormOneConeBrownianDistanceVariance`]-(TBA)
+      - Inequality Brownian distance variance [`IneqBrownianDistanceVariance`]-(TBA)
+    - Risk formulation
+      - Quadratic risk expression [`QuadRiskExpr`]
+      - Rotated second order cone [`RSOCRiskExpr`]
+- Worst Realisation [`WorstRealisation`]-(TBA)
+- Range [`Range`]-(TBA)
+- Turnover Risk Measure [`TurnoverRiskMeasure`]-(TBA)
+- Tracking Risk Measure [`TrackingRiskMeasure`]-(TBA)
+  - Formulations
+    - L1-norm [`NOCTracking`]
+    - L2-norm [`SOCTracking`]
+    - L2-norm squared [`SquaredSOCTracking`]
+- Risk Tracking Risk Measure
+  - Formulations
+    - Dependent variable tracking [`DependentVariableTracking`]
+    - Independent variable tracking [`IndependentVariableTracking`]
+- Power Norm Value at Risk [`PowerNormValueatRisk`]-(TBA)
+- Power Norm Value at Risk Range [`PowerNormValueatRiskRange`]-(TBA)
+- Power Norm Drawdown at Risk [`PowerNormDrawdownatRisk`]-(TBA)
+
+#### Risk measures for hierarchical optimisation
+
+These are all subtypes of [`HierarchicalRiskMeasure`], and are only supported by hierarchical optimisation estimators.
+
+- High order moment [`HighOrderMoment`]
+  - Unstandardised third lower moment [`ThirdLowerMoment`]
+  - Standardised third lower moment [`StandardisedHighOrderMoment`] and [`ThirdLowerMoment`]
+  - Unstandardised fourth moment [`FourthMoment`]
+    - Full [`Full`]
+    - Semi [`Semi`]
+  - Standardised fourth moment [`StandardisedHighOrderMoment`] and [`FourthMoment`]
+    - Full [`Full`]
+    - Semi [`Semi`]
+- Relative Drawdown at Risk [`RelativeDrawdownatRisk`]-(TBA)
+- Relative Conditional Drawdown at Risk [`RelativeConditionalDrawdownatRisk`]-(TBA)
+- Relative Entropic Drawdown at Risk [`RelativeEntropicDrawdownatRisk`]-(TBA)
+- Relative Relativistic Drawdown at Risk [`RelativeRelativisticDrawdownatRisk`]-(TBA)
+- Relative Average Drawdown [`RelativeAverageDrawdown`]-(TBA)
+- Relative Ulcer Index [`RelativeUlcerIndex`]-(TBA)
+- Relative Maximum Drawdown [`RelativeMaximumDrawdown`]-(TBA)
+- Relative Power Norm Drawdown at Risk [`RelativePowerNormDrawdownatRisk`]-(TBA)
+- Risk Ratio Risk Measure [`RiskRatioRiskMeasure`]-(TBA)
+- Equal Risk Measure [`EqualRiskMeasure`]-(TBA)
+- Median Absolute Deviation [`MedianAbsoluteDeviation`]-(TBA)
+
+#### Non-optimisation risk measures
+
+These risk measures are unsuitable for optimisation because they can return negative values. However, they can be used for performance metrics.
+
+- Mean Return [`MeanReturn`]-(TBA)
+- Third Central Moment [`ThirdCentralMoment`]-@(ref)
+- Skewness [`Skewness`]-(TBA)
+- Return Risk Measure [`ReturnRiskMeasure`]
+- Return Risk Ratio Risk Measure [`ReturnRiskRatioRiskMeasure`]
+
+### Performance metrics
+
+- Expected risk [`expected_risk`]-(TBA)
+- Number of effective assets [`number_effective_assets`]-(TBA)
+- Risk contribution
+  - Asset risk contribution [`risk_contribution`]-(TBA)
+  - Factor risk contribution [`factor_risk_contribution`]-(TBA)
+- Expected return [`expected_return`]
+  - Arithmetic [`ArithmeticReturn`]-(TBA)
+  - Logarithmic [`LogarithmicReturn`]-(TBA)
+- Expected risk-adjusted return ratio [`expected_ratio`] and [`expected_risk_ret_ratio`]
+- Expected risk-adjusted ratio information criterion [`expected_sric`] and [`expected_risk_ret_sric`]
+- Brinson performance attribution [`brinson_attribution`]
+
+### Portfolio optimisation
+
+Optimisations are implemented via [`optimise`]-(TBA). Optimisations consume an estimator and return a result.
+
+#### Naive
+
+These return a [`NaiveOptimisationResult`]-(TBA).
+
+- Inverse Volatility [`InverseVolatility`]-(TBA)
+- Equal Weighted [`EqualWeighted`]-(TBA)
+- Random (Dirichlet) [`RandomWeighted`]-(TBA)
+
+##### Naive optimisation features
+
+- Weight bounds [`WeightBoundsEstimator`], [`UniformValues`], and [`WeightBounds`]
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(TBA)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(TBA)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(TBA)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(TBA)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(TBA)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(TBA)
+
+#### Traditional
+
+These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`]-(TBA), which encodes all supported constraints.
+
+##### Objective function optimisations
+
+These optimisations support a variety of objective functions.
+
+- Objective functions
+  - Minimum risk [`MinimumRisk`]-(TBA)
+  - Maximum utility [`MaximumUtility`]-(TBA)
+  - Maximum return over risk ratio [`MaximumRatio`]-(TBA)
+  - Maximum return [`MaximumReturn`]-(TBA)
+- Exclusive to [`MeanRisk`]-(TBA) and [`NearOptimalCentering`]-(TBA)
+  - N-dimensional Pareto fronts [`Frontier`]
+    - Return based
+    - Risk based
+- Optimisation estimators
+  - Mean-Risk [`MeanRisk`]-(TBA) returns a [`MeanRiskResult`]-(TBA)
+  - Near Optimal Centering [`NearOptimalCentering`]-(TBA) returns a [`NearOptimalCenteringResult`]-(TBA)
+  - Factor Risk Contribution [`FactorRiskContribution`]-(TBA) returns a [`FactorRiskContributionResult`]-(TBA)
+
+##### Risk budgeting optimisations
+
+These optimisations attempt to achieve weight values according to a risk budget vector. This vector can be provided on a per asset or per factor basis.
+
+- Budget targets
+  - Asset risk budgeting [`AssetRiskBudgeting`]-(TBA)
+  - Factor risk budgeting [`FactorRiskBudgeting`]-(TBA)
+- Optimisation estimators
+  - Risk Budgeting [`RiskBudgeting`]-(TBA) returns a [`RiskBudgetingResult`]-(TBA)
+  - Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(TBA) returns a [`RiskBudgetingResult`]-(TBA)
+    - Relaxed risk budgeting types
+      - Basic [`BasicRelaxedRiskBudgeting`]-(TBA)
+      - Regularised [`RegularisedRelaxedRiskBudgeting`]-(TBA)
+      - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(TBA)
+
+##### Traditional optimisation features
+
+- Custom objective penalty [`CustomJuMPObjective`]-(TBA)
+- Weight bounds [`WeightBoundsEstimator`], [`UniformValues`], and [`WeightBounds`]
+- Budget
+  - Directionality
+    - Long
+    - Short
+  - Type
+    - Exact
+    - Range [`BudgetRange`]-(TBA)
+- Threshold [`ThresholdEstimator`] and [`Threshold`]
+  - Directionality
+    - Long
+    - Short
+  - Type
+    - Asset
+    - Set [`AssetSetsMatrixEstimator`]
+- Linear constraints [`LinearConstraintEstimator`] and [`LinearConstraint`]
+- Centralit(y/ies) [`CentralityEstimator`]
+- Cardinality
+  - Asset
+  - Asset group(s) [`LinearConstraintEstimator`] and [`LinearConstraint`]
+  - Set(s)
+  - Set group(s) [`LinearConstraintEstimator`] and [`LinearConstraint`]
+- Turnover(s) [`TurnoverEstimator`] and [`Turnover`]
+- Fees [`FeesEstimator`] and [`Fees`]
+- Tracking error(s) [`TrackingError`]
+- Phylogen(y/ies) [`IntegerPhylogenyEstimator`] and [`SemiDefinitePhylogenyEstimator`]
+- Portfolio returns
+  - Arithmetic returns [`ArithmeticReturn`]-(TBA)
+    - Uncertainty set [`BoxUncertaintySet`], [`BoxUncertaintySetAlgorithm`], [`EllipsoidalUncertaintySet`], and [`EllipsoidalUncertaintySetAlgorithm`]
+    - Custom expected returns vector
+  - Logarithmic returns [`LogarithmicReturn`]-(TBA)
+- Risk vector scalarisation
+  - Weighted sum [`SumScalariser`]
+  - Maximum value [`MaxScalariser`]
+  - Log-sum-exp [`LogSumExpScalariser`]
+- Custom constraint
+- Number of effective assets
+- Regularisation penalty
+  - L1
+  - L2
+
+#### [Clustering](@id readme-clustering-opt)
+
+Clustering optimisations make use of asset relationships to either minimise the risk exposure by breaking the asset universe into subsets which are hierarchically or individually optimised.
+
+##### Hierarchical clustering optimisations
+
+These optimisations minimise risk by hierarchically splitting the asset universe into subsets, computing the risk of each subset, and combining them according to their hierarchy.
+
+- Hierarchical Risk Parity [`HierarchicalRiskParity`]-(TBA) returns a [`HierarchicalResult`]-(TBA)
+- Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`]-(TBA) returns a [`HierarchicalResult`]-(TBA)
+
+###### Hierarchical clustering optimisation features
+
+- Weight bounds [`WeightBoundsEstimator`], [`UniformValues`], and [`WeightBounds`]
+- Fees [`FeesEstimator`] and [`Fees`]
+- Risk vector scalarisation
+  - Weighted sum [`SumScalariser`]
+  - Maximum value [`MaxScalariser`]
+  - Log-sum-exp [`LogSumExpScalariser`]
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(TBA)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(TBA)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(TBA)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(TBA)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(TBA)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(TBA)
+
+##### Schur complementary optimisation
+
+Schur complementary hierarchical risk parity provides a bridge between mean variance optimisation and hierarchical risk parity by using an interpolation parameter. It converges to hierarchical risk parity, and approximates mean variance by adjusting this parameter. It uses the Schur complement to adjust the weights of a portfolio according to how much more useful information is gained by assigning more weight to a group of assets.
+
+- Schur Complementary Hierarchical Risk Parity [`SchurComplementHierarchicalRiskParity`]-(TBA) returns a [`SchurComplementHierarchicalRiskParityResult`]-(TBA)
+
+###### Schur complementary optimisation features
+
+- Weight bounds [`WeightBoundsEstimator`], [`UniformValues`], and [`WeightBounds`]
+- Fees [`FeesEstimator`] and [`Fees`]
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(TBA)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(TBA)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(TBA)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(TBA)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(TBA)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(TBA)
+
+##### Clustering optimisation
+
+Nested clustered optimisation breaks the asset universe into smaller subsets and treats every subset as an individual portfolio. Then it creates a synthetic asset out of each portfolio, optimises the portfolio of synthetic assets. The final weights are the inner product between the individual portfolio weights and outer portfolio.
+
+- Nested Clustered [`NestedClustered`]-(TBA) returns a [`NestedClusteredResult`]-(TBA)
+
+##### Clustering optimisation features
+
+- Any features supported by the inner and outer estimators.
+- Weight bounds [`WeightBoundsEstimator`], [`UniformValues`], and [`WeightBounds`]
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(TBA)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(TBA)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(TBA)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(TBA)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(TBA)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(TBA)
+- Cross validation predictor for the outer estimator
+
+#### Ensemble optimisation
+
+These work similar to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided, all of which are optimised, and each result is treated as a synthetic asset from which a synthetic portfolio is created and optimised according to an outer estimator. The final weights are the inner product between the individual portfolio weights and outer portfolio.
+
+- Stacking [`Stacking`]-(TBA) returns a [`StackingResult`]-(TBA)
+
+##### Ensemble optimisation features
+
+- Any features supported by the inner and outer estimators.
+- Weight bounds [`WeightBoundsEstimator`], [`UniformValues`], and [`WeightBounds`]
+- Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(TBA)
+  - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(TBA)
+    - Error formulations
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(TBA)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(TBA)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(TBA)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(TBA)
+- Cross validation predictor for the outer estimator
+
+#### Finite allocation optimisation
+
+Unlike all other estimators, finite allocation does not yield an "optimal" value, but rather the optimal attainable solution based on a finite amount of capital. They use the result of other estimations, the latest prices, and a cash amount.
+
+- Discrete (MIP) [`DiscreteAllocation`]-(TBA)
+  - Weight finalisers
+    - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(TBA)
+    - JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(TBA)
+      - Error formulations
+        - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(TBA)
+        - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(TBA)
+        - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(TBA)
+        - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(TBA)
+- Greedy [`GreedyAllocation`]
 
 ### Plotting
 
+Visualising the results is quite a useful way of summarising the portfolio characteristics or evolution. To this extent we provide a few plotting functions with more to come.
+
 - Simple or compound cumulative returns.
-
-  - Portfolio.
-  - Assets.
-
+  - Portfolio [`plot_ptf_cumulative_returns`]-(TBA).
+  - Assets [`plot_asset_cumulative_returns`]-(TBA).
 - Portfolio composition.
-
-  - Single portfolio.
-
+  - Single portfolio [`plot_composition`]-(TBA).
   - Multi portfolio.
-
-    - Stacked bar.
-    - Stacked area.
+    - Stacked bar [`plot_stacked_bar_composition`]-(TBA).
+    - Stacked area [`plot_stacked_area_composition`]-(TBA).
 - Risk contribution.
-
-  - Asset risk contribution.
-  - Factor risk contribution.
-- Asset dendrogram.
-- Asset clusters + optional dendrogram.
-- Simple or compound drawdowns.
-- Portfolio returns histogram + density.
-- 2/3D risk measure scatter plots.
-
-## How to Cite
-
-If you use PortfolioOptimisers.jl in your work, please cite using the reference given in [CITATION.cff](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/CITATION.cff).
-
-## Contributing
-
-If you want to make contributions of any kind, please first take a look into our [contributing guide directly on GitHub](docs/src/contribute/1-contributing.md) or the [contributing page on the website](https://dcelisgarza.github.io/PortfolioOptimisers.jl/dev/contribute/1-contributing)
+  - Asset risk contribution [`plot_risk_contribution`]-(TBA).
+  - Factor risk contribution [`plot_factor_risk_contribution`]-(TBA).
+- Asset dendrogram [`plot_dendrogram`]-(TBA).
+- Asset clusters + optional dendrogram [`plot_clusters`]-(TBA).
+- Simple or compound drawdowns [`plot_drawdowns`]-(TBA).
+- Portfolio returns histogram + density [`plot_histogram`]-(TBA).
+- 2/3D risk measure scatter plots [`plot_measures`]-(TBA).

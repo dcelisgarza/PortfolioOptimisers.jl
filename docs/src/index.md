@@ -154,8 +154,7 @@ rd = prices_to_returns(prices)
 # Define the continuous solver.
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false, "max_step_fraction" => 0.9),
-             check_sol = (; allow_local = true, allow_almost = true));
-nothing # hide
+             check_sol = (; allow_local = true, allow_almost = true))
 ```
 
 `PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`]-(@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
@@ -244,8 +243,22 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
 
 This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
+We can also plot the returns' histogram and probability density.
+
+```@example 0_index
+plot_histogram(mip_res.w, rd.X, slv)
+```
+
+We can also plot the compounded or uncompounded drawdowns, here we plot the former.
+
+```@example 0_index
+plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
+```
+
+There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
+
 !!! Info
-    This section is under active development.
+    This section is under active development and any [`<name>`]-(@ref) lack docstrings. Some docstrings are also outdated, please refer to [Issue #58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
 
 ## Features
 
@@ -943,19 +956,21 @@ Unlike all other estimators, finite allocation does not yield an "optimal" value
 
 ### Plotting
 
+Visualising the results is quite a useful way of summarising the portfolio characteristics or evolution. To this extent we provide a few plotting functions with more to come.
+
 - Simple or compound cumulative returns.
-  - Portfolio.
-  - Assets.
+  - Portfolio [`plot_ptf_cumulative_returns`]-(@ref).
+  - Assets [`plot_asset_cumulative_returns`]-(@ref).
 - Portfolio composition.
-  - Single portfolio.
+  - Single portfolio [`plot_composition`]-(@ref).
   - Multi portfolio.
-    - Stacked bar.
-    - Stacked area.
+    - Stacked bar [`plot_stacked_bar_composition`]-(@ref).
+    - Stacked area [`plot_stacked_area_composition`]-(@ref).
 - Risk contribution.
-  - Asset risk contribution.
-  - Factor risk contribution.
-- Asset dendrogram.
-- Asset clusters + optional dendrogram.
-- Simple or compound drawdowns.
-- Portfolio returns histogram + density.
-- 2/3D risk measure scatter plots.
+  - Asset risk contribution [`plot_risk_contribution`]-(@ref).
+  - Factor risk contribution [`plot_factor_risk_contribution`]-(@ref).
+- Asset dendrogram [`plot_dendrogram`]-(@ref).
+- Asset clusters + optional dendrogram [`plot_clusters`]-(@ref).
+- Simple or compound drawdowns [`plot_drawdowns`]-(@ref).
+- Portfolio returns histogram + density [`plot_histogram`]-(@ref).
+- 2/3D risk measure scatter plots [`plot_measures`]-(@ref).
