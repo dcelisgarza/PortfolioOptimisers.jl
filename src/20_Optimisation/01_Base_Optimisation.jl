@@ -12,9 +12,6 @@ abstract type OptimisationModelResult <: AbstractResult end
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
-abstract type CrossValidationEstimator <: AbstractEstimator end
-abstract type CrossValidationResult <: AbstractResult end
-abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
