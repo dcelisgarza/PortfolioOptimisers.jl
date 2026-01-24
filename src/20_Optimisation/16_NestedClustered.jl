@@ -1,19 +1,20 @@
-struct NestedClusteredResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
+struct NestedClusteredResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
        NonFiniteAllocationOptimisationResult
     oe::T1
     pr::T2
     clr::T3
     wb::T4
-    resi::T5
-    reso::T6
-    cv::T7
-    retcode::T8
-    w::T9
-    fb::T10
+    fees::T5
+    resi::T6
+    reso::T7
+    cv::T8
+    retcode::T9
+    w::T10
+    fb::T11
 end
 function factory(res::NestedClusteredResult, fb)
-    return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.resi, res.reso,
-                                 res.cv, res.retcode, res.w, fb)
+    return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
+                                 res.reso, res.cv, res.retcode, res.w, fb)
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @argcheck(!isa(opt.opt.clr, AbstractClusteringResult))
@@ -78,21 +79,22 @@ function assert_external_optimiser(opt::VecOptE_Opt)
     assert_external_optimiser.(opt)
     return nothing
 end
-struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
+struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
        ClusteringOptimisationEstimator
     pr::T1
     clr::T2
     wb::T3
-    sets::T4
-    opti::T5
-    opto::T6
-    cv::T7
-    wf::T8
-    strict::T9
-    ex::T10
-    fb::T11
+    fees::T4
+    sets::T5
+    opti::T6
+    opto::T7
+    cv::T8
+    wf::T9
+    strict::T10
+    ex::T11
+    fb::T12
     function NestedClustered(pr::PrE_Pr, clr::ClE_Cl, wb::Option{<:WbE_Wb},
-                             sets::Option{<:AssetSets},
+                             fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
                              opti::NonFiniteAllocationOptimisationEstimator,
                              opto::NonFiniteAllocationOptimisationEstimator,
                              cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
@@ -105,13 +107,18 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pr), typeof(clr), typeof(wb), typeof(sets), typeof(opti),
-                   typeof(opto), typeof(cv), typeof(wf), typeof(strict), typeof(ex),
-                   typeof(fb)}(pr, clr, wb, sets, opti, opto, cv, wf, strict, ex, fb)
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(sets),
+                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(strict),
+                   typeof(ex), typeof(fb)}(pr, clr, wb, fees, sets, opti, opto, cv, wf,
+                                           strict, ex, fb)
     end
 end
 function NestedClustered(; pr::PrE_Pr = EmpiricalPrior(), clr::ClE_Cl = ClustersEstimator(),
                          wb::Option{<:WbE_Wb} = nothing,
+                         fees::Option{<:FeesE_Fees} = nothing,
                          sets::Option{<:AssetSets} = nothing,
                          opti::NonFiniteAllocationOptimisationEstimator,
                          opto::NonFiniteAllocationOptimisationEstimator,
@@ -120,7 +127,7 @@ function NestedClustered(; pr::PrE_Pr = EmpiricalPrior(), clr::ClE_Cl = Clusters
                          strict::Bool = false,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
-    return NestedClustered(pr, clr, wb, sets, opti, opto, cv, wf, strict, ex, fb)
+    return NestedClustered(pr, clr, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)
     @argcheck(!isa(opt.clr, AbstractClusteringResult))
@@ -144,12 +151,13 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
     X = isa(nco.pr, AbstractPriorResult) ? nco.pr.X : X
     pr = prior_view(nco.pr, i)
     wb = weight_bounds_view(nco.wb, i)
+    fees = fees_view(nco.fees, i)
     sets = nothing_asset_sets_view(nco.sets, i)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
-    return NestedClustered(; pr = pr, clr = nco.clr, wb = wb, sets = sets, opti = opti,
-                           opto = opto, cv = nco.cv, wf = nco.wf, strict = nco.strict,
-                           ex = nco.ex, fb = nco.fb)
+    return NestedClustered(; pr = pr, clr = nco.clr, wb = wb, fees = fees, sets = sets,
+                           opti = opti, opto = opto, cv = nco.cv, wf = nco.wf,
+                           strict = nco.strict, ex = nco.ex, fb = nco.fb)
 end
 function nested_clustering_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                      wf::WeightFinaliser, strict::Bool, resi::VecOpt,
@@ -179,15 +187,17 @@ end
 """
 Overload this using nco.cv for custom cross-validation prediction
 """
+function _predict_outer_nco_estimator_returns() end
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
-                                             pr::AbstractPriorResult, wi::MatNum,
-                                             resi::VecOpt, cls::VecVecInt)
+                                             pr::AbstractPriorResult, fees::Option{<:Fees},
+                                             wi::MatNum, resi::VecOpt, cls::VecVecInt)
     iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
     ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
     X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)
-        X[:, i] = predict(res, pri)
+        feesi = fees_view(fees, cl)
+        X[:, i] = predict(res, pri, feesi)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)
@@ -198,6 +208,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     pr = prior(nco.pr, rd; dims = dims)
     clr = clusterise(nco.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
+    fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(pr.X),
+                            strict = nco.strict)
     idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
@@ -213,13 +225,13 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
         wi[cl, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_nco_estimator_returns(nco, rd, pr, wi, resi, cls)
+    rdo = predict_outer_nco_estimator_returns(nco, rd, pr, fees, wi, resi, cls)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.wf, nco.strict, resi,
                                                  reso, wi * reso.w; datatype = eltype(pr.X))
-    return NestedClusteredResult(typeof(nco), pr, clr, wb, resi, reso, nco.cv, retcode, w,
-                                 nothing)
+    return NestedClusteredResult(typeof(nco), pr, clr, wb, fees, resi, reso, nco.cv,
+                                 retcode, w, nothing)
 end
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
