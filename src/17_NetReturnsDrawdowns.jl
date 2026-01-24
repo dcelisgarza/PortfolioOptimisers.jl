@@ -53,6 +53,9 @@ end
 function calc_net_returns(w::VecNum, X::MatNum, fees::Fees)
     return X * w .- calc_fees(w, fees)
 end
+function calc_net_returns(w::VecVecNum, X::MatNum, args...)
+    return [calc_net_returns(wi, X, args...) for wi in w]
+end
 """
     calc_net_asset_returns(w::VecNum, X::MatNum, args...)
     calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)

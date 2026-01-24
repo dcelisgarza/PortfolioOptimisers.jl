@@ -176,6 +176,22 @@ function nested_clustering_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetS
     end
     return wb, retcode, w
 end
+"""
+Overload this using nco.cv for custom cross-validation prediction
+"""
+function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
+                                             pr::AbstractPriorResult, wi::MatNum,
+                                             resi::VecOpt, cls::VecVecInt)
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
+    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
+    for (i, (res, cl)) in enumerate(zip(resi, cls))
+        pri = prior_view(pr, cl)
+        X[:, i] = predict(res, pri)
+    end
+    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
+                         ts = rd.ts, iv = iv, ivpa = ivpa)
+end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -188,21 +204,16 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     opti = nco.opti
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
-        if length(cl) == 1
-            wi[cl, i] .= one(eltype(pr.X))
-            resi[i] = SingletonOptimisation(OptimisationSuccess(nothing))
-        else
-            optic = opt_view(opti, cl, pr.X)
-            rdc = returns_result_view(rd, cl)
-            res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
-                           str_names = str_names, save = save, kwargs...)
-            #! Support efficient frontier?
-            @argcheck(!isa(res.retcode, AbstractVector))
-            wi[cl, i] = res.w
-            resi[i] = res
-        end
+        optic = opt_view(opti, cl, pr.X)
+        rdc = returns_result_view(rd, cl)
+        res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
+                       str_names = str_names, save = save, kwargs...)
+        #! Support efficient frontier?
+        @argcheck(!isa(res.retcode, AbstractVector))
+        wi[cl, i] = res.w
+        resi[i] = res
     end
-    rdo = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
+    rdo = predict_outer_nco_estimator_returns(nco, rd, pr, wi, resi, cls)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.wf, nco.strict, resi,

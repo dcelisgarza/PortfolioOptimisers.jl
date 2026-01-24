@@ -81,6 +81,21 @@ function opt_view(st::Stacking, i, X::MatNum)
     return Stacking(; pr = pr, wb = wb, opti = opti, opto = opto, cv = st.cv, wf = st.wf,
                     sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
+"""
+Overload this using st.cv for custom cross-validation prediction
+"""
+function predict_outer_st_estimator_returns(st::Stacking, rd::ReturnsResult,
+                                            pr::AbstractPriorResult, wi::MatNum,
+                                            resi::VecOpt)
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
+    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
+    for (i, res) in enumerate(resi)
+        X[:, i] = predict(res, pr)
+    end
+    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
+                         ts = rd.ts, iv = iv, ivpa = ivpa)
+end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -97,7 +112,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_estimator_returns(st, rd, pr, wi, resi)
+    rdo = predict_outer_st_estimator_returns(st, rd, pr, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
