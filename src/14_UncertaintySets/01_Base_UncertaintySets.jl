@@ -201,6 +201,10 @@ Constructs an uncertainty set from a given estimator and returns data.
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError)
+    if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
+        @argcheck(!isnothing(rd.F), IsNothingError)
+    end
     return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
@@ -233,6 +237,10 @@ Constructs an expected returns uncertainty set from a given estimator and return
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError)
+    if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
+        @argcheck(!isnothing(rd.F), IsNothingError)
+    end
     return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
@@ -265,6 +273,10 @@ Constructs a covariance uncertainty set from a given estimator and returns data.
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError)
+    if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
+        @argcheck(!isnothing(rd.F), IsNothingError)
+    end
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """

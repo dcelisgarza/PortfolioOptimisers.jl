@@ -579,6 +579,8 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
   - [`ReturnsResult`](@ref)
 """
 function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+    @argcheck(!isnothing(rd.X), IsNothingError)
+    @argcheck(!isnothing(rd.F), IsNothingError)
     return regression(re, rd.X, rd.F)
 end
 

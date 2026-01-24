@@ -76,7 +76,7 @@ end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Option{<:VecNum})
-    rr = regression(re, rd.X, rd.F)
+    rr = regression(re, rd)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)
     Nf = size(b1, 2)

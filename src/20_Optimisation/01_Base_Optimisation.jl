@@ -12,9 +12,6 @@ abstract type OptimisationModelResult <: AbstractResult end
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
-abstract type CrossValidationEstimator <: AbstractEstimator end
-abstract type CrossValidationResult <: AbstractResult end
-abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
@@ -176,15 +173,6 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
-struct SingletonOptimisation{T1} <: NonFiniteAllocationOptimisationResult
-    retcode::T1
-    function SingletonOptimisation(retcode::OptimisationReturnCode)
-        return new{typeof(retcode)}(retcode)
-    end
-end
-function SingletonOptimisation(; retcode::OptimisationReturnCode)
-    return SingletonOptimisation(retcode)
-end
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end
@@ -216,18 +204,6 @@ function assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 end
 function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
     return nothing
-end
-function generate_grouped_returns_result(rd::ReturnsResult, pr::AbstractPriorResult,
-                                         wi::MatNum)
-    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
-    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = pr.X * wi, nf = rd.nf,
-                         F = rd.F, ts = rd.ts, iv = iv, ivpa = ivpa)
-end
-function predict_outer_estimator_returns(opt::NonFiniteAllocationOptimisationEstimator,
-                                         rd::ReturnsResult, pr::AbstractPriorResult,
-                                         wi::MatNum, resi::VecOpt; kwargs...)
-    return generate_grouped_returns_result(rd, pr, wi)
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,

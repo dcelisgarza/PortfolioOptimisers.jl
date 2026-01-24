@@ -429,7 +429,7 @@ There are other kinds of plots which we explore in the [examples](https://dcelis
 - Find complete indices [`find_complete_indices`]
 - Find uncorrelated indices [`find_uncorrelated_indices`]-(TBA)
 
-### Matrix Processing
+### Matrix processing
 
 - Positive definite projection [`Posdef`], [`posdef!`], [`posdef`]
 - Denoising [`Denoise`], [`denoise!`], [`denoise`]
@@ -439,7 +439,7 @@ There are other kinds of plots which we explore in the [examples](https://dcelis
 - Detoning [`Detone`], [`detone!`], [`detone`]
 - Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`], [`matrix_processing!`], [`matrix_processing`], [`DenoiseDetoneAlg`], [`DenoiseAlgDetone`], [`DetoneDenoiseAlg`], [`DetoneAlgDenoise`], [`AlgDenoiseDetone`], [`AlgDetoneDenoise`]
 
-### Regression Models
+### Regression models
 
 Factor prior models and implied volatility use [`regression`] in their estimation, which return a [`Regression`] object.
 
@@ -467,9 +467,9 @@ Factor prior models and implied volatility use [`regression`] in their estimatio
     - Principal component [`PCA`]
     - Probabilistic principal component [`PPCA`]
 
-### Moment Estimation
+### Moment estimation
 
-#### [Expected Returns](@id readme-expected-returns)
+#### Expected returns
 
 Overloads `Statistics.mean`.
 
@@ -487,13 +487,13 @@ Overloads `Statistics.mean`.
     - Mean Squared Error [`MeanSquaredError`]
 - Standard deviation expected returns [`StandardDeviationExpectedReturns`]-(TBA)
 
-#### [Variance and Standard Deviation](@id readme-variance)
+#### Variance and standard deviation
 
 Overloads `Statistics.var` and `Statistics.std`.
 
 - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`]
 
-#### [Covariance and Correlation](@id readme-covariance-correlation)
+#### Covariance and correlation
 
 Overloads `Statistics.cov` and `Statistics.cor`.
 
@@ -546,7 +546,7 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`]
 - Correlation covariance [`CorrelationCovariance`]-(TBA)
 
-#### [Coskewness](@id readme-coskewness)
+#### Coskewness
 
 Implements [`coskewness`].
 
@@ -554,7 +554,7 @@ Implements [`coskewness`].
   - Full coskewness [`Full`]
   - Semi (downside) coskewness [`Semi`]
 
-#### [Cokurtosis](@id readme-cokurtosis)
+#### Cokurtosis
 
 Implements [`cokurtosis`].
 
@@ -695,7 +695,7 @@ The following estimator can only generate box sets.
 
 - [`DeltaUncertaintySet`]
 
-### [Turnover](@id readme-turnover)
+### Turnover
 
 The turnover is defined as the element-wise absolute difference between the vector of current weights and a vector of benchmark weights. It can be used as a constraint, method for fee calculation, and risk measure. These are all implemented using [`turnover_constraints`], [`TurnoverEstimator`], and [`Turnover`].
 
@@ -714,7 +714,7 @@ Fees are a non-negligible aspect of active investing. As such `PortfolioOptimise
 
 Various risk measures and analyses require the computation of simple and cumulative portfolio returns and drawdowns both in aggregate and per-asset. These are computed by [`calc_net_returns`], [`calc_net_asset_returns`], [`cumulative_returns`], [`drawdowns`].
 
-### [Tracking](@id readme-tracking)
+### Tracking
 
 It is often useful to create portfolios that track the performance of an index, indicator, or another portfolio.
 
@@ -1013,7 +1013,7 @@ These optimisations attempt to achieve weight values according to a risk budget 
   - L1
   - L2
 
-#### [Clustering](@id readme-clustering-opt)
+#### Clustering
 
 Clustering optimisations make use of asset relationships to either minimise the risk exposure by breaking the asset universe into subsets which are hierarchically or individually optimised.
 

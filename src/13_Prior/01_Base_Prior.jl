@@ -138,6 +138,8 @@ Abstract supertype for high order prior estimators.
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
+const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                <:AbstractHighOrderPriorEstimator_F}
 """
     abstract type AbstractPriorResult <: AbstractResult end
 
@@ -177,6 +179,10 @@ Compute prior information from asset and/or factor returns using a prior estimat
   - [`AbstractPriorResult`](@ref)
 """
 function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError)
+    if isa(pr, AbstractHiLoOrderPriorEstimator_F)
+        @argcheck(!isnothing(rd.F), IsNothingError)
+    end
     return prior(pr, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """

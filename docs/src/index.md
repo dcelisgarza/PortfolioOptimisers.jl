@@ -268,7 +268,7 @@ There are other kinds of plots which we explore in the [examples](https://dcelis
 - Find complete indices [`find_complete_indices`](@ref)
 - Find uncorrelated indices [`find_uncorrelated_indices`]-(@ref)
 
-### Matrix Processing
+### Matrix processing
 
 - Positive definite projection [`Posdef`](@ref), [`posdef!`](@ref), [`posdef`](@ref)
 - Denoising [`Denoise`](@ref), [`denoise!`](@ref), [`denoise`](@ref)
@@ -278,7 +278,7 @@ There are other kinds of plots which we explore in the [examples](https://dcelis
 - Detoning [`Detone`](@ref), [`detone!`](@ref), [`detone`](@ref)
 - Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing`](@ref), [`DenoiseDetoneAlg`](@ref), [`DenoiseAlgDetone`](@ref), [`DetoneDenoiseAlg`](@ref), [`DetoneAlgDenoise`](@ref), [`AlgDenoiseDetone`](@ref), [`AlgDetoneDenoise`](@ref)
 
-### Regression Models
+### Regression models
 
 Factor prior models and implied volatility use [`regression`](@ref) in their estimation, which return a [`Regression`](@ref) object.
 
@@ -306,9 +306,9 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
     - Principal component [`PCA`](@ref)
     - Probabilistic principal component [`PPCA`](@ref)
 
-### Moment Estimation
+### Moment estimation
 
-#### [Expected Returns](@id readme-expected-returns)
+#### [Expected returns](@id readme-expected-returns)
 
 Overloads `Statistics.mean`.
 
@@ -326,13 +326,13 @@ Overloads `Statistics.mean`.
     - Mean Squared Error [`MeanSquaredError`](@ref)
 - Standard deviation expected returns [`StandardDeviationExpectedReturns`]-(@ref)
 
-#### [Variance and Standard Deviation](@id readme-variance)
+#### [Variance and standard deviation](@id readme-variance)
 
 Overloads `Statistics.var` and `Statistics.std`.
 
 - Optionally weighted variance with custom expected returns estimator [`SimpleVariance`](@ref)
 
-#### [Covariance and Correlation](@id readme-covariance-correlation)
+#### [Covariance and correlation](@id readme-covariance-correlation)
 
 Overloads `Statistics.cov` and `Statistics.cor`.
 
