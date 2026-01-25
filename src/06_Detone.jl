@@ -9,23 +9,23 @@ All concrete types representing detoning estimators should subtype `AbstractDeto
 
 In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` including all necessary parameters as part of the struct, and implement the following methods:
 
-  - [`detone!`](@ref): In-place detoning.
-  - [`detone`](@ref): Optional out-of-place detoning.
+  - `detone!(dt::AbstractDetoneEstimator, X::MatNum)`: In-place detoning.
+  - `detone(dt::AbstractDetoneEstimator, X::MatNum)`: Optional out-of-place detoning.
 
 For example, we can create a dummy detoning estimator as follows:
 
 ```jldoctest
 julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator end
 
-julia> function PortfolioOptimisers.detone!(est::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.detone!(dt::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place detoning estimator here.
            println("Detoning matrix in-place...")
            return nothing
        end
 
-julia> function PortfolioOptimisers.detone(est::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.detone(dt::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
-           detone!(est, X)
+           detone!(dt, X)
            return X
        end
 

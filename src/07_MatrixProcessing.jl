@@ -9,8 +9,8 @@ All concrete types that implement matrix processing routines—such as covarianc
 
 In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` including all necessary parameters as part of the struct, and implement the following methods:
 
-  - [`matrix_processing!`](@ref): In-place processing of a covariance or correlation matrix.
-  - [`matrix_processing`](@ref): Optional out-of-place processing of a covariance or correlation matrix.
+  - `matrix_processing!`(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...): In-place processing of a covariance or correlation matrix.
+  - `matrix_processing`(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...): Optional out-of-place processing of a covariance or correlation matrix.
 
 For example, we can create a dummy matrix processing estimator as follows:
 

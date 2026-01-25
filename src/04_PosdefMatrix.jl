@@ -9,23 +9,23 @@ All concrete types that implement positive definite matrix projection or estimat
 
 In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` including all necessary parameters as part of the struct, and implement the following methods:
 
-  - [`posdef!`](@ref): In-place projection of a matrix to the nearest positive definite matrix.
-  - [`posdef`](@ref): Optional out-of-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum)`: In-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum)`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
 
 For example, we can create a dummy positive definite estimator as follows:
 
 ```jldoctest
 julia> struct MyPosdefEstimator <: PortfolioOptimisers.AbstractPosdefEstimator end
 
-julia> function PortfolioOptimisers.posdef!(est::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.posdef!(pdm::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place PD projection logic here.
            println("Projecting to positive definite matrix in-place...")
            return nothing
        end
 
-julia> function PortfolioOptimisers.posdef(est::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.posdef(pdm::MyPosdefEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
-           posdef!(est, X)
+           posdef!(pdm, X)
            return X
        end
 

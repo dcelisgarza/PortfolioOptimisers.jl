@@ -28,6 +28,81 @@ Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
 
 All concrete types that implement covariance estimation should subtype `AbstractCovarianceEstimator`.
 
+# Interfaces
+
+In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractCovarianceEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`Statistics.cov`]: Covariance matrix estimation.
+  - [`Statistics.cor`]: Correlation matrix estimation.
+  - [`factory`](@ref): Factory method for creating instances of the estimator.
+
+If the estimator supports weights, include a weights field in the struct rather than as part of the function signatures.
+
+For example, we can create a dummy covariance estimator as follows:
+
+```jldoctest
+julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
+           w::T1
+           function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w) && isempty(w)
+                   throw(IsEmptyError("`w` cannot be an empty weights object"))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyCovarianceEstimator(;
+                                      w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyCovarianceEstimator(w)
+       end
+
+julia> function factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
+           return MyCovarianceEstimator(; w = w)
+       end
+
+julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = X * X'
+           return sigma
+       end
+
+julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = X * X'
+           d = LinearAlgebra.diag(sigma)
+           StatsBase.cov2cor!(sigma, sqrt.(d))
+           return sigma
+       end
+
+julia> cov(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×3 Matrix{Float64}:
+ 5.0  1.7   2.7
+ 1.7  0.58  0.92
+ 2.7  0.92  1.46
+
+julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×3 Matrix{Float64}:
+ 1.0       0.998274  0.999315
+ 0.998274  1.0       0.999764
+ 0.999315  0.999764  1.0
+```
+
 # Related
 
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
@@ -40,6 +115,96 @@ abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
 
 All concrete types that implement variance estimation should subtype `AbstractVarianceEstimator`.
+
+# Interfaces
+
+In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractVarianceEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+
+  - [`Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`]: Variance estimation.
+  - [`Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`]: Standard deviation estimation.
+  - [`Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`]: Variance estimation.
+  - [`Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`]: Standard deviation estimation.
+  - [`factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`](@ref): Factory method for creating instances of the estimator.
+
+If the estimator supports weights, include a weights field in the struct rather than as part of the function signatures.
+
+For example, we can create a dummy covariance estimator as follows:
+
+```jldoctest
+julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
+           w::T1
+           function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w) && isempty(w)
+                   throw(IsEmptyError("`w` cannot be an empty weights object"))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyVarianceEstimator(;
+                                    w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyVarianceEstimator(w)
+       end
+
+julia> function factory(::MyVarianceEstimator, w::StatsBase.AbstractWeights)
+           return MyVarianceEstimator(; w = w)
+       end
+
+julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = diag(X * X')
+           return isone(dims) ? reshape(sigma, :, 1) : reshape(sigma, 1, :)
+       end
+
+julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = sqrt.(diag(X * X'))
+           return isone(dims) ? reshape(sigma, :, 1) : reshape(sigma, 1, :)
+       end
+
+julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           return mean(diag(X' * X))
+       end
+
+julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           return sqrt(mean(diag(X' * X)))
+       end
+
+julia> var(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×3 Matrix{Float64}:
+ 5.0  1.7   2.7
+ 1.7  0.58  0.92
+ 2.7  0.92  1.46
+
+julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×3 Matrix{Float64}:
+ 1.0       0.998274  0.999315
+ 0.998274  1.0       0.999764
+ 0.999315  0.999764  1.0
+
+[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+[`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
+```
 
 # Related
 

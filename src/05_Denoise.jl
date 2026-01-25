@@ -9,24 +9,23 @@ All concrete types that implement denoising of covariance-like or correlation-li
 
 In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` including all necessary parameters as part of the struct, and implement the following methods:
 
-  - [`denoise!`](@ref): In-place denoising.
-  - [`denoise`](@ref): Optional out-of-place denoising.
+  - `denoise!(de::AbstractDenoiseEstimator, X::MatNum, q::Number)`: In-place denoising.
+  - `denoise(de::AbstractDenoiseEstimator, X::MatNum, q::Number)`: Optional out-of-place denoising.
 
 For example, we can create a dummy denoising estimator as follows:
 
 ```jldoctest
 julia> struct MyDenoiseEstimator <: PortfolioOptimisers.AbstractDenoiseEstimator end
 
-julia> function PortfolioOptimisers.denoise!(est::MyDenoiseEstimator,
-                                             X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.denoise!(de::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place denoising estimator here.
            println("Denoising matrix in-place...")
            return nothing
        end
 
-julia> function PortfolioOptimisers.denoise(est::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.denoise(de::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
-           denoise!(est, X)
+           denoise!(de, X)
            return X
        end
 
@@ -59,7 +58,7 @@ All concrete types that implement a specific denoising algorithm should subtype 
 
 If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, including all necessary parameters as part of the struct, and implement the following method:
 
-  - [`_denoise!`](@ref): In-place denoising of a covariance or correlation matrix using the specific algorithm.
+  - `_denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum, num_factors::Integer)`: In-place denoising of a covariance or correlation matrix using the specific algorithm.
 
 For example, we can create a dummy denoising algorithm as follows:
 
