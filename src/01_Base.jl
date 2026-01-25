@@ -706,7 +706,7 @@ const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
                  :cle => "`cle`: Clusters estimator.",
                  :clr => "`clr`: Clusters result.",
                  :cler => "`cle`: Clusters estimator or result.",
-                 :ple => "`pl`: Phylogeny estimator.", 
+                 :ple => "`pl`: Phylogeny estimator.",
                  :plr => "`pl`: Phylogeny result.",
                  :pler => "`pl`: Phylogeny estimator or result.",
                  :nte => "`pl`: Network estimator.",
@@ -748,18 +748,21 @@ const glossary = Dict(
                       :oow => "`w`: Optional observation weights vector.",
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
+                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
                       :dn => "`dn`: Matrix denoising estimator.",
+                      :odn => "`dn`: Optional matrix denoising estimator.",
                       :dna => "`dna`: Matrix denoising algorithm.",
                       :dt => "`dt`: Matrix detoning estimator.",
-                      :mp => "`mp`: Matrix processing estimator.",
-                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
-                      :odn => "`dn`: Optional matrix denoising estimator.",
                       :odt => "`dt`: Optional matrix detoning estimator.",
+                      :mp => "`mp`: Matrix processing estimator.",
                       :omp => "`mp`: Optional matrix processing estimator.",
+                      :mpa => "`mpa`: Matrix processing algorithm.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
                       :ce => "`ce`: Covariance estimator.",#
+                      :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
                       :ve => "`ve`: Variance estimator.",#
+                      :nve => "`ve`: New variance estimator with the appropriate weights applied.",#
                       :ske => "`ske`: Coskewness estimator.",
                       :kte => "`kte`: Cokurtosis estimator.",
                       :de => "`de`: Distance matrix estimator.",
@@ -771,7 +774,7 @@ const glossary = Dict(
                       :cle => "`cle`: Clusters estimator.",#
                       :clr => "`clr`: Clusters result.",#
                       :cler => "`clr`: Clusters estimator or result.",#
-                      :ple => "`ple`: Phylogeny estimator.",# 
+                      :ple => "`ple`: Phylogeny estimator.",#
                       :plr => "`plr`: Phylogeny result.",
                       :pler => "`pl`: Phylogeny estimator or result.",
                       :nte => "`nte`: Network estimator.",#
@@ -809,11 +812,11 @@ const glossary = Dict(
                       :rho => "`rho`: Correlation matrix.",
                       :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
                       :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
-                      :kt => "`kt`: Cokurtosis matrix.",# 
+                      :kt => "`kt`: Cokurtosis matrix.",#
                       :sk => "`sk`: Coskewness matrix.",#
                       :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
                       :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.")
+                      :F => "`F`: Data matrix.", :Xv => "`X`: Data vector.")
 
 """
     validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")

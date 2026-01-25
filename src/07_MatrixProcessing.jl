@@ -7,12 +7,26 @@ All concrete types that implement matrix processing routines—such as covarianc
 
 # Interfaces
 
-In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `matrix_processing!`(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...): In-place processing of a covariance or correlation matrix.
-  - `matrix_processing`(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...): Optional out-of-place processing of a covariance or correlation matrix.
+  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...)`: In-place processing of a covariance or correlation matrix.
+  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...)`: Optional out-of-place processing of a covariance or correlation matrix.
 
-For example, we can create a dummy matrix processing estimator as follows:
+## Arguments
+
+  - $(glossary[:mp])
+  - $(glossary[:sigrho])
+  - $(glossary[:X])
+  - `args...`: Additional positional arguments passed to custom algorithms.
+  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+
+## Returns
+
+  - `sigma::MatNum`: The processed input matrix `sigma`.
+
+# Examples
+
+We can create a dummy matrix processing estimator as follows:
 
 ```jldoctest
 julia> struct MyMatrixProcessingEstimator <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
@@ -61,12 +75,24 @@ All concrete types that implement a specific matrix processing algorithm should 
 
 # Interfaces
 
-In order to implement a new matrix processing algorithm that works with the current matrix processing estimator, subtype `AbstractMatrixProcessingAlgorithm`, including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new matrix processing algorithm that works with the current matrix processing estimator, subtype `AbstractMatrixProcessingAlgorithm`, with all necessary parameters as part of the struct, and implement the following methods:
 
-  - [`matrix_processing_algorithm!`](@ref): In-place application of a custom matrix processing algorithm.
-  - [`matrix_processing_algorithm`](@ref): Optional out-of-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...)`: In-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...)`: Optional out-of-place application of a custom matrix processing algorithm.
 
-For example, we can create a dummy matrix processing algorithm as follows:
+## Arguments
+
+  - $(glossary[:mpa])
+  - `args...`: Additional positional arguments.
+  - `kwargs...`: Additional keyword arguments.
+
+## Returns
+
+  - `sigma::MatNum`: The input matrix `sigma` after applying the algorithm.
+
+# Examples
+
+We can create a dummy matrix processing algorithm as follows:
 
 ```jldoctest
 julia> struct MyMatrixProcessingAlgorithm <: PortfolioOptimisers.AbstractMatrixProcessingAlgorithm end

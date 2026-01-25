@@ -7,12 +7,23 @@ All concrete types representing detoning estimators should subtype `AbstractDeto
 
 # Interfaces
 
-In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
   - `detone!(dt::AbstractDetoneEstimator, X::MatNum)`: In-place detoning.
   - `detone(dt::AbstractDetoneEstimator, X::MatNum)`: Optional out-of-place detoning.
 
-For example, we can create a dummy detoning estimator as follows:
+## Arguments
+
+  - $(glossary[:odt])
+  - $(glossary[:sigrhoX])
+
+## Returns
+
+  - `X::MatNum`: The detoned input matrix `X`.
+
+# Examples
+
+We can create a dummy detoning estimator as follows:
 
 ```jldoctest
 julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator end

@@ -7,12 +7,23 @@ All concrete types that implement positive definite matrix projection or estimat
 
 # Interfaces
 
-In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
   - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum)`: In-place projection of a matrix to the nearest positive definite matrix.
   - `posdef(pdm::AbstractPosdefEstimator, X::MatNum)`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
 
-For example, we can create a dummy positive definite estimator as follows:
+## Arguments
+
+  - $(glossary[:pdm])
+  - $(glossary[:sigrhoX])
+
+## Returns
+
+  - `X::MatNum`: The projected input matrix `X`.
+
+# Examples
+
+We can create a dummy positive definite estimator as follows:
 
 ```jldoctest
 julia> struct MyPosdefEstimator <: PortfolioOptimisers.AbstractPosdefEstimator end

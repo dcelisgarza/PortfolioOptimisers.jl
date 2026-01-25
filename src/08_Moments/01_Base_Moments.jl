@@ -30,15 +30,39 @@ All concrete types that implement covariance estimation should subtype `Abstract
 
 # Interfaces
 
-In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractCovarianceEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractCovarianceEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
 
-  - [`Statistics.cov`]: Covariance matrix estimation.
-  - [`Statistics.cor`]: Correlation matrix estimation.
-  - [`factory`](@ref): Factory method for creating instances of the estimator.
+## Covariance and correlation
 
-If the estimator supports weights, include a weights field in the struct rather than as part of the function signatures.
+  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`]: Covariance matrix estimation.
+  - [`Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`]: Correlation matrix estimation.
 
-For example, we can create a dummy covariance estimator as follows:
+### Arguments
+
+  - $(glossary[:ce])
+  - $(glossary[:X])
+  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
+
+### Returns
+
+  - `sigma::MatNum`: Covariance matrix.
+
+## Factory method
+
+  - [`factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights)`]: Factory method for creating instances of the estimator.
+
+### Arguments
+
+  - $(glossary[:ce])
+  - $(glossary[:ow])
+
+### Returns
+
+  - $(glossary[:nce])
+
+# Examples
+
+We can create a dummy covariance estimator as follows:
 
 ```jldoctest
 julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
@@ -118,17 +142,51 @@ All concrete types that implement variance estimation should subtype `AbstractVa
 
 # Interfaces
 
-In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractVarianceEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractVarianceEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
 
-  - [`Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`]: Variance estimation.
-  - [`Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`]: Standard deviation estimation.
-  - [`Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`]: Variance estimation.
-  - [`Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`]: Standard deviation estimation.
-  - [`factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`](@ref): Factory method for creating instances of the estimator.
+## Variance and standard deviation
 
-If the estimator supports weights, include a weights field in the struct rather than as part of the function signatures.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Standard deviation estimation.
 
-For example, we can create a dummy covariance estimator as follows:
+### Arguments
+
+  - $(glossary[:ve])
+
+  - `X`
+
+      + $(glossary[:X])
+      + $(glossary[:Xv])
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+### Returns
+
+  - $(glossary[:X])
+
+      + `val::MatNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+
+  - $(glossary[:Xv])
+
+      + `val::VecNum`: Variance or standard deviation of `X`.
+
+## Factory method
+
+  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator.
+
+### Arguments
+
+  - $(glossary[:ve])
+  - $(glossary[:ow])
+
+### Returns
+
+  - $(glossary[:nve])
+
+# Examples
+
+We can create a dummy variance estimator as follows:
 
 ```jldoctest
 julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
