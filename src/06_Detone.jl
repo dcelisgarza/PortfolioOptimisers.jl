@@ -20,19 +20,24 @@ julia> struct MyDetoneEstimator <: PortfolioOptimisers.AbstractDetoneEstimator e
 julia> function PortfolioOptimisers.detone!(dt::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place detoning estimator here.
            println("Detoning matrix in-place...")
-           return nothing
+           return X
        end
 
 julia> function PortfolioOptimisers.detone(dt::MyDetoneEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
+           println("Copy X...")
            detone!(dt, X)
            return X
        end
 
 julia> detone!(MyDetoneEstimator(), [1.0 2.0; 2.0 1.0])
 Detoning matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
 
 julia> detone(MyDetoneEstimator(), [1.0 2.0; 2.0 1.0])
+Copy X...
 Detoning matrix in-place...
 2×2 Matrix{Float64}:
  1.0  2.0
@@ -106,7 +111,7 @@ function Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
 end
 """
     detone!(dt::Detone, X::MatNum)
-    detone!(::Nothing, args...)
+    detone!(::Nothing, X::MatNum)
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -123,7 +128,7 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Returns
 
-  - `nothing`. The input matrix `X` is modified in-place.
+  - `X::MatNum`: The input matrix `X` is modified in-place.
 
 # Validation
 
@@ -169,8 +174,8 @@ julia> X
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
-function detone!(::Nothing, args...)
-    return nothing
+function detone!(::Nothing, X::MatNum)
+    return X
 end
 function detone!(de::Detone, X::MatNum)
     n = de.n
@@ -192,11 +197,11 @@ function detone!(de::Detone, X::MatNum)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
-    return nothing
+    return X
 end
 """
     detone(dt::Detone, X::MatNum)
-    detone(::Nothing, args...)
+    detone(::Nothing, X::MatNum)
 
 Out-of-place version of [`detone!`](@ref).
 
@@ -212,8 +217,8 @@ Out-of-place version of [`detone!`](@ref).
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
-function detone(::Nothing, args...)
-    return nothing
+function detone(::Nothing, X::MatNum)
+    return X
 end
 function detone(de::Detone, X::MatNum)
     X = copy(X)

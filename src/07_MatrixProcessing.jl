@@ -22,7 +22,7 @@ julia> function PortfolioOptimisers.matrix_processing!(est::MyMatrixProcessingEs
                                                        X::PortfolioOptimisers.MatNum)
            # Implement your in-place matrix processing logic here.
            println("Processing matrix in-place...")
-           return nothing
+           return sigma
        end
 
 julia> function PortfolioOptimisers.matrix_processing(est::MyMatrixProcessingEstimator,
@@ -35,6 +35,9 @@ julia> function PortfolioOptimisers.matrix_processing(est::MyMatrixProcessingEst
 
 julia> matrix_processing!(MyMatrixProcessingEstimator(), [1.0 2.0; 2.0 1.0], rand(10, 2))
 Processing matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
 
 julia> matrix_processing(MyMatrixProcessingEstimator(), [1.0 2.0; 2.0 1.0], rand(10, 2))
 Processing matrix in-place...
@@ -74,7 +77,7 @@ julia> function PortfolioOptimisers.matrix_processing_algorithm!(alg::MyMatrixPr
                                                                  kwargs...)
            # Implement your in-place matrix processing algorithm logic here.
            println("Applying custom matrix processing algorithm in-place...")
-           return nothing
+           return sigma
        end
 
 julia> function PortfolioOptimisers.matrix_processing_algorithm(alg::MyMatrixProcessingAlgorithm,
@@ -224,7 +227,7 @@ Matrix processing order: Custom Algorithm → Detoning → Denoising.
 """
 struct AlgDetoneDenoise <: AbstractMatrixProcessingOrder end
 """
-    matrix_processing_algorithm!(::Nothing, args...; kwargs...)
+    matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
 
 No-op fallback for matrix processing algorithm routines.
 
@@ -238,18 +241,18 @@ These methods are called internally when no matrix processing algorithm is speci
 
 # Returns
 
-  - `nothing`.
+  - `sigma::MatNum`: The input matrix `sigma` is returned unchanged.
 
 # Related
 
   - [`matrix_processing_algorithm`](@ref)
   - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
 """
-function matrix_processing_algorithm!(::Nothing, args...; kwargs...)
-    return nothing
+function matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
+    return sigma
 end
 """
-    matrix_processing_algorithm(::Nothing, args...; kwargs...)
+    matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
 
 Same as [`matrix_processing_algorithm!`](@ref), but meant for returning a new matrix instead of modifying it in-place.
 
@@ -258,8 +261,8 @@ Same as [`matrix_processing_algorithm!`](@ref), but meant for returning a new ma
   - [`matrix_processing_algorithm!`](@ref)
   - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
 """
-function matrix_processing_algorithm(::Nothing, args...; kwargs...)
-    return nothing
+function matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
+    return sigma
 end
 """
     struct DenoiseDetoneAlgMatrixProcessing{T1, T2, T3, T4, T5} <: AbstractMatrixProcessingEstimator
@@ -372,7 +375,7 @@ end
 """
     matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
                        kwargs...)
-    matrix_processing!(::Nothing, args...; kwargs...)
+    matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
 
 No-op fallback for in-place processing of a covariance or correlation matrix.
 
@@ -386,7 +389,7 @@ No-op fallback for in-place processing of a covariance or correlation matrix.
 
 # Returns
 
-  - `nothing`. The input matrix `sigma` is modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
 
 # Related
 
@@ -399,8 +402,8 @@ No-op fallback for in-place processing of a covariance or correlation matrix.
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`MatNum`](@ref)
 """
-function matrix_processing!(::Nothing, args...; kwargs...)
-    return nothing
+function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
+    return sigma
 end
 """
     matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing, sigma::MatNum, X::MatNum, args...;
@@ -420,7 +423,7 @@ This method applies a sequence of matrix processing steps to the input covarianc
 
 # Returns
 
-  - `nothing`. The input matrix `sigma` is modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
 
 # Details
 
@@ -448,8 +451,6 @@ julia> sigma = cov(X)
  -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
 
 julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; dn = Denoise()), sigma, X)
-
-julia> sigma
 5×5 Matrix{Float64}:
  0.132026  0.0        0.0        0.0        0.0
  0.0       0.0514194  0.0        0.0        0.0
@@ -466,8 +467,6 @@ julia> sigma = cov(X)
  -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
 
 julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; dt = Detone()), sigma, X)
-
-julia> sigma
 5×5 Matrix{Float64}:
  0.132026    0.0124802   0.0117303    0.0176194    0.0042142
  0.0124802   0.0514194   0.0273105   -0.0290864    0.0088165
@@ -501,7 +500,7 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     denoise!(mp.dn, sigma, T / N)
     detone!(mp.dt, sigma)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
-    return nothing
+    return sigma
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:DenoiseAlgDetone},
@@ -511,7 +510,7 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     denoise!(mp.dn, sigma, T / N)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
     detone!(mp.dt, sigma)
-    return nothing
+    return sigma
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:DetoneDenoiseAlg},
@@ -521,7 +520,7 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     detone!(mp.dt, sigma)
     denoise!(mp.dn, sigma, T / N)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
-    return nothing
+    return sigma
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:DetoneAlgDenoise},
@@ -531,7 +530,7 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     detone!(mp.dt, sigma)
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
     denoise!(mp.dn, sigma, T / N)
-    return nothing
+    return sigma
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:AlgDenoiseDetone},
@@ -541,7 +540,7 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
     denoise!(mp.dn, sigma, T / N)
     detone!(mp.dt, sigma)
-    return nothing
+    return sigma
 end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:AlgDetoneDenoise},
@@ -551,7 +550,7 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
     detone!(mp.dt, sigma)
     denoise!(mp.dn, sigma, T / N)
-    return nothing
+    return sigma
 end
 """
     matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
@@ -571,8 +570,8 @@ Out-of-place version of [`matrix_processing!`](@ref).
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`MatNum`](@ref)
 """
-function matrix_processing(::Nothing, args...; kwargs...)
-    return nothing
+function matrix_processing(::Nothing, sigma::MatNum, args...; kwargs...)
+    return sigma
 end
 function matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum,
                            args...; kwargs...)
