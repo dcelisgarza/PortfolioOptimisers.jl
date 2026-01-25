@@ -5,55 +5,72 @@ description: Generate Julia docstrings.
 
 Create Julia docstrings for the selected code.
 
-  - Extremely important to follow the established style.
-  - Place the type (without constructor), function (with type information), or macro (with type information).
-  - Give a general description.
+- Extremely important to follow the established style.
+- Place the type (without constructor), function (with type information), or macro (with type information).
+- Give a general description.
 
 ## Abstract types
 
-  - Add a heading "# Related Types" at the end of the docstring.
-    
-      + List the subtypes.
+- Add a heading "# Interfaces".
+
+  - List the interfaces it implements.
+
+  - For each interface add:
+
+    - Add a subheading "## Arguments".
+      - List and describe the arguments of the interface.
+
+    - Add a subheading "## Returns".
+
+      - List the return values with their types and a description
+
+- Add a heading "# Examples".
+
+  - Provide an example of implementing all the interfaces as a jldoctest.
+
+- Add a heading "# Related Types" at the end of the docstring.
+
+  - List the subtypes.
 
 ## Concrete Types
 
-  - Add a heading "# Fields".
-    
-      + List the fields without their types.
-      + Every field should have a description of what it does.
+- Add a heading "# Fields".
 
-  - If applicable, add a heading "# Constructors".
-    
-      + List the keyword constructors in codeblocks.
-      + Include their types and default arguments.
-      + Write how the arguments correspond to the fields.
-  - If applicable, add a subheading "## Validation".
-    
-      + List the validation rules.
-  - If applicable, add a heading "# Examples".
-    
-      + Provide a short example as a jldoctest.
-  - Add a heading "# Related" at the end of the docstring.
-    
-      + List related types, functions, macros, and packages with links.
+  - List the fields without their types.
+  - Every field should have a description of what it does.
+
+- If applicable, add a heading "# Constructors".
+
+  - List the keyword constructors in codeblocks.
+  - Include their types and default arguments.
+  - Write how the arguments correspond to the fields.
+- If applicable, add a subheading "## Validation".
+
+  - List the validation rules.
+- If applicable, add a heading "# Examples".
+
+  - Provide a short example as a jldoctest.
+- Add a heading "# Related" at the end of the docstring.
+
+  - List related types, functions, macros, and packages with links.
 
 ## Functions and Macros
 
-  - Add a heading "# Arguments".
-    
-      + List the arguments and keyword arguments without their types.
-      + Every argument should have a description of what it does.
+- Add a heading "# Arguments".
 
-  - Add a heading "# Returns".
-    
-      + Describe what it returns.
-      + Include type information.
-  - If applicable, add a heading "# Validation".
-    
-      + List the validation rules.
-  - Add a heading "# Details".
-    
-      + Provide a bullet point summary of the behavior.
-  - Add a heading "# Related" at the end of the docstring.
-    
-      + List related types, functions, macros, and packages with links.
+  - List the arguments and keyword arguments without their types.
+  - Every argument should have a description of what it does.
+
+- Add a heading "# Returns".
+
+  - Describe what it returns.
+  - Include type information.
+- If applicable, add a heading "# Validation".
+
+  - List the validation rules.
+- Add a heading "# Details".
+
+  - Provide a bullet point summary of the behavior.
+- Add a heading "# Related" at the end of the docstring.
+
+  - List related types, functions, macros, and packages with links.
