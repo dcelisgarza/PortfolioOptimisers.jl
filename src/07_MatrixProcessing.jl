@@ -43,6 +43,7 @@ julia> function PortfolioOptimisers.matrix_processing(est::MyMatrixProcessingEst
                                                       sigma::PortfolioOptimisers.MatNum,
                                                       X::PortfolioOptimisers.MatNum)
            sigma = copy(sigma)
+           println("Copy sigma...")
            matrix_processing!(est, sigma, X)
            return sigma
        end
@@ -54,6 +55,7 @@ Processing matrix in-place...
  2.0  1.0
 
 julia> matrix_processing(MyMatrixProcessingEstimator(), [1.0 2.0; 2.0 1.0], rand(10, 2))
+Copy sigma...
 Processing matrix in-place...
 2×2 Matrix{Float64}:
  1.0  2.0
@@ -112,8 +114,7 @@ julia> function PortfolioOptimisers.matrix_processing_algorithm(alg::MyMatrixPro
                                                                 kwargs...)
            sigma = copy(sigma)
            println("Copy sigma...")
-           matrix_processing_algorithm!(alg, sigma, X; kwargs...)
-           return sigma
+           return PortfolioOptimisers.matrix_processing_algorithm!(alg, sigma, X; kwargs...)
        end
 
 julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; alg = MyMatrixProcessingAlgorithm()),
@@ -123,13 +124,13 @@ Applying custom matrix processing algorithm in-place...
  1.0  1.0
  1.0  1.0
 
-julia> matrix_processing(DenoiseDetoneAlgMatrixProcessing(; alg = MyMatrixProcessingAlgorithm()),
-                         [1.0 2.0; 2.0 1.0], rand(10, 2))
+julia> PortfolioOptimisers.matrix_processing_algorithm(MyMatrixProcessingAlgorithm(),
+                                                       [1.0 2.0; 2.0 1.0], rand(10, 2))
 Copy sigma...
 Applying custom matrix processing algorithm in-place...
 2×2 Matrix{Float64}:
- 1.0  1.0
- 1.0  1.0
+ 1.0  2.0
+ 2.0  1.0
 ```
 
 # Related

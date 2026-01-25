@@ -10,5 +10,5 @@
             push!(no_docs, sym)
         end
     end
-    @test length(no_docs) == 382
+    @test length(no_docs) == 381
 end
