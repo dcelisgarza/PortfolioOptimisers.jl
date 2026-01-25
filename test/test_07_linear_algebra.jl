@@ -55,7 +55,7 @@
         @test !LinearAlgebra.isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
 
-        @test isnothing(posdef(nothing))
+        @test posdef(nothing, sigma2) === sigma2
     end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
@@ -76,7 +76,7 @@
             end
             @test success
         end
-        @test isnothing(denoise(nothing))
+        @test denoise(nothing, pr.sigma) === pr.sigma
         sigma1 = copy(pr.sigma)
         sigma2 = denoise(des[2], sigma1, q)
         denoise!(des[2], sigma1, q)
@@ -95,16 +95,17 @@
             end
             @test success
         end
-        @test isnothing(detone(nothing))
+        @test denoise(nothing, pr.sigma) === pr.sigma
         sigma1 = copy(pr.sigma)
         sigma2 = detone(des[2], sigma1)
         detone!(des[2], sigma1)
         @test sigma1 == sigma2
     end
     @testset "Matrix processing" begin
-        @test isnothing(matrix_processing!(nothing))
-        @test isnothing(matrix_processing(nothing))
-        @test isnothing(PortfolioOptimisers.matrix_processing_algorithm(nothing))
+        @test matrix_processing!(nothing, pr.sigma) === pr.sigma
+        @test matrix_processing(nothing, pr.sigma) === pr.sigma
+        @test PortfolioOptimisers.matrix_processing_algorithm(nothing, pr.sigma) ===
+              pr.sigma
         sigma1 = copy(pr.sigma)
         sigma2 = copy(pr.sigma)
         sigma3 = copy(pr.sigma)

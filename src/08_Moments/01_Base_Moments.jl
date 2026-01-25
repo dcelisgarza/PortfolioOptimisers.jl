@@ -79,10 +79,12 @@ julia> function MyCovarianceEstimator(;
                                       w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
            return MyCovarianceEstimator(w)
        end
+MyCovarianceEstimator
 
 julia> function factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
            return MyCovarianceEstimator(; w = w)
        end
+factory (generic function with 1 method)
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
@@ -261,10 +263,6 @@ julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
  2.23606797749979
  0.7615773105863908
  1.2083045973594573
-
-
-[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-[`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 ```
 
 # Related

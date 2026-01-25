@@ -93,7 +93,7 @@ function predict_outer_st_estimator_returns(st::Stacking, rd::ReturnsResult,
     ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
     X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
     for (i, res) in enumerate(resi)
-        X[:, i] = predict(res, pr, fees)
+        X[:, i] = calc_net_returns(res, pr, fees)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)

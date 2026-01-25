@@ -205,6 +205,16 @@ end
 function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
     return nothing
 end
+"""
+fees takes precedence over res.fees if both are provided
+"""
+function calc_net_returns(res::NonFiniteAllocationOptimisationResult,
+                          pr::AbstractPriorResult, fees::Option{<:Fees} = nothing)
+    if isnothing(fees) && hasproperty(res, :fees)
+        fees = res.fees
+    end
+    return calc_net_returns(res.w, pr.X, fees)
+end
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
