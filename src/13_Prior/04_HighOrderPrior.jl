@@ -352,7 +352,7 @@ HighOrderPriorEstimator
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
-      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton    
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │      dn ┼ nothing
       │           │      │      dt ┼ nothing
@@ -469,9 +469,9 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
         end
     end
     pr = prior(pe.pe, X, F; kwargs...)
-    kt = cokurtosis(pe.kte, pr.X; kwargs...)
+    kt = cokurtosis(pe.kte, X; kwargs...)
     L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(size(pr.X, 2))[2:3] : (nothing, nothing)
-    sk, V = coskewness(pe.ske, pr.X; kwargs...)
+    sk, V = coskewness(pe.ske, X; kwargs...)
     return HighOrderPrior(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
                           skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end

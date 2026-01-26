@@ -152,12 +152,8 @@
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
-        @test isapprox(pr2.kt,
-                       cokurtosis(Cokurtosis(; alg = Full()), pr2.X;
-                                  mean = transpose(pr2.mu)))
-        @test all(isapprox.((pr2.sk, pr2.V),
-                            coskewness(Coskewness(; alg = Full()), pr2.X;
-                                       mean = transpose(pr2.mu))))
+        @test isapprox(pr2.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
+        @test all(isapprox.((pr2.sk, pr2.V), coskewness(Coskewness(; alg = Full()), rd.X)))
     end
     @testset "High Order Factor Prior" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HighOrderFactorPrior.csv.gz"), DataFrame)
