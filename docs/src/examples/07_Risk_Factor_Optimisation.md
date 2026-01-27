@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/07_Risk_Factor_Optimisation.jl"
 ```
@@ -76,7 +77,7 @@ rd = prices_to_returns(X, F)
 
 Priors whos names don't start with the prefix `High` return [`LowOrderPrior`](@ref), while those that do return [`HighOrderPrior`](@ref) objects.
 
-We have two different regression models with various targets. We won't explore them all in detail here, see [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) for details. First lets define the prior estimators.
+We have two different regression models with various targets. We won't explore them all in detail here, see [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) for details. First let's define the prior estimators.
 
 ````@example 07_Risk_Factor_Optimisation
 pes = [EmpiricalPrior(),#
@@ -91,13 +92,13 @@ pes = [EmpiricalPrior(),#
                                                       re = DimensionReductionRegression()))]
 ````
 
-Now lets compute the prior statistics for each estimator.
+Now let's compute the prior statistics for each estimator.
 
 ````@example 07_Risk_Factor_Optimisation
 prs = prior.(pes, rd)
 ````
 
-First lets compare the first three prior results.
+First let's compare the first three prior results.
 
 The expected returns, found in the `mu` field, do not change much between [`EmpiricalPrior`](@ref) and [`FactorPrior`](@ref). Which illustrates one of the reasons why it's unwise to put much stock on expected returns estimates, since they are highly uncertain and sensitive to noise. We will explore different expected returns estimators, which attempt to improve this drawback in future examples.
 
@@ -145,7 +146,7 @@ println("prs[4].V  == prs[5].V  == prs[6].V : $(prs[4].V == prs[5].V == prs[6].V
 println("prs[4].kt == prs[5].kt == prs[6].kt: $(prs[4].kt == prs[5].kt == prs[6].kt)\n")
 ````
 
-Now lets compare the last four prior results. Remember the last two also use a factor model for the high order moments
+Now let's compare the last four prior results. Remember the last two also use a factor model for the high order moments
 
 ````@example 07_Risk_Factor_Optimisation
 for i in 5:7
@@ -164,13 +165,13 @@ end
 
 As expected, the higher moments are the same only for `prs[5]` and `prs[6]`, since neither of them adjust the higher moments using a factor model. However, their low order moments differ because they use different regression models. The low order moments of `prs[5]` and `prs[7]` use the [`StepwiseRegression`](@ref) model, while `prs[6]` and `prs[8]` use the [`DimensionReductionRegression`](@ref) model, so those match too. Aside from `prs[5]` and `prs[6]`, the higher order moments are computed using regression models.
 
-Lets compare what these higher order moments look like. First lets create the names for the higher order moments.
+Let's compare what these higher order moments look like. First let's create the names for the higher order moments.
 
 ````@example 07_Risk_Factor_Optimisation
 nx2 = collect(Iterators.flatten([(nx * "_") .* rd.nx for nx in rd.nx]))
 ````
 
-Now lets examine what the coskewness and its negative spectral slices look like.
+Now let's examine what the coskewness and its negative spectral slices look like.
 
 ````@example 07_Risk_Factor_Optimisation
 pretty_table(DataFrame([rd.nx prs[4].sk], ["Assets^2 / Assets"; nx2]);
@@ -236,7 +237,7 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
 
 ### 3.1 Mean-Standard deviation optimisation
 
-First lets examine the mean-standard deviation efficient frontier using the empirical and factor priors. We will compute the efficient fronteir with 50 points for all relevant priors.
+First let's examine the mean-standard deviation efficient frontier using the empirical and factor priors. We will compute the efficient fronteir with 50 points for all relevant priors.
 
 ````@example 07_Risk_Factor_Optimisation
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
@@ -254,7 +255,12 @@ mrs = [MeanRisk(; r = StandardDeviation(), obj = MinimumRisk(), opt = opt) for o
 ress = optimise.(mrs)
 ````
 
-Lets plot the efficient frontiers.
+Let's plot the efficient frontiers.
+
+````@example 07_Risk_Factor_Optimisation
+using GraphRecipes, StatsPlots
+````
+
 Empirical prior composition.
 
 ````@example 07_Risk_Factor_Optimisation
@@ -313,7 +319,7 @@ plot_measures(ress[3].w, prs[3]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 ````
 
-Lets optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
+Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 
 ````@example 07_Risk_Factor_Optimisation
 opts = [JuMPOptimiser(; pr = prs[1], slv = slv), JuMPOptimiser(; pr = prs[2], slv = slv),
@@ -352,7 +358,7 @@ mrs = [MeanRisk(; r = NegativeSkewness(), obj = MinimumRisk(), opt = opt) for op
 ress = optimise.(mrs)
 ````
 
-Lets plot the efficient frontiers.
+Let's plot the efficient frontiers.
 
 Empirical prior composition.
 
@@ -415,7 +421,7 @@ plot_measures(ress[3].w, prs[8]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret
               right_margin = 6Plots.mm)
 ````
 
-Lets optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
+Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 
 ````@example 07_Risk_Factor_Optimisation
 opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[7], slv = slv),
@@ -454,7 +460,7 @@ mrs = [MeanRisk(; r = Kurtosis(), obj = MinimumRisk(), opt = opt) for opt in opt
 ress = optimise.(mrs)
 ````
 
-Lets plot the efficient frontiers. However, this time when plotting the frontiers we will use the prior returns because the kurtosis risk measure is not computed from the cokurtosis matrix, but from the returns directly.
+Let's plot the efficient frontiers. However, this time when plotting the frontiers we will use the prior returns because the kurtosis risk measure is not computed from the cokurtosis matrix, but from the returns directly.
 Empirical prior composition.
 
 ````@example 07_Risk_Factor_Optimisation
@@ -515,7 +521,7 @@ plot_measures(ress[3].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret
               right_margin = 6Plots.mm)
 ````
 
-Lets optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
+Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 
 ````@example 07_Risk_Factor_Optimisation
 opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[7], slv = slv),
@@ -537,4 +543,3 @@ These findings are again consistent with the previous result, and reflective of 
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-
