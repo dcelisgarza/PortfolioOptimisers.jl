@@ -151,3 +151,8 @@ pretty_table(DataFrame([rd.nx prs[1].sigma], ["Assets"; rd.nx]); formatters = [m
 pretty_table(DataFrame([rd.nx prs[2].sigma], ["Assets"; rd.nx]); formatters = [mmtfmt],
              title = "Fixed denoise",
              source_notes = "Condition number fixed denoise: $(round(cond(prs[2].sigma); digits = 3))")
+pretty_table(DataFrame([rd.nx prs[3].sigma], ["Assets"; rd.nx]); formatters = [mmtfmt],
+             title = "LoGo(MaxDist)",
+             source_notes = "Condition number LoGo(MaxDist): $(round(cond(prs[3].sigma); digits = 3))")
+
+using GraphRecipes, StatsPlots

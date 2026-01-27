@@ -3,7 +3,7 @@
 
 This example shows how to use factor models to perform optimisations. These reduce the estimation error by modelling asset returns as a function of common risk factors.
 =#
-using PortfolioOptimisers, PrettyTables, GraphRecipes, StatsPlots
+using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
@@ -240,6 +240,7 @@ ress = optimise.(mrs)
 #=
 Lets plot the efficient frontiers.
 =#
+using GraphRecipes, StatsPlots
 # Empirical prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
