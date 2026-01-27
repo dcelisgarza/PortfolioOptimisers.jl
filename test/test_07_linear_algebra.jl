@@ -72,7 +72,7 @@
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")
-                find_tol(mu, df[!, i])
+                find_tol(vec(sigma1), df[!, i])
             end
             @test success
         end

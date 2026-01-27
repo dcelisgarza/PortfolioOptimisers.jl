@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/04_Pareto_Surface.jl"
 ```
@@ -115,8 +114,8 @@ r2 = Kurtosis()
 
 First we need to get the bounds of our pareto surface. We can do this in many different ways, the simplest are:
 
-- Minimise the risk using both risk measures simultaneously subject to optional constraints.
-- Maximise the return, utility or ratio subject to optional constraints.
+  - Minimise the risk using both risk measures simultaneously subject to optional constraints.
+  - Maximise the return, utility or ratio subject to optional constraints.
 
 We will simply maximise the risk-return ratio for both risk measures on their own with no added constraints. This will not give a complete surface, but it will give us a reasonable range of values.
 
@@ -237,3 +236,4 @@ plot_measures(res3.w, pr; x = r1, y = r2,
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+
