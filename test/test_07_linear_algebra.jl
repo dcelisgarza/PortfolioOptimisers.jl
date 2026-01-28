@@ -100,6 +100,7 @@
         sigma2 = detone(des[2], sigma1)
         detone!(des[2], sigma1)
         @test sigma1 == sigma2
+        @test detone(nothing, pr.sigma) === pr.sigma
     end
     @testset "Matrix processing" begin
         @test matrix_processing!(nothing, pr.sigma) === pr.sigma
