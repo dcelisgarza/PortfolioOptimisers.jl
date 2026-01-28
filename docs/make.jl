@@ -64,8 +64,10 @@ for file in data_files
        joinpath(@__DIR__, "src/examples/" * file); force = true)
 end
 
+diff_flags = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
 for file in code_files
-    if isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, "../examples/" * file))`))))
+    if diff_flags &&
+       isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, "../examples/" * file))`))))
         continue
     end
     Literate.markdown(example_path * file, build_path_md;
