@@ -432,9 +432,11 @@ This section is under active development and any [`<name>`]-(TBA) lack docstring
 
 - Positive definite projection [`Posdef`](@ref), [`posdef!`](@ref), [`posdef`](@ref)
 - <details><summary>Denoising [`Denoise`](@ref), [`denoise!`](@ref), [`denoise`](@ref)</summary>
+  
   - Spectral [`SpectralDenoise`](@ref)
   - Fixed [`FixedDenoise`](@ref)
   - Shrunk [`ShrunkDenoise`](@ref)
+
   </details>
 - Detoning [`Detone`](@ref), [`detone!`](@ref), [`detone`](@ref)
 - Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing`](@ref), [`DenoiseDetoneAlg`](@ref), [`DenoiseAlgDetone`](@ref), [`DetoneDenoiseAlg`](@ref), [`DetoneAlgDenoise`](@ref), [`AlgDenoiseDetone`](@ref), [`AlgDetoneDenoise`](@ref)
