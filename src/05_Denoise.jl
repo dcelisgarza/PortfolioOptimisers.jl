@@ -557,7 +557,7 @@ function denoise!(dn::Denoise, X::MatNum, q::Number)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.StatsBase.cov2cor!(X, s)
+        StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
     max_val = find_max_eval(vals, q, dn.kernel, dn.m, dn.n, dn.args, dn.kwargs)[1]

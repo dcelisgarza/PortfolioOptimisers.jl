@@ -366,7 +366,7 @@ All concrete and/or abstract types that implement a specific algorithm used by a
 
 # Interfaces
 
-Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different expected returns algorithms within the library.
+Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different expected returns algorithms within the library. The interfaces should be defined at the level of the expected returns estimator that utilises these algorithms.
 
 # Related
 
@@ -383,7 +383,7 @@ All concrete and/or abstract types that implement a specific algorithm for momen
 
 # Interfaces
 
-Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different moment algorithms within the library.
+Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different moment algorithms within the library. The interfaces should be defined at the level of the covariance estimator that utilises these algorithms.
 
 # Related
 
@@ -419,7 +419,7 @@ struct Semi <: AbstractMomentAlgorithm end
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
-This function attempts to compute the weighted covariance matrix using the provided estimator and keyword arguments. If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility. This ensures robust weighted covariance estimation across different estimator types and StatsBase versions.
+This function attempts to compute the weighted covariance matrix using the provided estimator and keyword arguments. If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility. This ensures robust weighted covariance estimation across different estimator types.
 
 # Arguments
 
@@ -476,7 +476,7 @@ end
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
-This function attempts to compute the weighted correlation matrix using the provided estimator and keyword arguments. If an error occurs, it falls back to computing the weighted covariance matrix and then converts it to a correlation matrix. This ensures robust weighted correlation estimation across different estimator types and StatsBase versions.
+This function attempts to compute the weighted correlation matrix using the provided estimator and keyword arguments. If an error occurs, it falls back to computing the weighted covariance matrix and then converts it to a correlation matrix. This ensures robust weighted correlation estimation across different estimator types. If that fails, it tries again with [`robus_cov`](@ref) and converts the result to a correlation matrix.
 
 # Arguments
 
@@ -508,9 +508,9 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
     catch
         sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
@@ -522,9 +522,9 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
     else
         sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
@@ -541,9 +541,9 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     catch
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
@@ -555,9 +555,9 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     else
         sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
-            StatsBase.StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
         else
-            sigma = StatsBase.StatsBase.cov2cor(Matrix(sigma))
+            sigma = StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end

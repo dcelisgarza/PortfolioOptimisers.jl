@@ -146,6 +146,10 @@ Abstract supertype for matrix processing order types in `PortfolioOptimisers.jl`
 
 All concrete and/or abstract types that specify the order of matrix processing steps—such as denoising, detoning, and algorithm application—should be subtypes of `AbstractMatrixProcessingOrder`.
 
+# Interfaces
+
+Given that these are meant to be used by matrix processing estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different matrix processing orders within the library. The interfaces should be defined at the level of the matrix processing estimator that utilises these orders.
+
 # Related Types
 
   - [`DenoiseDetoneAlg`](@ref)

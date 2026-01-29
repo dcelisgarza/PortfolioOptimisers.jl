@@ -49,7 +49,7 @@ GeneralCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Option`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator

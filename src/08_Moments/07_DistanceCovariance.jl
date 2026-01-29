@@ -43,7 +43,7 @@ DistanceCovariance
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator

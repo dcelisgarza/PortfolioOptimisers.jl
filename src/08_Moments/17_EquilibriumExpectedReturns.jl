@@ -56,7 +56,7 @@ EquilibriumExpectedReturns
 
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     ce::T1

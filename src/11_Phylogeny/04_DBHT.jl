@@ -1927,7 +1927,7 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     iscov = any(!isone, s)
     S = if iscov
         s .= sqrt.(s)
-        StatsBase.StatsBase.cov2cor(sigma, s)
+        StatsBase.cov2cor(sigma, s)
     else
         sigma
     end

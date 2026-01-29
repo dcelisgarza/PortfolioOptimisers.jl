@@ -25,7 +25,7 @@ Keyword arguments correspond to the fields above.
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`Option`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
@@ -111,7 +111,7 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function factory(::SimpleExpectedReturns, w::StatsBase.AbstractWeights)

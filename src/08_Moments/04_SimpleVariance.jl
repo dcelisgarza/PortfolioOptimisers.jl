@@ -50,7 +50,7 @@ SimpleVariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::VecNum; mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
