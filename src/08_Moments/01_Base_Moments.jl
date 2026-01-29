@@ -419,8 +419,6 @@ struct Semi <: AbstractMomentAlgorithm end
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
-This function attempts to compute the weighted covariance matrix using the provided estimator and keyword arguments. If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility. This ensures robust weighted covariance estimation across different estimator types.
-
 # Arguments
 
   - `ce`: Covariance estimator to use.
@@ -433,6 +431,11 @@ This function attempts to compute the weighted covariance matrix using the provi
 # Returns
 
   - `sigma::MatNum`: Covariance matrix.
+
+# Details
+
+  - This function attempts to compute the optionally weighted covariance matrix using the provided estimator and keyword arguments.
+  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility. This ensures robust covariance estimation across different estimator types.
 
 # Related
 
@@ -476,8 +479,6 @@ end
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
-This function attempts to compute the weighted correlation matrix using the provided estimator and keyword arguments. If an error occurs, it falls back to computing the weighted covariance matrix and then converts it to a correlation matrix. This ensures robust weighted correlation estimation across different estimator types. If that fails, it tries again with [`robus_cov`](@ref) and converts the result to a correlation matrix.
-
 # Arguments
 
   - `ce`: Covariance estimator to use.
@@ -490,6 +491,12 @@ This function attempts to compute the weighted correlation matrix using the prov
 # Returns
 
   - `rho::MatNum`: Correlation matrix.
+
+# Details
+
+  - This function attempts to compute the optionally weighted correlation matrix using the provided estimator and keyword arguments.
+  - If an error occurs, it falls back to computing the optionally weighted covariance matrix and then converts it to a correlation matrix.
+  - If that also errors, it tries again with [`robust_cov`](@ref) and converts the result to a correlation matrix. This ensures robust correlation estimation across different estimator types.
 
 # Related
 
