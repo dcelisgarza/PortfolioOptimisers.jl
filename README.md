@@ -12,10 +12,6 @@
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-## Welcome to PortfolioOptimisers.jl
-
- [`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
-
 > [!CAUTION]
 > Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
 
@@ -30,7 +26,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-For more information on the package's *vast* feature list, check out the [documentation](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable) for details.
+Please visit the [documentation](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable) for details on the *vast* feature list.
 
 ## Installation
 

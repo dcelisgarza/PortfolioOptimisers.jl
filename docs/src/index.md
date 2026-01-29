@@ -36,10 +36,11 @@ CurrentModule = PortfolioOptimisers
 
 # Welcome to PortfolioOptimisers.jl
 
-[`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
+::: danger
 
-!!! Danger
-    Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
+Investing conveys real risk, the entire point of portfolio optimisation is to minimise it to tolerable levels. The examples use outdated data and a variety of stocks (including what I consider to be meme stocks) for demonstration purposes only. None of the information in this documentation should be taken as financial advice. Any advice is limited to improving portfolio construction, most of which is common investment and statistical knowledge.
+
+:::
 
 Portfolio optimisation is the science of either:
 
@@ -52,7 +53,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-For more information on the package's *vast* feature list, please check out the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs.
+Please visit the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) for details.
 
 ## Caveat emptor
 
@@ -299,7 +300,7 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
     - Bayesian information criteria [`BIC`](@ref)
     - R-squared [`RSquared`](@ref)
     - Adjusted R-squared criteria [`AdjustedRSquared`](@ref)
-- :::details Dimensional reduction with custom mean and variance estimators [`DimensionReductionRegression`](@ref)
+- ::: details Dimensional reduction with custom mean and variance estimators [`DimensionReductionRegression`](@ref)
   - Principal component [`PCA`](@ref)
   - Probabilistic principal component [`PPCA`](@ref)
 
