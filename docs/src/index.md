@@ -19,7 +19,7 @@ hero:
       link: https://github.com/dcelisgarza/PortfolioOptimisers.jl
     - theme: alt
       text: API
-      link: api/00_Introduction
+      link: api/00_API_Introduction
 
 authors:
   - name: Daniel Celis Garza
