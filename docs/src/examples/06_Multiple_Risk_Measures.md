@@ -76,7 +76,7 @@ nothing #hide
 
 Some risk measures can use precomputed prior statistics which take precedence over the ones in `PriorResult`. We can make use of this to minimise the variance with different covariance matrices simultaneously.
 
-We will also precompute the prior statistics to minimise redundant work. First lets create a vector of Variances onto which we will push the different variances. We'll use 5 variance estimators, and their equally weighted sum.
+We will also precompute the prior statistics to minimise redundant work. First let's create a vector of Variances onto which we will push the different variances. We'll use 5 variance estimators, and their equally weighted sum.
 
   1. Denoised covariance using the spectral algorithm.
   2. Gerber 1 covariance.
@@ -100,7 +100,7 @@ ces = [PortfolioOptimisersCovariance(;
        PortfolioOptimisersCovariance(; ce = DistanceCovariance())]
 ````
 
-Lets define a vector of variance risk measure using each of the different covariance matrices.
+Let's define a vector of variance risk measure using each of the different covariance matrices.
 
 ````@example 06_Multiple_Risk_Measures
 rs = [Variance(; sigma = cov(ce, rd.X)) for ce in ces]

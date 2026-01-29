@@ -187,7 +187,6 @@ end
 """
 Overload this using nco.cv for custom cross-validation prediction
 """
-function _predict_outer_nco_estimator_returns() end
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
@@ -197,7 +196,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)
         feesi = fees_view(fees, cl)
-        X[:, i] = predict(res, pri, feesi)
+        X[:, i] = calc_net_returns(res, pri, feesi)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)

@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/03_Efficient_Frontier.jl"
 ```
@@ -123,3 +122,4 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

@@ -1341,6 +1341,10 @@
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), lcs = res.lcs)
         @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
+
+        @test isnothing(linear_constraints(LinearConstraintEstimator(;
+                                                                     val = ["FOO >= 0.2"]),
+                                           sets; strict = false))
     end
     @testset "Regularisation" begin
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,

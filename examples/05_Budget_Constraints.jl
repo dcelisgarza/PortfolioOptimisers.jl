@@ -114,7 +114,7 @@ mip_res1 = optimise(da, res1.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res1.shares, :cost => mip_res1.cost,
                        :opt_weights => res1.w, :mip_weights => mip_res1.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res1.cost))")
+println("long cost + short cost = cost = $(sum(mip_res1.cost))")
 println("long cost: $(sum(mip_res1.cost[mip_res1.cost .>= zero(eltype(mip_res1.cost))]))")
 println("short cost: $(sum(mip_res1.cost[mip_res1.cost .< zero(eltype(mip_res1.cost))]))")
 println("remaining cash: $(mip_res1.cash)")
@@ -153,7 +153,7 @@ mip_res2 = optimise(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res2.cost))")
+println("long cost + short cost = cost = $(sum(mip_res2.cost))")
 println("long cost: $(sum(mip_res2.cost[mip_res2.cost .>= zero(eltype(mip_res2.cost))]))")
 println("short cost: $(sum(mip_res2.cost[mip_res2.cost .< zero(eltype(mip_res2.cost))]))")
 println("remaining cash: $(mip_res2.cash)")
@@ -185,7 +185,7 @@ mip_res3 = optimise(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res3.cost))")
+println("long cost + short cost = cost = $(sum(mip_res3.cost))")
 println("long cost: $(sum(mip_res3.cost[mip_res3.cost .>= zero(eltype(mip_res3.cost))]))")
 println("short cost: $(sum(mip_res3.cost[mip_res3.cost .< zero(eltype(mip_res3.cost))]))")
 println("remaining cash: $(mip_res3.cash)")
@@ -213,7 +213,7 @@ mip_res4 = optimise(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res4.cost))")
+println("long cost + short cost = cost = $(sum(mip_res4.cost))")
 println("long cost: $(sum(mip_res4.cost[mip_res4.cost .>= zero(eltype(mip_res4.cost))]))")
 println("short cost: $(sum(mip_res4.cost[mip_res4.cost .< zero(eltype(mip_res4.cost))]))")
 println("remaining cash: $(mip_res4.cash)")
@@ -247,7 +247,7 @@ mip_res5 = optimise(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res5.cost))")
+println("long cost + short cost = cost = $(sum(mip_res5.cost))")
 println("long cost: $(sum(mip_res5.cost[mip_res5.cost .>= zero(eltype(mip_res5.cost))]))")
 println("short cost: $(sum(mip_res5.cost[mip_res5.cost .< zero(eltype(mip_res5.cost))]))")
 println("remaining cash: $(mip_res5.cash)")
@@ -278,7 +278,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res6.w))")
 #=
 As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them a unbounded wiggle room without violating the constraints, and without directly constraining the short weights.
 
-In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value is greater than or equal to the short budget constraint. 
+In general, the short budget constraint will only constrain the portfolio weights when the unbounded optimal portfolio has a short budget whose absolute value is greater than or equal to the short budget constraint.
 =#
 
 opt7 = JuMPOptimiser(; pr = pr, slv = slv,

@@ -13,7 +13,8 @@ for sym in private_symbols
 end
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
-                    :(using PortfolioOptimisers, StatsBase); recursive = true)
+                    :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra);
+                    recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)
@@ -56,11 +57,19 @@ data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
 example_pages = fix_suffix_md.("examples/" .* code_files)
 
 for file in data_files
+    if isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, "../examples/" * file))`))))
+        continue
+    end
     cp(joinpath(@__DIR__, "../examples/" * file),
        joinpath(@__DIR__, "src/examples/" * file); force = true)
 end
 
+diff_flags = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
 for file in code_files
+    if diff_flags &&
+       isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, "../examples/" * file))`))))
+        continue
+    end
     Literate.markdown(example_path * file, build_path_md;
                       preprocess = pre_process_content_md, postprocess = postprocess,
                       documenter = true, credit = true)

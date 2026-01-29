@@ -24,3 +24,4 @@ Distributionally
 Brinson
 scalarisation
 JuMP
+docstrings

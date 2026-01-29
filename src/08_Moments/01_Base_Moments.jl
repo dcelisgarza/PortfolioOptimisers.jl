@@ -28,6 +28,107 @@ Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
 
 All concrete types that implement covariance estimation should subtype `AbstractCovarianceEstimator`.
 
+# Interfaces
+
+In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractCovarianceEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+
+## Covariance and correlation
+
+  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`]: Covariance matrix estimation.
+  - [`Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`]: Correlation matrix estimation.
+
+### Arguments
+
+  - $(glossary[:ce])
+  - $(glossary[:X])
+  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
+
+### Returns
+
+  - `sigma::MatNum`: Covariance matrix.
+
+## Factory method
+
+  - [`factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights)`]: Factory method for creating instances of the estimator.
+
+### Arguments
+
+  - $(glossary[:ce])
+  - $(glossary[:ow])
+
+### Returns
+
+  - $(glossary[:nce])
+
+# Examples
+
+We can create a dummy covariance estimator as follows:
+
+```jldoctest
+julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
+           w::T1
+           function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w) && isempty(w)
+                   throw(IsEmptyError("`w` cannot be an empty weights object"))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyCovarianceEstimator(;
+                                      w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyCovarianceEstimator(w)
+       end
+MyCovarianceEstimator
+
+julia> function factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
+           return MyCovarianceEstimator(; w = w)
+       end
+factory (generic function with 1 method)
+
+julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = X * X'
+           return sigma
+       end
+
+julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = X * X'
+           d = LinearAlgebra.diag(sigma)
+           StatsBase.cov2cor!(sigma, sqrt.(d))
+           return sigma
+       end
+
+julia> cov(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×3 Matrix{Float64}:
+ 5.0  1.7   2.7
+ 1.7  0.58  0.92
+ 2.7  0.92  1.46
+
+julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×3 Matrix{Float64}:
+ 1.0       0.998274  0.999315
+ 0.998274  1.0       0.999764
+ 0.999315  0.999764  1.0
+```
+
 # Related
 
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
@@ -40,6 +141,129 @@ abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
 
 All concrete types that implement variance estimation should subtype `AbstractVarianceEstimator`.
+
+# Interfaces
+
+In order to implement a new covariance estimator which will work seamlessly with the library, subtype `AbstractVarianceEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+
+## Variance and standard deviation
+
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Standard deviation estimation.
+
+### Arguments
+
+  - $(glossary[:ve])
+
+  - `X`
+
+      + $(glossary[:X])
+      + $(glossary[:Xv])
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+### Returns
+
+  - $(glossary[:X])
+
+      + `val::MatNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+
+  - $(glossary[:Xv])
+
+      + `val::VecNum`: Variance or standard deviation of `X`.
+
+## Factory method
+
+  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator.
+
+### Arguments
+
+  - $(glossary[:ve])
+  - $(glossary[:ow])
+
+### Returns
+
+  - $(glossary[:nve])
+
+# Examples
+
+We can create a dummy variance estimator as follows:
+
+```jldoctest
+julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
+           w::T1
+           function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w) && isempty(w)
+                   throw(IsEmptyError("`w` cannot be an empty weights object"))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyVarianceEstimator(;
+                                    w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyVarianceEstimator(w)
+       end
+MyVarianceEstimator
+
+julia> function factory(::MyVarianceEstimator, w::StatsBase.AbstractWeights)
+           return MyVarianceEstimator(; w = w)
+       end
+factory (generic function with 1 method)
+
+julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = diag(X * X')
+           return isone(dims) ? reshape(sigma, :, 1) : reshape(sigma, 1, :)
+       end
+
+julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
+                               dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           sigma = sqrt.(diag(X * X'))
+           return isone(dims) ? reshape(sigma, :, 1) : reshape(sigma, 1, :)
+       end
+
+julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           return mean(diag(X' * X))
+       end
+
+julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
+           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           X = X .* w
+           return sqrt(mean(diag(X' * X)))
+       end
+
+julia> var(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×1 Matrix{Float64}:
+ 5.0
+ 0.58
+ 1.4600000000000002
+
+julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+3×1 Matrix{Float64}:
+ 2.23606797749979
+ 0.7615773105863908
+ 1.2083045973594573
+```
 
 # Related
 

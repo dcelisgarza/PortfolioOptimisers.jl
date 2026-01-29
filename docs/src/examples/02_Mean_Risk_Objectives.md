@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/02_Mean_Risk_Objectives.jl"
 ```
@@ -131,3 +130,4 @@ We can see that indeed, the minimum risk produces the portfolio with minimum ris
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

@@ -941,9 +941,8 @@ Extract the Value-at-Risk (VaR) for asset `i` from a prior result.
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Number)
-    #! Don't use a view, use a copy, value at risk uses partialsort!
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
-    return ValueatRisk(; alpha = alpha)(pr.X[:, i])
+    return ValueatRisk(; alpha = alpha)(view(pr.X, :, i))
 end
 """
     ep_var_views!(var_views::Nothing, args...; kwargs...)
@@ -1379,9 +1378,8 @@ Compute the Conditional Value-at-Risk (CVaR) for asset `i` from a prior result.
   - [`get_pr_value`](@ref)
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number)
-    #! Don't use a view, use a copy, value at risk uses partialsort!
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
-    return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
+    return ConditionalValueatRisk(; alpha = alpha)(view(pr.X, :, i))
 end
 """
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -1860,7 +1858,7 @@ Extract the skewness for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
     #! Think about how to include pr.w
-    return Skewness()([1], reshape(pr.X[:, i], :, 1))
+    return Skewness()([1], reshape(view(pr.X, :, i), :, 1))
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -1943,8 +1941,9 @@ Extract the kurtosis for asset `i` from a prior result.
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
     #! Think about how to include pr.w
     return HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
-                                                                                        reshape(pr.X[:,
-                                                                                                     i],
+                                                                                        reshape(view(pr.X,
+                                                                                                     :,
+                                                                                                     i),
                                                                                                 :,
                                                                                                 1))
 end

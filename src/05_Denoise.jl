@@ -7,33 +7,49 @@ All concrete types that implement denoising of covariance-like or correlation-li
 
 # Interfaces
 
-In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` including all necessary parameters as part of the struct, and implement the following methods:
+In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - [`denoise!`](@ref): In-place denoising.
-  - [`denoise`](@ref): Optional out-of-place denoising.
+  - `denoise!(dn::AbstractDenoiseEstimator, X::MatNum, q::Number)`: In-place denoising.
+  - `denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number)`: Optional out-of-place denoising.
 
-For example, we can create a dummy denoising estimator as follows:
+## Arguments
+
+  - $(glossary[:dn])
+  - $(glossary[:sigrhoX])
+  - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
+
+## Returns
+
+  - `X::MatNum`: The denoised input matrix `X`.
+
+# Examples
+
+We can create a dummy denoising estimator as follows:
 
 ```jldoctest
 julia> struct MyDenoiseEstimator <: PortfolioOptimisers.AbstractDenoiseEstimator end
 
-julia> function PortfolioOptimisers.denoise!(est::MyDenoiseEstimator,
-                                             X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.denoise!(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
            # Implement your in-place denoising estimator here.
            println("Denoising matrix in-place...")
-           return nothing
+           return X
        end
 
-julia> function PortfolioOptimisers.denoise(est::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.denoise(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
            X = copy(X)
-           denoise!(est, X)
+           println("Copy X...")
+           denoise!(dn, X)
            return X
        end
 
 julia> denoise!(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
 Denoising matrix in-place...
+2×2 Matrix{Float64}:
+ 1.0  2.0
+ 2.0  1.0
 
 julia> denoise(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+Copy X...
 Denoising matrix in-place...
 2×2 Matrix{Float64}:
  1.0  2.0
@@ -57,27 +73,44 @@ All concrete types that implement a specific denoising algorithm should subtype 
 
 # Interfaces
 
-If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, including all necessary parameters as part of the struct, and implement the following method:
+If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, with all necessary parameters as part of the struct, and implement the following method:
 
-  - [`_denoise!`](@ref): In-place denoising of a covariance or correlation matrix using the specific algorithm.
+  - `_denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum, num_factors::Integer)`: In-place denoising of a covariance or correlation matrix using the specific algorithm.
 
-For example, we can create a dummy denoising algorithm as follows:
+## Arguments
+
+  - `alg`: Denoising algorithm.
+  - $(glossary[:sigrhoX])
+  - `vals`: Eigenvalues of `X`, sorted in ascending order.
+  - `vecs`: Corresponding eigenvectors of `X`.
+  - `num_factors`: Number of eigenvalues to treat as noise.
+
+## Returns
+
+  - `X::MatNum`: The input matrix `X` is modified in-place.
+
+# Examples
+
+We can create a dummy denoising algorithm as follows:
 
 ```jldoctest
 julia> struct MyDenoiseAlgorithm <: PortfolioOptimisers.AbstractDenoiseAlgorithm end
 
-julia> function PortfolioOptimisers._denoise!(de::MyDenoiseAlgorithm,
+julia> function PortfolioOptimisers._denoise!(dn::MyDenoiseAlgorithm,
                                               X::PortfolioOptimisers.MatNum,
                                               vals::PortfolioOptimisers.VecNum,
                                               vecs::PortfolioOptimisers.MatNum,
                                               num_factors::Integer)
            # Implement your in-place denoising logic here.
            println("Denoising matrix using custom algorithm...")
-           return nothing
+           return X
        end
 
 julia> denoise!(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
 Denoising matrix using custom algorithm...
+2×2 Matrix{Float64}:
+ 2.0  1.0
+ 1.0  2.0
 
 julia> denoise(Denoise(; alg = MyDenoiseAlgorithm()), [2.0 1.0; 1.0 2.0], 1 / 100)
 Denoising matrix using custom algorithm...
@@ -310,7 +343,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 # Returns
 
-  - `nothing`. The input matrix `X` is modified in-place.
+  - `X::MatNum`: The input matrix `X` is modified in-place.
 
 # Related
 
@@ -331,13 +364,13 @@ function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= zero(eltype(X))
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
-    return nothing
+    return X
 end
 function _denoise!(::FixedDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
     vals[1:num_factors] .= sum(vals[1:num_factors]) / num_factors
     X .= StatsBase.cov2cor(vecs * LinearAlgebra.Diagonal(vals) * transpose(vecs))
-    return nothing
+    return X
 end
 function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -355,7 +388,7 @@ function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
     X .= corr0 +
          alg.alpha * corr1 +
          (one(alg.alpha) - alg.alpha) * LinearAlgebra.Diagonal(corr1)
-    return nothing
+    return X
 end
 """
     errPDF(x::Number, vals::VecNum, q::Number,
@@ -451,8 +484,8 @@ function find_max_eval(vals::VecNum, q::Number,
     return e_max, x
 end
 """
-    denoise!(de::Denoise, X::MatNum, q::Number)
-    denoise!(::Nothing, args...)
+    denoise!(dn::Denoise, X::MatNum, q::Number)
+    denoise!(::Nothing, X::MatNum, args...)
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
@@ -470,7 +503,7 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Returns
 
-  - `nothing`. The input matrix `X` is modified in-place.
+  - `X::MatNum`: The input matrix `X` is modified in-place.
 
 # Examples
 
@@ -490,8 +523,6 @@ julia> X = X' * X
  1.77493  2.07886  1.30459  1.87091  2.44414
 
 julia> denoise!(Denoise(), X, 10 / 5)
-
-julia> X
 5×5 Matrix{Float64}:
  3.29494  2.28883  1.70633  2.12343  2.17377
  2.28883  2.46967  1.59575  1.98583  2.0329
@@ -517,10 +548,10 @@ julia> X
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function denoise!(::Nothing, args...)
-    return nothing
+function denoise!(::Nothing, X::MatNum, args...)
+    return X
 end
-function denoise!(de::Denoise, X::MatNum, q::Number)
+function denoise!(dn::Denoise, X::MatNum, q::Number)
     assert_matrix_issquare(X, :X)
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
@@ -529,18 +560,18 @@ function denoise!(de::Denoise, X::MatNum, q::Number)
         StatsBase.StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
-    max_val = find_max_eval(vals, q, de.kernel, de.m, de.n, de.args, de.kwargs)[1]
+    max_val = find_max_eval(vals, q, dn.kernel, dn.m, dn.n, dn.args, dn.kwargs)[1]
     num_factors = searchsortedlast(vals, max_val)
-    _denoise!(de.alg, X, vals, vecs, num_factors)
-    posdef!(de.pdm, X)
+    _denoise!(dn.alg, X, vals, vecs, num_factors)
+    posdef!(dn.pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
-    return nothing
+    return X
 end
 """
-    denoise(de::Denoise, X::MatNum, q::Number)
-    denoise(::Nothing, args...)
+    denoise(dn::Denoise, X::MatNum, q::Number)
+    denoise(::Nothing, X::MatNum, args...)
 
 Out-of-place version of [`denoise!`](@ref).
 
@@ -561,12 +592,12 @@ Out-of-place version of [`denoise!`](@ref).
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function denoise(::Nothing, args...)
-    return nothing
+function denoise(::Nothing, X::MatNum, args...)
+    return X
 end
-function denoise(de::Denoise, X::MatNum, q::Number)
+function denoise(dn::Denoise, X::MatNum, q::Number)
     X = copy(X)
-    denoise!(de, X, q)
+    denoise!(dn, X, q)
     return X
 end
 

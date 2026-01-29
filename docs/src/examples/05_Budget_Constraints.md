@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/05_Budget_Constraints.jl"
 ```
@@ -121,7 +120,7 @@ mip_res1 = optimise(da, res1.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res1.shares, :cost => mip_res1.cost,
                        :opt_weights => res1.w, :mip_weights => mip_res1.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res1.cost))")
+println("long cost + short cost = cost = $(sum(mip_res1.cost))")
 println("long cost: $(sum(mip_res1.cost[mip_res1.cost .>= zero(eltype(mip_res1.cost))]))")
 println("short cost: $(sum(mip_res1.cost[mip_res1.cost .< zero(eltype(mip_res1.cost))]))")
 println("remaining cash: $(mip_res1.cash)")
@@ -160,7 +159,7 @@ mip_res2 = optimise(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res2.cost))")
+println("long cost + short cost = cost = $(sum(mip_res2.cost))")
 println("long cost: $(sum(mip_res2.cost[mip_res2.cost .>= zero(eltype(mip_res2.cost))]))")
 println("short cost: $(sum(mip_res2.cost[mip_res2.cost .< zero(eltype(mip_res2.cost))]))")
 println("remaining cash: $(mip_res2.cash)")
@@ -192,7 +191,7 @@ mip_res3 = optimise(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res3.cost))")
+println("long cost + short cost = cost = $(sum(mip_res3.cost))")
 println("long cost: $(sum(mip_res3.cost[mip_res3.cost .>= zero(eltype(mip_res3.cost))]))")
 println("short cost: $(sum(mip_res3.cost[mip_res3.cost .< zero(eltype(mip_res3.cost))]))")
 println("remaining cash: $(mip_res3.cash)")
@@ -220,7 +219,7 @@ mip_res4 = optimise(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res4.cost))")
+println("long cost + short cost = cost = $(sum(mip_res4.cost))")
 println("long cost: $(sum(mip_res4.cost[mip_res4.cost .>= zero(eltype(mip_res4.cost))]))")
 println("short cost: $(sum(mip_res4.cost[mip_res4.cost .< zero(eltype(mip_res4.cost))]))")
 println("remaining cash: $(mip_res4.cash)")
@@ -254,7 +253,7 @@ mip_res5 = optimise(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
              formatters = [mipresfmt])
-println("long cost + short cost = cost: $(sum(mip_res5.cost))")
+println("long cost + short cost = cost = $(sum(mip_res5.cost))")
 println("long cost: $(sum(mip_res5.cost[mip_res5.cost .>= zero(eltype(mip_res5.cost))]))")
 println("short cost: $(sum(mip_res5.cost[mip_res5.cost .< zero(eltype(mip_res5.cost))]))")
 println("remaining cash: $(mip_res5.cash)")
@@ -308,3 +307,4 @@ The previous example has an essentially unbounded short budget. If we constrain 
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

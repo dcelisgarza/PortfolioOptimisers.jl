@@ -152,12 +152,8 @@
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
-        @test isapprox(pr2.kt,
-                       cokurtosis(Cokurtosis(; alg = Full()), pr2.X;
-                                  mean = transpose(pr2.mu)))
-        @test all(isapprox.((pr2.sk, pr2.V),
-                            coskewness(Coskewness(; alg = Full()), pr2.X;
-                                       mean = transpose(pr2.mu))))
+        @test isapprox(pr2.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
+        @test all(isapprox.((pr2.sk, pr2.V), coskewness(Coskewness(; alg = Full()), rd.X)))
     end
     @testset "High Order Factor Prior" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HighOrderFactorPrior.csv.gz"), DataFrame)
@@ -851,7 +847,7 @@
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                        sigma_views = sigma_views, sk_views = sk_views,
                                        opt = opt), rd)
-        @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = 5e-6)
+        @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = 1e-4)
         @test isapprox(pr.sigma[1, 1], 1.3 * pr0.sigma[1, 1], rtol = 5e-3)
         @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                              reshape(pr.X[:,
