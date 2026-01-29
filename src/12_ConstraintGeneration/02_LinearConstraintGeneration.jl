@@ -1154,8 +1154,15 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
             end
             At += Ai * c
         end
-        @argcheck(any(!iszero, At),
-                  DomainError("At least one entry in At must be non-zero:\nany(!iszero, At) => $(any(!iszero, At))"))
+        if !any(!iszero, At)
+            msg = "At least one entry in At must be non-zero:\nlc => $(lc)\nany(!iszero, At) => $(any(!iszero, At))"
+            if strict
+                throw(ArgumentError(msg))
+            else
+                @warn(msg)
+                continue
+            end
+        end
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="
         A = At .* d
@@ -1180,10 +1187,10 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
         A_eq = transpose(reshape(A_eq, length(nx), :))
         eq = PartialLinearConstraint(; A = A_eq, B = B_eq)
     end
-    return if !ineq_flag && !eq_flag
-        nothing
-    else
+    return if ineq_flag || eq_flag
         LinearConstraint(; ineq = ineq, eq = eq)
+    else
+        nothing
     end
 end
 """

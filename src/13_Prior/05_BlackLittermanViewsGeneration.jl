@@ -117,8 +117,15 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
             end
             At += Ai * c
         end
-        @argcheck(any(!iszero, At),
-                  DomainError("At least one entry in At must be non-zero:\nany(!iszero, At) => $(any(!iszero, At))"))
+        if !any(!iszero, At)
+            msg = "At least one entry in At must be non-zero:\nlc => $(lc)\nany(!iszero, At) => $(any(!iszero, At))"
+            if strict
+                throw(ArgumentError(msg))
+            else
+                @warn(msg)
+                continue
+            end
+        end
         append!(P, At)
         append!(Q, lc.rhs)
     end
