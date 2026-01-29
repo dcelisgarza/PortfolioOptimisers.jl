@@ -421,9 +421,9 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 
 # Arguments
 
-  - `ce`: Covariance estimator to use.
-  - `X`: Data matrix.
-  - `w`: Optional weights for each observation.
+  - $(glossary[:ce])
+  - $(glossary[:X])
+  - $(glossary[:oow])
   - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
@@ -481,9 +481,9 @@ Compute the correlation matrix robustly using the specified covariance estimator
 
 # Arguments
 
-  - `ce`: Covariance estimator to use.
-  - `X`: Data matrix.
-  - `w`: Optional weights for each observation.
+  - $(glossary[:ce])
+  - $(glossary[:X])
+  - $(glossary[:oow])
   - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.
