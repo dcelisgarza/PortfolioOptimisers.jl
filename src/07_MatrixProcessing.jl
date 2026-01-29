@@ -3,7 +3,7 @@
 
 Abstract supertype for all matrix processing estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement matrix processing routines—such as covariance matrix cleaning, denoising, or detoning—should subtype `AbstractMatrixProcessingEstimator`.
+All concrete and/or abstract types that implement matrix processing routines---such as covariance matrix cleaning, denoising, or detoning---should be subtypes of `AbstractMatrixProcessingEstimator`.
 
 # Interfaces
 
@@ -73,7 +73,7 @@ abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 
 Abstract supertype for all matrix processing algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement a specific matrix processing algorithm should subtype `AbstractMatrixProcessingAlgorithm`.
+All concrete and/or abstract types that implement a specific matrix processing algorithm should be subtypes of `AbstractMatrixProcessingAlgorithm`.
 
 # Interfaces
 
@@ -144,7 +144,7 @@ abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for matrix processing order types in `PortfolioOptimisers.jl`.
 
-All concrete types that specify the order of matrix processing steps—such as denoising, detoning, and algorithm application—should subtype `AbstractMatrixProcessingOrder`. This enables flexible configuration of the sequence in which matrix processing operations are applied within the matrix processing pipeline.
+All concrete and/or abstract types that specify the order of matrix processing steps—such as denoising, detoning, and algorithm application—should be subtypes of `AbstractMatrixProcessingOrder`.
 
 # Related Types
 

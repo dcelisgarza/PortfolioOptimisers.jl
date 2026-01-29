@@ -7,9 +7,9 @@
         ex::T5
     end
 
-A flexible container type for configuring and applying distance-based covariance estimators in PortfolioOptimisers.jl.
+A flexible container type for configuring and applying distance-based covariance estimators in `PortfolioOptimisers.jl`.
 
-`DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy. This enables modular and extensible workflows for robust covariance estimation using distance statistics.
+`DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy.
 
 # Fields
 

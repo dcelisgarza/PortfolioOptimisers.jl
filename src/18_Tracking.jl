@@ -3,7 +3,7 @@
 
 Abstract supertype for all tracking result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing tracking error or tracking constraint results should subtype `AbstractTracking`. This enables a consistent, composable interface for tracking error measurement, tracking constraint generation, and related portfolio analytics.
+All concrete and/or abstract types representing tracking error or tracking constraint results should be subtypes of `AbstractTracking`.
 
 # Related
 
@@ -43,9 +43,9 @@ const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
     abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all tracking algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all tracking algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types representing tracking algorithms (such as weights or returns tracking) should subtype `AbstractTrackingAlgorithm`. This enables a consistent, composable interface for tracking error computation, tracking constraint generation, and related portfolio analytics.
+All concrete and/or abstract types representing tracking algorithms (such as weights or returns tracking) should be subtypes of `AbstractTrackingAlgorithm`.
 
 # Related
 
@@ -58,9 +58,9 @@ abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 """
     abstract type TrackingFormulation <: AbstractAlgorithm end
 
-Abstract supertype for all tracking formulation algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all tracking formulation algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should subtype `TrackingFormulation`. This enables a consistent, composable interface for tracking error computation, constraint generation, and related portfolio analytics.
+All concrete and/or abstract types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should be subtypes of `TrackingFormulation`.
 
 # Related
 
@@ -75,9 +75,9 @@ abstract type TrackingFormulation <: AbstractAlgorithm end
 """
     abstract type NormTracking <: TrackingFormulation end
 
-Abstract supertype for all norm-based tracking formulation algorithms in PortfolioOptimisers.jl.
+Abstract supertype for all norm-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
-All concrete types representing norm-based tracking algorithms (such as second-order cone or norm-one tracking) should subtype `NormTracking`. This enables a consistent, composable interface for tracking error computation and constraint generation using norm-based formulations.
+All concrete and/or abstract types representing norm-based tracking algorithms (such as second-order cone or norm-one tracking) should be subtypes of `NormTracking`.
 
 # Related
 
@@ -90,9 +90,9 @@ abstract type NormTracking <: TrackingFormulation end
 """
     abstract type VariableTracking <: TrackingFormulation end
 
-Abstract supertype for all variable-based tracking formulation algorithms in PortfolioOptimisers.jl.
+Abstract supertype for all variable-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
-All concrete types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should subtype `VariableTracking`. This enables a consistent, composable interface for tracking error computation and constraint generation using variable-based formulations.
+All concrete and/or abstract types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should be subtypes of `VariableTracking`.
 
 # Related
 
@@ -445,7 +445,7 @@ end
 
 Return a view of a `WeightsTracking` object for the given index or indices.
 
-This function creates a new [`WeightsTracking`](@ref) instance by extracting a view of the fees and portfolio weights fields at the specified index or indices. This enables efficient subsetting and composability for tracking algorithms in portfolio analytics workflows.
+This function creates a new [`WeightsTracking`](@ref) instance by extracting a view of the fees and portfolio weights fields at the specified index or indices.
 
 # Arguments
 
@@ -737,7 +737,7 @@ end
 
 Return a view of a `TrackingError` object for the given index or indices.
 
-This function creates a new [`TrackingError`](@ref) instance by extracting a view of the underlying tracking algorithm at the specified index or indices. The error value and formulation algorithm are preserved. This enables efficient subsetting and composability for tracking error results in portfolio analytics workflows.
+This function creates a new [`TrackingError`](@ref) instance by extracting a view of the underlying tracking algorithm at the specified index or indices. The error value and formulation algorithm are preserved.
 
 # Arguments
 
@@ -826,7 +826,7 @@ end
 
 Construct a new `TrackingError` object with updated tracking algorithm weights.
 
-This function creates a new [`TrackingError`](@ref) instance by updating the underlying tracking algorithm using the provided weights `w`. The error value and formulation algorithm are preserved. This enables composable updates to tracking error results in portfolio analytics workflows.
+This function creates a new [`TrackingError`](@ref) instance by updating the underlying tracking algorithm using the provided weights `w`. The error value and formulation algorithm are preserved.
 
 # Arguments
 

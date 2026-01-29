@@ -3,7 +3,7 @@
 
 Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
-All concrete types representing detoning estimators should subtype `AbstractDetoneEstimator`.
+All concrete and/or abstract types representing detoning estimators should be subtypes of `AbstractDetoneEstimator`.
 
 # Interfaces
 

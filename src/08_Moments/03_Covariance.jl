@@ -4,9 +4,9 @@
         w::T2
     end
 
-A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary covariance estimators and optional observation weights.
+A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrary covariance estimators and optional observation weights.
 
-`GeneralCovariance` allows users to specify both the covariance estimation method and optional observation weights. This enables robust and extensible covariance estimation workflows.
+`GeneralCovariance` allows users to specify both the covariance estimation method and optional observation weights.
 
 # Fields
 
@@ -165,9 +165,9 @@ end
         alg::T3
     end
 
-A flexible container type for configuring and applying joint expected returns and covariance estimation in PortfolioOptimisers.jl.
+A flexible container type for configuring and applying joint expected returns and covariance estimation in `PortfolioOptimisers.jl`.
 
-`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm. This enables modular and extensible workflows for portfolio optimization and risk modeling.
+`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm.
 
 # Fields
 

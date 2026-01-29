@@ -1,9 +1,9 @@
 """
     abstract type CokurtosisEstimator <: AbstractEstimator end
 
-Abstract supertype for all cokurtosis estimators in PortfolioOptimisers.jl.
+Abstract supertype for all cokurtosis estimators in `PortfolioOptimisers.jl`.
 
-All concrete types implementing cokurtosis estimation algorithms should subtype `CokurtosisEstimator`.
+All concrete and/or abstract types implementing cokurtosis estimation algorithms should be subtypes of `CokurtosisEstimator`.
 
 # Related
 
@@ -20,7 +20,7 @@ abstract type CokurtosisEstimator <: AbstractEstimator end
 
 Container type for cokurtosis estimators.
 
-`Cokurtosis` encapsulates the mean estimator, matrix processing estimator, and moment algorithm for cokurtosis estimation. This enables modular workflows for higher-moment portfolio analysis.
+`Cokurtosis` encapsulates the mean estimator, matrix processing estimator, and moment algorithm for cokurtosis estimation.
 
 # Fields
 

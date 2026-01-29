@@ -1,9 +1,9 @@
 """
     abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
 
-Abstract supertype for all dimension reduction regression algorithm targets in PortfolioOptimisers.jl.
+Abstract supertype for all dimension reduction regression algorithm targets in `PortfolioOptimisers.jl`.
 
-All concrete types implementing dimension reduction algorithms for regression (such as PCA or PPCA) should subtype `DimensionReductionTarget`. This enables a consistent and extensible interface for specifying dimension reduction strategies within regression-based moment estimation.
+All concrete and/or abstract types implementing dimension reduction algorithms for regression (such as PCA or PPCA) should be subtypes of `DimensionReductionTarget`.
 
 These types are used to specify the dimension reduction method when constructing a [`DimensionReductionRegression`](@ref) estimator.
 
@@ -162,7 +162,7 @@ end
 
 Estimator for dimension reduction regression-based moment estimation.
 
-`DimensionReductionRegression` is a flexible estimator type for performing regression with dimension reduction, such as PCA or PPCA, as a preprocessing step. It allows users to specify the expected returns estimator, variance estimator, dimension reduction target (e.g., `PCA`, `PPCA`), and the regression target (e.g., `LinearModel`). This enables modular workflows for moment estimation in high-dimensional settings.
+`DimensionReductionRegression` is a flexible estimator type for performing regression with dimension reduction, such as PCA or PPCA, as a preprocessing step. It allows users to specify the expected returns estimator, variance estimator, dimension reduction target (e.g., `PCA`, `PPCA`), and the regression target (e.g., `LinearModel`).
 
 # Fields
 

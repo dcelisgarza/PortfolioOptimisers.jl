@@ -1,9 +1,9 @@
 """
     abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 
-Abstract supertype for all rank-based covariance estimators in PortfolioOptimisers.jl.
+Abstract supertype for all rank-based covariance estimators in `PortfolioOptimisers.jl`.
 
-All concrete types implementing rank-based covariance estimation algorithms should subtype `RankCovarianceEstimator`.
+All concrete and/or abstract types implementing rank-based covariance estimation algorithms should be subtypes of `RankCovarianceEstimator`.
 
 # Related
 

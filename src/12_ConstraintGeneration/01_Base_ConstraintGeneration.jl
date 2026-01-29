@@ -1,9 +1,9 @@
 """
     abstract type AbstractConstraintResult <: AbstractResult end
 
-Abstract supertype for all constraint result types in PortfolioOptimisers.jl.
+Abstract supertype for all constraint result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing the result of constraint generation or evaluation should subtype `AbstractConstraintResult`.
+All concrete and/or abstract types representing the result of constraint generation or evaluation should be subtypes of `AbstractConstraintResult`.
 
 # Related
 
@@ -14,9 +14,9 @@ abstract type AbstractConstraintResult <: AbstractResult end
 """
     abstract type AbstractConstraintEstimator <: AbstractEstimator end
 
-Abstract supertype for all constraint estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all constraint estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing constraint generation or estimation algorithms should subtype `AbstractConstraintEstimator`. This enables extensible and composable workflows for constraint construction and validation.
+All concrete and/or abstract types implementing constraint generation or estimation algorithms should be subtypes of `AbstractConstraintEstimator`.
 
 # Related
 
@@ -29,7 +29,7 @@ abstract type AbstractConstraintEstimator <: AbstractEstimator end
 
 Union type representing supported comparison operators for constraint generation.
 
-This type is used to specify which comparison operators are valid for defining constraints in PortfolioOptimisers.jl. It includes equality and both directions of inequality.
+This type is used to specify which comparison operators are valid for defining constraints in `PortfolioOptimisers.jl`. It includes equality and both directions of inequality.
 
 # Related
 

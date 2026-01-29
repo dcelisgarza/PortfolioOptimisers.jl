@@ -24,9 +24,9 @@ end
 """
     abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 
-Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all covariance estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement covariance estimation should subtype `AbstractCovarianceEstimator`.
+All concrete and/or abstract types that implement covariance estimation should be subtypes of `AbstractCovarianceEstimator`.
 
 # Interfaces
 
@@ -34,8 +34,8 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Covariance and correlation
 
-  - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`]: Covariance matrix estimation.
-  - [`Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`]: Correlation matrix estimation.
+  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`: Covariance matrix estimation.
+  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`: Correlation matrix estimation.
 
 ### Arguments
 
@@ -47,9 +47,9 @@ In order to implement a new covariance estimator which will work seamlessly with
 
   - `sigma::MatNum`: Covariance matrix.
 
-## Factory method
+## Factory
 
-  - [`factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights)`]: Factory method for creating instances of the estimator.
+  - `factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -138,9 +138,9 @@ abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 """
     abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 
-Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all variance estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement variance estimation should subtype `AbstractVarianceEstimator`.
+All concrete and/or abstract types that implement variance estimation should be subtypes of `AbstractVarianceEstimator`.
 
 # Interfaces
 
@@ -173,9 +173,9 @@ In order to implement a new covariance estimator which will work seamlessly with
 
       + `val::VecNum`: Variance or standard deviation of `X`.
 
-## Factory method
+## Factory
 
-  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator.
+  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -222,8 +222,8 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
            end
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
-           sigma = diag(X * X')
-           return isone(dims) ? reshape(sigma, :, 1) : reshape(sigma, 1, :)
+           sigma = LinearAlgebra.diag(X * X')
+           return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 2)
        end
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
@@ -236,33 +236,29 @@ julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.
            end
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
-           sigma = sqrt.(diag(X * X'))
-           return isone(dims) ? reshape(sigma, :, 1) : reshape(sigma, 1, :)
+           sigma = sqrt.(LinearAlgebra.diag(X * X'))
+           return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 1)
        end
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
-           return mean(diag(X' * X))
+           return mean(LinearAlgebra.diag(X' * X))
        end
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
            w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
            X = X .* w
-           return sqrt(mean(diag(X' * X)))
+           return sqrt(mean(LinearAlgebra.diag(X' * X)))
        end
 
 julia> var(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
-3×1 Matrix{Float64}:
- 5.0
- 0.58
- 1.4600000000000002
+1×3 Matrix{Float64}:
+ 5.0  0.58  1.46
 
 julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
-3×1 Matrix{Float64}:
- 2.23606797749979
- 0.7615773105863908
- 1.2083045973594573
+1×3 Matrix{Float64}:
+ 2.23607  0.761577  1.2083
 ```
 
 # Related
@@ -274,9 +270,86 @@ abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 """
     abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 
-Abstract supertype for all expected returns estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all expected returns estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement expected returns estimation should subtype `AbstractExpectedReturnsEstimator`.
+All concrete and/or abstract types that implement expected returns estimation should be subtypes of `AbstractExpectedReturnsEstimator`.
+
+# Interfaces
+
+In order to implement a new expected returns estimator which will work seamlessly with the library, subtype `AbstractExpectedReturnsEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+
+## Expected returns
+
+  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...)`: Expected returns estimation.
+
+### Arguments
+
+    - $(glossary[:me])
+    - $(glossary[:X])
+    - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+### Returns
+
+    - `val::VecNum`: Expected returns vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+
+## Factory
+
+  - `factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+
+### Arguments
+
+    - $(glossary[:me])
+    - $(glossary[:ow])
+
+### Returns
+
+    - $(glossary[:nme])
+
+# Examples
+
+```jldoctest
+julia> struct MyExpectedReturnsEstimator{T1} <:
+              PortfolioOptimisers.AbstractExpectedReturnsEstimator
+           w::T1
+           function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w) && isempty(w)
+                   throw(IsEmptyError("`w` cannot be an empty weights object"))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyExpectedReturnsEstimator(;
+                                           w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyExpectedReturnsEstimator(w)
+       end
+MyExpectedReturnsEstimator
+
+julia> function factory(::MyExpectedReturnsEstimator, w::StatsBase.AbstractWeights)
+           return MyExpectedReturnsEstimator(; w = w)
+       end
+factory (generic function with 1 method)
+
+julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
+                                dims::Int = 1, kwargs...)
+           if !(dims in (1, 2))
+               throw(DomainError(dims, "dims must be either 1 or 2"))
+           end
+           if dims == 2
+               X = X'
+           end
+           w = ifelse(isnothing(est.w), fill(one(eltype(X)), size(X, 1)), est.w)
+           X = X .* w
+           mu = sum(X; dims = 1) / sum(w)
+           return isone(dims) ? reshape(mu, 1, :) : reshape(mu, :, 1)
+       end
+
+julia> mean(MyExpectedReturnsEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1]; dims = 2)
+3×1 Matrix{Float64}:
+ 1.5
+ 0.5
+ 0.8
+```
 
 # Related
 
@@ -287,9 +360,13 @@ abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
     abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all expected returns algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all expected returns algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement a specific algorithm for expected returns estimation (e.g., shrinkage, robust mean) should subtype `AbstractExpectedReturnsAlgorithm`. This allows for flexible extension and dispatch of expected returns estimation routines.
+All concrete and/or abstract types that implement a specific algorithm used by an expected returns estimator should be subtypes of `AbstractExpectedReturnsAlgorithm`.
+
+# Interfaces
+
+Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different expected returns algorithms within the library.
 
 # Related
 
@@ -300,9 +377,13 @@ abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """
     abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all moment algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all moment algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement a specific algorithm for moment estimation (e.g., full, semi) should subtype `AbstractMomentAlgorithm`. This allows for flexible extension and dispatch of moment estimation routines.
+All concrete and/or abstract types that implement a specific algorithm for moment estimation should be subtypes of `AbstractMomentAlgorithm`.
+
+# Interfaces
+
+Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different moment algorithms within the library.
 
 # Related
 

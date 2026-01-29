@@ -1,9 +1,9 @@
 """
     abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
 
-Abstract supertype for all Smyth-Broby covariance estimators in PortfolioOptimisers.jl.
+Abstract supertype for all Smyth-Broby covariance estimators in `PortfolioOptimisers.jl`.
 
-All concrete types implementing Smyth-Broby covariance estimation algorithms should subtype `BaseSmythBrobyCovariance`.
+All concrete and/or abstract types implementing Smyth-Broby covariance estimation algorithms should be subtypes of `BaseSmythBrobyCovariance`.
 
 # Related
 
@@ -14,9 +14,9 @@ abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
 """
     abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 
-Abstract supertype for all Smyth-Broby covariance algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all Smyth-Broby covariance algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific Smyth-Broby covariance algorithms should subtype `SmythBrobyCovarianceAlgorithm`. This enables flexible extension and dispatch of Smyth-Broby covariance routines.
+All concrete and/or abstract types implementing specific Smyth-Broby covariance algorithms should be subtypes of `SmythBrobyCovarianceAlgorithm`.
 
 These types are used to specify the algorithm when constructing a [`SmythBrobyCovariance`](@ref) estimator.
 
@@ -237,9 +237,9 @@ struct StandardisedSmythBrobyGerber2 <: StandardisedSmythBrobyCovarianceAlgorith
         ex::T10
     end
 
-A flexible container type for configuring and applying Smyth-Broby covariance estimators in PortfolioOptimisers.jl.
+A flexible container type for configuring and applying Smyth-Broby covariance estimators in `PortfolioOptimisers.jl`.
 
-`SmythBrobyCovariance` encapsulates all components required for Smyth-Broby-based covariance or correlation estimation, including the expected returns estimator, variance estimator, positive definite matrix estimator, algorithm parameters, and the specific Smyth-Broby algorithm variant. This enables modular and extensible workflows for robust covariance estimation using Smyth-Broby statistics.
+`SmythBrobyCovariance` encapsulates all components required for Smyth-Broby-based covariance or correlation estimation, including the expected returns estimator, variance estimator, positive definite matrix estimator, algorithm parameters, and the specific Smyth-Broby algorithm variant.
 
 # Fields
 

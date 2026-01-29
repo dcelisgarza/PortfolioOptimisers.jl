@@ -283,7 +283,7 @@ end
 
 Construct a new `ReturnRiskMeasure` object with an updated return estimator based on the provided prior result.
 
-This function creates a new [`ReturnRiskMeasure`](@ref) instance by updating the internal return estimator using the prior result and any additional arguments or keyword arguments. This enables composable updates to risk measures that use expected return as their metric.
+This function creates a new [`ReturnRiskMeasure`](@ref) instance by updating the internal return estimator using the prior result and any additional arguments or keyword arguments.
 
 # Arguments
 
@@ -441,7 +441,7 @@ end
 
 Construct a new `ReturnRiskRatioRiskMeasure` object with updated return and risk estimators based on the provided prior result.
 
-This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal return estimator and risk measure using the prior result and any additional arguments or keyword arguments. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal return estimator and risk measure using the prior result and any additional arguments or keyword arguments.
 
 # Arguments
 
@@ -475,7 +475,7 @@ end
 
 Construct a new `ReturnRiskRatioRiskMeasure` object with an updated uncertainty set risk measure.
 
-This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided uncertainty set and any additional keyword arguments. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided uncertainty set and any additional keyword arguments. The return estimator and risk-free rate are preserved.
 
 # Arguments
 
@@ -541,7 +541,7 @@ end
 
 Construct a new `ReturnRiskRatioRiskMeasure` object with updated risk measure weights.
 
-This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided portfolio weights `w`. The return estimator and risk-free rate are preserved. This enables composable updates to ratio-based risk measures in portfolio analytics workflows.
+This function creates a new [`ReturnRiskRatioRiskMeasure`](@ref) instance by updating the internal risk measure using the provided portfolio weights `w`. The return estimator and risk-free rate are preserved.
 
 # Arguments
 

@@ -755,7 +755,7 @@ end
 
 Broadcast prior reference replacement across multiple view constraints.
 
-`replace_prior_views` applies [`replace_prior_views`](@ref) to each element of a vector of parsed view constraints, replacing prior references with their corresponding prior values. This enables efficient batch processing of multiple view constraints in entropy pooling routines.
+`replace_prior_views` applies [`replace_prior_views`](@ref) to each element of a vector of parsed view constraints, replacing prior references with their corresponding prior values.
 
 # Arguments
 

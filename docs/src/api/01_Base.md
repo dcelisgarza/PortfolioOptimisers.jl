@@ -4,7 +4,7 @@
 
 ## Base abstract types
 
-`PortfolioOptimisers.jl` is designed in a deliberately structured and hierarchical way. This enables us to create self-contained, independent, composable processes. These abstract types form the basis of this hierarchy.
+`PortfolioOptimisers.jl` is designed in a deliberately structured and hierarchical way. Enabling us to create self-contained, independent, composable processes. These abstract types form the basis of this hierarchy.
 
 ```@docs
 AbstractEstimator

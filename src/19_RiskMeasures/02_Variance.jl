@@ -1,7 +1,7 @@
 """
     abstract type SecondMomentFormulation <: AbstractAlgorithm end
 
-Abstract supertype for optimisation formulations of second moment risk measures in PortfolioOptimisers.jl.
+Abstract supertype for optimisation formulations of second moment risk measures in `PortfolioOptimisers.jl`.
 
 # Related Types
 
@@ -15,7 +15,7 @@ abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
     abstract type VarianceFormulation <: SecondMomentFormulation end
 
-Abstract supertype for optimisation formulations of variance-based risk measures in PortfolioOptimisers.jl.
+Abstract supertype for optimisation formulations of variance-based risk measures in `PortfolioOptimisers.jl`.
 
 # Related Types
 
@@ -596,7 +596,7 @@ UncertaintySetVariance
            │         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
            │         │           │      │     pdm ┼ Posdef
            │         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()   
+           │         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
            │         │           │      │      dn ┼ nothing
            │         │           │      │      dt ┼ nothing
            │         │           │      │     alg ┼ nothing

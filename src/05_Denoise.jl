@@ -3,7 +3,7 @@
 
 Abstract supertype for all denoising estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement denoising of covariance-like or correlation-like matrices should subtype `AbstractDenoiseEstimator`.
+All concrete and/or abstract types that implement denoising of covariance-like or correlation-like matrices should be subtypes of `AbstractDenoiseEstimator`.
 
 # Interfaces
 
@@ -69,7 +69,7 @@ abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 
 Abstract supertype for all denoising algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement a specific denoising algorithm should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
+All concrete and/or abstract types that implement a specific denoising algorithm should be subtypes of `AbstractDenoiseAlgorithm`.
 
 # Interfaces
 

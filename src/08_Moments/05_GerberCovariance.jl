@@ -1,9 +1,9 @@
 """
     abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 
-Abstract supertype for all Gerber covariance estimators in PortfolioOptimisers.jl.
+Abstract supertype for all Gerber covariance estimators in `PortfolioOptimisers.jl`.
 
-All concrete types implementing Gerber covariance estimation algorithms should subtype `BaseGerberCovariance`.
+All concrete and/or abstract types implementing Gerber covariance estimation algorithms should be subtypes of `BaseGerberCovariance`.
 
 # Related
 
@@ -18,9 +18,9 @@ abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
     abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 
-Abstract supertype for all Gerber covariance algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all Gerber covariance algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific Gerber covariance algorithms should subtype `GerberCovarianceAlgorithm`. This enables flexible extension and dispatch of Gerber covariance routines.
+All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`.
 
 These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator.
 
@@ -373,9 +373,9 @@ end
         alg::T4
     end
 
-A flexible container type for configuring and applying Gerber covariance estimators in PortfolioOptimisers.jl.
+A flexible container type for configuring and applying Gerber covariance estimators in `PortfolioOptimisers.jl`.
 
-`GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant. This enables modular and extensible workflows for robust covariance estimation using Gerber statistics.
+`GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant.
 
 # Fields
 

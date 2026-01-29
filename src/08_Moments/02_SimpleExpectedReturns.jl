@@ -3,7 +3,7 @@
         w::T1
     end
 
-A simple expected returns estimator for PortfolioOptimisers.jl, representing the sample mean with optional observation weights.
+A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
 
 `SimpleExpectedReturns` is the standard estimator for computing expected returns as the (possibly weighted) mean of asset returns. It supports both unweighted and weighted mean estimation by storing an optional weights vector.
 

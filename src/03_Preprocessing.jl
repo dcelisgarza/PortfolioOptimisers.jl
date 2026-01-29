@@ -3,7 +3,7 @@
 
 Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing the result of returns calculations should subtype `AbstractReturnsResult`.
+All concrete and/or types representing the result of returns calculations should be subtypes of `AbstractReturnsResult`.
 
 # Related
 

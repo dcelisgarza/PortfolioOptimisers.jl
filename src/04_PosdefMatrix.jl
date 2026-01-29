@@ -3,7 +3,7 @@
 
 Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement positive definite matrix projection or estimation should subtype `AbstractPosdefEstimator`.
+All concrete and/or abstract types that implement positive definite matrix projection or estimation should be subtypes of `AbstractPosdefEstimator`.
 
 # Interfaces
 

@@ -130,9 +130,9 @@ end
 """
     abstract type AbstractParsingResult <: AbstractConstraintResult end
 
-Abstract supertype for all equation parsing result types in PortfolioOptimisers.jl.
+Abstract supertype for all equation parsing result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing parsing results should subtype `AbstractParsingResult`.
+All concrete and/or abstract types representing parsing results should be subtypes of `AbstractParsingResult`.
 
 # Related
 

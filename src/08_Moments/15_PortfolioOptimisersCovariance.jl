@@ -6,7 +6,7 @@
 
 Composite covariance estimator with post-processing.
 
-`PortfolioOptimisersCovariance` is a flexible container type that combines any covariance estimator with a matrix post-processing step. This enables users to apply additional transformations or corrections (such as shrinkage, regularisation, or projection to positive definite) to the covariance or correlation matrix after it is estimated.
+`PortfolioOptimisersCovariance` is a flexible container type that combines any covariance estimator with a matrix post-processing step.
 
 # Fields
 
@@ -67,7 +67,7 @@ end
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
-This method computes the covariance matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`. This enables workflows such as shrinkage, regularisation, or projection to positive definite after covariance estimation.
+This method computes the covariance matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
 
 # Arguments
 
@@ -107,7 +107,7 @@ end
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
-This method computes the correlation matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`. This enables workflows such as shrinkage, regularisation, or projection to positive definite after correlation estimation.
+This method computes the correlation matrix for the input data matrix `X` using the underlying covariance estimator in `ce`, and then applies the matrix post-processing step specified by `ce.mp`.
 
 # Arguments
 

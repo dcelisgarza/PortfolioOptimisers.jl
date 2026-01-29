@@ -164,7 +164,7 @@ has_pretty_show_method(::Clustering.KmeansResult) = true
 
 Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
 
-All error types specific to `PortfolioOptimisers.jl` should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
+All error types specific to `PortfolioOptimisers.jl` should be subtypes of `PortfolioOptimisersError`.
 
 # Related
 
@@ -759,6 +759,7 @@ const glossary = Dict(
                       :mpa => "`mpa`: Matrix processing algorithm.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
+                      :nme => "`nme`: New expected returns estimator with the appropriate weights applied.",
                       :ce => "`ce`: Covariance estimator.",#
                       :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
                       :ve => "`ve`: Variance estimator.",#
