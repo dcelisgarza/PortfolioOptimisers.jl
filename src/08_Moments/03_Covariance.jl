@@ -143,7 +143,7 @@ Return a new `GeneralCovariance` estimator with observation weights `w`.
 # Arguments
 
   - `ce`: A `GeneralCovariance` estimator.
-  - $(glossary[:ow])
+  - $(arg_dict[:ow])
 
 # Returns
 
@@ -225,8 +225,8 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 
 # Arguments
 
-  - $(glossary[:ce])
-  - $(glossary[:ow])
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
 
 # Returns
 

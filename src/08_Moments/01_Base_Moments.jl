@@ -5,7 +5,7 @@ Fallback for covariance estimator factory methods.
 
 # Arguments
 
-  - $(glossary[:ce])
+  - $(arg_dict[:ce])
   - `args...`: Optional arguments (ignored for base covariance estimators).
 
 # Returns
@@ -39,8 +39,8 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Arguments
 
-  - $(glossary[:ce])
-  - $(glossary[:X])
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
 ### Returns
@@ -53,12 +53,12 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Arguments
 
-  - $(glossary[:ce])
-  - $(glossary[:ow])
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
 
 ### Returns
 
-  - $(glossary[:nce])
+  - $(arg_dict[:nce])
 
 # Examples
 
@@ -155,21 +155,21 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Arguments
 
-  - $(glossary[:ve])
+  - $(arg_dict[:ve])
 
   - `X`
 
-      + $(glossary[:X])
-      + $(glossary[:Xv])
+      + $(arg_dict[:X])
+      + $(arg_dict[:Xv])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 ### Returns
 
-  - $(glossary[:X])
+  - $(arg_dict[:X])
 
       + `val::MatNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
 
-  - $(glossary[:Xv])
+  - $(arg_dict[:Xv])
 
       + `val::VecNum`: Variance or standard deviation of `X`.
 
@@ -179,12 +179,12 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Arguments
 
-  - $(glossary[:ve])
-  - $(glossary[:ow])
+  - $(arg_dict[:ve])
+  - $(arg_dict[:ow])
 
 ### Returns
 
-  - $(glossary[:nve])
+  - $(arg_dict[:nve])
 
 # Examples
 
@@ -284,8 +284,8 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ### Arguments
 
-    - $(glossary[:me])
-    - $(glossary[:X])
+    - $(arg_dict[:me])
+    - $(arg_dict[:X])
     - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 ### Returns
@@ -298,12 +298,12 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ### Arguments
 
-    - $(glossary[:me])
-    - $(glossary[:ow])
+    - $(arg_dict[:me])
+    - $(arg_dict[:ow])
 
 ### Returns
 
-    - $(glossary[:nme])
+    - $(arg_dict[:nme])
 
 # Examples
 
@@ -421,9 +421,9 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 
 # Arguments
 
-  - $(glossary[:ce])
-  - $(glossary[:X])
-  - $(glossary[:oow])
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
   - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
@@ -481,9 +481,9 @@ Compute the correlation matrix robustly using the specified covariance estimator
 
 # Arguments
 
-  - $(glossary[:ce])
-  - $(glossary[:X])
-  - $(glossary[:oow])
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
   - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.

@@ -14,8 +14,8 @@ In order to implement a new positive definite matrix estimator which will work s
 
 ## Arguments
 
-  - $(glossary[:pdm])
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:pdm])
+  - $(arg_dict[:sigrhoX])
 
 ## Returns
 
@@ -120,12 +120,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - $(glossary[:opdm])
+  - $(arg_dict[:opdm])
 
       + `::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
       + `::Nothing`: No-op, returns X.
 
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
 
 # Returns
 

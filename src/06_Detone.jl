@@ -14,8 +14,8 @@ In order to implement a new detoning estimator which will work seamlessly with t
 
 ## Arguments
 
-  - $(glossary[:odt])
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:odt])
+  - $(arg_dict[:sigrhoX])
 
 ## Returns
 
@@ -77,7 +77,7 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 # Fields
 
   - `n`: Number of leading principal components to remove.
-  - $(glossary[:opdm])
+  - $(arg_dict[:opdm])
 
 # Constructor
 
@@ -130,12 +130,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - $(glossary[:odt])
+  - $(arg_dict[:odt])
 
       + `::Detone`: The top `n` principal components are removed from `X` in-place.
       + `::Nothing`: No-op and returns `nothing`.
 
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
 
 # Returns
 

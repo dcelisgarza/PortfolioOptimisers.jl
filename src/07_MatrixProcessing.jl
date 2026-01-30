@@ -14,9 +14,9 @@ In order to implement a new matrix processing estimator which will work seamless
 
 ## Arguments
 
-  - $(glossary[:mp])
-  - $(glossary[:sigrho])
-  - $(glossary[:X])
+  - $(arg_dict[:mp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 
@@ -84,7 +84,7 @@ In order to implement a new matrix processing algorithm that works with the curr
 
 ## Arguments
 
-  - $(glossary[:mpa])
+  - $(arg_dict[:mpa])
   - `args...`: Additional positional arguments.
   - `kwargs...`: Additional keyword arguments.
 
@@ -315,9 +315,9 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Fields
 
-  - $(glossary[:opdm])
-  - $(glossary[:odn])
-  - $(glossary[:odt])
+  - $(arg_dict[:opdm])
+  - $(arg_dict[:odn])
+  - $(arg_dict[:odt])
   - `alg`: Optional custom matrix processing algorithm.
   - `order`: Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
 
@@ -417,9 +417,9 @@ No-op fallback for in-place processing of a covariance or correlation matrix.
 
 # Arguments
 
-  - $(glossary[:omp])
-  - $(glossary[:sigrho])
-  - $(glossary[:X])
+  - $(arg_dict[:omp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 
@@ -451,9 +451,9 @@ This method applies a sequence of matrix processing steps to the input covarianc
 
 # Arguments
 
-  - $(glossary[:omp])
-  - $(glossary[:sigrho])
-  - $(glossary[:X])
+  - $(arg_dict[:omp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 

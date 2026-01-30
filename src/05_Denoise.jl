@@ -14,8 +14,8 @@ In order to implement a new denoising estimator which will work seamlessly with 
 
 ## Arguments
 
-  - $(glossary[:dn])
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:dn])
+  - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 ## Returns
@@ -80,7 +80,7 @@ If you wish to implement a new denoising algorithm that works with an existing d
 ## Arguments
 
   - `alg`: Denoising algorithm.
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
@@ -249,7 +249,7 @@ A flexible container type for configuring and applying denoising algorithms to c
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
-  - $(glossary[:opdm])
+  - $(arg_dict[:opdm])
 
 # Constructor
 
@@ -336,7 +336,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 # Arguments
 
   - `alg`: Denoising algorithm.
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
@@ -493,12 +493,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - $(glossary[:odn])
+  - $(arg_dict[:odn])
 
       + `::Denoise`: The specified denoising algorithm is applied to `X` in-place.
       + `::Nothing`: No-op.
 
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 # Returns

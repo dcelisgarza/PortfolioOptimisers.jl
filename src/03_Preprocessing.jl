@@ -437,7 +437,7 @@ This function scans the specified dimension of the input matrix and returns the 
 
 # Returns
 
-  - `res::Vector{Int}`: Indices of columns (or rows) in `X` that are complete.
+  - `res::VecInt`: Indices of columns (or rows) in `X` that are complete.
 
 # Validation
 
