@@ -19,13 +19,6 @@ resfmt = (v, i, j) -> begin
         return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
     end
 end;
-mipresfmt = (v, i, j) -> begin
-    if j ∈ (1, 2, 3)
-        return v
-    else
-        return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
-    end
-end;
 
 #=
 ## 1. ReturnsResult data

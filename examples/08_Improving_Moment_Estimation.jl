@@ -19,13 +19,6 @@ resfmt = (v, i, j) -> begin
         return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
     end
 end;
-mipresfmt = (v, i, j) -> begin
-    if j ∈ (1, 2, 3)
-        return v
-    else
-        return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
-    end
-end;
 mmtfmt = (v, i, j) -> begin
     if i == j == 1
         return v
@@ -44,7 +37,7 @@ end;
 #=
 ## 1. ReturnsResult data
 
-We will use the same data as the previous example. But we will also load factor data.
+We will use the same data as the previous example.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -52,11 +45,8 @@ using CSV, TimeSeries, DataFrames
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-F = TimeArray(CSV.File(joinpath(@__DIR__, "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
-pretty_table(F[(end - 5):end]; formatters = [tsfmt])
-
 ## Compute the returns
-rd = prices_to_returns(X, F)
+rd = prices_to_returns(X)
 
 #=
 ## 2. Prior statistics
