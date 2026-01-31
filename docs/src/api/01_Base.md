@@ -85,5 +85,6 @@ In order to standardise the documentation we use a arg_dict of terms.
 
 ```@docs
 arg_dict
-validation
+val_dict
+ret_dict
 ```

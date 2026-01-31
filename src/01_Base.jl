@@ -826,6 +826,9 @@ Validation rules for certain arg_dict terms used in the documentation of `Portfo
 """
 val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
+"""
+Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
+"""
 ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector.",
                 :sigma => "`sigma::MatNum`: Covariance matrix.",
                 :sk => "`sk::MatNum`: Coskewness matrix.",

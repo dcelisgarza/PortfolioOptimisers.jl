@@ -23,3 +23,31 @@ function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
     add_to_objective_penalty!(model, l2)
     return nothing
 end
+struct LnRegularisation{T1, T2}
+    n::T1
+    val::T2
+    function LnRegularisation(n::Num_VecNum, val::Num_VecNum)
+        n_flag = isa(n, VecNum)
+        val_flag = isa(val, VecNum)
+        if n_flag || val_flag
+            @argcheck(n_flag && val_flag,
+                      "If either `n` or `val` is a vector, both must be vectors of the same length.")
+            @argcheck(length(n) == length(val))
+        end
+        return new{typeof(n), typeof(val)}(n, val)
+    end
+end
+function LnRegularisation(; n::Num_VecNum = 3, val::Num_VecNum = 1e-3)
+    return LnRegularisation(n, val)
+end
+function set_ln_regularisation(model::JuMP.Model, ln::LnRegularisation)
+    w = model[:w]
+    sc = model[:sc]
+    for (i, (n, val)) in enumerate(zip(ln.n, ln.val))
+        t_ln, ln = model[Symbol(:t_ln_, i)], model[Symbol(:ln_, i)] = JuMP.@variable(model,
+                                                                                     (), ())
+        model[(Symbol(:cln_, i))] = JuMP.@constraint(model,
+                                                     [sc * t_ln, 1, t_ln] in
+                                                     JuMP.MOI.PowerCone(inv(n)))
+    end
+end
