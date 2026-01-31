@@ -152,7 +152,7 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1))]
 
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
-                                                      ro = r[1],# outer (inter-cluster) risk measure
+                                                      ro = r[1],  # outer (inter-cluster) risk measure
                                                       opt = HierarchicalOptimiser(; pr = pr,
                                                                                   clr = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
@@ -191,7 +191,7 @@ When the weights are different enough that one risk measure domintes over the ot
 r = [Variance(), NegativeSkewness()]
 
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
-                                                      ro = r[1],# outer (inter-cluster) risk measure
+                                                      ro = r[1],  # outer (inter-cluster) risk measure
                                                       opt = HierarchicalOptimiser(; pr = pr,
                                                                                   clr = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],

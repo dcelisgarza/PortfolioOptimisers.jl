@@ -615,16 +615,16 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla kt + BOP(GM) mu" => ress[1].w
              formatters = [resfmt])
 ````
 
-Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with cross validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures). There are also other ways of directly mitigating these instabilities raging:
+Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with cross validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures), or to impose constraints on the maximum risk without adding them to the objective function. There are also other ways of directly mitigating these instabilities, such as making use of:
 
-1. Estimators like [`Stacking`]-(@ref) and [`NearOptimalCentering`]-(@ref).
+1. Estimators like [`Stacking`]-(@ref), [`NearOptimalCentering`]-(@ref), and [`NestedClusters`]-(@ref).
 2. Uncertainty sets for the expected returns and covariance matrices.
 3. Logarithmic returns directly in the optimisation.
-4. L1 and L2 regularisation.
+4. Regularisation constraints.
 5. Buy-in threshold constraints.
 6. Phylogeny constraints.
 
-These are a few things directly reduce the impact of moment estimation errors on the resulting portfolios, but can be used with other risk measures as well.
+Even though those and other techniques do not fix the inherent sensitivity of moment-based optimisations to estimation errors, they can mitigate them.
 
 ---
 
