@@ -140,7 +140,7 @@ SOCTracking
 struct SOCTracking{T1} <: NormTracking
     ddof::T1
     function SOCTracking(ddof::Integer)
-        @argcheck(zero(ddof) <= ddof, DomainError)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
@@ -190,7 +190,7 @@ SquaredSOCTracking
 struct SquaredSOCTracking{T1} <: NormTracking
     ddof::T1
     function SquaredSOCTracking(ddof::Integer)
-        @argcheck(zero(ddof) <= ddof, DomainError)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
@@ -219,10 +219,35 @@ NOCTracking()
   - [`norm_tracking`](@ref)
 """
 struct NOCTracking <: NormTracking end
+struct PNormTracking{T1, T2} <: NormTracking
+    p::T1
+    ddof::T2
+    function PNormTracking(p::Number, ddof::Integer)
+        assert_nonempty_gt0_finite_val(p, :p)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(p), typeof(ddof)}(p, ddof)
+    end
+end
+function PNormTracking(; p::Number = 3, ddof::Integer = 0)
+    return PNormTracking(p, ddof)
+end
+struct InfNormTracking{T1, T2} <: NormTracking
+    ddof::T1
+    pos::T2
+    function InfNormTracking(ddof::Integer, pos::Bool)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof), typeof(pos)}(ddof, pos)
+    end
+end
+function InfNormTracking(; ddof::Integer = 0, pos::Bool = true)
+    return InfNormTracking(ddof, pos)
+end
 """
     norm_tracking(f::SOCTracking, a, b; N::Option{<:Number} = nothing)
     norm_tracking(f::SquaredSOCTracking, a, b; N::Option{<:Number} = nothing)
     norm_tracking(::NOCTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::PNormTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::InfNormTracking, a, b; N::Option{<:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
@@ -274,6 +299,21 @@ end
 function norm_tracking(::NOCTracking, a, b, N::Option{<:Number} = nothing)
     factor = ifelse(isnothing(N), 1, N)
     return LinearAlgebra.norm(a - b, 1) / factor
+end
+function norm_tracking(f::PNormTracking, a, b, N::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(N), 1, N - f.ddof)
+    factor = if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+    return LinearAlgebra.norm(a - b, f.p) / factor
+end
+function norm_tracking(f::InfNormTracking, a, b, N::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(N), 1, N - f.ddof)
+    ty = promote_type(eltype(a), eltype(b))
+    p = ifelse(f.pos, typemax(ty), typemin(ty))
+    return LinearAlgebra.norm(a - b, p) / factor
 end
 """
     struct IndependentVariableTracking <: VariableTracking end

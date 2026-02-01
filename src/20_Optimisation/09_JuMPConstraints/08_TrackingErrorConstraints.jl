@@ -57,6 +57,46 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
+                                         tr::TrackingError{<:Any, <:Any, <:PNormTracking},
+                                         args...; kwargs...)
+    X = pr.X
+    k = model[:k]
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, X)
+    wb = tracking_benchmark(tr.tr, X)
+    T = size(X, 1)
+    err = tr.err
+    p_inv = inv(tr.alg.p)
+    scale = T - tr.alg.ddof
+    f = err * (tr.alg.p == 3 ? cbrt(scale) : scale^p_inv)
+    t_te, r_te = model[Symbol(:t_te_, i)], model[Symbol(:r_te_, i)] = JuMP.@variables(model,
+                                                                                      begin
+                                                                                          ()
+                                                                                          [1:T]
+                                                                                      end)
+    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
+    model[Symbol(:cte_pnorm_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
+                                                                               begin
+                                                                                   [i = 1:T],
+                                                                                   [sc *
+                                                                                    r_te[i],
+                                                                                    1,
+                                                                                    sc *
+                                                                                    tr[i]] in
+                                                                                   JuMP.MOI.PowerCone(p_inv)
+                                                                                   sc *
+                                                                                   (sum(r_te) -
+                                                                                    t_te) ==
+                                                                                   0
+                                                                                   sc *
+                                                                                   (t_te -
+                                                                                    f * k) <=
+                                                                                   0
+                                                                               end)
+    return nothing
+end
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
                                          tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
