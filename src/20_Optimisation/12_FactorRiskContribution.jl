@@ -117,7 +117,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_l1_regularisation!(model, frc.opt.l1)
     set_l2_regularisation!(model, frc.opt.l2)
     set_linf_regularisation!(model, frc.opt.linf)
-    set_ln_regularisation!(model, frc.opt.ln)
+    set_lp_regularisation!(model, frc.opt.lp)
     set_non_fixed_fees!(model, fees)
     set_risk_constraints!(model, frc.r, frc, pr, pl, fees, b1; rd = rd)
     scalarise_risk_expression!(model, frc.opt.sca)

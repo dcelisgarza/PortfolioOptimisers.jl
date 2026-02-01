@@ -1426,7 +1426,7 @@
                         0.09904023885895782, 0.05862319774028108], rtol = 1e-6)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBounds(; lb = -1, ub = 1), ln = LnRegularisation())
+                            wb = WeightBounds(; lb = -1, ub = 1), lp = LpRegularisation())
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,

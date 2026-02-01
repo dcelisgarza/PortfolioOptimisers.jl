@@ -155,7 +155,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)
     set_linf_regularisation!(model, rb.opt.linf)
-    set_ln_regularisation!(model, rb.opt.ln)
+    set_lp_regularisation!(model, rb.opt.lp)
     set_non_fixed_fees!(model, fees)
     set_risk_constraints!(model, rb.r, rb, pr, pl, fees; rd = rd)
     scalarise_risk_expression!(model, rb.opt.sca)

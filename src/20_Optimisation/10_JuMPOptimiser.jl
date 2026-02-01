@@ -68,7 +68,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l1::T33
     l2::T34
     linf::T35
-    ln::T36
+    lp::T36
     strict::T37
     function JuMPOptimiser(pr::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
@@ -90,7 +90,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number},
-                           linf::Option{<:Number}, ln::Option{LnReg_VecLnReg}, strict::Bool)
+                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, strict::Bool)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -126,8 +126,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         if !isnothing(linf)
             assert_nonempty_gt0_finite_val(linf, :linf)
         end
-        if isa(ln, AbstractVector)
-            @argcheck(!isempty(ln))
+        if isa(lp, AbstractVector)
+            @argcheck(!isempty(lp))
         end
         if isa(scard, Integer)
             assert_nonempty_gt0_finite_val(scard, :scard)
@@ -246,11 +246,11 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(tr), typeof(pl), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(ln), typeof(strict)}(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct,
+                   typeof(lp), typeof(strict)}(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct,
                                                gcard, sgcard, smtx, sgmtx, slt, sst, sglt,
                                                sgst, tn, fees, sets, tr, pl, ret, sca, ccnt,
                                                cobj, sc, so, ss, card, scard, nea, l1, l2,
-                                               linf, ln, strict)
+                                               linf, lp, strict)
     end
 end
 function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -281,10 +281,10 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
-                       ln::Option{<:LnReg_VecLnReg} = nothing, strict::Bool = false)
+                       lp::Option{<:LpReg_VecLpReg} = nothing, strict::Bool = false)
     return JuMPOptimiser(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, pl, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, ln, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     X = isa(opt.pr, AbstractPriorResult) ? opt.pr.X : X
@@ -325,7 +325,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          sets = sets, tr = tr, pl = opt.pl, ret = ret, sca = opt.sca,
                          ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, scard = opt.scard, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, linf = opt.linf, ln = opt.ln, strict = opt.strict)
+                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
@@ -386,7 +386,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          tr = opt.tr, pl = pl, ret = ret, sca = opt.sca, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
-                         linf = opt.linf, ln = opt.ln, strict = opt.strict)
+                         linf = opt.linf, lp = opt.lp, strict = opt.strict)
 end
 
 export ProcessedJuMPOptimiserAttributes, JuMPOptimiser
