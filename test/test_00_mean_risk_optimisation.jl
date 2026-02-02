@@ -178,214 +178,220 @@
     rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                       timestamp = :Date)[(end - 50):end])
     pr2 = prior(EmpiricalPrior(), rd2)
-    # @testset "Mean Risk" begin
-    objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
-    rets = [ArithmeticReturn(), LogarithmicReturn()]
-    rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
-          UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
-          LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
-          LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
-          LowOrderMoment(; alg = SecondMoment(; alg1 = Full(), alg2 = SOCRiskExpr())),
-          LowOrderMoment(; alg = SecondMoment()),
-          LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
-          ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
-          EntropicValueatRiskRange(), RelativisticValueatRisk(),
-          RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
-          UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
-          RelativisticDrawdownatRisk(), Kurtosis(; N = 2), Kurtosis(),
-          OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
-          OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
-          OrderedWeightsArrayRange(), NegativeSkewness(),
-          NegativeSkewness(; alg = SquaredSOCRiskExpr()),
-          DistributionallyRobustConditionalValueatRisk(),
-          ValueatRisk(; alg = DistributionValueatRisk()),
-          DistributionallyRobustConditionalValueatRiskRange(),
-          ValueatRiskRange(; alg = DistributionValueatRisk()),
-          TurnoverRiskMeasure(; w = w0),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
-          DistributionallyRobustConditionalDrawdownatRisk(), PowerNormValueatRisk(),
-          PowerNormValueatRiskRange(), PowerNormDrawdownatRisk(),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = PNormTracking()),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                              alg = InfNormTracking(; pos = false)),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                              alg = PNormTracking(; p = 10)),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = InfNormTracking())]
-    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
-    i = 1
-    for r in rs, obj in objs, ret in rets
-        opt = JuMPOptimiser(; pr = pr, slv = slv, ret = ret)
-        mr = MeanRisk(; r = r, obj = obj, opt = opt)
-        res = optimise(mr, rd)
-        @test isa(res.retcode, OptimisationSuccess)
-        rtol = if i == 22 && Sys.islinux()
-            1e-2
-        elseif i in
-               (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141, 148,
-                154, 175, 184, 196, 252)
-            5e-5
-        elseif i in
-               (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177, 179,
-                192, 204, 214, 216, 254)
-            5e-6
-        elseif i in (18, 157, 158, 174, 228)
-            5e-4
-        elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176)
-            1e-5
-        elseif i in (160, 164, 180)
-            5e-3
-        elseif i in (162, 178)
-            1e-3
-        elseif i in (198, 210)
-            5e-2
-        elseif i in (208, 234, 246)
-            1e-4
-        elseif i == 240
-            0.25
-        else
-            1e-6
-        end
-        success = isapprox(res.w, df[!, i]; rtol = rtol)
-        if !success
-            println("Counter: $i")
-            find_tol(res.w, df[!, i])
-        end
-        @test success
-        if isa(obj, MaximumRatio)
-            rk = expected_risk(factory(r, pr, slv), res.w, rd.X)
-            rt = expected_return(ret, res.w, pr)
-            opt1 = JuMPOptimiser(; pr = pr, slv = slv,
-                                 ret = bounds_returns_estimator(ret, rt))
-            mr = MeanRisk(; r = r, opt = opt1)
+    @testset "Mean Risk" begin
+        objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
+        rets = [ArithmeticReturn(), LogarithmicReturn()]
+        rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
+              UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
+              LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
+              LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
+              LowOrderMoment(; alg = SecondMoment(; alg1 = Full(), alg2 = SOCRiskExpr())),
+              LowOrderMoment(; alg = SecondMoment()),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
+              ConditionalValueatRisk(), ConditionalValueatRiskRange(),
+              EntropicValueatRisk(), EntropicValueatRiskRange(), RelativisticValueatRisk(),
+              RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
+              UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
+              RelativisticDrawdownatRisk(), Kurtosis(; N = 2), Kurtosis(),
+              OrderedWeightsArray(; alg = ExactOrderedWeightsArray()),
+              OrderedWeightsArray(),
+              OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
+              OrderedWeightsArrayRange(), NegativeSkewness(),
+              NegativeSkewness(; alg = SquaredSOCRiskExpr()),
+              DistributionallyRobustConditionalValueatRisk(),
+              ValueatRisk(; alg = DistributionValueatRisk()),
+              DistributionallyRobustConditionalValueatRiskRange(),
+              ValueatRiskRange(; alg = DistributionValueatRisk()),
+              TurnoverRiskMeasure(; w = w0),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
+              DistributionallyRobustConditionalDrawdownatRisk(), PowerNormValueatRisk(),
+              PowerNormValueatRiskRange(), PowerNormDrawdownatRisk(),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                  alg = PNormTracking(; p = 2)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                  alg = InfNormTracking(; pos = false)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                  alg = PNormTracking(; p = 10)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                  alg = InfNormTracking())]
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
+        i = 1
+        for r in rs, obj in objs, ret in rets
+            opt = JuMPOptimiser(; pr = pr, slv = slv, ret = ret)
+            mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise(mr, rd)
-            rt1 = expected_return(ret, res.w, pr)
-            @test rt1 >= rt || abs(rt1 - rt) < 1e-10
-            mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
-                          opt = opt)
-            res = optimise(mr, rd)
-            rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
-            if !isa(r, Kurtosis) || isa(r, Kurtosis) && isnothing(r.N)
-                tol = if i == 161
-                    5e-10
-                elseif i == 203
-                    0.00014
-                elseif i == 204
-                    0.00022
-                else
-                    1e-10
-                end
-                @test rk1 <= rk || abs(rk1 - rk) < tol
-            else
-                @test rk1 / rk < 1.07
-            end
-        end
-        i += 1
-    end
-
-    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskDT.csv.gz"), DataFrame)
-    tr = WeightsTracking(; w = w0)
-    opt = JuMPOptimiser(; pr = pr, slv = slv)
-    i = 1
-    for r in rs
-        r1 = RiskTrackingRiskMeasure(; tr = tr, r = r, alg = DependentVariableTracking())
-        mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise(mr, rd)
-        if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
-            @test isa(res.retcode, OptimisationFailure)
-            i += 1
-            continue
-        else
             @test isa(res.retcode, OptimisationSuccess)
+            rtol = if i == 22 && Sys.islinux()
+                1e-2
+            elseif i in
+                   (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141,
+                    148, 154, 175, 184, 196, 252)
+                5e-5
+            elseif i in
+                   (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
+                    179, 192, 204, 214, 216, 254)
+                5e-6
+            elseif i in (18, 157, 158, 174, 228)
+                5e-4
+            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176)
+                1e-5
+            elseif i in (160, 164, 180)
+                5e-3
+            elseif i in (162, 178)
+                1e-3
+            elseif i in (198, 210)
+                5e-2
+            elseif i in (208, 234, 246)
+                1e-4
+            elseif i == 240
+                0.25
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+            if isa(obj, MaximumRatio)
+                rk = expected_risk(factory(r, pr, slv), res.w, rd.X)
+                rt = expected_return(ret, res.w, pr)
+                opt1 = JuMPOptimiser(; pr = pr, slv = slv,
+                                     ret = bounds_returns_estimator(ret, rt))
+                mr = MeanRisk(; r = r, opt = opt1)
+                res = optimise(mr, rd)
+                rt1 = expected_return(ret, res.w, pr)
+                @test rt1 >= rt || abs(rt1 - rt) < 1e-10
+                mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
+                              opt = opt)
+                res = optimise(mr, rd)
+                rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
+                if !isa(r, Kurtosis) || isa(r, Kurtosis) && isnothing(r.N)
+                    tol = if i == 161
+                        5e-10
+                    elseif i == 203
+                        0.00014
+                    elseif i == 204
+                        0.00022
+                    else
+                        1e-10
+                    end
+                    @test rk1 <= rk || abs(rk1 - rk) < tol
+                else
+                    @test rk1 / rk < 1.07
+                end
+            end
+            i += 1
         end
-        rtol = if i in (12, 14, 30)
-            5e-4
-        elseif i in (13, 16, 17)
-            0.05
-        elseif i in (15, 28, 41, 42)
-            0.1
-        elseif i == 29
-            5e-6
-        elseif i in (18, 24)
-            5e-3
-        elseif i == 22 && Sys.islinux()
-            1e-2
-        elseif i in (22, 23)
-            1e-4
-        elseif i in (26, 43)
-            5e-5
-        else
-            1e-6
-        end
-        success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
-        if !success
-            println("Counter: $i")
-            find_tol(res.w, df[!, "$i"])
-            display([res.w df[!, "$i"]])
-        end
-        @test success
-        i += 1
-    end
 
-    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskIT.csv.gz"), DataFrame)
-    opt = JuMPOptimiser(; pr = pr, slv = slv)
-    i = 1
-    for r in rs
-        r1 = RiskTrackingRiskMeasure(; tr = tr, r = r, alg = IndependentVariableTracking())
-        mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise(mr, rd)
-        @test isa(res.retcode, OptimisationSuccess)
-        rtol = if i in (16, 30)
-            5e-5
-        elseif i == 24
-            5e-6
-        elseif i == 27
-            5e-5
-        else
-            1e-6
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskDT.csv.gz"), DataFrame)
+        tr = WeightsTracking(; w = w0)
+        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        i = 1
+        for r in rs
+            r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
+                                         alg = DependentVariableTracking())
+            mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
+            res = optimise(mr, rd)
+            if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
+                @test isa(res.retcode, OptimisationFailure)
+                i += 1
+                continue
+            else
+                @test isa(res.retcode, OptimisationSuccess)
+            end
+            rtol = if i in (12, 14, 30)
+                5e-4
+            elseif i in (13, 16, 17)
+                0.05
+            elseif i in (15, 28, 41, 42)
+                0.1
+            elseif i == 29
+                5e-6
+            elseif i in (18, 24)
+                5e-3
+            elseif i == 22 && Sys.islinux()
+                1e-2
+            elseif i in (22, 23)
+                1e-4
+            elseif i in (26, 43)
+                5e-5
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, "$i"])
+                display([res.w df[!, "$i"]])
+            end
+            @test success
+            i += 1
         end
-        success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
-        if !success
-            println("Counter: $i")
-            find_tol(res.w, df[!, "$i"])
-            display([res.w df[!, "$i"]])
-        end
-        @test success
-        i += 1
-    end
 
-    res = optimise(MeanRisk(; wi = w0,
-                            opt = JuMPOptimiser(; pr = pr,
-                                                slv = Solver(; solver = Clarabel.Optimizer,
-                                                             settings = ["verbose" => false,
-                                                                         "max_iter" => 1])),
-                            fb = InverseVolatility(; pr = pr)))
-    @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskIT.csv.gz"), DataFrame)
+        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        i = 1
+        for r in rs
+            r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
+                                         alg = IndependentVariableTracking())
+            mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
+            res = optimise(mr, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            rtol = if i in (16, 30)
+                5e-5
+            elseif i == 24
+                5e-6
+            elseif i == 27
+                5e-5
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, "$i"])
+                display([res.w df[!, "$i"]])
+            end
+            @test success
+            i += 1
+        end
 
-    r = BrownianDistanceVariance()
-    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"), DataFrame)
-    i = 1
-    for obj in objs, ret in rets
-        opt = JuMPOptimiser(; pr = pr2, slv = slv, ret = ret)
-        mr = MeanRisk(; r = r, obj = obj, opt = opt)
-        res = optimise(mr, rd2)
-        @test isa(res.retcode, OptimisationSuccess)
-        rtol = if i == 4
-            5e-6
-        elseif i == 6
-            5e-5
-        else
-            1e-6
+        res = optimise(MeanRisk(; wi = w0,
+                                opt = JuMPOptimiser(; pr = pr,
+                                                    slv = Solver(;
+                                                                 solver = Clarabel.Optimizer,
+                                                                 settings = ["verbose" => false,
+                                                                             "max_iter" => 1])),
+                                fb = InverseVolatility(; pr = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+
+        r = BrownianDistanceVariance()
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"), DataFrame)
+        i = 1
+        for obj in objs, ret in rets
+            opt = JuMPOptimiser(; pr = pr2, slv = slv, ret = ret)
+            mr = MeanRisk(; r = r, obj = obj, opt = opt)
+            res = optimise(mr, rd2)
+            @test isa(res.retcode, OptimisationSuccess)
+            rtol = if i == 4
+                5e-6
+            elseif i == 6
+                5e-5
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+            i += 1
         end
-        success = isapprox(res.w, df[!, i]; rtol = rtol)
-        if !success
-            println("Counter: $i")
-            find_tol(res.w, df[!, i])
-        end
-        @test success
-        i += 1
     end
-    # end
     @testset "Formulations" begin
         opt = JuMPOptimiser(; pr = pr, slv = slv)
         r = factory(Variance(), pr)
@@ -1427,17 +1433,18 @@
                         0.09904023885895782, 0.05862319774028108], rtol = 1e-6)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBounds(; lb = -1, ub = 1), lp = LpRegularisation())
+                            wb = WeightBounds(; lb = -1, ub = 1),
+                            lp = LpRegularisation(; p = -1, val = 1e-4))
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,
-                       [-0.04622976471229939, -0.04834817593984892, 0.018878186430662854,
-                        -0.02016471866733371, 0.08397873338027838, 0.04665098111662739,
-                        0.05067991476101939, 0.1349656714062616, 0.04608029180435123,
-                        0.10006647367530562, 0.036383606818442334, 0.11982918374913054,
-                        0.03873575646005216, 0.10080385464877407, 0.04373976330491741,
-                        0.09326152215206925, -0.02122736883938398, 0.05062295276731926,
-                        0.09815617455757071, 0.07313695386801744], rtol = 1e-6)
+                       [-0.05764697001130279, -0.04431070972751474, 0.00747553535021098,
+                        -0.023908797442917386, 0.08821875094947536, 0.046977548770644396,
+                        0.04908160016925732, 0.15439190880914685, 0.04884651182287862,
+                        0.10640175439005223, 0.02159205126254584, 0.13329454362025117,
+                        0.042156711769183466, 0.10774681701781148, 0.03202888209996061,
+                        0.09501657403907941, -0.022310182501551167, 0.04164013305521783,
+                        0.1011939820035937, 0.07211335193158373], rtol = 1e-6)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1),
