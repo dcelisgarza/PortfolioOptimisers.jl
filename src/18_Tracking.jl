@@ -223,7 +223,6 @@ struct PNormTracking{T1, T2} <: NormTracking
     p::T1
     ddof::T2
     function PNormTracking(p::Number, ddof::Integer)
-        assert_nonempty_gt0_finite_val(p, :p)
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(p), typeof(ddof)}(p, ddof)
     end
@@ -918,5 +917,6 @@ function factory(tr::TrackingError, w::VecNum)
     return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
 end
 
-export SOCTracking, SquaredSOCTracking, NOCTracking, IndependentVariableTracking,
-       DependentVariableTracking, WeightsTracking, ReturnsTracking, TrackingError
+export SOCTracking, SquaredSOCTracking, NOCTracking, PNormTracking, InfNormTracking,
+       IndependentVariableTracking, DependentVariableTracking, WeightsTracking,
+       ReturnsTracking, TrackingError

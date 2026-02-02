@@ -90,7 +90,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number},
-                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, strict::Bool)
+                           linf::Option{<:LInfReg_VecLInfReg}, lp::Option{LpReg_VecLpReg},
+                           strict::Bool)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -122,9 +123,6 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
         end
         if !isnothing(l2)
             assert_nonempty_gt0_finite_val(l2, :l2)
-        end
-        if !isnothing(linf)
-            assert_nonempty_gt0_finite_val(linf, :linf)
         end
         if isa(lp, AbstractVector)
             @argcheck(!isempty(lp))
@@ -280,7 +278,8 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        card::Option{<:Integer} = nothing,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
-                       l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
+                       l2::Option{<:Number} = nothing,
+                       linf::Option{<:LInfReg_VecLInfReg} = nothing,
                        lp::Option{<:LpReg_VecLpReg} = nothing, strict::Bool = false)
     return JuMPOptimiser(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, pl, ret, sca,

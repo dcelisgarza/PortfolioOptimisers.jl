@@ -65,6 +65,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:PNormTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
+    tr = r.tr
+    # @argcheck(tr.alg.p >= 1, DomainError)
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
@@ -75,7 +77,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                            ()
                                                                                                                            [1:T]
                                                                                                                        end)
-    tr = r.tr
     p_inv = inv(tr.alg.p)
     scale = T - tr.alg.ddof
     scale = tr.alg.p == 3 ? cbrt(scale) : scale^p_inv

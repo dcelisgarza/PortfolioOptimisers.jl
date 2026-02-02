@@ -1439,7 +1439,22 @@
                         0.09815617455757071, 0.07313695386801744], rtol = 1e-6)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBounds(; lb = -1, ub = 1), linf = 8e-5)
+                            wb = WeightBounds(; lb = -1, ub = 1),
+                            linf = LInfRegularisation(; val = 8e-5))
+        mr = MeanRisk(; opt = opt)
+        res = optimise(mr)
+        @test isapprox(res.w,
+                       [-0.10012716916989911, -0.037330227223905686, -0.0362005729255792,
+                        -0.03437255975979355, 0.1297453778361631, 0.048219568550521216,
+                        0.04271321394187886, 0.12974638519965564, 0.0860548071819024,
+                        0.1297463758040975, 0.01047545372694966, 0.1297463839813271,
+                        0.0643702863005255, 0.12974637704447126, 0.015476757316173454,
+                        0.1297463695755112, -0.02667527421008015, 0.020454176815837947,
+                        0.1176102092952984, 0.05085406071894451], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1),
+                            linf = LInfRegularisation(; val = 8e-5, pos = false))
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,
