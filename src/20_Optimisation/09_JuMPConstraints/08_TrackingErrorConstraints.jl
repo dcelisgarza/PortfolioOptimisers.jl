@@ -75,24 +75,57 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                                                           [1:T]
                                                                                       end)
     tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
-    model[Symbol(:cte_pnorm_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
-                                                                               begin
-                                                                                   [i = 1:T],
-                                                                                   [sc *
-                                                                                    r_te[i],
-                                                                                    1,
-                                                                                    sc *
-                                                                                    tr[i]] in
-                                                                                   JuMP.MOI.PowerCone(p_inv)
-                                                                                   sc *
-                                                                                   (sum(r_te) -
-                                                                                    t_te) ==
-                                                                                   0
-                                                                                   sc *
-                                                                                   (t_te -
-                                                                                    f * k) <=
-                                                                                   0
-                                                                               end)
+    model[Symbol(:cte_pnorm_, i)], model[Symbol(:cste_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
+                                                                                                         begin
+                                                                                                             [i = 1:T],
+                                                                                                             [sc *
+                                                                                                              r_te[i],
+                                                                                                              1,
+                                                                                                              sc *
+                                                                                                              tr[i]] in
+                                                                                                             JuMP.MOI.PowerCone(p_inv)
+                                                                                                             sc *
+                                                                                                             (sum(r_te) -
+                                                                                                              t_te) ==
+                                                                                                             0
+                                                                                                             sc *
+                                                                                                             (t_te -
+                                                                                                              f *
+                                                                                                              k) <=
+                                                                                                             0
+                                                                                                         end)
+    return nothing
+end
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
+                                         tr::TrackingError{<:Any, <:Any, <:InfNormTracking},
+                                         args...; kwargs...)
+    X = pr.X
+    k = model[:k]
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, X)
+    wb = tracking_benchmark(tr.tr, X)
+    T = size(X, 1)
+    err = tr.err
+    scale = T - tr.alg.ddof
+    sign = ifelse(tr.alg.pos, 1, -1)
+    f = err * scale
+    t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
+    tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
+    model[Symbol(:cte_infnorm_, i)], model[Symbol(:cte_, i)] = JuMP.@constraints(model,
+                                                                                 begin
+                                                                                     [sc *
+                                                                                      t_te
+                                                                                      sc *
+                                                                                      sign *
+                                                                                      tr] in
+                                                                                     JuMP.MOI.NormInfinityCone(1 +
+                                                                                                               T)
+                                                                                     sc *
+                                                                                     (t_te -
+                                                                                      f * k) <=
+                                                                                     0
+                                                                                 end)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,

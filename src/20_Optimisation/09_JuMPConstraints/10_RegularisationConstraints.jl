@@ -77,7 +77,7 @@ function set_linf_regularisation!(model::JuMP.Model, linf_val::Number)
     w = model[:w]
     sc = model[:sc]
     JuMP.@variable(model, t_linf)
-    JuMP.@constraint(model, clinf_noc,
+    JuMP.@constraint(model, clinf_nic,
                      [sc * t_linf; sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w)))
     JuMP.@expression(model, linf, linf_val * t_linf)
     add_to_objective_penalty!(model, linf)
