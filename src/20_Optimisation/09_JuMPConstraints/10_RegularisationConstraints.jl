@@ -72,7 +72,8 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
                                                                                     [i = 1:N],
                                                                                     [sc *
                                                                                      r_lp[i],
-                                                                                     1,
+                                                                                     sc *
+                                                                                     t_lp,
                                                                                      sc *
                                                                                      w[i]] in
                                                                                     JuMP.MOI.PowerCone(p_inv)

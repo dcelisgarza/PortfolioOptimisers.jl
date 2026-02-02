@@ -59,6 +59,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::TrackingError{<:Any, <:Any, <:PNormTracking},
                                          args...; kwargs...)
+    @argcheck(tr.alg.p > 1, DomainError)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
@@ -80,7 +81,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                                                                              [i = 1:T],
                                                                                                              [sc *
                                                                                                               r_te[i],
-                                                                                                              1,
+                                                                                                              sc *
+                                                                                                              t_te,
                                                                                                               sc *
                                                                                                               tr[i]] in
                                                                                                              JuMP.MOI.PowerCone(p_inv)
