@@ -226,15 +226,15 @@
                 1e-2
             elseif i in
                    (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141,
-                    148, 154, 175, 184, 196, 252)
+                    148, 154, 175, 184, 196, 252, 269, 276, 281)
                 5e-5
             elseif i in
                    (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
-                    179, 192, 204, 214, 216, 254)
+                    179, 192, 204, 214, 216, 254, 264)
                 5e-6
             elseif i in (18, 157, 158, 174, 228)
                 5e-4
-            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176)
+            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 263, 266, 280)
                 1e-5
             elseif i in (160, 164, 180)
                 5e-3
@@ -242,7 +242,7 @@
                 1e-3
             elseif i in (198, 210)
                 5e-2
-            elseif i in (208, 234, 246)
+            elseif i in (208, 234, 246, 270, 282)
                 1e-4
             elseif i == 240
                 0.25
@@ -316,7 +316,7 @@
                 1e-2
             elseif i in (22, 23)
                 1e-4
-            elseif i in (26, 43)
+            elseif i in (26, 43, 44)
                 5e-5
             else
                 1e-6
@@ -344,7 +344,7 @@
                 5e-5
             elseif i == 24
                 5e-6
-            elseif i == 27
+            elseif i in (27, 44)
                 5e-5
             else
                 1e-6
@@ -1434,7 +1434,7 @@
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1),
-                            lp = LpRegularisation(; p = -1, val = 1e-4))
+                            lp = LpRegularisation(; val = 1e-4))
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,
