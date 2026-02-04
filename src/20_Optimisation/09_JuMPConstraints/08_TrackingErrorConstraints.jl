@@ -3,7 +3,7 @@ function set_tracking_error_constraints!(args...; kwargs...)
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         tr::TrackingError{<:Any, <:Any, <:NOCTracking},
+                                         tr::TrackingError{<:Any, <:Any, <:L1Tracking},
                                          args...; kwargs...)
     X = pr.X
     k = model[:k]
@@ -31,8 +31,8 @@ end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::TrackingError{<:Any, <:Any,
-                                                           <:Union{<:SOCTracking,
-                                                                   <:SquaredSOCTracking}},
+                                                           <:Union{<:L2Tracking,
+                                                                   <:SquaredL2Tracking}},
                                          args...; kwargs...)
     X = pr.X
     k = model[:k]
@@ -57,7 +57,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         tr::TrackingError{<:Any, <:Any, <:PNormTracking},
+                                         tr::TrackingError{<:Any, <:Any, <:LpTracking},
                                          args...; kwargs...)
     @argcheck(tr.alg.p > 1, DomainError)
     X = pr.X
@@ -100,7 +100,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         tr::TrackingError{<:Any, <:Any, <:InfNormTracking},
+                                         tr::TrackingError{<:Any, <:Any, <:LInfTracking},
                                          args...; kwargs...)
     X = pr.X
     k = model[:k]

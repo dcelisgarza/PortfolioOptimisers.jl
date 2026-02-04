@@ -204,15 +204,14 @@
               ValueatRiskRange(; alg = DistributionValueatRisk()),
               TurnoverRiskMeasure(; w = w0),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
-              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Tracking()),
               DistributionallyRobustConditionalDrawdownatRisk(), PowerNormValueatRisk(),
               PowerNormValueatRiskRange(), PowerNormDrawdownatRisk(),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = PNormTracking(; p = 2)),
+                                  alg = LpTracking(; p = 2)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfTracking()),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = InfNormTracking()),
-              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = PNormTracking(; p = 10))]
+                                  alg = LpTracking(; p = 10))]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
@@ -612,7 +611,7 @@
         res10 = optimise(MeanRisk(;
                                   r = ValueatRisk(;
                                                   alg = DistributionValueatRisk(;
-                                                                                dist = TDist(5)),),
+                                                                                dist = TDist(5))),
                                   opt = opt))
         @test isapprox(res9.w, res10.w; rtol = 5e-2)
 
@@ -624,7 +623,7 @@
         res12 = optimise(MeanRisk(;
                                   r = ValueatRiskRange(;
                                                        alg = DistributionValueatRisk(;
-                                                                                     dist = TDist(5)),),
+                                                                                     dist = TDist(5))),
                                   opt = opt))
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
 
@@ -1502,7 +1501,7 @@
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = TrackingError(; tr = ReturnsTracking(; w = wr),
-                                               err = 2.5e-3, alg = NOCTracking()))
+                                               err = 2.5e-3, alg = L1Tracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - wr, 1) / size(rd.X, 1) <= 2.5e-3
@@ -1516,21 +1515,21 @@
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = TrackingError(; tr = ReturnsTracking(; w = wr),
-                                               err = 4.5e-3, alg = PNormTracking()))
+                                               err = 4.5e-3, alg = LpTracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1)) <= 4.5e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 8e-5,
-                                               alg = InfNormTracking()))
+                                               alg = LInfTracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = [TrackingError(; tr = WeightsTracking(; w = w0),
-                                                err = 2e-3, alg = NOCTracking())])
+                                                err = 2e-3, alg = L1Tracking())])
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3

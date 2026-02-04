@@ -42,7 +42,7 @@ struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tr::AbstractTrackingAlgorithm,
-                             alg::NormTracking = SOCTracking())
+                             alg::NormTracking = L2Tracking())
     return TrackingRiskMeasure(settings, tr, alg)
 end
 function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)

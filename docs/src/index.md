@@ -560,11 +560,12 @@ It is often useful to create portfolios that track the performance of an index, 
 
 The error can be computed using different algorithms using [`norm_tracking`](@ref).
 
-- L1-norm [`NOCTracking`](@ref)
-- L2-norm [`SOCTracking`](@ref)
-- L2-norm squared [`SquaredSOCTracking`](@ref)
-- Lp-norm [`PNormTracking`]-(@ref)
-- L-Inf-norm [`InfNormTracking`]-(@ref)
+- ::: details Norm tracking algorithms
+  - L1-norm [`L1Tracking`](@ref)
+  - L2-norm [`L2Tracking`](@ref)
+  - L2-norm squared [`SquaredL2Tracking`](@ref)
+  - Lp-norm [`LpTracking`]-(@ref)
+  - L-Inf-norm [`LInfTracking`]-(@ref)
 
 It is also possible to track the error in with risk measures [`RiskTrackingError`]-(@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
@@ -684,11 +685,11 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
 - Range [`Range`]-(@ref)
 - Turnover Risk Measure [`TurnoverRiskMeasure`]-(@ref)
 - ::: details Tracking Risk Measure [`TrackingRiskMeasure`]-(@ref)
-  - L1-norm [`NOCTracking`](@ref)
-  - L2-norm [`SOCTracking`](@ref)
-  - L2-norm squared [`SquaredSOCTracking`](@ref)
-  - Lp-norm [`PNormTracking`]-(@ref)
-  - L-Inf-norm [`InfNormTracking`]-(@ref)
+  - L1-norm [`L1Tracking`](@ref)
+  - L2-norm [`L2Tracking`](@ref)
+  - L2-norm squared [`SquaredL2Tracking`](@ref)
+  - Lp-norm [`LpTracking`]-(@ref)
+  - L-Inf-norm [`LInfTracking`]-(@ref)
 - ::: details Risk Tracking Risk Measure
   - Dependent variable tracking [`DependentVariableTracking`](@ref)
   - Independent variable tracking [`IndependentVariableTracking`](@ref)

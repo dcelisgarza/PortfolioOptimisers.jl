@@ -1,5 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:L1Tracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -21,14 +21,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return tracking_risk
 end
 function set_tracking_risk!(model::JuMP.Model,
-                            r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
+                            r::TrackingRiskMeasure{<:Any, <:Any, <:L2Tracking},
                             opt::RiskJuMPOptimisationEstimator,
                             tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
 function set_tracking_risk!(model::JuMP.Model,
-                            r::TrackingRiskMeasure{<:Any, <:Any, <:SquaredSOCTracking},
+                            r::TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Tracking},
                             opt::RiskJuMPOptimisationEstimator,
                             tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
     qtracking_risk = model[Symbol(:sq_, key)] = JuMP.@expression(model, tracking_risk^2)
@@ -39,8 +39,8 @@ function set_tracking_risk!(model::JuMP.Model,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
-                                                      <:Union{<:SOCTracking,
-                                                              <:SquaredSOCTracking}},
+                                                      <:Union{<:L2Tracking,
+                                                              <:SquaredL2Tracking}},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -62,7 +62,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return set_tracking_risk!(model, r, opt, tracking_risk, key)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:PNormTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     @argcheck(r.alg.p > 1, DomainError)
@@ -102,7 +102,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return tracking_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:InfNormTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)

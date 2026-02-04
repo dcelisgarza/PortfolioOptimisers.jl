@@ -3,9 +3,9 @@
 ## Public
 
 ```@docs
-SOCTracking
-SquaredSOCTracking
-NOCTracking
+L2Tracking
+SquaredL2Tracking
+L1Tracking
 IndependentVariableTracking
 DependentVariableTracking
 WeightsTracking
