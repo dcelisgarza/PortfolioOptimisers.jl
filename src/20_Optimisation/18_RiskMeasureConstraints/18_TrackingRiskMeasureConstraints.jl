@@ -112,15 +112,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     scale = T - r.alg.ddof
-    sign = ifelse(r.alg.pos, 1, -1)
     tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / scale)
     benchmark = tracking_benchmark(r.tr, pr.X)
     tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
                                                                    net_X - benchmark * k)
-
     model[Symbol(:ctracking_infnorm_, i)] = JuMP.@constraint(model,
                                                              [sc * t_tracking_risk;
-                                                              sc * sign * tracking_r] in
+                                                              sc * tracking_r] in
                                                              JuMP.MOI.NormInfinityCone(1 +
                                                                                        T))
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)

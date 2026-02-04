@@ -110,7 +110,6 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     T = size(X, 1)
     err = tr.err
     scale = T - tr.alg.ddof
-    sign = ifelse(tr.alg.pos, 1, -1)
     f = err * scale
     t_te = model[Symbol(:t_te_, i)] = JuMP.@variable(model)
     tr = model[Symbol(:te_, i)] = JuMP.@expression(model, net_X - wb * k)
@@ -119,7 +118,6 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                                                      [sc *
                                                                                       t_te
                                                                                       sc *
-                                                                                      sign *
                                                                                       tr] in
                                                                                      JuMP.MOI.NormInfinityCone(1 +
                                                                                                                T)

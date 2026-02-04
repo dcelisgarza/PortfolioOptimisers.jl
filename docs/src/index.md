@@ -5,8 +5,8 @@ layout: home
 
 hero:
   name: "PortfolioOptimisers.jl"
-  text: Sir, this is a casino.
-  tagline: 🦍🤝💪 💎🙌 🚀🌕.
+  text: Quantitative portfolio construction
+  tagline: Democratising, demystifying, and derisking investing
   image:
     src: logo.svg
     alt: PortfolioOptimisers

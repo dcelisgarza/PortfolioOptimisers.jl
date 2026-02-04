@@ -210,11 +210,9 @@
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
                                   alg = PNormTracking(; p = 2)),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = InfNormTracking(; pos = false)),
+                                  alg = InfNormTracking()),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = PNormTracking(; p = 10)),
-              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = InfNormTracking())]
+                                  alg = PNormTracking(; p = 10))]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
@@ -226,16 +224,15 @@
                 1e-2
             elseif i in
                    (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141,
-                    148, 154, 175, 184, 196, 252, 276, 281)
+                    148, 154, 175, 184, 196, 252, 276)
                 5e-5
             elseif i in
                    (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
                     179, 192, 204, 214, 216, 254, 264)
                 5e-6
-            elseif i in (18, 157, 158, 174, 228, 270, 282)
+            elseif i in (18, 157, 158, 174, 228, 270)
                 5e-4
-            elseif i in
-                   (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 263, 266, 268, 278, 280)
+            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 263, 266, 268)
                 1e-5
             elseif i in (160, 164, 180)
                 5e-3
@@ -1448,22 +1445,7 @@
                         0.1011939820035937, 0.07211335193158373], rtol = 5e-5)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBounds(; lb = -1, ub = 1),
-                            linf = LInfRegularisation(; val = 8e-5))
-        mr = MeanRisk(; opt = opt)
-        res = optimise(mr)
-        @test isapprox(res.w,
-                       [-0.10012716916989911, -0.037330227223905686, -0.0362005729255792,
-                        -0.03437255975979355, 0.1297453778361631, 0.048219568550521216,
-                        0.04271321394187886, 0.12974638519965564, 0.0860548071819024,
-                        0.1297463758040975, 0.01047545372694966, 0.1297463839813271,
-                        0.0643702863005255, 0.12974637704447126, 0.015476757316173454,
-                        0.1297463695755112, -0.02667527421008015, 0.020454176815837947,
-                        0.1176102092952984, 0.05085406071894451], rtol = 1e-6)
-
-        opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBounds(; lb = -1, ub = 1),
-                            linf = LInfRegularisation(; val = 8e-5, pos = false))
+                            wb = WeightBounds(; lb = -1, ub = 1), linf = 8e-5)
         mr = MeanRisk(; opt = opt)
         res = optimise(mr)
         @test isapprox(res.w,
@@ -1545,13 +1527,6 @@
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
-
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 5e-5,
-                                               alg = InfNormTracking(; pos = false)))
-        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise(mre)
-        @test LinearAlgebra.norm(rd.X * res.w - wr, -Inf) / size(rd.X, 1) <= 5e-5
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = [TrackingError(; tr = WeightsTracking(; w = w0),
