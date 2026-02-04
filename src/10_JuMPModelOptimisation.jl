@@ -3,7 +3,7 @@
 
 Abstract supertype for all JuMP-based optimisation result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing the result of a JuMP model optimisation should subtype `AbstractJuMPResult`.
+All concrete and/or abstract types representing the result of a JuMP model optimisation should be subtypes of `AbstractJuMPResult`.
 
 # Related
 

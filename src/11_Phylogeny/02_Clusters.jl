@@ -1,9 +1,9 @@
 """
     abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 
-Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all clustering estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClustersEstimator`.
+All concrete and/or abstract types implementing clustering-based estimation algorithms should be subtypes of `AbstractClustersEstimator`.
 
 # Related
 
@@ -14,9 +14,9 @@ abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 """
     abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
 
-Abstract supertype for all clustering algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all clustering algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific clustering algorithms should subtype `AbstractClustersAlgorithm`. This enables flexible extension and dispatch of clustering routines.
+All concrete and/or abstract types implementing specific clustering algorithms should be subtypes of `AbstractClustersAlgorithm`.
 
 # Related
 
@@ -32,9 +32,9 @@ abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgo
 """
     abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 
-Abstract supertype for all optimal number of clusters estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all optimal number of clusters estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing algorithms to estimate the optimal number of clusters should subtype `AbstractOptimalNumberClustersEstimator`.
+All concrete and/or abstract types implementing algorithms to estimate the optimal number of clusters should be subtypes of `AbstractOptimalNumberClustersEstimator`.
 
 # Related
 
@@ -44,9 +44,9 @@ abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 """
     abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all optimal number of clusters algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all optimal number of clusters algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific algorithms for determining the optimal number of clusters should subtype `AbstractOptimalNumberClustersAlgorithm`. This enables flexible extension and dispatch of cluster number selection routines.
+All concrete and/or abstract types implementing specific algorithms for determining the optimal number of clusters should be subtypes of `AbstractOptimalNumberClustersAlgorithm`.
 
 # Related
 
@@ -57,9 +57,9 @@ const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
     abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
-Abstract supertype for all clustering result types in PortfolioOptimisers.jl.
+Abstract supertype for all clustering result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing the result of a clustering estimation should subtype `AbstractClusteringResult`.
+All concrete and/or abstract types representing the result of a clustering estimation should be subtypes of `AbstractClusteringResult`.
 
 # Related
 
@@ -76,7 +76,7 @@ const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
         k::T4
     end
 
-Result type for hierarchical clustering in PortfolioOptimisers.jl.
+Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
 `Clusters` stores the output of a hierarchical clustering algorithm, including the clustering object, similarity and distance matrices, and the number of clusters.
 
@@ -127,7 +127,7 @@ end
 
 Return the clustering result as-is.
 
-This function provides a generic interface for extracting or processing clustering results. By default, it simply returns the provided clustering result object unchanged. This allows for consistent downstream handling of clustering results in PortfolioOptimisers.jl workflows.
+This function provides a generic interface for extracting or processing clustering results. By default, it simply returns the provided clustering result object unchanged. This allows for consistent downstream handling of clustering results in `PortfolioOptimisers.jl` workflows.
 
 # Arguments
 
@@ -260,7 +260,7 @@ end
         alg::T2
     end
 
-Estimator type for selecting the optimal number of clusters in PortfolioOptimisers.jl.
+Estimator type for selecting the optimal number of clusters in `PortfolioOptimisers.jl`.
 
 `OptimalNumberClusters` encapsulates the configuration for determining the optimal number of clusters, including the maximum allowed clusters and the algorithm used for selection.
 
@@ -326,7 +326,7 @@ end
         linkage::T1
     end
 
-Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
+Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
 `HClustAlgorithm` specifies the linkage method used for hierarchical clustering, such as `:ward`, `:single`, `:complete`, or `:average`.
 
@@ -370,7 +370,7 @@ end
         onc::T4
     end
 
-Estimator type for clustering in PortfolioOptimisers.jl.
+Estimator type for clustering in `PortfolioOptimisers.jl`.
 
 `ClustersEstimator` encapsulates all configuration required for clustering, including the covariance estimator, distance estimator, res algorithm, and optimal number of clusters estimator.
 
@@ -400,7 +400,7 @@ ClustersEstimator
       │      │    me ┼ SimpleExpectedReturns
       │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing

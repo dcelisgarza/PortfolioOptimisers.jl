@@ -6,7 +6,7 @@
 
 Container type for excess expected returns estimators.
 
-`ExcessExpectedReturns` encapsulates a mean estimator and a risk-free rate for computing excess expected returns. This enables modular workflows for estimating expected returns above a specified risk-free rate.
+`ExcessExpectedReturns` encapsulates a mean estimator and a risk-free rate for computing excess expected returns.
 
 # Fields
 

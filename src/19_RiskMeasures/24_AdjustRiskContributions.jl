@@ -7,7 +7,7 @@ const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                              <:SOCRiskExpr},
                                   <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                      <:NSkeQuadFormulations},
-                                  <:TrackingRiskMeasure{<:Any, <:Any, <:SquaredSOCTracking}}
+                                  <:TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Tracking}}
 const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                          <:LowOrderMoment{<:Any, <:Any, <:Any,
                                                           <:SecondMoment{<:Any, <:Any,
@@ -17,7 +17,7 @@ const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                          <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:QuadSecondMomentFormulations},
                                          <:TrackingRiskMeasure{<:Any, <:Any,
-                                                               <:SquaredSOCTracking}}
+                                                               <:SquaredL2Tracking}}
 const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
                                 <:HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment},
                                 <:HighOrderMoment{<:Any, <:Any, <:Any,

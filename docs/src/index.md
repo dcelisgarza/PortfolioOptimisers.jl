@@ -5,8 +5,8 @@ layout: home
 
 hero:
   name: "PortfolioOptimisers.jl"
-  text: Sir, this is a casino.
-  tagline: 🦍🤝💪 💎🙌 🚀🌕.
+  text: Quantitative portfolio construction
+  tagline: Democratising, demystifying, and derisking investing
   image:
     src: logo.svg
     alt: PortfolioOptimisers
@@ -560,9 +560,12 @@ It is often useful to create portfolios that track the performance of an index, 
 
 The error can be computed using different algorithms using [`norm_tracking`](@ref).
 
-- L1-norm [`NOCTracking`](@ref)
-- L2-norm [`SOCTracking`](@ref)
-- L2-norm squared [`SquaredSOCTracking`](@ref)
+- ::: details Norm tracking algorithms
+  - L1-norm [`L1Tracking`](@ref)
+  - L2-norm [`L2Tracking`](@ref)
+  - L2-norm squared [`SquaredL2Tracking`](@ref)
+  - Lp-norm [`LpTracking`]-(@ref)
+  - L-Inf-norm [`LInfTracking`]-(@ref)
 
 It is also possible to track the error in with risk measures [`RiskTrackingError`]-(@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
@@ -682,9 +685,11 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
 - Range [`Range`]-(@ref)
 - Turnover Risk Measure [`TurnoverRiskMeasure`]-(@ref)
 - ::: details Tracking Risk Measure [`TrackingRiskMeasure`]-(@ref)
-  - L1-norm [`NOCTracking`](@ref)
-  - L2-norm [`SOCTracking`](@ref)
-  - L2-norm squared [`SquaredSOCTracking`](@ref)
+  - L1-norm [`L1Tracking`](@ref)
+  - L2-norm [`L2Tracking`](@ref)
+  - L2-norm squared [`SquaredL2Tracking`](@ref)
+  - Lp-norm [`LpTracking`]-(@ref)
+  - L-Inf-norm [`LInfTracking`]-(@ref)
 - ::: details Risk Tracking Risk Measure
   - Dependent variable tracking [`DependentVariableTracking`](@ref)
   - Independent variable tracking [`IndependentVariableTracking`](@ref)
@@ -843,6 +848,8 @@ These optimisations attempt to achieve weight values according to a risk budget 
 - ::: details Regularisation penalty
   - L1
   - L2
+  - Lp [`LpRegularisation`]-(@ref)
+  - L-Inf
 
 #### [Clustering optimisation](@id readme-clustering-opt)
 

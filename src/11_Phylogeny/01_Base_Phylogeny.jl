@@ -1,9 +1,9 @@
 """
     abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
 
-Abstract supertype for all phylogeny estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all phylogeny estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing phylogeny-based estimation algorithms should subtype `AbstractPhylogenyEstimator`.
+All concrete and/or abstract types implementing phylogeny-based estimation algorithms should be subtypes of `AbstractPhylogenyEstimator`.
 
 # Related
 
@@ -14,9 +14,9 @@ abstract type AbstractPhylogenyEstimator <: AbstractEstimator end
 """
     abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all phylogeny algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all phylogeny algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific phylogeny algorithms should subtype `AbstractPhylogenyAlgorithm`. This enables flexible extension and dispatch of phylogeny routines.
+All concrete and/or abstract types implementing specific phylogeny algorithms should be subtypes of `AbstractPhylogenyAlgorithm`.
 
 # Related
 
@@ -27,9 +27,9 @@ abstract type AbstractPhylogenyAlgorithm <: AbstractAlgorithm end
 """
     abstract type AbstractPhylogenyResult <: AbstractResult end
 
-Abstract supertype for all phylogeny result types in PortfolioOptimisers.jl.
+Abstract supertype for all phylogeny result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing the result of a phylogeny estimation should subtype `AbstractPhylogenyResult`.
+All concrete and/or abstract types representing the result of a phylogeny estimation should be subtypes of `AbstractPhylogenyResult`.
 
 # Related
 

@@ -168,6 +168,8 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_number_effective_assets!(model, rrb.opt.nea)
     set_l1_regularisation!(model, rrb.opt.l1)
     set_l2_regularisation!(model, rrb.opt.l2)
+    set_linf_regularisation!(model, rrb.opt.linf)
+    set_lp_regularisation!(model, rrb.opt.lp)
     set_non_fixed_fees!(model, fees)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
     set_sdp_phylogeny_constraints!(model, pl)

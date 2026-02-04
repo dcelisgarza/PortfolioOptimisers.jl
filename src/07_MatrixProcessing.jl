@@ -3,7 +3,7 @@
 
 Abstract supertype for all matrix processing estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement matrix processing routines—such as covariance matrix cleaning, denoising, or detoning—should subtype `AbstractMatrixProcessingEstimator`.
+All concrete and/or abstract types that implement matrix processing routines---such as covariance matrix cleaning, denoising, or detoning---should be subtypes of `AbstractMatrixProcessingEstimator`.
 
 # Interfaces
 
@@ -14,9 +14,9 @@ In order to implement a new matrix processing estimator which will work seamless
 
 ## Arguments
 
-  - $(glossary[:mp])
-  - $(glossary[:sigrho])
-  - $(glossary[:X])
+  - $(arg_dict[:mp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 
@@ -73,7 +73,7 @@ abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 
 Abstract supertype for all matrix processing algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement a specific matrix processing algorithm should subtype `AbstractMatrixProcessingAlgorithm`.
+All concrete and/or abstract types that implement a specific matrix processing algorithm should be subtypes of `AbstractMatrixProcessingAlgorithm`.
 
 # Interfaces
 
@@ -84,7 +84,7 @@ In order to implement a new matrix processing algorithm that works with the curr
 
 ## Arguments
 
-  - $(glossary[:mpa])
+  - $(arg_dict[:mpa])
   - `args...`: Additional positional arguments.
   - `kwargs...`: Additional keyword arguments.
 
@@ -144,7 +144,11 @@ abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 
 Abstract supertype for matrix processing order types in `PortfolioOptimisers.jl`.
 
-All concrete types that specify the order of matrix processing steps—such as denoising, detoning, and algorithm application—should subtype `AbstractMatrixProcessingOrder`. This enables flexible configuration of the sequence in which matrix processing operations are applied within the matrix processing pipeline.
+All concrete and/or abstract types that specify the order of matrix processing steps—such as denoising, detoning, and algorithm application—should be subtypes of `AbstractMatrixProcessingOrder`.
+
+# Interfaces
+
+Given that these are meant to be used by matrix processing estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different matrix processing orders within the library. The interfaces should be defined at the level of the matrix processing estimator that utilises these orders.
 
 # Related Types
 
@@ -311,9 +315,9 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Fields
 
-  - $(glossary[:opdm])
-  - $(glossary[:odn])
-  - $(glossary[:odt])
+  - $(arg_dict[:opdm])
+  - $(arg_dict[:odn])
+  - $(arg_dict[:odt])
   - `alg`: Optional custom matrix processing algorithm.
   - `order`: Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
 
@@ -413,9 +417,9 @@ No-op fallback for in-place processing of a covariance or correlation matrix.
 
 # Arguments
 
-  - $(glossary[:omp])
-  - $(glossary[:sigrho])
-  - $(glossary[:X])
+  - $(arg_dict[:omp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 
@@ -447,9 +451,9 @@ This method applies a sequence of matrix processing steps to the input covarianc
 
 # Arguments
 
-  - $(glossary[:omp])
-  - $(glossary[:sigrho])
-  - $(glossary[:X])
+  - $(arg_dict[:omp])
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 

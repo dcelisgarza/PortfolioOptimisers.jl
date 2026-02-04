@@ -3,7 +3,7 @@
 
 Abstract supertype for all histogram binning algorithms.
 
-`AbstractBins` is the abstract type for all binning algorithm types used in histogram-based calculations within PortfolioOptimisers.jl, such as mutual information and variation of information analysis. Concrete subtypes implement specific binning strategies (e.g., Knuth, Freedman-Diaconis, Scott, Hacine-Gharbi-Ravier) and provide a consistent interface for bin selection.
+`AbstractBins` is the abstract type for all binning algorithm types used in histogram-based calculations within `PortfolioOptimisers.jl`, such as mutual information and variation of information analysis. Concrete subtypes implement specific binning strategies (e.g., Knuth, Freedman-Diaconis, Scott, Hacine-Gharbi-Ravier) and provide a consistent interface for bin selection.
 
 # Related
 
@@ -20,7 +20,7 @@ const Int_Bin = Union{<:AbstractBins, <:Integer}
 
 Abstract supertype for all histogram binning algorithms implemented using AstroPy's bin width selection methods.
 
-`AstroPyBins` is the abstract type for all binning algorithm types that rely on bin width selection functions from the [AstroPy](https://www.astropy.org/) Python library, such as Knuth, Freedman-Diaconis, and Scott. Concrete subtypes implement specific binning strategies and provide a consistent interface for bin selection in histogram-based calculations within PortfolioOptimisers.jl.
+`AstroPyBins` is the abstract type for all binning algorithm types that rely on bin width selection functions from the [AstroPy](https://www.astropy.org/) Python library, such as Knuth, Freedman-Diaconis, and Scott. Concrete subtypes implement specific binning strategies and provide a consistent interface for bin selection in histogram-based calculations within `PortfolioOptimisers.jl`.
 
 # Related
 

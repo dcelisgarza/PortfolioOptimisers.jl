@@ -164,7 +164,7 @@ has_pretty_show_method(::Clustering.KmeansResult) = true
 
 Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
 
-All error types specific to `PortfolioOptimisers.jl` should subtype `PortfolioOptimisersError`. This enables consistent error handling and dispatch throughout the package.
+All error types specific to `PortfolioOptimisers.jl` should be subtypes of `PortfolioOptimisersError`.
 
 # Related
 
@@ -681,7 +681,7 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
 
 """
-    glossary = Dict(
+    arg_dict = Dict(
                  # Weight vectors.
                  :pw => "`w`: Portfolio weights vector.",
                  :ow => "`w`: Observation weights vector.",
@@ -739,9 +739,9 @@ const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
                  :feesr => "`fees`: Fees result.",
                  :feeser => "`fees`: Fees estimator or result.")
 
-This dictionary contains the glossary terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
 """
-const glossary = Dict(
+const arg_dict = Dict(
                       # Weight vectors.
                       :pw => "`w`: Portfolio weights vector.",
                       :ow => "`w`: Observation weights vector.",
@@ -759,6 +759,7 @@ const glossary = Dict(
                       :mpa => "`mpa`: Matrix processing algorithm.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
+                      :nme => "`nme`: New expected returns estimator with the appropriate weights applied.",
                       :ce => "`ce`: Covariance estimator.",#
                       :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
                       :ve => "`ve`: Variance estimator.",#
@@ -819,10 +820,18 @@ const glossary = Dict(
                       :F => "`F`: Data matrix.", :Xv => "`X`: Data vector.")
 
 """
-    validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
-Validation rules for certain glossary terms used in the documentation of `PortfolioOptimisers.jl`.
+Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 """
-validation = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+
+"""
+Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
+"""
+ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector.",
+                :sigma => "`sigma::MatNum`: Covariance matrix.",
+                :sk => "`sk::MatNum`: Coskewness matrix.",
+                :kt => "`kt::MatNum`: Cokurtosis matrix.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

@@ -5,7 +5,7 @@
         corrected::T3
     end
 
-A flexible variance estimator for PortfolioOptimisers.jl supporting optional expected returns estimators, observation weights, and bias correction.
+A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional expected returns estimators, observation weights, and bias correction.
 
 `SimpleVariance` enables users to specify an expected returns estimator (for mean-centering), optional observation weights, and whether to apply bias correction (Bessel's correction). This type is suitable for both unweighted and weighted variance estimation workflows.
 
@@ -50,7 +50,7 @@ SimpleVariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::VecNum; mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)

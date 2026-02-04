@@ -6,8 +6,7 @@ struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     alg::T4
     function RiskTrackingError(tr::WeightsTracking, r::AbstractBaseRiskMeasure, err::Number,
                                alg::VariableTracking)
-        @argcheck(isfinite(err))
-        @argcheck(err >= zero(err))
+        assert_nonempty_nonneg_finite_val(err, :err)
         r = no_bounds_no_risk_expr_risk_measure(r)
         return new{typeof(tr), typeof(r), typeof(err), typeof(alg)}(tr, r, err, alg)
     end
@@ -43,7 +42,7 @@ struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tr::AbstractTrackingAlgorithm,
-                             alg::NormTracking = SOCTracking())
+                             alg::NormTracking = L2Tracking())
     return TrackingRiskMeasure(settings, tr, alg)
 end
 function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)

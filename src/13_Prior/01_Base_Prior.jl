@@ -440,7 +440,7 @@ end
         f_w::T12
     end
 
-Container type for low order prior results in PortfolioOptimisers.jl.
+Container type for low order prior results in `PortfolioOptimisers.jl`.
 
 `LowOrderPrior` stores the output of low order prior estimation routines, including asset returns, mean vector, covariance matrix, Cholesky factor, weights, entropy, Kullback-Leibler divergence, outlier weights, regression results, and optional factor moments. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics.
 
@@ -601,7 +601,7 @@ end
         skmp::T7
     end
 
-Container type for high order prior results in PortfolioOptimisers.jl.
+Container type for high order prior results in `PortfolioOptimisers.jl`.
 
 `HighOrderPrior` stores the output of high order prior estimation routines, including low order prior results, cokurtosis tensor, elimination and summation matrices, coskewness tensor, quadratic skewness matrix, and matrix processing estimator. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics involving higher moments.
 
@@ -737,7 +737,7 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractPriorR
             end
         end
         return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
-                   typeof(skmp), typeof(f_kt), #typeof(chol_kt), 
+                   typeof(skmp), typeof(f_kt), #typeof(chol_kt),
                    typeof(f_sk), typeof(f_V)}(pr, kt, L2, S2, sk, V, skmp, f_kt,
                                               #  chol_kt,
                                               f_sk, f_V)
@@ -750,7 +750,7 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
                         f_kt::Option{<:MatNum} = nothing,
                         # chol_kt::Option{<:MatNum} = nothing,
                         f_sk::Option{<:MatNum} = nothing, f_V::Option{<:MatNum} = nothing)
-    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt, 
+    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt,
                           f_sk, f_V)
 end
 

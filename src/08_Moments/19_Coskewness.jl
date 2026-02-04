@@ -1,9 +1,9 @@
 """
     abstract type CoskewnessEstimator <: AbstractEstimator end
 
-Abstract supertype for all coskewness estimators in PortfolioOptimisers.jl.
+Abstract supertype for all coskewness estimators in `PortfolioOptimisers.jl`.
 
-All concrete types implementing coskewness estimation algorithms should subtype `CoskewnessEstimator`.
+All concrete and/or abstract types implementing coskewness estimation algorithms should be subtypes of `CoskewnessEstimator`.
 
 # Related
 
@@ -20,7 +20,7 @@ abstract type CoskewnessEstimator <: AbstractEstimator end
 
 Container type for coskewness estimators.
 
-`Coskewness` encapsulates the mean estimator, matrix processing estimator, and moment algorithm for coskewness estimation. This enables modular workflows for higher-moment portfolio analysis.
+`Coskewness` encapsulates the mean estimator, matrix processing estimator, and moment algorithm for coskewness estimation.
 
 # Fields
 

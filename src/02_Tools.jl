@@ -633,7 +633,7 @@ Constructs an index vector for extracting the fourth moment submatrix correspond
 
 # Returns
 
-  - `idx::Vector{Int}`: Indices for extracting the fourth moment submatrix.
+  - `idx::VecInt`: Indices for extracting the fourth moment submatrix.
 
 # Examples
 
@@ -665,7 +665,7 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
 
 # Returns
 
-An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
+  - `types::Vector{Any}`: An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
 
 # Examples
 
@@ -709,7 +709,7 @@ This is useful for converting arrays with abstract element types to arrays with 
 
 # Returns
 
-A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
+  - `A_new::Vector{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 
 # Examples
 
@@ -814,7 +814,7 @@ Algorithm for reducing a vector of real values to its optionally weighted mean.
 
 # Fields
 
-  - $(glossary[:oow])
+  - $(arg_dict[:oow])
 
 # Constructors
 
@@ -826,7 +826,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - $(validation[:oow])
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -863,7 +863,7 @@ Construct a `MeanValue` instance with observation weights `w`.
 # Arguments
 
   - `mv`: Instance to update.
-  - $(glossary[:ow])
+  - $(arg_dict[:ow])
 
 # Returns
 
@@ -886,7 +886,7 @@ Algorithm for reducing a vector of real values to its optionally weighted median
 
 # Fields
 
-  - $(glossary[:oow])
+  - $(arg_dict[:oow])
 
 # Constructors
 
@@ -898,7 +898,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - $(validation[:oow])
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -935,7 +935,7 @@ Constructs a `MedianValue` instance with observation weights `w`.
 # Arguments
 
   - `mv`: Instance to update.
-  - $(glossary[:ow])
+  - $(arg_dict[:ow])
 
 # Returns
 
@@ -980,7 +980,7 @@ Algorithm for reducing a vector of real values to its optionally weighted standa
 
 # Fields
 
-  - $(glossary[:oow])
+  - $(arg_dict[:oow])
   - `corrected`: Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population).
 
 # Constructors
@@ -993,7 +993,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - $(validation[:oow])
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -1032,7 +1032,7 @@ Constructs a `StdValue` instance with observation weights `w`.
 # Arguments
 
   - `sv`: Instance to update.
-  - $(glossary[:ow])
+  - $(arg_dict[:ow])
 
 # Returns
 
@@ -1056,7 +1056,7 @@ Algorithm for reducing a vector of real values to its optionally weighted varian
 
 # Fields
 
-  - $(glossary[:oow])
+  - $(arg_dict[:oow])
   - `corrected`: Indicates whether to use Bessel's correction (`true` for sample variance, `false` for population).
 
 # Constructors
@@ -1069,7 +1069,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - $(validation[:oow])
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -1108,7 +1108,7 @@ Constructs a `VarValue` instance with observation weights `w`.
 # Arguments
 
   - `vv`: Instance to update.
-  - $(glossary[:ow])
+  - $(arg_dict[:ow])
 
 # Returns
 
@@ -1236,7 +1236,7 @@ Construct a `StandardisedValue` instance with observation weights `w`.
 # Arguments
 
   - `msv`: Instance to update.
-  - $(glossary[:ow])
+  - $(arg_dict[:ow])
 
 # Returns
 

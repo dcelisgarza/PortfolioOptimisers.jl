@@ -1,9 +1,9 @@
 """
     abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
 
-Abstract supertype for all shrunk expected returns estimators in PortfolioOptimisers.jl.
+Abstract supertype for all shrunk expected returns estimators in `PortfolioOptimisers.jl`.
 
-All concrete types implementing shrinkage-based expected returns estimation algorithms should subtype `AbstractShrunkExpectedReturnsEstimator`.
+All concrete and/or abstract types implementing shrinkage-based expected returns estimation algorithms should be subtypes of `AbstractShrunkExpectedReturnsEstimator`.
 
 # Related
 
@@ -16,7 +16,7 @@ abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsE
 
 Abstract supertype for all shrinkage algorithms for expected returns estimation.
 
-All concrete types implementing specific shrinkage algorithms (e.g., James-Stein, Bayes-Stein) should subtype `AbstractShrunkExpectedReturnsAlgorithm`. This enables flexible extension and dispatch of shrinkage routines.
+All concrete and/or abstract types implementing specific shrinkage algorithms (e.g., James-Stein, Bayes-Stein) should be subtypes of `AbstractShrunkExpectedReturnsAlgorithm`.
 
 # Related
 
@@ -31,7 +31,7 @@ abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsA
 
 Abstract supertype for all shrinkage targets used in expected returns estimation.
 
-Concrete types implementing specific shrinkage targets (e.g., grand mean, volatility-weighted mean) should subtype `AbstractShrunkExpectedReturnsTarget`. This enables modular selection of shrinkage targets in shrinkage algorithms.
+Concrete types implementing specific shrinkage targets (e.g., grand mean, volatility-weighted mean) should subtype `AbstractShrunkExpectedReturnsTarget`.
 
 # Related
 
@@ -217,7 +217,7 @@ end
 
 Container type for shrinkage-based expected returns estimators.
 
-`ShrunkExpectedReturns` encapsulates all components required for shrinkage estimation of expected returns, including the mean estimator, covariance estimator, and shrinkage algorithm. This enables modular and extensible workflows for robust expected returns estimation using shrinkage techniques.
+`ShrunkExpectedReturns` encapsulates all components required for shrinkage estimation of expected returns, including the mean estimator, covariance estimator, and shrinkage algorithm.
 
 # Fields
 
@@ -245,7 +245,7 @@ ShrunkExpectedReturns
       │      │    me ┼ SimpleExpectedReturns
       │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)   
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing

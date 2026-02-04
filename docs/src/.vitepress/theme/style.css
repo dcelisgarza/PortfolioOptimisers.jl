@@ -24,7 +24,7 @@ https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/var
   --vp-font-family-mono: JuliaMono-Regular, monospace;
 }
 
-/* Disable contextual alternates (kind of like ligatures but different) in monospace, 
+/* Disable contextual alternates (kind of like ligatures but different) in monospace,
  which turns `/>` to an up arrow and `|>` (the Julia pipe symbol) to an up arrow as well. */
 .mono-no-substitutions {
   font-family: "JuliaMono-Regular", monospace;
@@ -95,12 +95,11 @@ code {
   --vp-home-hero-name-background: -webkit-linear-gradient(120deg,
       #9558B2 30%,
       #CB3C33);
-
-  --vp-home-hero-image-background-image: linear-gradient(-145deg,
+  /* --vp-home-hero-image-background-image: linear-gradient(-145deg,
       #9558b282 30%,
       #3798269a 30%,
       #cb3d33e3);
-  --vp-home-hero-image-filter: blur(40px);
+  --vp-home-hero-image-filter: blur(40px); */
 }
 
 /* Hero Section */
@@ -110,11 +109,12 @@ code {
       var(--julia-purple) 15%,
       var(--vp-dark-green-light),
       var(--vp-dark-green));
-  --vp-home-hero-image-background-image: linear-gradient(-45deg,
+  /* --vp-home-hero-image-background-image: linear-gradient(-45deg,
       var(--vp-dark-green) 30%,
       var(--vp-dark-green-light),
-      var(--vp-dark-gray) 30%);
-  --vp-home-hero-image-filter: blur(56px);
+      var(--vp-dark-gray) 30%
+      );
+  --vp-home-hero-image-filter: blur(56px); */
 }
 
 :root.dark {

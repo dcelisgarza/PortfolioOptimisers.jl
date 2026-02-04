@@ -32,7 +32,7 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)
 end
 struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16,
                      T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30,
-                     T31, T32, T33, T34, T35} <: BaseJuMPOptimisationEstimator
+                     T31, T32, T33, T34, T35, T36, T37} <: BaseJuMPOptimisationEstimator
     pr::T1 # PriorEstimator
     slv::T2
     wb::T3 # WeightBounds
@@ -67,7 +67,9 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     nea::T32
     l1::T33
     l2::T34
-    strict::T35
+    linf::T35
+    lp::T36
+    strict::T37
     function JuMPOptimiser(pr::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
                            lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
@@ -87,22 +89,24 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
-                           l1::Option{<:Number}, l2::Option{<:Number}, strict::Bool)
+                           l1::Option{<:Number}, l2::Option{<:Number},
+                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, strict::Bool)
+        if isa(slv, VecSlv)
+            @argcheck(!isempty(slv))
+        end
         if isa(bgt, Number)
             @argcheck(isfinite(bgt))
         elseif isa(bgt, BudgetCostEstimator)
             @argcheck(isnothing(sbgt))
         end
         if isa(sbgt, Number)
-            @argcheck(isfinite(sbgt))
-            @argcheck(sbgt >= 0)
+            assert_nonempty_nonneg_finite_val(sbgt, :sbgt)
         end
         if isa(ct, AbstractVector)
             @argcheck(!isempty(ct))
         end
         if !isnothing(card)
-            @argcheck(isfinite(card))
-            @argcheck(card > 0)
+            assert_nonempty_gt0_finite_val(card, :card)
         end
         if isa(tn, AbstractVector)
             @argcheck(!isempty(tn))
@@ -111,21 +115,27 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
             @argcheck(!isempty(tr))
         end
         if !isnothing(nea)
-            @argcheck(nea > zero(nea))
+            assert_nonempty_gt0_finite_val(nea, :nea)
         end
-        if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+        if !isnothing(l1)
+            assert_nonempty_gt0_finite_val(l1, :l1)
+        end
+        if !isnothing(l2)
+            assert_nonempty_gt0_finite_val(l2, :l2)
+        end
+        if !isnothing(linf)
+            assert_nonempty_gt0_finite_val(linf, :linf)
+        end
+        if isa(lp, AbstractVector)
+            @argcheck(!isempty(lp))
         end
         if isa(scard, Integer)
-            @argcheck(isfinite(scard))
-            @argcheck(scard > 0)
+            assert_nonempty_gt0_finite_val(scard, :scard)
             @argcheck(isa(smtx, MatNum_ASetMatE))
             @argcheck(isa(slt, Option{<:BtE_Bt}))
             @argcheck(isa(sst, Option{<:BtE_Bt}))
         elseif isa(scard, VecInt)
-            @argcheck(!isempty(scard))
-            @argcheck(all(isfinite, scard))
-            @argcheck(all(x -> x > 0, scard))
+            assert_nonempty_gt0_finite_val(scard, :scard)
             @argcheck(isa(smtx, AbstractVector))
             @argcheck(length(scard) == length(smtx))
             if isa(slt, AbstractVector)
@@ -235,41 +245,12 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(sglt), typeof(sgst), typeof(tn), typeof(fees), typeof(sets),
                    typeof(tr), typeof(pl), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
-                   typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(strict)}(pr,
-                                                                                       slv,
-                                                                                       wb,
-                                                                                       bgt,
-                                                                                       sbgt,
-                                                                                       lt,
-                                                                                       st,
-                                                                                       lcs,
-                                                                                       ct,
-                                                                                       gcard,
-                                                                                       sgcard,
-                                                                                       smtx,
-                                                                                       sgmtx,
-                                                                                       slt,
-                                                                                       sst,
-                                                                                       sglt,
-                                                                                       sgst,
-                                                                                       tn,
-                                                                                       fees,
-                                                                                       sets,
-                                                                                       tr,
-                                                                                       pl,
-                                                                                       ret,
-                                                                                       sca,
-                                                                                       ccnt,
-                                                                                       cobj,
-                                                                                       sc,
-                                                                                       so,
-                                                                                       ss,
-                                                                                       card,
-                                                                                       scard,
-                                                                                       nea,
-                                                                                       l1,
-                                                                                       l2,
-                                                                                       strict)
+                   typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
+                   typeof(lp), typeof(strict)}(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct,
+                                               gcard, sgcard, smtx, sgmtx, slt, sst, sglt,
+                                               sgst, tn, fees, sets, tr, pl, ret, sca, ccnt,
+                                               cobj, sc, so, ss, card, scard, nea, l1, l2,
+                                               linf, lp, strict)
     end
 end
 function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -299,10 +280,11 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        card::Option{<:Integer} = nothing,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
-                       l2::Option{<:Number} = nothing, strict::Bool = false)
+                       l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
+                       lp::Option{<:LpReg_VecLpReg} = nothing, strict::Bool = false)
     return JuMPOptimiser(pr, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, pl, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     X = isa(opt.pr, AbstractPriorResult) ? opt.pr.X : X
@@ -343,7 +325,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          sets = sets, tr = tr, pl = opt.pl, ret = ret, sca = opt.sca,
                          ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, scard = opt.scard, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, strict = opt.strict)
+                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
@@ -404,7 +386,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          tr = opt.tr, pl = pl, ret = ret, sca = opt.sca, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
-                         strict = opt.strict)
+                         linf = opt.linf, lp = opt.lp, strict = opt.strict)
 end
 
 export ProcessedJuMPOptimiserAttributes, JuMPOptimiser

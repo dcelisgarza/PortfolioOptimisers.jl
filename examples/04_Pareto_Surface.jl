@@ -216,7 +216,6 @@ plot_measures(res3.w, pr; x = r1, y = r2,
 We can view it in 2D as well.
 =#
 
-gr()
 plot_measures(res3.w, pr; x = r1, y = r2,
               c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                              rt = ArithmeticReturn(), rf = rf),

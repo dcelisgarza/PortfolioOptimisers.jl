@@ -3,7 +3,7 @@
 
 Abstract supertype for all denoising estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement denoising of covariance-like or correlation-like matrices should subtype `AbstractDenoiseEstimator`.
+All concrete and/or abstract types that implement denoising of covariance-like or correlation-like matrices should be subtypes of `AbstractDenoiseEstimator`.
 
 # Interfaces
 
@@ -14,8 +14,8 @@ In order to implement a new denoising estimator which will work seamlessly with 
 
 ## Arguments
 
-  - $(glossary[:dn])
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:dn])
+  - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 ## Returns
@@ -69,7 +69,7 @@ abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 
 Abstract supertype for all denoising algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement a specific denoising algorithm should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
+All concrete and/or abstract types that implement a specific denoising algorithm should be subtypes of `AbstractDenoiseAlgorithm`.
 
 # Interfaces
 
@@ -80,7 +80,7 @@ If you wish to implement a new denoising algorithm that works with an existing d
 ## Arguments
 
   - `alg`: Denoising algorithm.
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
@@ -249,7 +249,7 @@ A flexible container type for configuring and applying denoising algorithms to c
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
   - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
-  - $(glossary[:opdm])
+  - $(arg_dict[:opdm])
 
 # Constructor
 
@@ -336,7 +336,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 # Arguments
 
   - `alg`: Denoising algorithm.
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
@@ -493,12 +493,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - $(glossary[:odn])
+  - $(arg_dict[:odn])
 
       + `::Denoise`: The specified denoising algorithm is applied to `X` in-place.
       + `::Nothing`: No-op.
 
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 # Returns
@@ -557,7 +557,7 @@ function denoise!(dn::Denoise, X::MatNum, q::Number)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.StatsBase.cov2cor!(X, s)
+        StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
     max_val = find_max_eval(vals, q, dn.kernel, dn.m, dn.n, dn.args, dn.kwargs)[1]

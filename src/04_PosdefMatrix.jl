@@ -3,7 +3,7 @@
 
 Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types that implement positive definite matrix projection or estimation should subtype `AbstractPosdefEstimator`.
+All concrete and/or abstract types that implement positive definite matrix projection or estimation should be subtypes of `AbstractPosdefEstimator`.
 
 # Interfaces
 
@@ -14,8 +14,8 @@ In order to implement a new positive definite matrix estimator which will work s
 
 ## Arguments
 
-  - $(glossary[:pdm])
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:pdm])
+  - $(arg_dict[:sigrhoX])
 
 ## Returns
 
@@ -120,12 +120,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - $(glossary[:opdm])
+  - $(arg_dict[:opdm])
 
       + `::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
       + `::Nothing`: No-op, returns X.
 
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
 
 # Returns
 
@@ -174,7 +174,7 @@ function posdef!(pdm::Posdef, X::MatNum)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.StatsBase.cov2cor!(X, s)
+        StatsBase.cov2cor!(X, s)
     end
     NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)
     if !LinearAlgebra.isposdef(X)

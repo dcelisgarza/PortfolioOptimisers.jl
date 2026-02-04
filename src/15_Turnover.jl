@@ -139,7 +139,7 @@ end
 
 Create a new `TurnoverEstimator` with updated portfolio weights.
 
-Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio weights `w` and the turnover values and default value from an existing `TurnoverEstimator` `tn`. This enables composable updating of weights while preserving turnover constraint values.
+Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio weights `w` and the turnover values and default value from an existing `TurnoverEstimator` `tn`.
 
 # Arguments
 
@@ -148,7 +148,7 @@ Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio
 
 # Returns
 
-  - `tn::TurnoverEstimator`: New estimator object with updated weights and original turnover values and default.
+  - `tn::TurnoverEstimator`: New estimator object with the same values and default but updated weights.
 
 # Validation
 
@@ -365,7 +365,7 @@ end
 
 Create a new `Turnover` constraint with updated portfolio weights.
 
-`factory` constructs a new [`Turnover`](@ref) object using the provided portfolio weights `w` and the turnover values from an existing `Turnover` constraint `tn`. This enables composable updating of weights while preserving turnover constraint values.
+`factory` constructs a new [`Turnover`](@ref) object using the provided portfolio weights `w` and the turnover values from an existing `Turnover` constraint `tn`.
 
 # Arguments
 
@@ -537,7 +537,7 @@ end
 
 Create views of multiple turnover constraints or estimators for a subset of assets.
 
-`turnover_view` returns a vector of turnover constraint or estimator objects, each restricted to the indices or assets specified by `i`. This enables batch processing and composable handling of asset subsets across multiple turnover specifications.
+`turnover_view` returns a vector of turnover constraint or estimator objects, each restricted to the indices or assets specified by `i`.
 
 # Arguments
 

@@ -72,10 +72,17 @@
           TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tr = WeightsTracking(; w = w0)),
-          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Tracking()),
           RiskTrackingRiskMeasure(; r = StandardDeviation(), tr = WeightsTracking(; w = w0),
                                   alg = DependentVariableTracking()),
-          RiskRatioRiskMeasure(), MedianAbsoluteDeviation()]
+          RiskRatioRiskMeasure(), MedianAbsoluteDeviation(),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking()),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                              alg = LpTracking(; p = -10)),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                              alg = LInfTracking(; pos = false)),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking(; p = 10)),
+          TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfTracking())]
     @testset "HierarchicalRiskParity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"),
                       DataFrame)

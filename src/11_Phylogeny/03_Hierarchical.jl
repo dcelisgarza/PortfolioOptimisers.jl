@@ -94,9 +94,9 @@ end
 """
     abstract type AbstractPreorderBy <: AbstractAlgorithm end
 
-Abstract supertype for all preorder traversal strategies in PortfolioOptimisers.jl.
+Abstract supertype for all preorder traversal strategies in `PortfolioOptimisers.jl`.
 
-Concrete types implementing specific preorder traversal logic should subtype `AbstractPreorderBy`. This enables flexible extension and dispatch of preorder routines for hierarchical clustering trees.
+All concrete and/or abstract types implementing specific preorder traversal logic should be subtypes of `AbstractPreorderBy`.
 
 # Related
 

@@ -1,7 +1,7 @@
 """
     abstract type DBHTRootMethod <: AbstractAlgorithm end
 
-Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in PortfolioOptimisers.jl.
+Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in `PortfolioOptimisers.jl`.
 
 # Related
 
@@ -1763,7 +1763,7 @@ end
 """
     abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 
-Abstract supertype for all inverse matrix sparsification algorithms in PortfolioOptimisers.jl.
+Abstract supertype for all inverse matrix sparsification algorithms in `PortfolioOptimisers.jl`.
 
 # Related
 
@@ -1927,7 +1927,7 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     iscov = any(!isone, s)
     S = if iscov
         s .= sqrt.(s)
-        StatsBase.StatsBase.cov2cor(sigma, s)
+        StatsBase.cov2cor(sigma, s)
     else
         sigma
     end
@@ -1949,7 +1949,7 @@ end
 
 Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
 
-This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of PortfolioOptimisers.jl. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is not `nothing`, the result is projected to the nearest positive definite matrix.
+This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of `PortfolioOptimisers.jl`. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is not `nothing`, the result is projected to the nearest positive definite matrix.
 
 # Arguments
 

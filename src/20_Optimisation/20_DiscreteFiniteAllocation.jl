@@ -50,7 +50,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    JuMP.@constraint(model,
+    JuMP.@constraint(model, crel_err,
                      [sc * u
                       sc *
                       ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
@@ -67,7 +67,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    JuMP.@constraint(model,
+    JuMP.@constraint(model, csqrel_err,
                      [sc * u;
                       sc *
                       ((x * cash) ⊘ (w .* p) .- one(promote_type(eltype(w), eltype(p))))] in
@@ -79,7 +79,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    JuMP.@constraint(model,
+    JuMP.@constraint(model, cabs_err,
                      [sc * u; sc * (w * cash - x .* p)] in
                      JuMP.MOI.NormOneCone(length(x) + 1))
     return nothing
@@ -89,8 +89,9 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     x = model[:x]
     u = model[:u]
     sc = model[:sc]
-    JuMP.@constraint(model, [sc * u;
-                             sc * (w * cash - x .* p)] in JuMP.SecondOrderCone())
+    JuMP.@constraint(model, csqabs_err,
+                     [sc * u;
+                      sc * (w * cash - x .* p)] in JuMP.SecondOrderCone())
     return nothing
 end
 function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
@@ -114,7 +115,7 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     # r := remaining money
     # eta := ideal_investment - discrete_investment
     JuMP.@expression(model, r, cash - LinearAlgebra.dot(x, p))
-    JuMP.@constraint(model, sc * r >= 0)
+    JuMP.@constraint(model, cr, sc * r >= 0)
     set_discrete_error!(model, w, p, cash, da.wf)
     JuMP.@objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)

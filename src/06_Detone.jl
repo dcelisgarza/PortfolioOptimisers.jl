@@ -3,7 +3,7 @@
 
 Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
-All concrete types representing detoning estimators should subtype `AbstractDetoneEstimator`.
+All concrete and/or abstract types representing detoning estimators should be subtypes of `AbstractDetoneEstimator`.
 
 # Interfaces
 
@@ -14,8 +14,8 @@ In order to implement a new detoning estimator which will work seamlessly with t
 
 ## Arguments
 
-  - $(glossary[:odt])
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:odt])
+  - $(arg_dict[:sigrhoX])
 
 ## Returns
 
@@ -77,7 +77,7 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 # Fields
 
   - `n`: Number of leading principal components to remove.
-  - $(glossary[:opdm])
+  - $(arg_dict[:opdm])
 
 # Constructor
 
@@ -130,12 +130,12 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Arguments
 
-  - $(glossary[:odt])
+  - $(arg_dict[:odt])
 
       + `::Detone`: The top `n` principal components are removed from `X` in-place.
       + `::Nothing`: No-op and returns `nothing`.
 
-  - $(glossary[:sigrhoX])
+  - $(arg_dict[:sigrhoX])
 
 # Returns
 
@@ -195,7 +195,7 @@ function detone!(de::Detone, X::MatNum)
     iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
-        StatsBase.StatsBase.cov2cor!(X, s)
+        StatsBase.cov2cor!(X, s)
     end
     vals, vecs = LinearAlgebra.eigen(X)
     vals = LinearAlgebra.Diagonal(vals)[(end - n):end, (end - n):end]

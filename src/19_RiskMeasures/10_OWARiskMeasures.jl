@@ -3,7 +3,7 @@
 
 Abstract supertype for all Ordered Weights Array (OWA) estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing OWA estimation algorithms should subtype `AbstractOrderedWeightsArrayEstimator`.
+All concrete and/or abstract types implementing OWA estimation algorithms should be subtypes of `AbstractOrderedWeightsArrayEstimator`.
 
 # Related
 
@@ -17,7 +17,7 @@ abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 
 Abstract supertype for all Ordered Weights Array (OWA) algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific OWA algorithms should subtype `AbstractOrderedWeightsArrayAlgorithm`. This enables flexible extension and dispatch of OWA routines.
+All concrete and/or abstract types implementing specific OWA algorithms should be subtypes of `AbstractOrderedWeightsArrayAlgorithm`.
 
 # Related
 

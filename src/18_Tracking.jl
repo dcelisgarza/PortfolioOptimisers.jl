@@ -3,7 +3,7 @@
 
 Abstract supertype for all tracking result types in `PortfolioOptimisers.jl`.
 
-All concrete types representing tracking error or tracking constraint results should subtype `AbstractTracking`. This enables a consistent, composable interface for tracking error measurement, tracking constraint generation, and related portfolio analytics.
+All concrete and/or abstract types representing tracking error or tracking constraint results should be subtypes of `AbstractTracking`.
 
 # Related
 
@@ -43,9 +43,9 @@ const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
     abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all tracking algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all tracking algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types representing tracking algorithms (such as weights or returns tracking) should subtype `AbstractTrackingAlgorithm`. This enables a consistent, composable interface for tracking error computation, tracking constraint generation, and related portfolio analytics.
+All concrete and/or abstract types representing tracking algorithms (such as weights or returns tracking) should be subtypes of `AbstractTrackingAlgorithm`.
 
 # Related
 
@@ -58,41 +58,41 @@ abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 """
     abstract type TrackingFormulation <: AbstractAlgorithm end
 
-Abstract supertype for all tracking formulation algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all tracking formulation algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should subtype `TrackingFormulation`. This enables a consistent, composable interface for tracking error computation, constraint generation, and related portfolio analytics.
+All concrete and/or abstract types representing tracking formulation algorithms (such as norm-based or variable-based tracking) should be subtypes of `TrackingFormulation`.
 
 # Related
 
   - [`AbstractAlgorithm`](@ref)
   - [`NormTracking`](@ref)
   - [`VariableTracking`](@ref)
-  - [`SOCTracking`](@ref)
-  - [`SquaredSOCTracking`](@ref)
-  - [`NOCTracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`SquaredL2Tracking`](@ref)
+  - [`L1Tracking`](@ref)
 """
 abstract type TrackingFormulation <: AbstractAlgorithm end
 """
     abstract type NormTracking <: TrackingFormulation end
 
-Abstract supertype for all norm-based tracking formulation algorithms in PortfolioOptimisers.jl.
+Abstract supertype for all norm-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
-All concrete types representing norm-based tracking algorithms (such as second-order cone or norm-one tracking) should subtype `NormTracking`. This enables a consistent, composable interface for tracking error computation and constraint generation using norm-based formulations.
+All concrete and/or abstract types representing norm-based tracking algorithms (such as second-order cone or norm-one tracking) should be subtypes of `NormTracking`.
 
 # Related
 
   - [`TrackingFormulation`](@ref)
-  - [`SOCTracking`](@ref)
-  - [`SquaredSOCTracking`](@ref)
-  - [`NOCTracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`SquaredL2Tracking`](@ref)
+  - [`L1Tracking`](@ref)
 """
 abstract type NormTracking <: TrackingFormulation end
 """
     abstract type VariableTracking <: TrackingFormulation end
 
-Abstract supertype for all variable-based tracking formulation algorithms in PortfolioOptimisers.jl.
+Abstract supertype for all variable-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
-All concrete types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should subtype `VariableTracking`. This enables a consistent, composable interface for tracking error computation and constraint generation using variable-based formulations.
+All concrete and/or abstract types representing variable-based tracking algorithms (such as independent or dependent variable tracking) should be subtypes of `VariableTracking`.
 
 # Related
 
@@ -102,13 +102,13 @@ All concrete types representing variable-based tracking algorithms (such as inde
 """
 abstract type VariableTracking <: TrackingFormulation end
 """
-    struct SOCTracking{T1} <: NormTracking
+    struct L2Tracking{T1} <: NormTracking
         ddof::T1
     end
 
 Second-order cone (SOC) norm-based tracking formulation.
 
-`SOCTracking` implements a norm-based tracking error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation.
+`L2Tracking` implements a norm-based tracking error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation.
 
 # Fields
 
@@ -116,7 +116,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 # Constructor
 
-    SOCTracking(; ddof::Integer = 1)
+    L2Tracking(; ddof::Integer = 1)
 
 ## Validation
 
@@ -125,8 +125,8 @@ Second-order cone (SOC) norm-based tracking formulation.
 # Examples
 
 ```jldoctest
-julia> SOCTracking()
-SOCTracking
+julia> L2Tracking()
+L2Tracking
   ddof ┴ Int64: 1
 ```
 
@@ -134,27 +134,27 @@ SOCTracking
 
   - [`NormTracking`](@ref)
   - [`SquaredSOCRiskExpr`](@ref)
-  - [`NOCTracking`](@ref)
+  - [`L1Tracking`](@ref)
   - [`norm_tracking`](@ref)
 """
-struct SOCTracking{T1} <: NormTracking
+struct L2Tracking{T1} <: NormTracking
     ddof::T1
-    function SOCTracking(ddof::Integer)
-        @argcheck(zero(ddof) <= ddof, DomainError)
+    function L2Tracking(ddof::Integer)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
-function SOCTracking(; ddof::Integer = 1)
-    return SOCTracking(ddof)
+function L2Tracking(; ddof::Integer = 1)
+    return L2Tracking(ddof)
 end
 """
-    struct SquaredSOCTracking{T1} <: NormTracking
+    struct SquaredL2Tracking{T1} <: NormTracking
         ddof::T1
     end
 
 Second-order cone (SOC) squared norm-based tracking formulation.
 
-`SquaredSOCTracking` implements a norm-based tracking error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation where squared error is preferred.
+`SquaredL2Tracking` implements a norm-based tracking error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation where squared error is preferred.
 
 # Fields
 
@@ -163,7 +163,7 @@ Second-order cone (SOC) squared norm-based tracking formulation.
 # Constructors
 
 ```julia
-SquaredSOCTracking(; ddof::Integer = 1)
+SquaredL2Tracking(; ddof::Integer = 1)
 ```
 
   - `ddof`: Sets the degrees of freedom adjustment.
@@ -175,58 +175,82 @@ SquaredSOCTracking(; ddof::Integer = 1)
 # Examples
 
 ```jldoctest
-julia> SquaredSOCTracking()
-SquaredSOCTracking
+julia> SquaredL2Tracking()
+SquaredL2Tracking
   ddof ┴ Int64: 1
 ```
 
 # Related
 
   - [`NormTracking`](@ref)
-  - [`SOCTracking`](@ref)
-  - [`NOCTracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`L1Tracking`](@ref)
   - [`norm_tracking`](@ref)
 """
-struct SquaredSOCTracking{T1} <: NormTracking
+struct SquaredL2Tracking{T1} <: NormTracking
     ddof::T1
-    function SquaredSOCTracking(ddof::Integer)
-        @argcheck(zero(ddof) <= ddof, DomainError)
+    function SquaredL2Tracking(ddof::Integer)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
-function SquaredSOCTracking(; ddof::Integer = 1)
-    return SquaredSOCTracking(ddof)
+function SquaredL2Tracking(; ddof::Integer = 1)
+    return SquaredL2Tracking(ddof)
 end
 """
-    struct NOCTracking <: NormTracking end
+    struct L1Tracking <: NormTracking end
 
 Norm-one (NOC) tracking formulation.
 
-`NOCTracking` implements a norm-based tracking error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for tracking error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
+`L1Tracking` implements a norm-based tracking error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for tracking error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
 
 # Examples
 
 ```jldoctest
-julia> NOCTracking()
-NOCTracking()
+julia> L1Tracking()
+L1Tracking()
 ```
 
 # Related
 
   - [`NormTracking`](@ref)
-  - [`SOCTracking`](@ref)
-  - [`SquaredSOCTracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`SquaredL2Tracking`](@ref)
   - [`norm_tracking`](@ref)
 """
-struct NOCTracking <: NormTracking end
+struct L1Tracking <: NormTracking end
+struct LpTracking{T1, T2} <: NormTracking
+    p::T1
+    ddof::T2
+    function LpTracking(p::Number, ddof::Integer)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(p), typeof(ddof)}(p, ddof)
+    end
+end
+function LpTracking(; p::Number = 3, ddof::Integer = 0)
+    return LpTracking(p, ddof)
+end
+struct LInfTracking{T1, T2} <: NormTracking
+    ddof::T1
+    pos::T2
+    function LInfTracking(ddof::Integer, pos::Bool)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof), typeof(pos)}(ddof, pos)
+    end
+end
+function LInfTracking(; ddof::Integer = 0, pos::Bool = true)
+    return LInfTracking(ddof, pos)
+end
 """
-    norm_tracking(f::SOCTracking, a, b; N::Option{<:Number} = nothing)
-    norm_tracking(f::SquaredSOCTracking, a, b; N::Option{<:Number} = nothing)
-    norm_tracking(::NOCTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::L2Tracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::SquaredL2Tracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(::L1Tracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::LpTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::LInfTracking, a, b; N::Option{<:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
-`norm_tracking` computes the tracking error using either the Euclidean (L2) norm for [`SOCTracking`](@ref), squared Euclidean (L2) norm for [`SquaredSOCTracking`](@ref), or the L1 (norm-one) distance for [`NOCTracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+`norm_tracking` computes the tracking error using either the Euclidean (L2) norm for [`L2Tracking`](@ref), squared Euclidean (L2) norm for [`SquaredL2Tracking`](@ref), or the L1 (norm-one) distance for [`L1Tracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
 
 # Arguments
 
@@ -241,39 +265,54 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Details
 
-  - For `SOCTracking`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is not `nothing`, else unscaled.
-  - For `SquaredSOCTracking`, computes `LinearAlgebra.norm(a - b, 2)^2 / (N - f.ddof)` if `N` is not `nothing`, else unscaled.
-  - For `NOCTracking`, computes `LinearAlgebra.norm(a - b, 1) / N` if `N` is not `nothing`, else unscaled.
+  - For `L2Tracking`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is not `nothing`, else unscaled.
+  - For `SquaredL2Tracking`, computes `LinearAlgebra.norm(a - b, 2)^2 / (N - f.ddof)` if `N` is not `nothing`, else unscaled.
+  - For `L1Tracking`, computes `LinearAlgebra.norm(a - b, 1) / N` if `N` is not `nothing`, else unscaled.
 
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.norm_tracking(SOCTracking(), [0.5, 0.5], [0.6, 0.4], 2)
+julia> PortfolioOptimisers.norm_tracking(L2Tracking(), [0.5, 0.5], [0.6, 0.4], 2)
 0.14142135623730948
 
-julia> PortfolioOptimisers.norm_tracking(NOCTracking(), [0.5, 0.5], [0.6, 0.4], 2)
+julia> PortfolioOptimisers.norm_tracking(L1Tracking(), [0.5, 0.5], [0.6, 0.4], 2)
 0.09999999999999998
 ```
 
 # Related
 
-  - [`SOCTracking`](@ref)
-  - [`NOCTracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`L1Tracking`](@ref)
   - [`NormTracking`](@ref)
   - [`Option`](@ref)
 """
-function norm_tracking(f::SOCTracking, a, b, N::Option{<:Number} = nothing)
+function norm_tracking(f::L2Tracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
     return LinearAlgebra.norm(a - b, 2) / factor
 end
-function norm_tracking(f::SquaredSOCTracking, a, b, N::Option{<:Number} = nothing)
+function norm_tracking(f::SquaredL2Tracking, a, b, N::Option{<:Number} = nothing)
     factor = isnothing(N) ? 1 : (N - f.ddof)
     val = LinearAlgebra.norm(a - b, 2)
     return val^2 / factor
 end
-function norm_tracking(::NOCTracking, a, b, N::Option{<:Number} = nothing)
+function norm_tracking(::L1Tracking, a, b, N::Option{<:Number} = nothing)
     factor = ifelse(isnothing(N), 1, N)
     return LinearAlgebra.norm(a - b, 1) / factor
+end
+function norm_tracking(f::LpTracking, a, b, N::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(N), 1, N - f.ddof)
+    factor = if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+    return LinearAlgebra.norm(a - b, f.p) / factor
+end
+function norm_tracking(f::LInfTracking, a, b, N::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(N), 1, N - f.ddof)
+    ty = promote_type(eltype(a), eltype(b))
+    p = ifelse(f.pos, typemax(ty), typemin(ty))
+    return LinearAlgebra.norm(a - b, p) / factor
 end
 """
     struct IndependentVariableTracking <: VariableTracking end
@@ -445,7 +484,7 @@ end
 
 Return a view of a `WeightsTracking` object for the given index or indices.
 
-This function creates a new [`WeightsTracking`](@ref) instance by extracting a view of the fees and portfolio weights fields at the specified index or indices. This enables efficient subsetting and composability for tracking algorithms in portfolio analytics workflows.
+This function creates a new [`WeightsTracking`](@ref) instance by extracting a view of the fees and portfolio weights fields at the specified index or indices.
 
 # Arguments
 
@@ -689,7 +728,7 @@ Tracking error result type.
 # Constructor
 
     TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
-                  alg::NormTracking = SOCTracking())
+                  alg::NormTracking = L2Tracking())
 
 ## Validation
 
@@ -706,7 +745,7 @@ TrackingError
       │   fees ┼ nothing
       │      w ┴ Vector{Float64}: [0.5, 0.5]
   err ┼ Float64: 0.01
-  alg ┼ SOCTracking
+  alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
 ```
 
@@ -716,8 +755,8 @@ TrackingError
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
   - [`NormTracking`](@ref)
-  - [`SOCTracking`](@ref)
-  - [`NOCTracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`L1Tracking`](@ref)
 """
 struct TrackingError{T1, T2, T3} <: AbstractTracking
     tr::T1
@@ -729,7 +768,7 @@ struct TrackingError{T1, T2, T3} <: AbstractTracking
     end
 end
 function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
-                       alg::NormTracking = SOCTracking())
+                       alg::NormTracking = L2Tracking())
     return TrackingError(tr, err, alg)
 end
 """
@@ -737,7 +776,7 @@ end
 
 Return a view of a `TrackingError` object for the given index or indices.
 
-This function creates a new [`TrackingError`](@ref) instance by extracting a view of the underlying tracking algorithm at the specified index or indices. The error value and formulation algorithm are preserved. This enables efficient subsetting and composability for tracking error results in portfolio analytics workflows.
+This function creates a new [`TrackingError`](@ref) instance by extracting a view of the underlying tracking algorithm at the specified index or indices. The error value and formulation algorithm are preserved.
 
 # Arguments
 
@@ -765,7 +804,7 @@ TrackingError
       │   fees ┼ nothing
       │      w ┴ Vector{Float64}: [0.5, 0.5, 0.6]
   err ┼ Float64: 0.01
-  alg ┼ SOCTracking
+  alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
 
 julia> PortfolioOptimisers.tracking_view(err, 2:3)
@@ -774,7 +813,7 @@ TrackingError
       │   fees ┼ nothing
       │      w ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
   err ┼ Float64: 0.01
-  alg ┼ SOCTracking
+  alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
 ```
 
@@ -826,7 +865,7 @@ end
 
 Construct a new `TrackingError` object with updated tracking algorithm weights.
 
-This function creates a new [`TrackingError`](@ref) instance by updating the underlying tracking algorithm using the provided weights `w`. The error value and formulation algorithm are preserved. This enables composable updates to tracking error results in portfolio analytics workflows.
+This function creates a new [`TrackingError`](@ref) instance by updating the underlying tracking algorithm using the provided weights `w`. The error value and formulation algorithm are preserved.
 
 # Arguments
 
@@ -854,7 +893,7 @@ TrackingError
       │   fees ┼ nothing
       │      w ┴ Vector{Float64}: [0.5, 0.5]
   err ┼ Float64: 0.01
-  alg ┼ SOCTracking
+  alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
 
 julia> PortfolioOptimisers.factory(err, [0.6, 0.4])
@@ -863,7 +902,7 @@ TrackingError
       │   fees ┼ nothing
       │      w ┴ Vector{Float64}: [0.6, 0.4]
   err ┼ Float64: 0.01
-  alg ┼ SOCTracking
+  alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
 ```
 
@@ -878,5 +917,6 @@ function factory(tr::TrackingError, w::VecNum)
     return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
 end
 
-export SOCTracking, SquaredSOCTracking, NOCTracking, IndependentVariableTracking,
-       DependentVariableTracking, WeightsTracking, ReturnsTracking, TrackingError
+export L2Tracking, SquaredL2Tracking, L1Tracking, LpTracking, LInfTracking,
+       IndependentVariableTracking, DependentVariableTracking, WeightsTracking,
+       ReturnsTracking, TrackingError

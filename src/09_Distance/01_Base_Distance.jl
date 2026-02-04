@@ -1,9 +1,9 @@
 """
     abstract type AbstractDistanceEstimator <: AbstractEstimator end
 
-Abstract supertype for all distance estimator types in PortfolioOptimisers.jl.
+Abstract supertype for all distance estimator types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing distance-based estimation algorithms should subtype `AbstractDistanceEstimator`.
+All concrete and/or abstract  types implementing distance-based estimation algorithms should be subtypes of `AbstractDistanceEstimator`.
 
 # Related
 
@@ -16,9 +16,9 @@ abstract type AbstractDistanceEstimator <: AbstractEstimator end
 """
     abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
 
-Abstract supertype for all distance algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all distance algorithm types in `PortfolioOptimisers.jl`.
 
-All concrete types implementing specific distance-based algorithms (such as correlation distance, absolute distance, log distance, or information-theoretic distances) should subtype `AbstractDistanceAlgorithm`. This enables flexible extension and dispatch of distance routines for use in portfolio optimization and risk analysis.
+All concrete and/or abstract types implementing specific distance-based algorithms (such as correlation distance, absolute distance, log distance, or information-theoretic distances) should be subtypes of `AbstractDistanceAlgorithm`.
 
 # Related
 

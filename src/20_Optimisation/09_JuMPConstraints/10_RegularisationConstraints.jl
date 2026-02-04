@@ -4,6 +4,12 @@ end
 function set_l2_regularisation!(args...)
     return nothing
 end
+function set_lp_regularisation!(args...)
+    return nothing
+end
+function set_linf_regularisation!(args...)
+    return nothing
+end
 function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
     w = model[:w]
     sc = model[:sc]
@@ -23,3 +29,64 @@ function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
     add_to_objective_penalty!(model, l2)
     return nothing
 end
+abstract type AbstractRegularisationEstimator <: AbstractEstimator end
+struct LpRegularisation{T1, T2} <: AbstractRegularisationEstimator
+    p::T1
+    val::T2
+    function LpRegularisation(p::Number, val::Number)
+        @argcheck(isfinite(p), IsNonFiniteError)
+        @argcheck(p > one(p), DomainError)
+        assert_nonempty_gt0_finite_val(val, :val)
+        return new{typeof(p), typeof(val)}(p, val)
+    end
+end
+function LpRegularisation(; p::Number = 3, val::Number = 1e-3)
+    return LpRegularisation(p, val)
+end
+const VecLpReg = AbstractVector{<:LpRegularisation}
+const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
+function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
+    w = model[:w]
+    sc = model[:sc]
+    N = length(w)
+    for (i, lp) in enumerate(lps)
+        val = lp.val
+        p_inv = inv(lp.p)
+        t_lp, r_lp = model[Symbol(:t_lp_, i)], model[Symbol(:r_lp_, i)] = JuMP.@variables(model,
+                                                                                          begin
+                                                                                              ()
+                                                                                              [1:N]
+                                                                                          end)
+        model[(Symbol(:clp_, i))], model[Symbol(:cslp_, i)] = JuMP.@constraints(model,
+                                                                                begin
+                                                                                    [i = 1:N],
+                                                                                    [sc *
+                                                                                     r_lp[i],
+                                                                                     sc *
+                                                                                     t_lp,
+                                                                                     sc *
+                                                                                     w[i]] in
+                                                                                    JuMP.MOI.PowerCone(p_inv)
+                                                                                    sc *
+                                                                                    (sum(r_lp) -
+                                                                                     t_lp) ==
+                                                                                    0
+                                                                                end)
+        lp_expr = model[Symbol(:lp_, i)] = JuMP.@expression(model, val * t_lp)
+        add_to_objective_penalty!(model, lp_expr)
+    end
+end
+function set_linf_regularisation!(model::JuMP.Model, linf::Number)
+    w = model[:w]
+    sc = model[:sc]
+    t_linf = model[:t_linf] = JuMP.@variable(model)
+    model[:clinf_nic] = JuMP.@constraint(model,
+                                         [sc * t_linf;
+                                          sc * w] in
+                                         JuMP.MOI.NormInfinityCone(1 + length(w)))
+    linf = model[:linf] = JuMP.@expression(model, linf * t_linf)
+    add_to_objective_penalty!(model, linf)
+    return nothing
+end
+
+export LpRegularisation

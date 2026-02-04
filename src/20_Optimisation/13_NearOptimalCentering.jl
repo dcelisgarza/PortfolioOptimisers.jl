@@ -580,6 +580,8 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
+    set_linf_regularisation!(model, opt.linf)
+    set_lp_regularisation!(model, opt.lp)
     set_non_fixed_fees!(model, opt.fees)
     set_risk_constraints!(model, r, noc, opt.pr, opt.pl, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sca)

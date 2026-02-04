@@ -7,9 +7,9 @@
         ex::T5
     end
 
-A flexible container type for configuring and applying distance-based covariance estimators in PortfolioOptimisers.jl.
+A flexible container type for configuring and applying distance-based covariance estimators in `PortfolioOptimisers.jl`.
 
-`DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy. This enables modular and extensible workflows for robust covariance estimation using distance statistics.
+`DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy.
 
 # Fields
 
@@ -43,7 +43,7 @@ DistanceCovariance
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator

@@ -1,5 +1,5 @@
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:L1Tracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -20,18 +20,17 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
-function set_tracking_skewness_risk!(model::JuMP.Model,
-                                     r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
-                                     opt::RiskJuMPOptimisationEstimator,
-                                     tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
+function set_tracking_risk!(model::JuMP.Model,
+                            r::TrackingRiskMeasure{<:Any, <:Any, <:L2Tracking},
+                            opt::RiskJuMPOptimisationEstimator,
+                            tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
-function set_tracking_skewness_risk!(model::JuMP.Model,
-                                     r::TrackingRiskMeasure{<:Any, <:Any,
-                                                            <:SquaredSOCTracking},
-                                     opt::RiskJuMPOptimisationEstimator,
-                                     tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
+function set_tracking_risk!(model::JuMP.Model,
+                            r::TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Tracking},
+                            opt::RiskJuMPOptimisationEstimator,
+                            tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
     qtracking_risk = model[Symbol(:sq_, key)] = JuMP.@expression(model, tracking_risk^2)
     ub = variance_risk_bounds_val(false, r.settings.ub)
     set_risk_upper_bound!(model, opt, tracking_risk, ub, key)
@@ -40,8 +39,8 @@ function set_tracking_skewness_risk!(model::JuMP.Model,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
-                                                      <:Union{<:SOCTracking,
-                                                              <:SquaredSOCTracking}},
+                                                      <:Union{<:L2Tracking,
+                                                              <:SquaredL2Tracking}},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -60,7 +59,70 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            [sc * t_tracking_risk;
                                                             sc * tracking_r] in
                                                            JuMP.SecondOrderCone())
-    return set_tracking_skewness_risk!(model, r, opt, tracking_risk, key)
+    return set_tracking_risk!(model, r, opt, tracking_risk, key)
+end
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking},
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               args...; kwargs...)
+    @argcheck(r.alg.p > 1, DomainError)
+    key = Symbol(:tracking_risk_, i)
+    sc = model[:sc]
+    k = model[:k]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    t_tracking_risk, r_tr = model[Symbol(:t_tracking_risk_, i)], model[Symbol(:r_tracking_risk_, i)] = JuMP.@variables(model,
+                                                                                                                       begin
+                                                                                                                           ()
+                                                                                                                           [1:T]
+                                                                                                                       end)
+    p_inv = inv(r.alg.p)
+    scale = T - r.alg.ddof
+    scale = r.alg.p == 3 ? cbrt(scale) : scale^p_inv
+    tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / scale)
+    benchmark = tracking_benchmark(r.tr, pr.X)
+    tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
+                                                                   net_X - benchmark * k)
+    model[Symbol(:ctracking_r_pnorm_, i)], model[Symbol(:ctracking_r_pnorm_eq_, i)] = JuMP.@constraints(model,
+                                                                                                        begin
+                                                                                                            [i = 1:T],
+                                                                                                            [sc *
+                                                                                                             r_tr[i],
+                                                                                                             sc *
+                                                                                                             t_tracking_risk,
+                                                                                                             sc *
+                                                                                                             tracking_r[i]] in
+                                                                                                            JuMP.MOI.PowerCone(p_inv)
+                                                                                                            sc *
+                                                                                                            (sum(r_tr) -
+                                                                                                             t_tracking_risk) ==
+                                                                                                            0
+                                                                                                        end)
+    set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
+    return tracking_risk
+end
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking},
+                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               args...; kwargs...)
+    key = Symbol(:tracking_risk_, i)
+    sc = model[:sc]
+    k = model[:k]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
+    scale = T - r.alg.ddof
+    tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / scale)
+    benchmark = tracking_benchmark(r.tr, pr.X)
+    tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
+                                                                   net_X - benchmark * k)
+    model[Symbol(:ctracking_infnorm_, i)] = JuMP.@constraint(model,
+                                                             [sc * t_tracking_risk;
+                                                              sc * tracking_r] in
+                                                             JuMP.MOI.NormInfinityCone(1 +
+                                                                                       T))
+    set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
+    return tracking_risk
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -199,7 +261,6 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         JuMP.unregister(model, :Dx)
         JuMP.unregister(model, :bdvariance_risk)
     end
-
     risk_expr = set_risk_tr_constraints!(Symbol(:triv_, i, :_), model, r, opt, pr, pl, fees,
                                          args...; kwargs...)
 

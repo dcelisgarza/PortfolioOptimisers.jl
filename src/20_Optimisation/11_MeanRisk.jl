@@ -250,6 +250,8 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_number_effective_assets!(model, mr.opt.nea)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
+    set_linf_regularisation!(model, mr.opt.linf)
+    set_lp_regularisation!(model, mr.opt.lp)
     set_non_fixed_fees!(model, fees)
     set_risk_constraints!(model, mr.r, mr, pr, pl, fees; rd = rd)
     scalarise_risk_expression!(model, mr.opt.sca)

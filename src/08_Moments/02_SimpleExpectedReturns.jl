@@ -3,7 +3,7 @@
         w::T1
     end
 
-A simple expected returns estimator for PortfolioOptimisers.jl, representing the sample mean with optional observation weights.
+A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
 
 `SimpleExpectedReturns` is the standard estimator for computing expected returns as the (possibly weighted) mean of asset returns. It supports both unweighted and weighted mean estimation by storing an optional weights vector.
 
@@ -19,13 +19,25 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-    - If `w` is not `nothing`, `!isempty(w)`.
+    - $(val_dict[:oow])
+
+# Examples
+
+```jldoctest
+julia> SimpleExpectedReturns()
+SimpleExpectedReturns
+  w ┴ nothing
+
+julia> SimpleExpectedReturns(; w = StatsBase.Weights([0.5, 0.5]))
+SimpleExpectedReturns
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.5, 0.5]
+```
 
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`Option`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
@@ -47,8 +59,8 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Arguments
 
-  - `me`: The expected returns estimator.
-  - `X`: Data array of asset returns (observations × assets).
+  - $(arg_dict[:me])
+  - $(arg_dict[:X])
   - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
@@ -101,8 +113,8 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 
 # Arguments
 
-  - $(glossary[:me])
-  - $(glossary[:ow])
+  - $(arg_dict[:me])
+  - $(arg_dict[:ow])
 
 # Returns
 
@@ -111,7 +123,7 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function factory(::SimpleExpectedReturns, w::StatsBase.AbstractWeights)

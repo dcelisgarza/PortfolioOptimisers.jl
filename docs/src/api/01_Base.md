@@ -4,7 +4,7 @@
 
 ## Base abstract types
 
-`PortfolioOptimisers.jl` is designed in a deliberately structured and hierarchical way. This enables us to create self-contained, independent, composable processes. These abstract types form the basis of this hierarchy.
+`PortfolioOptimisers.jl` is designed in a deliberately structured and hierarchical way. Enabling us to create self-contained, independent, composable processes. These abstract types form the basis of this hierarchy.
 
 ```@docs
 AbstractEstimator
@@ -79,11 +79,12 @@ Num_VecNum_VecScalar
 Num_ArrNum_VecScalar
 ```
 
-## Documentation glossary
+## Documentation arg_dict
 
-In order to standardise the documentation we use a glossary of terms.
+In order to standardise the documentation we use a arg_dict of terms.
 
 ```@docs
-glossary
-validation
+arg_dict
+val_dict
+ret_dict
 ```

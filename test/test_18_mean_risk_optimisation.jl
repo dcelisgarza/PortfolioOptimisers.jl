@@ -204,10 +204,14 @@
               ValueatRiskRange(; alg = DistributionValueatRisk()),
               TurnoverRiskMeasure(; w = w0),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
-              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = NOCTracking()),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Tracking()),
               DistributionallyRobustConditionalDrawdownatRisk(), PowerNormValueatRisk(),
-              PowerNormValueatRiskRange(), PowerNormDrawdownatRisk()]
-
+              PowerNormValueatRiskRange(), PowerNormDrawdownatRisk(),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                  alg = LpTracking(; p = 2)),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfTracking()),
+              TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
+                                  alg = LpTracking(; p = 10))]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
@@ -219,15 +223,15 @@
                 1e-2
             elseif i in
                    (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141,
-                    148, 154, 175, 184, 196, 252)
+                    148, 154, 175, 184, 196, 252, 276)
                 5e-5
             elseif i in
                    (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
-                    179, 192, 204, 214, 216, 254)
+                    179, 192, 204, 214, 216, 254, 264)
                 5e-6
-            elseif i in (18, 157, 158, 174, 228)
+            elseif i in (18, 157, 158, 174, 228, 270)
                 5e-4
-            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176)
+            elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 263, 266, 268)
                 1e-5
             elseif i in (160, 164, 180)
                 5e-3
@@ -235,7 +239,7 @@
                 1e-3
             elseif i in (198, 210)
                 5e-2
-            elseif i in (208, 234, 246)
+            elseif i in (208, 234, 246, 269)
                 1e-4
             elseif i == 240
                 0.25
@@ -309,7 +313,7 @@
                 1e-2
             elseif i in (22, 23)
                 1e-4
-            elseif i in (26, 43)
+            elseif i in (26, 43, 44)
                 5e-5
             else
                 1e-6
@@ -337,7 +341,7 @@
                 5e-5
             elseif i == 24
                 5e-6
-            elseif i == 27
+            elseif i in (27, 44)
                 5e-5
             else
                 1e-6
@@ -607,7 +611,7 @@
         res10 = optimise(MeanRisk(;
                                   r = ValueatRisk(;
                                                   alg = DistributionValueatRisk(;
-                                                                                dist = TDist(5)),),
+                                                                                dist = TDist(5))),
                                   opt = opt))
         @test isapprox(res9.w, res10.w; rtol = 5e-2)
 
@@ -619,7 +623,7 @@
         res12 = optimise(MeanRisk(;
                                   r = ValueatRiskRange(;
                                                        alg = DistributionValueatRisk(;
-                                                                                     dist = TDist(5)),),
+                                                                                     dist = TDist(5))),
                                   opt = opt))
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
 
@@ -1424,6 +1428,33 @@
                         4.894112955006514e-6, 0.09912274998209057, 0.035519395576107456,
                         0.08660290480901828, 1.711128248182528e-6, 0.03477208922064647,
                         0.09904023885895782, 0.05862319774028108], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1),
+                            lp = LpRegularisation(; val = 1e-4))
+        mr = MeanRisk(; opt = opt)
+        res = optimise(mr)
+        @test isapprox(res.w,
+                       [-0.05764697001130279, -0.04431070972751474, 0.00747553535021098,
+                        -0.023908797442917386, 0.08821875094947536, 0.046977548770644396,
+                        0.04908160016925732, 0.15439190880914685, 0.04884651182287862,
+                        0.10640175439005223, 0.02159205126254584, 0.13329454362025117,
+                        0.042156711769183466, 0.10774681701781148, 0.03202888209996061,
+                        0.09501657403907941, -0.022310182501551167, 0.04164013305521783,
+                        0.1011939820035937, 0.07211335193158373], rtol = 5e-5)
+
+        opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), linf = 8e-5)
+        mr = MeanRisk(; opt = opt)
+        res = optimise(mr)
+        @test isapprox(res.w,
+                       [-0.10012716916989911, -0.037330227223905686, -0.0362005729255792,
+                        -0.03437255975979355, 0.1297453778361631, 0.048219568550521216,
+                        0.04271321394187886, 0.12974638519965564, 0.0860548071819024,
+                        0.1297463758040975, 0.01047545372694966, 0.1297463839813271,
+                        0.0643702863005255, 0.12974637704447126, 0.015476757316173454,
+                        0.1297463695755112, -0.02667527421008015, 0.020454176815837947,
+                        0.1176102092952984, 0.05085406071894451], rtol = 1e-6)
     end
     @testset "Turnover" begin
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
@@ -1460,19 +1491,20 @@
         rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
                                                             "./assets/SP500_idx.csv.gz"));
                                           timestamp = :Date)[(end - 252):end])
+        wr = vec(rdb.X)
         opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            tr = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
+                            tr = TrackingError(; tr = ReturnsTracking(; w = wr),
                                                err = 3e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
-        @test LinearAlgebra.norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
+        @test LinearAlgebra.norm(rd.X * res.w - wr) / sqrt(size(rd.X, 1)) <= 3e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
-                            tr = TrackingError(; tr = ReturnsTracking(; w = vec(rdb.X)),
-                                               err = 2.5e-3, alg = NOCTracking()))
+                            tr = TrackingError(; tr = ReturnsTracking(; w = wr),
+                                               err = 2.5e-3, alg = L1Tracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
-        @test LinearAlgebra.norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
+        @test LinearAlgebra.norm(rd.X * res.w - wr, 1) / size(rd.X, 1) <= 2.5e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = TrackingError(; tr = WeightsTracking(; w = w0),
@@ -1482,8 +1514,22 @@
         @test LinearAlgebra.norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
         opt = JuMPOptimiser(; pr = pr, slv = slv,
+                            tr = TrackingError(; tr = ReturnsTracking(; w = wr),
+                                               err = 4.5e-3, alg = LpTracking()))
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise(mre)
+        @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1)) <= 4.5e-3
+
+        opt = JuMPOptimiser(; pr = pr, slv = slv,
+                            tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 8e-5,
+                                               alg = LInfTracking()))
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise(mre)
+        @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
+
+        opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = [TrackingError(; tr = WeightsTracking(; w = w0),
-                                                err = 2e-3, alg = NOCTracking())])
+                                                err = 2e-3, alg = L1Tracking())])
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
