@@ -563,6 +563,8 @@ The error can be computed using different algorithms using [`norm_tracking`](@re
 - L1-norm [`NOCTracking`](@ref)
 - L2-norm [`SOCTracking`](@ref)
 - L2-norm squared [`SquaredSOCTracking`](@ref)
+- Lp-norm [`PNormTracking`]-(@ref)
+- L-Inf-norm [`InfNormTracking`]-(@ref)
 
 It is also possible to track the error in with risk measures [`RiskTrackingError`]-(@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
@@ -685,6 +687,8 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
   - L1-norm [`NOCTracking`](@ref)
   - L2-norm [`SOCTracking`](@ref)
   - L2-norm squared [`SquaredSOCTracking`](@ref)
+  - Lp-norm [`PNormTracking`]-(@ref)
+  - L-Inf-norm [`InfNormTracking`]-(@ref)
 - ::: details Risk Tracking Risk Measure
   - Dependent variable tracking [`DependentVariableTracking`](@ref)
   - Independent variable tracking [`IndependentVariableTracking`](@ref)
@@ -843,6 +847,8 @@ These optimisations attempt to achieve weight values according to a risk budget 
 - ::: details Regularisation penalty
   - L1
   - L2
+  - Lp [`LpRegularisation`]-(@ref)
+  - L-Inf
 
 #### [Clustering optimisation](@id readme-clustering-opt)
 
