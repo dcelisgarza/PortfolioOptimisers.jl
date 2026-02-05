@@ -229,6 +229,47 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
+    returns_result_view(rd::ReturnsResult, i, j)
+
+Return a view of the `ReturnsResult` object for the asset or factor at index `j` and observation(s) at index `i`.
+
+# Arguments
+
+  - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
+  - `i`: Index or indices of the observation(s) to view.
+  - `j`: Index or indices of the assets to view.
+
+# Returns
+
+  - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified indices.
+
+# Details
+
+  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for index `j` and observation(s) `i`.
+  - Preserves factor names and returns for the selected observation(s).
+  - Preserves timestamps for the selected observation(s).
+  - Returns `nothing` for fields that are not present in the original object.
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`returns_result_view`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+"""
+function returns_result_view(rd::ReturnsResult, i, j, k = :)
+    nx = nothing_scalar_array_view(rd.nx, j)
+    X = isnothing(rd.X) ? rd.X : view(rd.X, i, j)
+    F = isnothing(rd.F) ? rd.F : view(rd.F, i, k)
+    nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)
+    ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
+    iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
+    ivpa = nothing_scalar_array_view(rd.ivpa, j)
+    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv, ivpa = ivpa)
+end
+"""
     prices_to_returns(X::TimeSeries.TimeArray; F::Option{TimeSeries.TimeArray} = nothing;
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
