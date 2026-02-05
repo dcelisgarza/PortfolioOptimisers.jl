@@ -220,7 +220,7 @@ Compute factor Black-Litterman prior moments for asset returns.
   - `pe`: Factor Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

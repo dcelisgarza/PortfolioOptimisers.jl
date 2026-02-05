@@ -442,7 +442,7 @@ Compute high order prior moments for asset returns using a composite estimator.
   - `pe`: High order prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor returns matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators.
 
 # Returns

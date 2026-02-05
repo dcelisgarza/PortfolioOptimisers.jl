@@ -50,7 +50,7 @@ NormalUncertaintySet
         │           │      │   alg ┴ Full()
         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
         │           │      │     pdm ┼ Posdef
-        │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton  
+        │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
         │           │      │      dn ┼ nothing
         │           │      │      dt ┼ nothing
@@ -166,7 +166,7 @@ Constructs box uncertainty sets for mean and covariance statistics under the ass
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -233,7 +233,7 @@ Constructs a box uncertainty set for expected returns under the assumption of no
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -279,7 +279,7 @@ Constructs a box uncertainty set for covariance under the assumption of normally
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -342,7 +342,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -415,7 +415,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -477,7 +477,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -539,7 +539,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -597,7 +597,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -652,7 +652,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -706,7 +706,7 @@ Constructs an ellipsoidal uncertainty set for covariance under the assumption of
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -773,7 +773,7 @@ Constructs an ellipsoidal uncertainty set for covariance under the assumption of
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -831,7 +831,7 @@ Constructs an ellipsoidal uncertainty set for covariance under the assumption of
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns

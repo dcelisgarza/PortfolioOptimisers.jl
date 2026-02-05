@@ -335,7 +335,7 @@ Constructs box uncertainty sets for expected returns and covariance statistics u
   - `ue`: ARCH uncertainty set estimator.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -394,7 +394,7 @@ Constructs a box uncertainty set for expected returns using bootstrap resampling
   - `ue`: ARCH uncertainty set estimator.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -444,7 +444,7 @@ Constructs a box uncertainty set for covariance using bootstrap resampling for t
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, box algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -496,7 +496,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -559,7 +559,7 @@ Constructs an ellipsoidal uncertainty set for expected returns using bootstrap r
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -613,7 +613,7 @@ Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampl
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns

@@ -70,7 +70,7 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 
   - `ce`: Kendall's tau-based covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
@@ -104,7 +104,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
   - `ce`: Kendall's tau-based covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns
@@ -187,7 +187,7 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 
   - `ce`: Spearman's rho-based covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
@@ -221,7 +221,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
   - `ce`: Spearman's rho-based covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns

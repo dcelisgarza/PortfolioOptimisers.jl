@@ -78,7 +78,7 @@ BlackLittermanPrior
              │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │      │     pdm ┼ Posdef
              │           │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │           │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()    
+             │           │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │      │      dn ┼ nothing
              │           │      │      │      dt ┼ nothing
              │           │      │      │     alg ┼ nothing
@@ -253,7 +253,7 @@ Compute the Black-Litterman prior moments for asset returns.
   - `pe`: Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F{Nothing, <:MatNum}`: Optional factor matrix (default: `nothing`).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

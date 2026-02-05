@@ -170,7 +170,7 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
       + `ske::Nothing`: No-op, returns `(nothing, nothing)`.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the mean.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 

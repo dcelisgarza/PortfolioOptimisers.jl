@@ -2020,7 +2020,7 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
   - `pe`: Entropy pooling prior estimator with iterative algorithm .
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix (default: `nothing`).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - If `true`, throws error for missing assets; otherwise, issue warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
@@ -2151,7 +2151,7 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
   - `pe`: Entropy pooling prior estimator with single-shot algorithm.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix.
-  - `dims`: Dimension along which to compute moments,
+  - $(arg_dict[:dims])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 

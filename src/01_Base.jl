@@ -817,7 +817,9 @@ const arg_dict = Dict(
                       :sk => "`sk`: Coskewness matrix.",#
                       :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
                       :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.", :Xv => "`X`: Data vector.")
+                      :F => "`F`: Data matrix.",#
+                      :Xv => "`X`: Data vector.",#
+                      :dims => "`dims`: Dimensions along which to perform the computation.")
 
 """
     val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")

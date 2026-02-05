@@ -87,7 +87,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
   - `me`: Equilibrium expected returns estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
 # Returns

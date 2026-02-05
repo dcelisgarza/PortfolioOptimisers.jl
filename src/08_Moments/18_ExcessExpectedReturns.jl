@@ -61,7 +61,7 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
   - `me`: Excess expected returns estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the mean.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns

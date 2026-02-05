@@ -78,7 +78,7 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
 
   - `ce`: Covariance estimator containing the method and optional weights.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean vector to use for centering.
   - `kwargs...`: Additional keyword arguments passed to [`robust_cov`](@ref).
 
@@ -112,7 +112,7 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
 
   - `ce`: Covariance estimator containing the method and optional weights.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean vector to use for centering.
   - `kwargs...`: Additional keyword arguments passed to [`robust_cor`](@ref).
 
@@ -283,7 +283,7 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
@@ -324,7 +324,7 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 

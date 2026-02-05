@@ -75,7 +75,7 @@ Compute the detoned and positive definite projected covariance matrix for the da
 
   - `ce`: The `DetoneCovariance` estimator specifying the base covariance estimator, detoning algorithm, and positive definite projection.
   - `X`: The data matrix (observations × assets).
-  - `dims`: The dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
 # Returns
@@ -124,7 +124,7 @@ Compute the detoned and positive definite projected correlation matrix for the d
 
   - `ce`: The `DetoneCovariance` estimator specifying the base covariance estimator, detoning algorithm, and positive definite projection.
   - `X`: The data matrix (observations × assets).
-  - `dims`: The dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
 # Returns

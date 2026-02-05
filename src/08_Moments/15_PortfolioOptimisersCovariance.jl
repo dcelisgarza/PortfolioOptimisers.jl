@@ -73,7 +73,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
 
   - `ce`: Composite covariance estimator with post-processing.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Returns
@@ -113,7 +113,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
 
   - `ce`: Composite covariance estimator with post-processing.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Returns

@@ -67,7 +67,7 @@ BayesianBlackLittermanPrior
              │       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       │           │      │     pdm ┼ Posdef
              │       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()   
+             │       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │           │      │      dn ┼ nothing
              │       │           │      │      dt ┼ nothing
              │       │           │      │     alg ┼ nothing
@@ -94,7 +94,7 @@ BayesianBlackLittermanPrior
              │       │   horizon ┴ nothing
              │    mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       │     pdm ┼ Posdef
-             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton        
+             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
              │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │       │      dn ┼ nothing
              │       │      dt ┼ nothing
@@ -203,7 +203,7 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
   - `pe`: Bayesian Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

@@ -125,7 +125,7 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
       + `ke::Nothing`: No-op, returns `nothing`.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the mean.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 

@@ -61,7 +61,7 @@ This method computes the expected returns as the sample mean of the input data `
 
   - $(arg_dict[:me])
   - $(arg_dict[:X])
-  - `dims`: Dimension along which to compute the mean.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
 # Returns

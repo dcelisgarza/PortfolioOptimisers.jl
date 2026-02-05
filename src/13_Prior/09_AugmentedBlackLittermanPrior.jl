@@ -143,7 +143,7 @@ AugmentedBlackLittermanPrior
         a_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   ukey ┼ String: "ux"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])        
+               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
         f_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   ukey ┼ String: "ux"
@@ -274,7 +274,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - `pe`: Augmented Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

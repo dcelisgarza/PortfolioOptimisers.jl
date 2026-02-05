@@ -249,7 +249,7 @@ This function applies the specified clustering estimator to the input data matri
   - `cle`: Clustering estimator.
   - `X`: Data matrix (observations × assets).
   - `branchorder`: Branch ordering strategy for hierarchical clustering.
-  - `dims`: Dimension along which to cluster.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns

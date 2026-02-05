@@ -909,7 +909,7 @@ Compute the adjacency matrix for a network estimator.
       + `nte::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -948,7 +948,7 @@ This function constructs the adjacency matrix for the network, then computes the
 
   - `nte`: NetworkEstimator estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -984,7 +984,7 @@ This function clusterises the data, cuts the tree into the optimal number of clu
   - `cle`: Clustering estimator or result.
   - `X`: Data matrix (observations × assets).
   - `branchorder`: Branch ordering strategy for hierarchical clustering.
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1021,7 +1021,7 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - `pl`: Phylogeny estimator.
   - `ct`: Centrality algorithm.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1050,7 +1050,7 @@ This function applies the centrality algorithm in the estimator to the network c
 
   - `cte`: Centrality estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1080,7 +1080,7 @@ This function computes the centrality vector and returns the weighted average us
   - `ct`: Centrality algorithm.
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1110,7 +1110,7 @@ This function applies the centrality algorithm in the estimator to the network a
   - `cte`: Centrality estimator.
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1193,7 +1193,7 @@ This function computes the phylogeny matrix using the estimator and data, then c
   - `cle`: NetworkEstimator or clustering estimator.
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns

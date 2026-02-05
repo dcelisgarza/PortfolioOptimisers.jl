@@ -432,8 +432,8 @@ This function scans the specified dimension of the input matrix and returns the 
 
 # Arguments
 
-  - `X`: Input matrix of numeric values (observations × assets).
-  - `dims`: Dimension along which to check for completeness (`1` for columns, `2` for rows). Default is `1`.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
 
 # Returns
 

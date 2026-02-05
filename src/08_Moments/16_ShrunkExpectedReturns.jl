@@ -350,7 +350,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
       + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the mean.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
 # Returns

@@ -44,7 +44,7 @@ FactorPrior
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
-      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton    
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │      dn ┼ nothing
       │           │      │      dt ┼ nothing
@@ -132,7 +132,7 @@ Compute factor-based prior moments for asset returns using a factor model.
   - `pe`: Factor prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
 # Returns

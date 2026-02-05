@@ -397,7 +397,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - `pl`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object containing asset returns.
-  - `dims`: Dimension along which to compute the phylogeny matrix.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
 
 # Returns

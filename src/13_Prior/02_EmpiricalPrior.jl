@@ -97,7 +97,7 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
   - `pe`: Empirical prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `args...`: Additional positional arguments (ignored).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Returns
@@ -137,7 +137,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
   - `pe`: Empirical prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `args...`: Additional positional arguments (ignored).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Returns

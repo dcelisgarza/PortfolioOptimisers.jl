@@ -124,7 +124,7 @@ OpinionPoolingPrior
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │               │           │      │     pdm ┼ Posdef
       │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()  
+      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │               │           │      │      dn ┼ nothing
       │               │           │      │      dt ┼ nothing
       │               │           │      │     alg ┼ nothing
@@ -146,7 +146,7 @@ OpinionPoolingPrior
       │          sets ┼ AssetSets
       │               │    key ┼ String: "nx"
       │               │   ukey ┼ String: "ux"
-      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"]) 
+      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
       │        ds_opt ┼ nothing
       │        dm_opt ┼ nothing
       │           opt ┼ OptimEntropyPooling
@@ -170,7 +170,7 @@ OpinionPoolingPrior
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │               │           │      │     pdm ┼ Posdef
       │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()  
+      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │               │           │      │      dn ┼ nothing
       │               │           │      │      dt ┼ nothing
       │               │           │      │     alg ┼ nothing
@@ -192,7 +192,7 @@ OpinionPoolingPrior
       │          sets ┼ AssetSets
       │               │    key ┼ String: "nx"
       │               │   ukey ┼ String: "ux"
-      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"]) 
+      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
       │        ds_opt ┼ nothing
       │        dm_opt ┼ nothing
       │           opt ┼ OptimEntropyPooling
@@ -216,7 +216,7 @@ OpinionPoolingPrior
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
-      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton    
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │      dn ┼ nothing
       │           │      │      dt ┼ nothing
@@ -364,7 +364,7 @@ Compute opinion pooling prior moments for asset returns.
   - `pe`: Opinion pooling prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix (default: `nothing`).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 

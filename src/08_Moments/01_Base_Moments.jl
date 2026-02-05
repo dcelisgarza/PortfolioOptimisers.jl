@@ -424,7 +424,7 @@ Compute the covariance matrix robustly using the specified covariance estimator 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
@@ -484,7 +484,7 @@ Compute the correlation matrix robustly using the specified covariance estimator
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 

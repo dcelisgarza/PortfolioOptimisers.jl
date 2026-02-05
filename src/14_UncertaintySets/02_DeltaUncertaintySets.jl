@@ -41,7 +41,7 @@ DeltaUncertaintySet
          │           │      │   alg ┴ Full()
          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
          │           │      │     pdm ┼ Posdef
-         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton 
+         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
          │           │      │      dn ┼ nothing
          │           │      │      dt ┼ nothing
@@ -85,7 +85,7 @@ Constructs box uncertainty sets for mean and covariance statistics using delta b
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics (default: 1).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -128,7 +128,7 @@ Constructs a box uncertainty set for expected returns (mean) using delta bounds 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator (default: `nothing`).
-  - `dims`: Dimension along which to compute statistics (default: `1`).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -167,7 +167,7 @@ Constructs a box uncertainty set for covariance using delta bounds from a prior 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator (default: `nothing`).
-  - `dims`: Dimension along which to compute statistics (default: `1`).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns

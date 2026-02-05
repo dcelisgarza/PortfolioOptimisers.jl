@@ -152,7 +152,7 @@ The same definitions apply as above, but for each individual asset in the return
 
   - `X`: Array of asset or portfolio returns (vector or matrix).
   - `compound`: If `true`, computes compounded cumulative returns; otherwise, computes simple cumulative returns.
-  - `dims`: Dimension along which to compute cumulative returns.
+  - $(arg_dict[:dims])
 
 # Returns
 

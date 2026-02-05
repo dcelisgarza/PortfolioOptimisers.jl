@@ -787,7 +787,7 @@ Compute the Gerber correlation matrix using an unstandardised Gerber covariance 
       + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber correlation matrix.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns
@@ -856,7 +856,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
       + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber covariance matrix.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns
