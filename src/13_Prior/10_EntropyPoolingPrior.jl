@@ -282,8 +282,8 @@ struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimise
                                                                                         alg)
     end
 end
-function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
-                             sc2::Number = 1e3,
+function OptimEntropyPooling(; args::Tuple = (Optim.Fminbox(; mu0 = 1e-4),),
+                             kwargs::NamedTuple = (;), sc1::Number = 1, sc2::Number = 1e3,
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
@@ -1114,7 +1114,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     function f(x)
         common_op(x)
-        return opt.sc1 * sum(y) + LinearAlgebra.dot(x, B)
+        return opt.sc1 * (sum(y) + LinearAlgebra.dot(x, B))
     end
     function g!(G, x)
         common_op(x)
