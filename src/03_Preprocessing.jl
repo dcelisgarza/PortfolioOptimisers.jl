@@ -432,7 +432,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     oc = setdiff(col_names, union(nx, nf, nb))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @argcheck(issubset(ts, TimeSeries.timestamp(iv)), ValueError)
+        @argcheck(issubset(ts, TimeSeries.timestamp(iv)))
         iv = iv[ts]
     end
     if !isnothing(iv)

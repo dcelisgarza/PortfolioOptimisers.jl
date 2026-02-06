@@ -38,7 +38,7 @@ end PortfolioOptimisers
 
 #=
 src_files = String[]
-sizehint!(src_files, 148)
+sizehint!(src_files, 149)
 for (root, dirs, files) in walkdir(@__DIR__)
     for file in files
         if file == "PortfolioOptimisers.jl"
@@ -150,6 +150,7 @@ include("19_RiskMeasures/25_ExpectedRisk.jl")
 include("19_RiskMeasures/26_RiskMeasureTools.jl")
 include("20_Optimisation/01_Base_Optimisation.jl")
 include("20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl")
+include("20_Optimisation/02_CrossValidation/02_WalkForward.jl")
 include("20_Optimisation/03_NaiveOptimisation.jl")
 include("20_Optimisation/04_Base_ClusteringOptimisation.jl")
 include("20_Optimisation/05_HierarchicalRiskParity.jl")
