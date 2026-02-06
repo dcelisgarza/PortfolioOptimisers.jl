@@ -237,7 +237,7 @@ end
                         sc2::Number = 1e3,
                         alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
-Keyword arguments correspond to the fields above.
+Ke`word arguments correspond to the fields above.
 
 ## Validation
 
@@ -282,8 +282,8 @@ struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimise
                                                                                         alg)
     end
 end
-function OptimEntropyPooling(; args::Tuple = (Optim.Fminbox(; mu0 = 1e-4),),
-                             kwargs::NamedTuple = (;), sc1::Number = 1, sc2::Number = 1e3,
+function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
+                             sc2::Number = 1e3,
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
@@ -1121,8 +1121,16 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         G .= grad
         return opt.sc1 * G
     end
-    result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
-                            opt.kwargs...)
+    #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
+    @static if pkgversion(Optim) == v"2.0.1"
+        args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
+                                opt.kwargs...)
+    else
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
+                                opt.kwargs...)
+    end
+    #! End: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
@@ -1174,8 +1182,16 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         G .= grad
         return opt.sc1 * G
     end
-    result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
-                            opt.kwargs...)
+    #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
+    @static if pkgversion(Optim) == v"2.0.1"
+        args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
+                                opt.kwargs...)
+    else
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
+                                opt.kwargs...)
+    end
+    #! End: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
@@ -1478,7 +1494,8 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
         else
-            LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) -
+            LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(view(X, :,
+                                                                                     i)) -
                                 B[i] for i in 1:N]) / sqrt(N)
         end
         return wi, err
