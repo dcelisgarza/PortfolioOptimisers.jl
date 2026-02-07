@@ -172,12 +172,12 @@ function split_from_period(wf::WalkForward{<:Any, <:Any, <:Any}, rd::ReturnsResu
             if !reduce_test
                 break
             end
-            push!(test_indices, idx[i + 1]:T)
+            push!(test_indices, idx[i]:T)
         else
-            push!(test_indices, idx[i + 1]:(idx[i + 1 + test_size] - purged_size))
+            push!(test_indices, idx[i]:(idx[i + test_size] - purged_size))
         end
         train_start = expend_train ? 1 : train_idx[i]
-        push!(train_indices, train_start:idx[i + 1])
+        push!(train_indices, train_start:idx[i])
         i += test_size
     end
 

@@ -49,7 +49,7 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv
                                  timestamp = :Date)[(end - 252):end],
                        TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                  timestamp = :Date)[(end - 252):end])
-cv = WalkForward(Day(10), 20; period = Day(1), previous = false)
+cv = WalkForward(Day(5), 20; period = Day(1), previous = false)
 train, test = split(cv, rd)
 
 # end
