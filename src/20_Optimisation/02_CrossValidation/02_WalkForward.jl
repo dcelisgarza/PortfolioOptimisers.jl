@@ -91,14 +91,7 @@ function split_from_period(wf::WalkForward{<:Integer}, rd::ReturnsResult)
         date_range = date_range + period_offset
     end
     idx = Int[]
-    j = 1
     for date in date_range
-        # if date < ti
-        #     continue
-        # end
-        # if date > tf
-        #     break
-        # end
         i = searchsortedlast(ts, date)
         if !previous && ts[i] != date
             i += 1
@@ -106,11 +99,7 @@ function split_from_period(wf::WalkForward{<:Integer}, rd::ReturnsResult)
         if i > length(ts)
             break
         end
-        # if j != 1 && idx[j - 1] == i
-        #     continue
-        # end
         push!(idx, i)
-        j += 1
     end
     N = length(idx)
     i = 1
@@ -124,7 +113,7 @@ function split_from_period(wf::WalkForward{<:Integer}, rd::ReturnsResult)
             if !reduce_test
                 break
             end
-            push!(test_indices, idx[(i + train_size)]:T)
+            push!(test_indices, idx[i + train_size]:T)
         else
             push!(test_indices, idx[i + train_size]:idx[i + train_size + test_size])
         end
@@ -151,14 +140,7 @@ function split_from_period(wf::WalkForward{<:Any, <:Any, <:Any}, rd::ReturnsResu
         date_range = date_range + period_offset
     end
     idx = Int[]
-    j = 1
     for date in date_range
-        # if date < ti
-        #     continue
-        # end
-        # if date > tf
-        #     break
-        # end
         i = searchsortedlast(ts, date)
         if !previous && ts[i] != date
             i += 1
@@ -166,32 +148,17 @@ function split_from_period(wf::WalkForward{<:Any, <:Any, <:Any}, rd::ReturnsResu
         if i > length(ts)
             break
         end
-        if j != 1 && idx[j - 1] == i
-            continue
-        end
         push!(idx, i)
-        j += 1
     end
 
     train_idx = Int[]
-    j = 1
     for date in date_range
         date = date - train_size
-        # if date < ti
-        #     continue
-        # end
-        # if date > tf
-        #     break
-        # end
         i = searchsortedlast(ts, date)
         if i > length(ts)
             break
         end
-        if j != 1 && train_idx[j - 1] == i
-            continue
-        end
         push!(train_idx, i)
-        j += 1
     end
     N = length(idx)
     i = searchsortedlast(train_idx, 0) + 1
