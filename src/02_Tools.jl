@@ -62,15 +62,16 @@ function assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Symbol = :val)
 end
 function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Symbol = :val)
     @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+              DomainError("isfinite($(val_sym[2])) must hold. Got\nisfinite($(val_sym[2])) => $(isfinite(val[2]))"))
     @argcheck(zero(val[2]) <= val[2],
-              DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
+              DomainError("0 <= $(val_sym[2]) must hold. Got\n$(val_sym[2]) => $(val[2])"))
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(val::Number, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
+    @argcheck(zero(val) <= val,
+              DomainError("0 <= $(val_sym) must hold. Got\n$(val_sym) => $(val)"))
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(args...)
@@ -140,15 +141,16 @@ function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Symbol = :val)
 end
 function assert_nonempty_gt0_finite_val(val::Pair, val_sym::Symbol = :val)
     @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+              DomainError("isfinite($(val_sym[2])) must hold. Got\nisfinite($(val_sym[2])) => $(isfinite(val[2]))"))
     @argcheck(zero(val[2]) < val[2],
-              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
+              DomainError("0 < $(val_sym[2]) must hold. Got\n$(val_sym[2]) => $(val[2])"))
     return nothing
 end
 function assert_nonempty_gt0_finite_val(val::Number, val_sym::Symbol = :val)
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
+    @argcheck(zero(val) < val,
+              DomainError("0 < $(val_sym) must hold. Got\n$(val_sym) => $(val)"))
     return nothing
 end
 function assert_nonempty_gt0_finite_val(args...)
@@ -212,7 +214,7 @@ function assert_nonempty_finite_val(val::ArrNum, val_sym::Symbol = :val)
 end
 function assert_nonempty_finite_val(val::Pair, val_sym::Symbol = :val)
     @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+              DomainError("isfinite($(val_sym[2])) must hold. Got\nisfinite($(val_sym[2])) => $(isfinite(val[2]))"))
     return nothing
 end
 function assert_nonempty_finite_val(val::Number, val_sym::Symbol = :val)
