@@ -66,13 +66,14 @@ function Base.split(wf::WalkForward{<:Any, <:Any, Nothing}, rd::ReturnsResult)
             if !reduce_test
                 break
             end
-            push!(test_indices, idx[test_start:end])
+            push!(test_indices, idx[(test_start + 1):end])
         else
-            push!(test_indices, idx[test_start:test_end])
+            push!(test_indices, idx[(test_start + 1):test_end])
         end
         push!(train_indices, idx[train_start:train_end])
         test_start = test_end
     end
+
     return train_indices, test_indices
 end
 function split_from_period(wf::WalkForward{<:Integer}, rd::ReturnsResult)
@@ -115,10 +116,10 @@ function split_from_period(wf::WalkForward{<:Integer}, rd::ReturnsResult)
             end
             push!(test_indices, idx[i + train_size]:T)
         else
-            push!(test_indices, idx[i + train_size]:idx[i + train_size + test_size])
+            push!(test_indices, idx[i + train_size]:(idx[i + train_size + test_size] - 1))
         end
         train_start = expend_train ? 1 : idx[i]
-        push!(train_indices, train_start:(idx[i + train_size] - purged_size))
+        push!(train_indices, train_start:(idx[i + train_size] - purged_size - 1))
         i += test_size
     end
 
@@ -139,6 +140,7 @@ function split_from_period(wf::WalkForward{<:Any, <:Any, <:Any}, rd::ReturnsResu
     if po_flag
         date_range = date_range + period_offset
     end
+
     idx = Int[]
     for date in date_range
         i = searchsortedlast(ts, date)
@@ -174,10 +176,10 @@ function split_from_period(wf::WalkForward{<:Any, <:Any, <:Any}, rd::ReturnsResu
             end
             push!(test_indices, idx[i]:T)
         else
-            push!(test_indices, idx[i]:(idx[i + test_size] - purged_size))
+            push!(test_indices, idx[i]:(idx[i + test_size] - purged_size - 1))
         end
         train_start = expend_train ? 1 : train_idx[i]
-        push!(train_indices, train_start:idx[i])
+        push!(train_indices, train_start:(idx[i] - 1))
         i += test_size
     end
 
