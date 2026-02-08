@@ -41,8 +41,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
                                     obj::ObjectiveFunction,
                                     pl::Option{<:PlCE_PhC_VecPlCE_PlC},
                                     sets::Option{<:AssetSets}, wi::Option{<:VecNum},
-                                    flag::Bool,
-                                    fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                                    flag::Bool, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -61,7 +60,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 pl::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                                 sets::Option{<:AssetSets} = nothing,
                                 wi::Option{<:VecNum} = nothing, flag::Bool = true,
-                                fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                                fb::Option{<:OptE_Opt} = nothing)
     return FactorRiskContribution(opt, re, r, obj, pl, sets, wi, flag, fb)
 end
 function opt_view(frc::FactorRiskContribution, i, X::MatNum)

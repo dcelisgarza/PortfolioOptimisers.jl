@@ -25,8 +25,7 @@ struct InverseVolatility{T1, T2, T3, T4, T5, T6} <: NaiveOptimisationEstimator
     strict::T5
     fb::T6
     function InverseVolatility(pr::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                               wf::WeightFinaliser, strict::Bool,
-                               fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                               wf::WeightFinaliser, strict::Bool, fb::Option{<:OptE_Opt})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -38,8 +37,7 @@ function InverseVolatility(; pr::PrE_Pr = EmpiricalPrior(),
                            wb::Option{<:WbE_Wb} = WeightBounds(),
                            sets::Option{<:AssetSets} = nothing,
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
-                           strict::Bool = false,
-                           fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                           strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return InverseVolatility(pr, wb, sets, wf, strict, fb)
 end
 function opt_view(opt::InverseVolatility, i, args...)
@@ -78,8 +76,7 @@ struct EqualWeighted{T1, T2, T3, T4, T5} <: NaiveOptimisationEstimator
     strict::T4
     fb::T5
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                           wf::WeightFinaliser, strict::Bool,
-                           fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                           wf::WeightFinaliser, strict::Bool, fb::Option{<:OptE_Opt})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -93,8 +90,7 @@ end
 function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        sets::Option{<:AssetSets} = nothing,
                        wf::WeightFinaliser = IterativeWeightFinaliser(),
-                       strict::Bool = false,
-                       fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                       strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return EqualWeighted(wb, sets, wf, strict, fb)
 end
 function opt_view(opt::EqualWeighted, i, args...)
@@ -128,8 +124,7 @@ struct RandomWeighted{T1, T2, T3, T4, T5, T6, T7} <: NaiveOptimisationEstimator
     fb::T7
     function RandomWeighted(rng::Random.AbstractRNG, seed::Option{<:Integer},
                             wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                            wf::WeightFinaliser, strict::Bool,
-                            fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                            wf::WeightFinaliser, strict::Bool, fb::Option{<:OptE_Opt})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -141,8 +136,7 @@ function RandomWeighted(; rng::Random.AbstractRNG = Random.default_rng(),
                         seed::Option{<:Integer} = nothing, wb::Option{<:WbE_Wb} = nothing,
                         sets::Option{<:AssetSets} = nothing,
                         wf::WeightFinaliser = IterativeWeightFinaliser(),
-                        strict::Bool = false,
-                        fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                        strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return RandomWeighted(rng, seed, wb, sets, wf, strict, fb)
 end
 function opt_view(opt::RandomWeighted, i, args...)

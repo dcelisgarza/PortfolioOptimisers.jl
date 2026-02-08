@@ -25,7 +25,7 @@ struct DiscreteAllocation{T1, T2, T3, T4, T5} <: FiniteAllocationOptimisationEst
     fb::T5
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation,
-                                fb::Option{<:FiniteAllocationOptimisationEstimator})
+                                fb::Option{<:FOptE_FOpt})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -37,7 +37,7 @@ struct DiscreteAllocation{T1, T2, T3, T4, T5} <: FiniteAllocationOptimisationEst
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             wf::JuMPWeightFinaliserFormulation = AbsoluteErrorWeightFinaliser(),
-                            fb::Option{<:FiniteAllocationOptimisationEstimator} = GreedyAllocation())
+                            fb::Option{<:FOptE_FOpt} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, wf, fb)
 end
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,

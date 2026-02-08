@@ -67,7 +67,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
     fb::T3
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
-                                                   fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                                                   fb::Option{<:OptE_Opt})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params))
         end
@@ -77,7 +77,7 @@ end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),
-                                               fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                                               fb::Option{<:OptE_Opt} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)

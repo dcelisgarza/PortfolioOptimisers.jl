@@ -1,5 +1,7 @@
 abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
 abstract type FiniteAllocationOptimisationResult <: OptimisationResult end
+const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
+                         <:FiniteAllocationOptimisationResult}
 
 function setup_alloc_optim(w::VecNum, p::VecNum, cash::Number,
                            T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing)

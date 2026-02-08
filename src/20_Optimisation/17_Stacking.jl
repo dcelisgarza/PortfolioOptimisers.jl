@@ -33,8 +33,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                       sets::Option{<:AssetSets}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,
                       cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
-                      strict::Bool, ex::FLoops.Transducers.Executor,
-                      fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                      strict::Bool, ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt})
         assert_external_optimiser(opto)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -53,7 +52,7 @@ function Stacking(; pr::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
                   cv::Option{<:CrossValidationEstimator} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                  fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                  fb::Option{<:OptE_Opt} = nothing)
     return Stacking(pr, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_external_optimiser(opt::Stacking)

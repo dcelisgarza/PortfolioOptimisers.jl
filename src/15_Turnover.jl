@@ -24,10 +24,11 @@ function turnover_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
+    struct TurnoverEstimator{T1, T2, T3, T4} <: AbstractEstimator
         w::T1
         val::T2
         dval::T3
+        fixed::T4
     end
 
 Estimator for turnover portfolio constraints.
@@ -41,10 +42,11 @@ This estimator can be converted into a concrete [`Turnover`](@ref) constraint us
   - `w`: Vector of current portfolio weights.
   - `val`: Asset-specific turnover values, as a dictionary, pair, or vector of pairs.
   - `dval`: Default turnover value for assets not specified in `val`.
+  - `fixed`: Boolean indicating whether the estimator is fixed (does not update with new weights) or variable (updates with new weights).
 
 # Constructor
 
-    TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing)
+    TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing, fixed::Bool = false)
 
 ## Validation
 
@@ -57,9 +59,10 @@ This estimator can be converted into a concrete [`Turnover`](@ref) constraint us
 ```jldoctest
 julia> TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2), dval = 0.0)
 TurnoverEstimator
-     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-   val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  dval ┴ Float64: 0.0
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: false
 ```
 
 # Related
@@ -71,21 +74,24 @@ TurnoverEstimator
   - [`Option`](@ref)
   - [`turnover_constraints`](@ref)
 """
-struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
+struct TurnoverEstimator{T1, T2, T3, T4} <: AbstractEstimator
     w::T1
     val::T2
     dval::T3
-    function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number} = nothing)
+    fixed::T4
+    function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
+                               fixed::Bool)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)
             @argcheck(zero(dval) <= dval, DomainError)
         end
-        return new{typeof(w), typeof(val), typeof(dval)}(w, val, dval)
+        return new{typeof(w), typeof(val), typeof(dval), typeof(fixed)}(w, val, dval, fixed)
     end
 end
-function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing)
-    return TurnoverEstimator(w, val, dval)
+function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing,
+                           fixed::Bool = false)
+    return TurnoverEstimator(w, val, dval, fixed)
 end
 """
     turnover_view(tn::TurnoverEstimator, i)
@@ -132,7 +138,7 @@ TurnoverEstimator
 function turnover_view(tn::TurnoverEstimator, i)
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
-    return TurnoverEstimator(; w = w, val = val, dval = tn.dval)
+    return TurnoverEstimator(; w = w, val = val, dval = tn.dval, fixed = tn.fixed)
 end
 """
     factory(tn::TurnoverEstimator, w::VecNum)
@@ -179,7 +185,11 @@ TurnoverEstimator
   - [`turnover_constraints`](@ref)
 """
 function factory(tn::TurnoverEstimator, w::VecNum)
-    return TurnoverEstimator(; w = w, val = tn.val, dval = tn.dval)
+    return if tn.fixed
+        tn
+    else
+        TurnoverEstimator(; w = w, val = tn.val, dval = tn.dval, fixed = tn.fixed)
+    end
 end
 """
     turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; datatype::DataType = Float64,
@@ -209,12 +219,13 @@ Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set
 ```jldoctest
 julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
 
-julia> tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1, "B" => 0.2));
+julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2));
 
 julia> turnover_constraints(tn, sets)
 Turnover
-    w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-  val ┴ Vector{Float64}: [0.1, 0.2, 0.0]
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
 ```
 
 # Related
@@ -228,12 +239,13 @@ function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
                               datatype::DataType = Float64, strict::Bool = false)
     return Turnover(; w = tn.w,
                     val = estimator_to_val(tn.val, sets, tn.dval; datatype = datatype,
-                                           strict = strict))
+                                           strict = strict), fixed = tn.fixed)
 end
 """
-    struct Turnover{T1, T2} <: AbstractResult
+    struct Turnover{T1, T2, T3} <: AbstractResult
         w::T1
         val::T2
+        fixed::T3
     end
 
 Container for turnover portfolio constraints.
@@ -262,9 +274,11 @@ Where:
       + When used as a constraint, this value is used to constrain the maximum allowed turnover per asset.
       + When used in [`Fees`](@ref), this value represents the turnover fee per asset.
 
+  - `fixed`: Boolean indicating whether the turnover constraint is fixed (does not update with new weights) or variable (updates with new weights).
+
 # Constructor
 
-    Turnover(; w::VecNum, val::Num_VecNum = 0.0)
+    Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)
 
 Keyword arguments correspond to the fields above.
 
@@ -301,20 +315,21 @@ Turnover
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
   - [`turnover_view`](@ref)
 """
-struct Turnover{T1, T2} <: AbstractResult
+struct Turnover{T1, T2, T3} <: AbstractResult
     w::T1
     val::T2
-    function Turnover(w::VecNum, val::Num_VecNum)
+    fixed::T3
+    function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if isa(val, VecNum)
             @argcheck(length(val) == length(w), DimensionMismatch)
         end
-        return new{typeof(w), typeof(val)}(w, val)
+        return new{typeof(w), typeof(val), typeof(fixed)}(w, val, fixed)
     end
 end
-function Turnover(; w::VecNum, val::Num_VecNum = 0.0)
-    return Turnover(w, val)
+function Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)
+    return Turnover(w, val, fixed)
 end
 """
     turnover_view(tn::Turnover, i)
@@ -358,7 +373,7 @@ Turnover
 function turnover_view(tn::Turnover, i)
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
-    return Turnover(; w = w, val = val)
+    return Turnover(; w = w, val = val, fixed = tn.fixed)
 end
 """
     factory(tn::Turnover, w::VecNum)
@@ -397,7 +412,7 @@ Turnover
   - [`turnover_constraints`](@ref)
 """
 function factory(tn::Turnover, w::VecNum)
-    return Turnover(; w = w, val = tn.val)
+    return tn.fixed ? tn : Turnover(; w = w, val = tn.val, fixed = tn.fixed)
 end
 """
     turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
@@ -423,8 +438,9 @@ julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
 
 julia> turnover_constraints(tn)
 Turnover
-    w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-  val ┴ Vector{Float64}: [0.1, 0.2, 0.0]
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
 ```
 
 # Related

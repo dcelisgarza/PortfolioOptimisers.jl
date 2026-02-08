@@ -68,8 +68,7 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     wi::T4
     fb::T5
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
-                           wi::Option{<:VecNum},
-                           fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                           wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -85,8 +84,7 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
 end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                       wi::Option{<:VecNum} = nothing,
-                       fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                       wi::Option{<:VecNum} = nothing, fb::Option{<:OptE_Opt} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::MatNum)
