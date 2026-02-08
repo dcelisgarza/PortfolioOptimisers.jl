@@ -401,8 +401,9 @@ Asset weights-based tracking algorithm.
 ```jldoctest
 julia> WeightsTracking(; w = [0.5, 0.5])
 WeightsTracking
-  fees ┼ nothing
-     w ┴ Vector{Float64}: [0.5, 0.5]
+   fees ┼ nothing
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: false
 ```
 
 # Related
@@ -452,25 +453,51 @@ This function creates a new [`WeightsTracking`](@ref) instance by copying the fe
 ```jldoctest
 julia> tr = WeightsTracking(; fees = Fees(; l = 0.002), w = [0.5, 0.5])
 WeightsTracking
-  fees ┼ Fees
-       │       tn ┼ nothing
-       │        l ┼ Float64: 0.002
-       │        s ┼ nothing
-       │       fl ┼ nothing
-       │       fs ┼ nothing
-       │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-     w ┴ Vector{Float64}: [0.5, 0.5]
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: false
 
 julia> PortfolioOptimisers.factory(tr, [0.6, 0.4])
 WeightsTracking
-  fees ┼ Fees
-       │       tn ┼ nothing
-       │        l ┼ Float64: 0.002
-       │        s ┼ nothing
-       │       fl ┼ nothing
-       │       fs ┼ nothing
-       │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-     w ┴ Vector{Float64}: [0.6, 0.4]
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.6, 0.4]
+  fixed ┴ Bool: false
+
+julia> tr = WeightsTracking(; fees = Fees(; l = 0.002), w = [0.5, 0.5], fixed = true)
+WeightsTracking
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: true
+
+julia> PortfolioOptimisers.factory(tr, [0.1, 0.1])
+WeightsTracking
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -515,8 +542,17 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
 
 julia> PortfolioOptimisers.tracking_view(tr, 2:3)
 WeightsTracking
-  fees ┼ nothing
-     w ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+   fees ┼ nothing
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+  fixed ┴ Bool: false
+
+julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6], fixed = true);
+
+julia> PortfolioOptimisers.tracking_view(tr, 2:3)
+WeightsTracking
+   fees ┼ nothing
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -528,7 +564,7 @@ WeightsTracking
 function tracking_view(tr::WeightsTracking, i)
     fees = fees_view(tr.fees, i)
     w = view(tr.w, i)
-    return WeightsTracking(; fees = fees, w = w)
+    return WeightsTracking(; fees = fees, w = w, fixed = tr.fixed)
 end
 """
     tracking_benchmark(tr::WeightsTracking, X::MatNum)
@@ -749,8 +785,9 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5]);
 julia> TrackingError(; tr = tr, err = 0.01)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ Vector{Float64}: [0.5, 0.5]
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.5, 0.5]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
@@ -808,8 +845,9 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
 julia> err = TrackingError(; tr = tr, err = 0.01)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ Vector{Float64}: [0.5, 0.5, 0.6]
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.5, 0.5, 0.6]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
@@ -817,8 +855,9 @@ TrackingError
 julia> PortfolioOptimisers.tracking_view(err, 2:3)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+      │    fees ┼ nothing
+      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1

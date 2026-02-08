@@ -123,9 +123,20 @@ julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" 
 
 julia> PortfolioOptimisers.turnover_view(tn, 1:2)
 TurnoverEstimator
-     w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-   val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  dval ┴ Float64: 0.0
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: false
+
+julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
+                              dval = 0.0, fixed = true);
+
+julia> PortfolioOptimisers.turnover_view(tn, 1:2)
+TurnoverEstimator
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -166,15 +177,32 @@ Constructs a new [`TurnoverEstimator`](@ref) object using the provided portfolio
 julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
                               dval = 0.0)
 TurnoverEstimator
-     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-   val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  dval ┴ Float64: 0.0
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: false
 
 julia> factory(tn, [0.1, 0.4, 0.5])
 TurnoverEstimator
-     w ┼ Vector{Float64}: [0.1, 0.4, 0.5]
-   val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  dval ┴ Float64: 0.0
+      w ┼ Vector{Float64}: [0.1, 0.4, 0.5]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: false
+
+julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
+                              dval = 0.0, fixed = true)
+TurnoverEstimator
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: true
+
+julia> factory(tn, [0.1, 0.4, 0.5])
+TurnoverEstimator
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -296,13 +324,15 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0])
 Turnover
-    w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-  val ┴ Vector{Float64}: [0.1, 0.2, 0.0]
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
 
-julia> Turnover(; w = [0.2, 0.3, 0.5], val = 0.02)
+julia> Turnover(; w = [0.2, 0.3, 0.5], val = 0.02, fixed = true)
 Turnover
-    w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-  val ┴ Float64: 0.02
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Float64: 0.02
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -359,8 +389,17 @@ julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
 
 julia> PortfolioOptimisers.turnover_view(tn, 1:2)
 Turnover
-    w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-  val ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+    val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
+  fixed ┴ Bool: false
+
+julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0], fixed = true);
+
+julia> PortfolioOptimisers.turnover_view(tn, 1:2)
+Turnover
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+    val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -396,13 +435,27 @@ Create a new `Turnover` constraint with updated portfolio weights.
 ```jldoctest
 julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0])
 Turnover
-    w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-  val ┴ Vector{Float64}: [0.1, 0.2, 0.0]
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
 
 julia> factory(tn, [0.0, 0.2, 0.8])
 Turnover
-    w ┼ Vector{Float64}: [0.0, 0.2, 0.8]
-  val ┴ Vector{Float64}: [0.1, 0.2, 0.0]
+      w ┼ Vector{Float64}: [0.0, 0.2, 0.8]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
+
+julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0], fixed = true)
+Turnover
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: true
+
+julia> factory(tn, [0.0, 0.2, 0.8])
+Turnover
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -573,21 +626,23 @@ Create views of multiple turnover constraints or estimators for a subset of asse
 # Examples
 
 ```jldoctest
-julia> tn1 = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
+julia> tn1 = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0], fixed = true);
 
 julia> tn2 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
-                               dval = 0.0);
+                               dval = 0.0, fixed = true);
 
 julia> PortfolioOptimisers.turnover_view(concrete_typed_array([tn1, tn2]), 1:2)
-2-element Vector{Union{Turnover{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}}, TurnoverEstimator{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Dict{String, Float64}, Float64}}}:
+2-element Vector{Union{Turnover{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, TurnoverEstimator{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Dict{String, Float64}, Float64, Bool}}}:
  Turnover
-    w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-  val ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+    val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
+  fixed ┴ Bool: true
 
  TurnoverEstimator
-     w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-   val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-  dval ┴ Float64: 0.0
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
+   dval ┼ Float64: 0.0
+  fixed ┴ Bool: true
 ```
 
 # Related
