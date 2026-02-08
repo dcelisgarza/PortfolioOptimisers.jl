@@ -1374,8 +1374,11 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
       + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the standardised Smyth-Broby correlation matrix.
 
   - `X`: Data matrix (observations × assets).
+
   - $(arg_dict[:dims])
+
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
 # Returns
@@ -1451,8 +1454,11 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
       + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:StandardisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the standardised Smyth-Broby covariance matrix.
 
   - `X`: Data matrix (observations × assets).
+
   - $(arg_dict[:dims])
+
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
 # Returns

@@ -909,7 +909,9 @@ Compute the adjacency matrix for a network estimator.
       + `nte::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
 
   - `X`: Data matrix (observations × assets).
+
   - $(arg_dict[:dims])
+
   - `kwargs...`: Additional keyword arguments.
 
 # Returns

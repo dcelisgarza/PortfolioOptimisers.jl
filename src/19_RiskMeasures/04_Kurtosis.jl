@@ -43,6 +43,7 @@ Keyword arguments correspond to the fields above.
       + `::VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
 
   - If `w` is not `nothing`, `!isempty(w)`.
+
   - If `kt` is not `nothing`:
 
       + `!isempty(kt)` and `size(kt, 1) == size(kt, 2)`.
@@ -51,6 +52,7 @@ Keyword arguments correspond to the fields above.
 
           * `::VecNum`: `length(mu)^2 == size(kt, 1)`.
           * `::VecScalar`: `length(mu.v)^2 == size(kt, 1)`.
+
   - If `N` is not `nothing`: must be positive.
 
 # `JuMP` Formulations

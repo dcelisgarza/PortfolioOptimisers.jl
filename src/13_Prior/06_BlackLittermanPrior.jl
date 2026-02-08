@@ -179,6 +179,7 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
       + `::VecNum`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
 
   - `P`: The view matrix (views × assets).
+
   - `sigma`: The prior covariance matrix (assets × assets).
 
 # Returns

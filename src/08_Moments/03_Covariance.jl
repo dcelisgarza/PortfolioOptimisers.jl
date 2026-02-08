@@ -283,8 +283,11 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
 
   - `X`: Data matrix (observations × assets).
+
   - $(arg_dict[:dims])
+
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
 # Returns
@@ -324,8 +327,11 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
 
   - `X`: Data matrix (observations × assets).
+
   - $(arg_dict[:dims])
+
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
 # Returns

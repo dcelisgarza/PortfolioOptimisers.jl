@@ -87,8 +87,11 @@ This method computes the correlation matrix using the provided covariance estima
       + `de::Distance{<:Any, <:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
 
   - `ce`: Covariance estimator.
+
   - `X`: Data matrix (observations × features).
+
   - $(arg_dict[:dims])
+
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
 # Returns
@@ -263,7 +266,9 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
       + `de::Distance{<:Any, <:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
 
   - `rho`: Correlation or covariance matrix.
+
   - `args...`: Additional arguments (ignored).
+
   - `kwargs...`: Additional keyword arguments.
 
 # Returns

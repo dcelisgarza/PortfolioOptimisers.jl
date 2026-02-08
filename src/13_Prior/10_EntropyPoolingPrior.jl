@@ -691,9 +691,13 @@ Replace prior references in view parsing results with their corresponding prior 
   - `res`: Parsed view constraint containing variables and coefficients.
 
   - `pr`: Prior result object containing prior values.
+
   - `sets`: Asset set mapping asset names to indices.
+
   - `key`: Moment type key (`:mu`, `:var`, `:cvar`, etc.).
+
   - `alpha`: Optional confidence level for VaR/CVaR views.
+
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
@@ -1056,6 +1060,7 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
   - `w`: Prior weights (length = number of observations).
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+
   - `opt: Optim.jl-based entropy pooling optimiser with exponential objective.
 
       + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
@@ -1209,6 +1214,7 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
   - `w`: Prior weights (length = number of observations).
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+
   - `opt`: JuMP.jl-based entropy pooling optimiser with exponential objective.
 
       + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.

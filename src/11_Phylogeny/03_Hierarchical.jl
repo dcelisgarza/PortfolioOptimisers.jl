@@ -370,6 +370,7 @@ This function applies the specified optimal number of clusters estimator (`onc`)
       + `onc::OptimalNumberClusters{<:Any, <:SilhouetteScore}`: Computes the standardised silhouette score for each possible cluster count, and selects the first valid `k` that maximises the score.
 
   - `clustering`: Hierarchical clustering object.
+
   - `dist`: Distance matrix used for clustering.
 
 # Returns

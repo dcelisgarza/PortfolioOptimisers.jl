@@ -161,6 +161,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
       + $(arg_dict[:X])
       + $(arg_dict[:Xv])
+
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 ### Returns

@@ -509,12 +509,16 @@ Where:
   - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
 
   - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{W}``: `N × N` auxiliary symmetric matrices.
+
   - ``\\mathbf{\\Sigma}_l``: `N × N` lower bound of the covariance matrix.
+
   - ``\\mathbf{\\Sigma}_u``: `N × N` upper bound of the covariance matrix.
+
   - ``k``: Scalar variable/constant.
 
       + If the objective risk-adjusted return, it is a non-negative variable.
       + Else it is equal to 1.
+
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
 
 ## Ellipsoidal uncertainty set
@@ -536,16 +540,24 @@ Where:
   - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
 
   - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+
   - ``\\mathbf{W}``, ``\\mathbf{E}``: `N × N` auxiliary symmetric matrices.
+
   - ``k_{\\mathbf{\\Sigma}}``: Scalar constant defining the size of the uncertainty set.
+
   - ``\\sigma``: Variable representing the portfolio's variance of the variance.
+
   - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
+
   - ``k``: Scalar variable/constant.
 
       + If the objective risk-adjusted return, it is a non-negative variable.
       + Else it is equal to 1.
+
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
+
   - ``\\mathrm{vec}(\\cdot)``: Vectorisation operator, which unrolls a matrix as a column vector in column-major order.
+
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor

@@ -166,6 +166,7 @@ This function dispatches on the type of `se` to apply the appropriate similarity
       + `se::GeneralExponentialSimilarity`: Uses a generalised exponential transformation.
 
   - `D`: Distance matrix.
+
   - `kwargs...`: Additional keyword arguments (not used).
 
 # Returns

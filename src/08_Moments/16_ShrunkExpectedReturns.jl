@@ -300,7 +300,9 @@ Compute the shrinkage target vector for expected returns estimation.
       + `tgt::MeanSquaredError`: Returns a vector filled with the trace of `sigma` divided by `T`.
 
   - `mu`: 1D array of expected returns.
+
   - `sigma`: Covariance matrix of asset returns.
+
   - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
 
 # Returns
@@ -350,7 +352,9 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
       + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
 
   - `X`: Data matrix (observations × assets).
+
   - $(arg_dict[:dims])
+
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
 # Returns
@@ -362,11 +366,13 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - Computes the sample mean and covariance.
 
   - Computes the shrinkage target using `target_mean`.
+
   - Computes the shrinkage intensity `alpha` with:
 
       + `JamesStein`: The centered mean and eigenvalues of the covariance matrix.
       + `BayesStein`: A Bayesian formula involving the centered mean and inverse covariance.
       + `BodnarOkhrinParolya`: A Bayesian formula involving the target mean, mean and inverse covariance.
+
   - ReturnsResult the shrunk mean vector.
 
 # Related

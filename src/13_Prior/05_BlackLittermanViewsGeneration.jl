@@ -156,7 +156,9 @@ Unified interface for constructing or passing through Black-Litterman investor v
       + [`LinearConstraintEstimator`](@ref): calls the method described above using the `val` field of the estimator.
 
   - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+
   - `datatype`: Numeric type for coefficients and expected returns.
+
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
 
 # Returns
