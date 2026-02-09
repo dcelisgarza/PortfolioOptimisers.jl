@@ -127,7 +127,7 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
         date_range += period_offset
     end
 
-    idx = Int[]
+    idx = typeof(T)[]
     for date in date_range
         i = searchsortedlast(ts, date)
         if !previous && ts[i] != date
@@ -141,8 +141,8 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
 
     N = length(idx)
     i = 1
-    train_indices = Vector{UnitRange{Int}}(undef, 0)
-    test_indices = Vector{UnitRange{Int}}(undef, 0)
+    train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
     while true
         if i + train_size > N
             break
@@ -211,7 +211,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         date_range += period_offset
     end
 
-    idx = Int[]
+    idx = typeof(T)[]
     for date in date_range
         i = searchsortedlast(ts, date)
         if !previous && ts[i] != date
@@ -223,7 +223,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         push!(idx, i)
     end
 
-    train_idx = Int[]
+    train_idx = typeof(T)[]
     for date in date_range
         date = date - train_size
         i = searchsortedlast(ts, date)
@@ -235,8 +235,8 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
 
     N = length(idx)
     i = searchsortedlast(train_idx, 0) + 1
-    train_indices = Vector{UnitRange{Int}}(undef, 0)
-    test_indices = Vector{UnitRange{Int}}(undef, 0)
+    train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
     while true
         if i > N
             break
