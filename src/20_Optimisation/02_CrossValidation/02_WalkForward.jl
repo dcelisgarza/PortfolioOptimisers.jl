@@ -206,7 +206,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     if po_flag
         ti = min(ti, ti - period_offset)
     end
-    date_range = date_adjuster(adjuster, ti:period:tf)
+    date_range = adjuster(ti:period:tf)
     if po_flag
         date_range += period_offset
     end
@@ -266,7 +266,7 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     if po_flag
         ti = min(ti, ti - period_offset)
     end
-    date_range = date_adjuster(adjuster, ti:period:tf)
+    date_range = adjuster(ti:period:tf)
     if po_flag
         date_range += period_offset
     end
@@ -303,4 +303,4 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     return special_div(last_allowed_start - M, test_size) + 1
 end
 
-export IndexWalkForward, DateWalkForward, date_adjuster, n_splits
+export IndexWalkForward, DateWalkForward, n_splits
