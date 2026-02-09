@@ -60,10 +60,8 @@ function n_splits(iwf::IndexWalkForward, rd::ReturnsResult)
     return val
 end
 abstract type DateAdjusterEstimator <: AbstractEstimator end
-function date_adjuster(::Nothing, date)
-    return date
-end
 const IntPeriodDateRange = Union{<:Integer, <:Dates.Period}
+const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
 struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimator
     train_size::T1
     test_size::T2
@@ -78,8 +76,7 @@ struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimat
                              period::Option{<:Union{<:Dates.Period, <:Dates.CompoundPeriod}},
                              period_offset::Option{<:Union{<:Dates.Period,
                                                            <:Dates.CompoundPeriod}},
-                             purged_size::Integer,
-                             adjuster::Option{<:DateAdjusterEstimator}, previous::Bool,
+                             purged_size::Integer, adjuster::DateAdjType, previous::Bool,
                              expend_train::Bool, reduce_test::Bool)
         assert_nonempty_nonneg_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
@@ -108,7 +105,7 @@ function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                          period::Option{<:Union{<:Dates.Period, <:Dates.CompoundPeriod}} = nothing,
                          period_offset::Option{<:Union{<:Dates.Period,
                                                        <:Dates.CompoundPeriod}} = nothing,
-                         purged_size::Integer = 0, adjuster::Option{<:Function} = nothing,
+                         purged_size::Integer = 0, adjuster::DateAdjType = identity,
                          previous::Bool = false, expend_train::Bool = false,
                          reduce_test::Bool = false)
     return DateWalkForward(train_size, test_size, period, period_offset, purged_size,
@@ -125,7 +122,7 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     if po_flag
         ti = min(ti, ti - period_offset)
     end
-    date_range = date_adjuster(adjuster, ti:period:tf)
+    date_range = adjuster(ti:period:tf)
     if po_flag
         date_range += period_offset
     end
@@ -179,7 +176,7 @@ function n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     if po_flag
         ti = min(ti, ti - period_offset)
     end
-    date_range = date_adjuster(adjuster, ti:period:tf)
+    date_range = adjuster(ti:period:tf)
     if po_flag
         date_range += period_offset
     end

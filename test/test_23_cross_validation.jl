@@ -43,9 +43,19 @@
         @test test == UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
                                        817:927, 928:1008]
 
-        # cv = DateWalkForward(12, 3; period = Month(1))
-        # train, test = split(cv, rd)
-        # N = n_splits(cv, rd)
+        function ldm(x)
+            val = lastdayofmonth.(x)
+            if val[end] > x[end]
+                val = val[1:(end - 1)]
+            end
+            return val
+        end
+
+        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm)
+        train, test = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test all(x -> length(x) in (252, 253), train)
+        @test all(x -> length(x) in (61, 62, 63, 64), test)
 
         # cv = DateWalkForward(Day(18), 13; period = Month(1), previous = true)
         # train, test = split(cv, rd)
