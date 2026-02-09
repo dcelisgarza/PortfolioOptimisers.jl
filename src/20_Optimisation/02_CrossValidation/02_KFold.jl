@@ -29,7 +29,7 @@ function Base.split(kf::KFold, rd::ReturnsResult)
     return train_indices, test_indices
 end
 function n_splits(kf::KFold, rd::ReturnsResult)
-    return kf.n
+    return min(kf.n, size(rd.X, 1))
 end
 
 export KFold
