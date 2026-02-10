@@ -11,10 +11,24 @@
         train, test = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train) == length(test) == N == cv.n
-
         lengths = fill(div(T, cv.n), cv.n)
         lengths[1:(mod(T, cv.n))] .+= one(eltype(lengths))
         @test length.(train) == T .- lengths
+        @test length.(test) == lengths
+
+        purged_size = 7
+        embargo_size = 11
+        cv = KFold(; n = 5, purged_size = purged_size, embargo_size = embargo_size)
+        train, test = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train) == length(test) == N == cv.n
+        lengths = fill(div(T, cv.n), cv.n)
+        lengths[1:(mod(T, cv.n))] .+= one(eltype(lengths))
+        ladj = fill(purged_size + embargo_size, cv.n)
+        ladj[2:(end - 1)] .+= purged_size
+        ladj[end] -= embargo_size
+        lengths_train = lengths - ladj
+        @test length.(train) == (T .- lengths) - ladj
         @test length.(test) == lengths
     end
     @testset "Walk forward" begin
@@ -142,10 +156,8 @@
         train, test = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train) == length(test) == N
-        @test all(x -> length(x) in (16, 17), train)
-        @test all(x -> length(x) in (272, 273, 274), test)
-        @test train == UnitRange{Int64}[7:22, 279:294, 551:567]
-        @test test == UnitRange{Int64}[23:294, 295:567, 568:841]
+        @test train == UnitRange{Int64}[1:22, 1:293, 1:567, 1:840]
+        @test test == UnitRange{Int64}[23:276, 294:550, 568:823, 841:1008]
 
         cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
                              purged_size = 17, period_offset = Week(2))
