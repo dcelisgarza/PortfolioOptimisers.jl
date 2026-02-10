@@ -32,6 +32,14 @@ function HierarchicalEqualRiskContribution(;
                                            fb::Option{<:OptE_Opt} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
+function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
+    opt = factory(hec.opt, w)
+    ri = factory(hec.ri, w)
+    ro = factory(hec.ro, w)
+    fb = factory(hec.fb, w)
+    return HierarchicalEqualRiskContribution(; opt = opt, ri = ri, ro = ro, scai = hec.scai,
+                                             scao = hec.scao, ex = hec.ex, fb = fb)
+end
 function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
     X = isa(hec.opt.pr, AbstractPriorResult) ? hec.opt.pr.X : X
     ri = hec.ri

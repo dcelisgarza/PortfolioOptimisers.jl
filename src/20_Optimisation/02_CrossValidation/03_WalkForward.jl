@@ -1,4 +1,4 @@
-abstract type WalkForwardEstimator <: CrossValidationEstimator end
+abstract type WalkForwardEstimator <: SequentialCrossValidationEstimator end
 struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
     train_size::T1
     test_size::T2

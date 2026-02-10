@@ -12,7 +12,7 @@ struct NestedClusteredResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     w::T10
     fb::T11
 end
-function factory(res::NestedClusteredResult, fb)
+function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
     return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
                                  res.reso, res.cv, res.retcode, res.w, fb)
 end
@@ -146,6 +146,15 @@ function assert_external_optimiser(opt::NestedClustered)
         assert_external_optimiser(opt.opti)
     end
     return nothing
+end
+function factory(nco::NestedClustered, w::AbstractVector)
+    fees = factory(nco.fees, w)
+    opti = factory(nco.opti, w)
+    opto = factory(nco.opto, w)
+    fb = factory(nco.fb, w)
+    return NestedClustered(; pr = nco.pr, clr = nco.clr, wb = nco.wb, fees = fees,
+                           sets = nco.sets, opti = opti, opto = opto, cv = nco.cv,
+                           wf = nco.wf, strict = nco.strict, ex = nco.ex, fb = fb)
 end
 function opt_view(nco::NestedClustered, i, X::MatNum)
     X = isa(nco.pr, AbstractPriorResult) ? nco.pr.X : X

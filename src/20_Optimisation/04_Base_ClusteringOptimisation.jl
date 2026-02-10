@@ -11,7 +11,7 @@ struct HierarchicalResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
     w::T7
     fb::T8
 end
-function factory(res::HierarchicalResult, fb)
+function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
     return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
                               fb)
 end
@@ -46,6 +46,11 @@ function HierarchicalOptimiser(; pr::PrE_Pr = EmpiricalPrior(),
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
     return HierarchicalOptimiser(pr, clr, slv, wb, fees, sets, wf, strict)
+end
+function factory(opt::HierarchicalOptimiser, w::AbstractVector)
+    return HierarchicalOptimiser(; pr = opt.pr, clr = opt.clr, slv = opt.slv, wb = opt.wb,
+                                 fees = factory(opt.fees, w), sets = opt.sets, wf = opt.wf,
+                                 strict = opt.strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i)
     pr = prior_view(hco.pr, i)

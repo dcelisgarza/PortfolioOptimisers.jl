@@ -6,7 +6,7 @@ struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: NonFiniteAllocationOptimisation
     model::T5
     fb::T6
 end
-function factory(res::MeanRiskResult, fb)
+function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
     return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
 function Base.getproperty(r::MeanRiskResult, sym::Symbol)
@@ -42,6 +42,12 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
                   fb::Option{<:OptE_Opt} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
+end
+function factory(mr::MeanRisk, w::AbstractVector)
+    opt = factory(mr.opt, w)
+    r = factory(mr.r, w)
+    fb = factory(mr.fb, w)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
 function opt_view(mr::MeanRisk, i, X::MatNum)
     X = isa(mr.opt.pr, AbstractPriorResult) ? mr.opt.pr.X : X

@@ -12,7 +12,7 @@ struct StackingResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     w::T9
     fb::T10
 end
-function factory(res::StackingResult, fb)
+function factory(res::StackingResult, fb::Option{<:OptE_Opt})
     return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
                           res.retcode, res.w, fb)
 end
@@ -70,6 +70,15 @@ function assert_internal_optimiser(opt::Stacking)
         assert_internal_optimiser(opt.opti)
     end
     return nothing
+end
+function factory(st::Stacking, w::AbstractVector)
+    fees = factory(st.fees, w)
+    opti = factory(st.opti, w)
+    opto = factory(st.opto, w)
+    fb = factory(st.fb, w)
+    return Stacking(; pr = st.pr, wb = st.wb, fees = fees, sets = st.sets, opti = opti,
+                    opto = opto, cv = st.cv, wf = st.wf, strict = st.strict, ex = st.ex,
+                    fb = fb)
 end
 function opt_view(st::Stacking, i, X::MatNum)
     X = isa(st.pr, AbstractPriorResult) ? st.pr.X : X

@@ -80,6 +80,11 @@ function SchurComplementHierarchicalRiskParity(;
                                                fb::Option{<:OptE_Opt} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
+function factory(sh::SchurComplementHierarchicalRiskParity, w::AbstractVector)
+    opt = factory(sh.opt, w)
+    fb = factory(sh.fb, w)
+    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
+end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
     X = isa(sh.opt.pr, AbstractPriorResult) ? sh.opt.pr.X : X
     opt = opt_view(sh.opt, i)

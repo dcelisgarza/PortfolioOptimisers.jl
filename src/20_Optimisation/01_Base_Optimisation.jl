@@ -3,6 +3,9 @@ const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
+function factory(opt::NonFiniteAllocationOptimisationEstimator, ::Any)
+    return opt
+end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end

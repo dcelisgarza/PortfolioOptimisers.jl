@@ -12,7 +12,7 @@ struct DiscreteAllocationResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     l_model::T10
     fb::T11
 end
-function factory(res::DiscreteAllocationResult, fb)
+function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
     return DiscreteAllocationResult(res.oe, res.retcode, res.s_retcode, res.l_retcode,
                                     res.shares, res.cost, res.w, res.cash, res.s_model,
                                     res.l_model, fb)

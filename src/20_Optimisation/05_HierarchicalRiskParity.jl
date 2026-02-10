@@ -17,6 +17,12 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                 fb::Option{<:OptE_Opt} = nothing)
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
+function factory(hrp::HierarchicalRiskParity, w::AbstractVector)
+    opt = factory(hrp.opt, w)
+    r = factory(hrp.r, w)
+    fb = factory(hrp.fb, w)
+    return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
+end
 function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
     X = isa(hrp.opt.pr, AbstractPriorResult) ? hrp.opt.pr.X : X
     r = risk_measure_view(hrp.r, i, X)

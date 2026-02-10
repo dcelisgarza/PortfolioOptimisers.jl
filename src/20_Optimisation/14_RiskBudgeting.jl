@@ -8,7 +8,7 @@ struct RiskBudgetingResult{T1, T2, T3, T4, T5, T6, T7} <:
     model::T6
     fb::T7
 end
-function factory(res::RiskBudgetingResult, fb)
+function factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
     return RiskBudgetingResult(res.oe, res.pa, res.prb, res.retcode, res.sol, res.model, fb)
 end
 function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
@@ -86,6 +86,12 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Var
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:VecNum} = nothing, fb::Option{<:OptE_Opt} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
+end
+function factory(rb::RiskBudgeting, w::AbstractVector)
+    opt = factory(rb.opt, w)
+    r = factory(rb.r, w)
+    fb = factory(rb.fb, w)
+    return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::MatNum)
     X = isa(rb.opt.pr, AbstractPriorResult) ? rb.opt.pr.X : X

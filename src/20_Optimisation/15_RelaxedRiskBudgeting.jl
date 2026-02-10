@@ -38,6 +38,12 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               fb::Option{<:OptE_Opt} = nothing)
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
+function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)
+    opt = factory(rrb.opt, w)
+    fb = factory(rrb.fb, w)
+    return RelaxedRiskBudgeting(; opt = opt, rba = rrb.rba, wi = rrb.wi, alg = rrb.alg,
+                                fb = fb)
+end
 function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)
     X = isa(rrb.opt.pr, AbstractPriorResult) ? rrb.opt.pr.X : X
     opt = opt_view(rrb.opt, i, X)

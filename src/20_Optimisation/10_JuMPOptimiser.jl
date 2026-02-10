@@ -286,6 +286,23 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, pl, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, strict)
 end
+function factory(opt::JuMPOptimiser, w::AbstractVector)
+    tn = factory(opt.tn, w)
+    fees = factory(opt.fees, w)
+    tr = factory(opt.tr, w)
+    ccnt = factory(opt.ccnt, w)
+    cobj = factory(opt.cobj, w)
+    return JuMPOptimiser(; pr = opt.pr, slv = opt.slv, wb = opt.wb, bgt = opt.bgt,
+                         sbgt = opt.sbgt, lt = opt.lt, st = opt.st, lcs = opt.lcs,
+                         ct = opt.ct, gcard = opt.gcard, sgcard = opt.sgcard,
+                         smtx = opt.smtx, sgmtx = opt.sgmtx, slt = opt.slt, sst = opt.sst,
+                         sglt = opt.sglt, sgst = opt.sgst, tn = tn, fees = fees,
+                         sets = opt.sets, tr = tr, pl = opt.pl, ret = opt.ret,
+                         sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
+                         ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
+                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         strict = opt.strict)
+end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     X = isa(opt.pr, AbstractPriorResult) ? opt.pr.X : X
     pr = prior_view(opt.pr, i)

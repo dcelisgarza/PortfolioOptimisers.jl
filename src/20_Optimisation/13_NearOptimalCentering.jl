@@ -14,7 +14,7 @@ struct NearOptimalCenteringResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     model::T9
     fb::T10
 end
-function factory(res::NearOptimalCenteringResult, fb)
+function factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt})
     return NearOptimalCenteringResult(res.oe, res.pa, res.w_min_retcode, res.w_opt_retcode,
                                       res.w_max_retcode, res.noc_retcode, res.retcode,
                                       res.sol, res.model, fb)
@@ -110,6 +110,16 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               fb::Option{<:OptE_Opt} = nothing)
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
+end
+function factory(noc::NearOptimalCentering, w::AbstractVector)
+    opt = factory(noc.opt, w)
+    r = factory(noc.r, w)
+    fb = factory(noc.fb, w)
+    return NearOptimalCentering(; opt = opt, r = r, obj = noc.obj, bins = noc.bins,
+                                w_min = noc.w_min, w_min_ini = noc.w_min_ini,
+                                w_opt = noc.w_opt, w_opt_ini = noc.w_opt_ini,
+                                w_max = noc.w_max, w_max_ini = noc.w_max_ini,
+                                ucs_flag = noc.ucs_flag, alg = noc.alg, fb = fb)
 end
 function opt_view(noc::NearOptimalCentering, i, X::MatNum)
     X = isa(noc.opt.pr, AbstractPriorResult) ? noc.opt.pr.X : X

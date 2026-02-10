@@ -14,7 +14,7 @@ struct NaiveOptimisationResult{T1, T2, T3, T4, T5, T6} <:
     w::T3
     fb::T6
 end
-function factory(res::NaiveOptimisationResult, fb)
+function factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 struct InverseVolatility{T1, T2, T3, T4, T5, T6} <: NaiveOptimisationEstimator
@@ -39,6 +39,10 @@ function InverseVolatility(; pr::PrE_Pr = EmpiricalPrior(),
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
                            strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return InverseVolatility(pr, wb, sets, wf, strict, fb)
+end
+function factory(opt::InverseVolatility, w::AbstractVector)
+    return InverseVolatility(; pr = opt.pr, wb = opt.wb, sets = opt.sets, wf = opt.wf,
+                             strict = opt.strict, fb = factory(opt.fb, w))
 end
 function opt_view(opt::InverseVolatility, i, args...)
     pr = prior_view(opt.pr, i)
@@ -93,6 +97,10 @@ function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return EqualWeighted(wb, sets, wf, strict, fb)
 end
+function factory(opt::EqualWeighted, w::AbstractVector)
+    return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf, strict = opt.strict,
+                         fb = factory(opt.fb, w))
+end
 function opt_view(opt::EqualWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)
     sets = nothing_asset_sets_view(opt.sets, i)
@@ -138,6 +146,10 @@ function RandomWeighted(; rng::Random.AbstractRNG = Random.default_rng(),
                         wf::WeightFinaliser = IterativeWeightFinaliser(),
                         strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return RandomWeighted(rng, seed, wb, sets, wf, strict, fb)
+end
+function factory(opt::RandomWeighted, w::AbstractVector)
+    return RandomWeighted(; rng = opt.rng, seed = opt.seed, wb = opt.wb, sets = opt.sets,
+                          wf = opt.wf, strict = opt.strict, fb = factory(opt.fb, w))
 end
 function opt_view(opt::RandomWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)

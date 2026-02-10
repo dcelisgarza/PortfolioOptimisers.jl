@@ -1,5 +1,6 @@
 function cross_val_predict(est::OptimisationEstimator, rd::ReturnsResult,
-                           cv::CrossValidationEstimator = KFold(); cols = nothing)
+                           cv::CrossValidationEstimator = KFold(); cols = nothing,
+                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     if !isnothing(cols)
         rd = returns_result_view(rd, cols)
     end

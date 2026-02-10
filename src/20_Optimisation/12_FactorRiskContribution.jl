@@ -9,7 +9,7 @@ struct FactorRiskContributionResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
     model::T7
     fb::T8
 end
-function factory(res::FactorRiskContributionResult, fb)
+function factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt})
     return FactorRiskContributionResult(res.oe, res.pa, res.rr, res.frc_plg, res.retcode,
                                         res.sol, res.model, fb)
 end
@@ -62,6 +62,14 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 wi::Option{<:VecNum} = nothing, flag::Bool = true,
                                 fb::Option{<:OptE_Opt} = nothing)
     return FactorRiskContribution(opt, re, r, obj, pl, sets, wi, flag, fb)
+end
+function factory(frc::FactorRiskContribution, w::AbstractVector)
+    opt = factory(frc.opt, w)
+    r = factory(frc.r, w)
+    fb = factory(frc.fb, w)
+    return FactorRiskContribution(; opt = opt, re = frc.re, r = r, obj = frc.obj,
+                                  pl = frc.pl, sets = frc.sets, wi = frc.wi,
+                                  flag = frc.flag, fb = fb)
 end
 function opt_view(frc::FactorRiskContribution, i, X::MatNum)
     X = isa(frc.opt.pr, AbstractPriorResult) ? frc.opt.pr.X : X

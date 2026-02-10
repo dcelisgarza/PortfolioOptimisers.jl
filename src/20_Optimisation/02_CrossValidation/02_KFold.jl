@@ -1,4 +1,4 @@
-struct KFold{T1} <: CrossValidationEstimator
+struct KFold{T1} <: NonSequentialCrossValidationEstimator
     n::T1
     function KFold(n::Integer)
         assert_nonempty_gt0_finite_val(n, :n)

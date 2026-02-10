@@ -8,7 +8,7 @@ struct GreedyAllocationResult{T1, T2, T3, T4, T5, T6, T7} <:
     cash::T6
     fb::T7
 end
-function factory(res::GreedyAllocationResult, fb)
+function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
     return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
                                   res.cash, fb)
 end
