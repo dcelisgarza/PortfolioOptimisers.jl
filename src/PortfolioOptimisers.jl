@@ -3,6 +3,7 @@ module PortfolioOptimisers
 using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering
+using Combinatorics: Combinatorics
 using DataFrames: DataFrames
 using Dates: Dates
 using Distances: Distances
@@ -151,8 +152,9 @@ include("19_RiskMeasures/26_RiskMeasureTools.jl")
 include("20_Optimisation/01_Base_Optimisation.jl")
 include("20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl")
 include("20_Optimisation/02_CrossValidation/02_KFold.jl")
-include("20_Optimisation/02_CrossValidation/03_WalkForward.jl")
-include("20_Optimisation/02_CrossValidation/04_Validation.jl")
+include("20_Optimisation/02_CrossValidation/03_Combinatorial.jl")
+include("20_Optimisation/02_CrossValidation/04_WalkForward.jl")
+include("20_Optimisation/02_CrossValidation/05_Validation.jl")
 include("20_Optimisation/03_NaiveOptimisation.jl")
 include("20_Optimisation/04_Base_ClusteringOptimisation.jl")
 include("20_Optimisation/05_HierarchicalRiskParity.jl")

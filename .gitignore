@@ -16,3 +16,4 @@ node_modules
 /test/.CondaPkg/*
 /docs/node_modules/*
 /docs/package-lock.json
+.venv/
