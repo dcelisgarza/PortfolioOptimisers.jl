@@ -73,13 +73,21 @@ end
 function binary_train_test_sets(ccv::CombinatorialCrossValidation)
     n_folds = ccv.n_folds
     num_splits = n_splits(ccv)
-    type = promote_type(typeof(num_splits), typeof(n_folds))
     folds_train_test = falses(n_folds, num_splits)
     test_set_idx = test_set_index(ccv)
     for (i, idx) in enumerate(test_set_idx)
         folds_train_test[idx, i] .= true
     end
     return folds_train_test
+end
+function recombined_paths(ccv::CombinatorialCrossValidation)
+    bidx = binary_train_test_sets(ccv)
+    out = zeros(Int, size(bidx, 1), n_test_paths(ccv))
+    for i in axes(bidx, 1)
+        tmp = view(bidx, i, :)
+        out[i, :] .= findall(tmp)
+    end
+    return out
 end
 
 export CombinatorialCrossValidation, n_test_paths, average_train_size, test_set_index,
