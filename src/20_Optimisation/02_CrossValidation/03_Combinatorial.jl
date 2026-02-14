@@ -108,12 +108,13 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
             train_test_idx[j, k] = -one(num_splits)
         end
     end
-    fold_index = Dict(i => findall(fold_idx_num .== i) for i in 1:n_folds)
-    train_idx = Vector{Vector{typeof(T)}}(undef, 0)
-    test_idx_list = Vector{Vector{Vector{typeof(T)}}}(undef, 0)
+    fold_index = [findall(x -> x == i, fold_idx_num) for i in 1:n_folds]
+    train_idx = Vector{Vector{typeof(T)}}(undef, num_splits)
+    test_idx_list = Vector{Vector{Vector{typeof(T)}}}(undef, num_splits)
     for i in 1:num_splits
-        push!(train_idx, findall(x -> x == 0, view(train_test_idx, :, i)))
-        push!(test_idx_list, [fold_index[j[1]] for j in findall(x -> x == i, rcp)])
+        train_idx[i] = findall(x -> x == zero(x), view(train_test_idx, :, i))
+        test_idx_list[i] = sort!([fold_index[j[1]] for j in findall(x -> x == i, rcp)];
+                                 by = x -> x[1])
     end
     return train_idx, test_idx_list
 end
@@ -126,10 +127,10 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
                train_size_w * abs(average_train_size(T, x, y) - target_train_size) /
                target_train_size
     end
-    costs = Vector{promote_type(typeof(train_size_w), typeof(n_test_paths_w),
-                                typeof(maxval))}(undef, 0)
-    type = promote_type(typeof(T), typeof(target_train_size), typeof(target_n_test_paths))
-    res = Vector{Tuple{type, type}}(undef, 0)
+    min_cost = typemax(promote_type(typeof(train_size_w), typeof(n_test_paths_w),
+                                    typeof(maxval)))
+    n_folds_opt = 0
+    n_test_folds_opt = 0
     for n_folds in 3:(T + 1)
         i = nothing
         for n_test_folds in 2:n_folds
@@ -137,14 +138,17 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
                 continue
             end
             cost = _cost(n_folds, n_test_folds)
-            push!(costs, cost)
-            push!(res, (n_folds, n_test_folds))
+            if cost < min_cost
+                min_cost = cost
+                n_folds_opt = n_folds
+                n_test_folds_opt = n_test_folds
+            end
             if isnothing(i) && cost > maxval
                 i = n_test_folds
             end
         end
     end
-    return res[argmin(costs)]
+    return n_folds_opt, n_test_folds_opt
 end
 
 export CombinatorialCrossValidation, optimal_number_folds

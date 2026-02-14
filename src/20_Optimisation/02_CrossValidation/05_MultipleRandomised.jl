@@ -1,12 +1,12 @@
 struct MultipleRandomised{T1, T2, T3, T4, T5, T6, T7} <: SequentialCrossValidationEstimator
-    wf::T1
+    cv::T1
     subset_size::T2
     n_subsets::T3
-    window_size::T4
-    max_comb::T5
+    max_comb::T4
+    window_size::T5
     rng::T6
     seed::T7
-    function MultipleRandomised(wf::WalkForwardEstimator, subset_size::Integer,
+    function MultipleRandomised(cv::WalkForwardEstimator, subset_size::Integer,
                                 n_subsets::Integer, max_comb::Integer,
                                 window_size::Option{<:Integer}, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer})
@@ -16,18 +16,18 @@ struct MultipleRandomised{T1, T2, T3, T4, T5, T6, T7} <: SequentialCrossValidati
         if !isnothing(window_size)
             assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
         end
-        return new{typeof(wf), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
-                   typeof(window_size), typeof(rng), typeof(seed)}(wf, subset_size,
+        return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
+                   typeof(window_size), typeof(rng), typeof(seed)}(cv, subset_size,
                                                                    n_subsets, max_comb,
                                                                    window_size, rng, seed)
     end
 end
-function MultipleRandomised(wf::WalkForwardEstimator; subset_size::Integer = 1,
+function MultipleRandomised(cv::WalkForwardEstimator; subset_size::Integer = 1,
                             n_subsets::Integer = 2, max_comb::Integer = 1_000_000_000,
                             window_size::Option{<:Integer} = nothing,
                             rng::Random.AbstractRNG = Random.default_rng(),
                             seed::Option{<:Integer} = nothing)
-    return MultipleRandomised(wf, subset_size, n_subsets, max_comb, window_size, rng, seed)
+    return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
 end
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
@@ -86,9 +86,9 @@ function fallback_sample_assets(N::Integer, k::Integer, n_subsets::Integer,
         subsets[:, i] .= sort!(StatsBase.sample(rng, 1:N, k; replace = false))
     end
 end
-function split(mrcv::MultipleRandomised, rd::ReturnsResult)
+function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     T, N = size(rd.X)
-    (; wf, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv
+    (; cv, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv
     @argcheck(subset_size <= N, "subset_size must not be greater than the number of assets")
     if !isnothing(window_size)
         @argcheck(window_size <= T,
@@ -103,11 +103,11 @@ function split(mrcv::MultipleRandomised, rd::ReturnsResult)
         @warn("The number of combinations for `subset_size = $subset_size` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
         fallback_sample_assets(N, subset_size, n_subsets, rng, seed)
     end
-    path_ids = Vector{typeof(n_subsets)}(undef, n_subsets)
-    train_indices = Vector{Vector{UnitRange{typeof(T)}}}(undef, 0)
-    test_indices = Vector{Vector{UnitRange{typeof(T)}}}(undef, 0)
-    asset_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
-    for i in eachindex(path_ids)
+    path_ids = Vector{typeof(n_subsets)}(undef, 0)
+    train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    asset_indices = Vector{Vector{typeof(T)}}(undef, 0)
+    for i in 1:n_subsets
         if isnothing(window_size)
             start_obs = 1
             rdi = rd
@@ -116,15 +116,15 @@ function split(mrcv::MultipleRandomised, rd::ReturnsResult)
             idx = start_obs:(start_obs + window_size)
             rdi = returns_result_view(rd, idx, :)
         end
-        for (train_idx, test_idx) in split(wf, rdi)
-            path_ids[i] = i
-            push!(train_indices, train_idx)
-            push!(test_indices, test_idx)
-            push!(asset_indices, view(asset_idx, :, i))
-        end
+        train_idx, test_idx = split(cv, rdi)
+        n_splits = length(train_idx)
+        append!(path_ids, fill(i, n_splits))
+        append!(train_indices, train_idx)
+        append!(test_indices, test_idx)
+        append!(asset_indices, Iterators.repeated(view(asset_idx, :, i), n_splits))
     end
 
-    return train_indices, test_indices, asset_indices
+    return train_indices, test_indices, asset_indices, path_ids
 end
 
-export MultipleRandomised, combination_by_index
+export MultipleRandomised
