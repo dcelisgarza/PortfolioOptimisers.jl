@@ -1,4 +1,4 @@
-struct CombinatorialCrossValidation{T1, T2, T3, T4} <: CrossValidationEstimator
+struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidationEstimator
     n_folds::T1
     n_test_folds::T2
     purged_size::T3
@@ -20,16 +20,25 @@ function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Int
                                       purged_size::Integer = 0, embargo_size::Integer = 0)
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size)
 end
+function n_splits(n_folds::Integer, n_test_folds::Integer)
+    return binomial(n_folds, n_test_folds)
+end
 function n_splits(ccv::CombinatorialCrossValidation)
-    return binomial(ccv.n_folds, ccv.n_test_folds)
+    return n_splits(ccv.n_folds, ccv.n_test_folds)
+end
+function n_test_paths(n_folds::Integer, n_test_folds::Integer)
+    return div(n_splits(n_folds, n_test_folds) * n_test_folds, n_folds)
 end
 function n_test_paths(ccv::CombinatorialCrossValidation)
     return div(n_splits(ccv) * ccv.n_test_folds, ccv.n_folds)
 end
+function average_train_size(T::Integer, n_folds::Integer, n_test_folds::Integer)
+    return T / n_folds * (n_folds - n_test_folds)
+end
 function average_train_size(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     T = size(rd.X, 1)
     (; n_folds, n_test_folds) = ccv
-    return T / n_folds * (n_folds - n_test_folds)
+    return average_train_size(T, n_folds, n_test_folds)
 end
 function test_set_index(ccv::CombinatorialCrossValidation)
     return collect(Combinatorics.combinations(1:(ccv.n_folds), ccv.n_test_folds))
@@ -67,10 +76,9 @@ function get_path_ids(ccv::CombinatorialCrossValidation)
 end
 function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     T = size(rd.X, 1)
-    (; n_folds, n_test_folds, purged_size, embargo_size) = ccv
+    (; n_folds, purged_size, embargo_size) = ccv
     min_fold_size = div(T, n_folds)
-    pes = purged_size + embargo_size
-    @argcheck(pes < min_fold_size)
+    @argcheck(purged_size + embargo_size < min_fold_size)
     fold_idx_num = div.(0:(T - 1), min_fold_size)
     fold_idx_num[fold_idx_num .== n_folds] .= n_folds - 1
     fold_idx_num .+= 1
@@ -94,21 +102,49 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     after_idx = findall(x -> x == -1, dif)
     after_idx_1 = getindex.(getindex.(after_idx, 1))
     after_idx_2 = getindex.(getindex.(after_idx, 2))
-    for i in 1:pes
+    for i in 1:(purged_size + embargo_size)
         j = map(x -> min(T, x + i), after_idx_1)
         for (j, k) in zip(j, after_idx_2)
             train_test_idx[j, k] = -one(num_splits)
         end
     end
     fold_index = Dict(i => findall(fold_idx_num .== i) for i in 1:n_folds)
-    #! allocate train and test induces
+    train_idx = Vector{Vector{typeof(T)}}(undef, 0)
+    test_idx_list = Vector{Vector{Vector{typeof(T)}}}(undef, 0)
     for i in 1:num_splits
-        train_idx = findall(x -> x == 0, view(train_test_idx, :, i))
-        test_idx_list = [fold_index[j[1]] for j in findall(x -> x == i, rcp)]
-        return train_idx, test_idx_list
+        push!(train_idx, findall(x -> x == 0, view(train_test_idx, :, i)))
+        push!(test_idx_list, [fold_index[j[1]] for j in findall(x -> x == i, rcp)])
     end
-    return fold_index
+    return train_idx, test_idx_list
+end
+function optimal_number_folds(T::Integer, target_train_size::Integer,
+                              target_n_test_paths::Integer; train_size_w::Number = 1,
+                              n_test_paths_w::Number = 1, maxval::Number = 1e5)
+    function _cost(x::Integer, y::Integer)
+        return n_test_paths_w * abs(n_test_paths(x, y) - target_n_test_paths) /
+               target_n_test_paths +
+               train_size_w * abs(average_train_size(T, x, y) - target_train_size) /
+               target_train_size
+    end
+    costs = Vector{promote_type(typeof(train_size_w), typeof(n_test_paths_w),
+                                typeof(maxval))}(undef, 0)
+    type = promote_type(typeof(T), typeof(target_train_size), typeof(target_n_test_paths))
+    res = Vector{Tuple{type, type}}(undef, 0)
+    for n_folds in 3:(T + 1)
+        i = nothing
+        for n_test_folds in 2:n_folds
+            if !(isnothing(i) || n_folds - n_test_folds <= i)
+                continue
+            end
+            cost = _cost(n_folds, n_test_folds)
+            push!(costs, cost)
+            push!(res, (n_folds, n_test_folds))
+            if isnothing(i) && cost > maxval
+                i = n_test_folds
+            end
+        end
+    end
+    return res[argmin(costs)]
 end
 
-export CombinatorialCrossValidation, n_test_paths, average_train_size, test_set_index,
-       binary_train_test_sets, recombined_paths, get_path_ids
+export CombinatorialCrossValidation, optimal_number_folds
