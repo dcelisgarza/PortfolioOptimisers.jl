@@ -223,7 +223,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         push!(idx, i)
     end
 
-    train_idx = typeof(T)[]
+    train_idx = Vector{typeof(T)}(undef, 0)
     for date in date_range
         date = date - train_size
         i = searchsortedlast(ts, date)

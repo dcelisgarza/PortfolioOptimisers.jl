@@ -103,7 +103,28 @@ function split(mrcv::MultipleRandomised, rd::ReturnsResult)
         @warn("The number of combinations for `subset_size = $subset_size` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
         fallback_sample_assets(N, subset_size, n_subsets, rng, seed)
     end
-    return nothing
+    path_ids = Vector{typeof(n_subsets)}(undef, n_subsets)
+    train_indices = Vector{Vector{UnitRange{typeof(T)}}}(undef, 0)
+    test_indices = Vector{Vector{UnitRange{typeof(T)}}}(undef, 0)
+    asset_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    for i in eachindex(path_ids)
+        if isnothing(window_size)
+            start_obs = 1
+            rdi = rd
+        else
+            start_obs = rand(rng, 1:(T - window_size))
+            idx = start_obs:(start_obs + window_size)
+            rdi = returns_result_view(rd, idx, :)
+        end
+        for (train_idx, test_idx) in split(wf, rdi)
+            path_ids[i] = i
+            push!(train_indices, train_idx)
+            push!(test_indices, test_idx)
+            push!(asset_indices, view(asset_idx, :, i))
+        end
+    end
+
+    return train_indices, test_indices, asset_indices
 end
 
 export MultipleRandomised, combination_by_index
