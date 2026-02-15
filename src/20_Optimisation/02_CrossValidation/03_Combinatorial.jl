@@ -20,21 +20,27 @@ function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Int
                                       purged_size::Integer = 0, embargo_size::Integer = 0)
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size)
 end
-struct CombinatorialCrossValidationResult{T1, T2} <: NonSequentialCrossValidationResult
+struct CombinatorialCrossValidationResult{T1, T2, T3} <: NonSequentialCrossValidationResult
     train_idx::T1
     test_idx::T2
+    path_ids::T3
     function CombinatorialCrossValidationResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                                test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}})
+                                                test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}},
+                                                path_ids::AbstractMatrix{<:Integer})
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
-        @argcheck(length(train_idx) == length(test_idx))
-        return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
+        @argcheck(!isempty(path_ids))
+        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 1))
+        return new{typeof(train_idx), typeof(test_idx), typeof(path_ids)}(train_idx,
+                                                                          test_idx,
+                                                                          path_ids)
     end
 end
 function CombinatorialCrossValidationResult(;
                                             train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                            test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}})
-    return CombinatorialCrossValidationResult(train_idx, test_idx)
+                                            test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}},
+                                            path_ids::AbstractMatrix{<:Integer})
+    return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
@@ -92,7 +98,7 @@ function get_path_ids(ccv::CombinatorialCrossValidation)
 end
 function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     T = size(rd.X, 1)
-    (; n_folds, purged_size, embargo_size) = ccv
+    (; n_folds, n_test_folds, purged_size, embargo_size) = ccv
     min_fold_size = div(T, n_folds)
     @argcheck(purged_size + embargo_size < min_fold_size)
     fold_idx_num = div.(0:(T - 1), min_fold_size)
@@ -132,8 +138,15 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
         test_idx_list[i] = sort!([fold_index[j[1]] for j in findall(x -> x == i, rcp)];
                                  by = x -> x[1])
     end
+    path_ids = zeros(Int, num_splits, n_test_folds)
+    for i in axes(path_ids, 1)
+        inds = findall(x -> x == i, rcp)
+        for j in axes(path_ids, 2)
+            path_ids[i, end - j + 1] = inds[j][2]
+        end
+    end
     return CombinatorialCrossValidationResult(; train_idx = train_idx,
-                                              test_idx = test_idx_list)
+                                              test_idx = test_idx_list, path_ids = path_ids)
 end
 function optimal_number_folds(T::Integer, target_train_size::Integer,
                               target_n_test_paths::Integer; train_size_w::Number = 1,

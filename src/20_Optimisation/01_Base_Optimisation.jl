@@ -211,12 +211,17 @@ end
 """
 fees takes precedence over res.fees if both are provided
 """
-function calc_net_returns(res::NonFiniteAllocationOptimisationResult,
-                          pr::AbstractPriorResult, fees::Option{<:Fees} = nothing)
+function calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
+                          fees::Option{<:Fees} = nothing)
     if isnothing(fees) && hasproperty(res, :fees)
         fees = res.fees
     end
-    return calc_net_returns(res.w, pr.X, fees)
+    return calc_net_returns(res.w, X, fees)
+end
+function calc_net_returns(res::NonFiniteAllocationOptimisationResult,
+                          pr::Union{<:AbstractPriorResult, <:ReturnsResult},
+                          fees::Option{<:Fees} = nothing)
+    return calc_net_returns(res, pr.X, fees)
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,

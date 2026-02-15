@@ -38,7 +38,7 @@
         @test n_folds == 4
         @test n_test_folds == 3
         cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11)
-        (; train_idx, test_idx) = split(cv, rd)
+        (; train_idx, test_idx, path_ids) = split(cv, rd)
         @test length(train_idx) == length(test_idx) == n_splits(cv)
         @test train_idx ==
               [[791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805,
@@ -298,6 +298,7 @@
                  967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981,
                  982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996,
                  997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008]]]
+        @test path_ids == [1 1 1; 2 2 1; 3 2 2; 3 3 3]
     end
     @testset "Walk forward" begin
         cv = IndexWalkForward(127, 171; reduce_test = false)
@@ -513,6 +514,6 @@
                                       "reduced_tol_infeas_abs" => 1e-4,
                                       "reduced_tol_infeas_rel" => 1e-4))]
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-        cross_val_predict(mr, rd)
+        predictions = cross_val_predict(mr, rd)
     end
 end
