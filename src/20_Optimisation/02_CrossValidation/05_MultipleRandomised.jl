@@ -29,6 +29,33 @@ function MultipleRandomised(cv::WalkForwardEstimator; subset_size::Integer = 1,
                             seed::Option{<:Integer} = nothing)
     return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
 end
+struct MultipleRandomisedResult{T1, T2, T3, T4} <: SequentialCrossValidationResult
+    train_idx::T1
+    test_idx::T2
+    asset_idx::T3
+    path_ids::T4
+    function MultipleRandomisedResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                      test_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                      asset_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                      path_ids::AbstractVector{<:Integer})
+        @argcheck(!isempty(train_idx))
+        @argcheck(!isempty(test_idx))
+        @argcheck(!isempty(asset_idx))
+        @argcheck(!isempty(path_ids))
+        @argcheck(length(train_idx) ==
+                  length(test_idx) ==
+                  length(asset_idx) ==
+                  length(path_ids))
+        return new{typeof(train_idx), typeof(test_idx), typeof(asset_idx),
+                   typeof(path_ids)}(train_idx, test_idx, asset_idx, path_ids)
+    end
+end
+function MultipleRandomisedResult(; train_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                  test_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                  asset_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                  path_ids::AbstractVector{<:Integer})
+    return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
+end
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
     @argcheck(0 < idx <= n_comb)
@@ -104,7 +131,7 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
             rdi = returns_result_view(rd, idx, :)
         end
         start_obs -= 1
-        train_idx, test_idx = split(cv, rdi)
+        (; train_idx, test_idx) = split(cv, rdi)
         num_splits = length(train_idx)
         append!(path_ids, fill(i, num_splits))
         append!(train_indices, [t .+ start_obs for t in train_idx])
@@ -112,7 +139,8 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
         append!(asset_indices, Iterators.repeated(view(asset_idx, :, i), num_splits))
     end
 
-    return train_indices, test_indices, asset_indices, path_ids
+    return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
+                                    asset_idx = asset_indices, path_ids = path_ids)
 end
 
-export MultipleRandomised
+export MultipleRandomised, MultipleRandomisedResult

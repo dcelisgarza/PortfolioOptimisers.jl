@@ -1,4 +1,19 @@
 abstract type WalkForwardEstimator <: SequentialCrossValidationEstimator end
+struct WalkForwardResult{T1, T2} <: SequentialCrossValidationResult
+    train_idx::T1
+    test_idx::T2
+    function WalkForwardResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                               test_idx::AbstractVector{<:AbstractVector{<:Integer}})
+        @argcheck(!isempty(train_idx))
+        @argcheck(!isempty(test_idx))
+        @argcheck(length(train_idx) == length(test_idx))
+        return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
+    end
+end
+function WalkForwardResult(; train_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                           test_idx::AbstractVector{<:AbstractVector{<:Integer}})
+    return WalkForwardResult(train_idx, test_idx)
+end
 struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
     train_size::T1
     test_size::T2
@@ -47,7 +62,7 @@ function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
         test_start = test_end
     end
 
-    return train_indices, test_indices
+    return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 function n_splits(iwf::IndexWalkForward, rd::ReturnsResult)
     (; train_size, test_size, purged_size, reduce_test) = iwf
@@ -160,7 +175,7 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
         i += test_size
     end
 
-    return train_indices, test_indices
+    return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 function special_div(a::Integer, b::Integer)
     q, r = divrem(a, b)
@@ -254,7 +269,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         i += test_size
     end
 
-    return train_indices, test_indices
+    return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
@@ -303,4 +318,4 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     return special_div(last_allowed_start - M, test_size) + 1
 end
 
-export IndexWalkForward, DateWalkForward, n_splits
+export WalkForwardResult, IndexWalkForward, DateWalkForward, n_splits

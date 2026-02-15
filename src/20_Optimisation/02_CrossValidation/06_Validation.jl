@@ -7,9 +7,10 @@ function cross_val_predict(est::OptimisationEstimator, rd::ReturnsResult,
     if hasproperty(cv, :shuffled) && cv.shuffled
         throw(ArgumentError("Cross validation estimator must not be shuffled."))
     end
-    train, test = split(cv, rd)
-    @argcheck(all(map((x, y) -> (x > zero(x) && y > zero(y)), diff(train[1]),
-                      diff(test[1]))),
+    res = split(cv, rd)
+    train_idx = res.train_idx
+    test_idx = res.test_idx
+    @argcheck(all(map((x, y) -> (x > zero(x) && y > zero(y)), diff([1]), diff(test_idx[1]))),
               ArgumentError("Cross validation estimator must not be shuffled."))
 
     return nothing

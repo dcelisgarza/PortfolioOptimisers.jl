@@ -121,7 +121,8 @@ macro define_pretty_show(T, flag::Bool = true)
                     elseif isa(val, AbstractMatrix)
                         print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))",
                               '\n')
-                    elseif isa(val, AbstractVector) && length(val) > 6
+                    elseif isa(val, AbstractVector) && length(val) > 6 ||
+                           isa(val, AbstractVector{<:AbstractArray})
                         print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
                     elseif isa(val, DataType)
                         tval = typeof(val)

@@ -20,6 +20,22 @@ function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Int
                                       purged_size::Integer = 0, embargo_size::Integer = 0)
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size)
 end
+struct CombinatorialCrossValidationResult{T1, T2} <: NonSequentialCrossValidationResult
+    train_idx::T1
+    test_idx::T2
+    function CombinatorialCrossValidationResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                                test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}})
+        @argcheck(!isempty(train_idx))
+        @argcheck(!isempty(test_idx))
+        @argcheck(length(train_idx) == length(test_idx))
+        return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
+    end
+end
+function CombinatorialCrossValidationResult(;
+                                            train_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                                            test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}})
+    return CombinatorialCrossValidationResult(train_idx, test_idx)
+end
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
 end
@@ -116,7 +132,8 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
         test_idx_list[i] = sort!([fold_index[j[1]] for j in findall(x -> x == i, rcp)];
                                  by = x -> x[1])
     end
-    return train_idx, test_idx_list
+    return CombinatorialCrossValidationResult(; train_idx = train_idx,
+                                              test_idx = test_idx_list)
 end
 function optimal_number_folds(T::Integer, target_train_size::Integer,
                               target_n_test_paths::Integer; train_size_w::Number = 1,
@@ -151,4 +168,5 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
     return n_folds_opt, n_test_folds_opt
 end
 
-export CombinatorialCrossValidation, optimal_number_folds
+export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
+       optimal_number_folds

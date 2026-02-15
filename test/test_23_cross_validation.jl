@@ -9,166 +9,28 @@
         T = size(rd.X, 1)
         n = 5
         cv = KFold(; n = n)
-        train, test = split(cv, rd)
+        (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
-        @test length(train) == length(test) == N == cv.n
+        @test length(train_idx) == length(test_idx) == N == cv.n
         lengths = fill(div(T, cv.n), cv.n)
         lengths[1:(mod(T, cv.n))] .+= one(eltype(lengths))
-        @test length.(train) == T .- lengths
-        @test length.(test) == lengths
+        @test length.(train_idx) == T .- lengths
+        @test length.(test_idx) == lengths
 
         purged_size = 7
         embargo_size = 11
         cv = KFold(; n = 5, purged_size = purged_size, embargo_size = embargo_size)
-        train, test = split(cv, rd)
+        (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
-        @test length(train) == length(test) == N == cv.n
+        @test length(train_idx) == length(test_idx) == N == cv.n
         lengths = fill(div(T, cv.n), cv.n)
         lengths[1:(mod(T, cv.n))] .+= one(eltype(lengths))
         ladj = fill(purged_size + embargo_size, cv.n)
         ladj[2:(end - 1)] .+= purged_size
         ladj[end] -= embargo_size
         lengths_train = lengths - ladj
-        @test length.(train) == (T .- lengths) - ladj
-        @test length.(test) == lengths
-    end
-    @testset "Walk forward" begin
-        cv = IndexWalkForward(127, 171; reduce_test = false)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) == 127, train)
-        @test all(x -> length(x) == 171, test)
-        @test train == UnitRange{Int64}[1:127, 172:298, 343:469, 514:640, 685:811]
-        @test test == UnitRange{Int64}[128:298, 299:469, 470:640, 641:811, 812:982]
-
-        cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) == 137, train)
-        @test all(x -> length(x) == 111, test[1:(end - 1)])
-        @test train ==
-              UnitRange{Int64}[1:137, 112:248, 223:359, 334:470, 445:581, 556:692, 667:803,
-                               778:914]
-        @test test == UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
-                                       817:927, 928:1008]
-
-        cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13,
-                              expend_train = true)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        for (i, t) in enumerate(train)
-            @test length(t) == 137 + (i - 1) * 111
-        end
-        @test all(x -> length(x) == 111, test[1:(end - 1)])
-        @test train ==
-              UnitRange{Int64}[1:137, 1:248, 1:359, 1:470, 1:581, 1:692, 1:803, 1:914]
-        @test test == UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
-                                       817:927, 928:1008]
-
-        function ldm(x)
-            val = lastdayofmonth.(x)
-            if val[end] > x[end]
-                val = val[1:(end - 1)]
-            end
-            return val
-        end
-        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) in (252, 253), train)
-        @test all(x -> length(x) in (61, 62, 63, 64), test)
-        @test train ==
-              UnitRange{Int64}[2:253, 64:315, 127:378, 190:442, 254:506, 316:567, 379:630,
-                               443:694, 507:758, 568:820, 631:882]
-        @test test == UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
-                                       631:694, 695:758, 759:820, 821:882, 883:946]
-
-        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm,
-                             period_offset = Week(3))
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) in (251, 252, 253), train)
-        @test all(x -> length(x) in (62, 63, 65), test)
-        @test train ==
-              UnitRange{Int64}[16:266, 78:329, 141:392, 205:457, 267:519, 330:581, 393:644,
-                               458:709, 520:772, 582:834, 645:896]
-        @test test == UnitRange{Int64}[267:329, 330:392, 393:457, 458:519, 520:581, 582:644,
-                                       645:709, 710:772, 773:834, 835:896, 897:961]
-
-        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) in (252, 253), train)
-        @test all(x -> length(x) in (61, 62, 63, 64), test)
-        @test train ==
-              UnitRange{Int64}[2:253, 63:315, 126:378, 190:442, 254:506, 316:567, 379:630,
-                               443:694, 507:758, 568:820, 631:882]
-        @test test == UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
-                                       631:694, 695:758, 759:820, 821:882, 883:946]
-
-        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true,
-                             purged_size = 17, reduce_test = true)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) in (252 - 17, 253 - 17), train)
-        @test all(x -> length(x) in (61, 62, 63, 64), test)
-        @test train ==
-              UnitRange{Int64}[2:236, 63:298, 126:361, 190:425, 254:489, 316:550, 379:613,
-                               443:677, 507:741, 568:803, 631:865, 695:929]
-        @test test == UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
-                                       631:694, 695:758, 759:820, 821:882, 883:946, 947:1008]
-
-        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true,
-                             purged_size = 17, reduce_test = true, expend_train = true)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        l = 0
-        for (i, t) in enumerate(train)
-            l += i == 1 ? 0 : length(test[i - 1])
-            @test length(t) in (252 - 17 + l, 253 - 17 + l)
-        end
-        @test all(x -> length(x) in (61, 62, 63, 64), test)
-        @test train ==
-              UnitRange{Int64}[1:236, 1:298, 1:361, 1:425, 1:489, 1:550, 1:613, 1:677,
-                               1:741, 1:803, 1:865, 1:929]
-        @test test == UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
-                                       631:694, 695:758, 759:820, 821:882, 883:946, 947:1008]
-
-        cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) in (16, 17), train)
-        @test all(x -> length(x) in (272, 273, 274), test)
-        @test train == UnitRange{Int64}[7:22, 279:294, 551:567]
-        @test test == UnitRange{Int64}[23:294, 295:567, 568:841]
-
-        cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
-                             previous = true, purged_size = 17, reduce_test = true,
-                             expend_train = true)
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test train == UnitRange{Int64}[1:22, 1:293, 1:567, 1:840]
-        @test test == UnitRange{Int64}[23:276, 294:550, 568:823, 841:1008]
-
-        cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
-                             purged_size = 17, period_offset = Week(2))
-        train, test = split(cv, rd)
-        N = n_splits(cv, rd)
-        @test length(train) == length(test) == N
-        @test all(x -> length(x) in (16, 17), train)
-        @test all(x -> length(x) in (272 - 17, 274 - 16), test)
-        @test train == UnitRange{Int64}[16:32, 288:304, 561:576]
-        @test test == UnitRange{Int64}[33:287, 305:559, 577:834]
+        @test length.(train_idx) == (T .- lengths) - ladj
+        @test length.(test_idx) == lengths
     end
     @testset "Combinatorial" begin
         n_folds, n_test_folds = optimal_number_folds(1008, 247, 7; train_size_w = 19,
@@ -176,9 +38,9 @@
         @test n_folds == 4
         @test n_test_folds == 3
         cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11)
-        train, test = split(cv, rd)
-        @test length(train) == length(test) == n_splits(cv)
-        @test train ==
+        (; train_idx, test_idx) = split(cv, rd)
+        @test length(train_idx) == length(test_idx) == n_splits(cv)
+        @test train_idx ==
               [[791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805,
                 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 820,
                 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835,
@@ -234,7 +96,7 @@
                 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202,
                 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217,
                 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229]]
-        @test test ==
+        @test test_idx ==
               [[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
                  22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
                  41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
@@ -437,36 +299,182 @@
                  982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996,
                  997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008]]]
     end
+    @testset "Walk forward" begin
+        cv = IndexWalkForward(127, 171; reduce_test = false)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) == 127, train_idx)
+        @test all(x -> length(x) == 171, test_idx)
+        @test train_idx == UnitRange{Int64}[1:127, 172:298, 343:469, 514:640, 685:811]
+        @test test_idx == UnitRange{Int64}[128:298, 299:469, 470:640, 641:811, 812:982]
+
+        cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) == 137, train_idx)
+        @test all(x -> length(x) == 111, test_idx[1:(end - 1)])
+        @test train_idx ==
+              UnitRange{Int64}[1:137, 112:248, 223:359, 334:470, 445:581, 556:692, 667:803,
+                               778:914]
+        @test test_idx ==
+              UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
+                               817:927, 928:1008]
+
+        cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13,
+                              expend_train = true)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        for (i, t) in enumerate(train_idx)
+            @test length(t) == 137 + (i - 1) * 111
+        end
+        @test all(x -> length(x) == 111, test_idx[1:(end - 1)])
+        @test train_idx ==
+              UnitRange{Int64}[1:137, 1:248, 1:359, 1:470, 1:581, 1:692, 1:803, 1:914]
+        @test test_idx ==
+              UnitRange{Int64}[151:261, 262:372, 373:483, 484:594, 595:705, 706:816,
+                               817:927, 928:1008]
+
+        function ldm(x)
+            val = lastdayofmonth.(x)
+            if val[end] > x[end]
+                val = val[1:(end - 1)]
+            end
+            return val
+        end
+        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) in (252, 253), train_idx)
+        @test all(x -> length(x) in (61, 62, 63, 64), test_idx)
+        @test train_idx ==
+              UnitRange{Int64}[2:253, 64:315, 127:378, 190:442, 254:506, 316:567, 379:630,
+                               443:694, 507:758, 568:820, 631:882]
+        @test test_idx ==
+              UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
+                               631:694, 695:758, 759:820, 821:882, 883:946]
+
+        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm,
+                             period_offset = Week(3))
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) in (251, 252, 253), train_idx)
+        @test all(x -> length(x) in (62, 63, 65), test_idx)
+        @test train_idx ==
+              UnitRange{Int64}[16:266, 78:329, 141:392, 205:457, 267:519, 330:581, 393:644,
+                               458:709, 520:772, 582:834, 645:896]
+        @test test_idx ==
+              UnitRange{Int64}[267:329, 330:392, 393:457, 458:519, 520:581, 582:644,
+                               645:709, 710:772, 773:834, 835:896, 897:961]
+
+        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) in (252, 253), train_idx)
+        @test all(x -> length(x) in (61, 62, 63, 64), test_idx)
+        @test train_idx ==
+              UnitRange{Int64}[2:253, 63:315, 126:378, 190:442, 254:506, 316:567, 379:630,
+                               443:694, 507:758, 568:820, 631:882]
+        @test test_idx ==
+              UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
+                               631:694, 695:758, 759:820, 821:882, 883:946]
+
+        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true,
+                             purged_size = 17, reduce_test = true)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) in (252 - 17, 253 - 17), train_idx)
+        @test all(x -> length(x) in (61, 62, 63, 64), test_idx)
+        @test train_idx ==
+              UnitRange{Int64}[2:236, 63:298, 126:361, 190:425, 254:489, 316:550, 379:613,
+                               443:677, 507:741, 568:803, 631:865, 695:929]
+        @test test_idx ==
+              UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
+                               631:694, 695:758, 759:820, 821:882, 883:946, 947:1008]
+
+        cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true,
+                             purged_size = 17, reduce_test = true, expend_train = true)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        l = 0
+        for (i, t) in enumerate(train_idx)
+            l += i == 1 ? 0 : length(test_idx[i - 1])
+            @test length(t) in (252 - 17 + l, 253 - 17 + l)
+        end
+        @test all(x -> length(x) in (61, 62, 63, 64), test_idx)
+        @test train_idx ==
+              UnitRange{Int64}[1:236, 1:298, 1:361, 1:425, 1:489, 1:550, 1:613, 1:677,
+                               1:741, 1:803, 1:865, 1:929]
+        @test test_idx ==
+              UnitRange{Int64}[254:315, 316:378, 379:442, 443:506, 507:567, 568:630,
+                               631:694, 695:758, 759:820, 821:882, 883:946, 947:1008]
+
+        cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) in (16, 17), train_idx)
+        @test all(x -> length(x) in (272, 273, 274), test_idx)
+        @test train_idx == UnitRange{Int64}[7:22, 279:294, 551:567]
+        @test test_idx == UnitRange{Int64}[23:294, 295:567, 568:841]
+
+        cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
+                             previous = true, purged_size = 17, reduce_test = true,
+                             expend_train = true)
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test train_idx == UnitRange{Int64}[1:22, 1:293, 1:567, 1:840]
+        @test test_idx == UnitRange{Int64}[23:276, 294:550, 568:823, 841:1008]
+
+        cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
+                             purged_size = 17, period_offset = Week(2))
+        (; train_idx, test_idx) = split(cv, rd)
+        N = n_splits(cv, rd)
+        @test length(train_idx) == length(test_idx) == N
+        @test all(x -> length(x) in (16, 17), train_idx)
+        @test all(x -> length(x) in (272 - 17, 274 - 16), test_idx)
+        @test train_idx == UnitRange{Int64}[16:32, 288:304, 561:576]
+        @test test_idx == UnitRange{Int64}[33:287, 305:559, 577:834]
+    end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
-        train0, test0 = split(cv, rd)
+        res = split(cv, rd)
+        train0, test0 = res.train_idx, res.test_idx
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 69)
-        train, test, asset, path_ids = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
 
         N = n_splits(cv.cv, rd)
-        @test length(train) == length(train) == cv.n_subsets * N
+        @test length(train_idx) == length(train_idx) == cv.n_subsets * N
         for i in 1:(cv.n_subsets)
             idx = ((i - 1) * N + 1):(i * N)
-            @test train[idx] == train0
-            @test test[idx] == test0
+            @test train_idx[idx] == train0
+            @test test_idx[idx] == test0
             @test all(path_ids[idx] .== i)
-            @test all(length.(asset[idx]) .== cv.subset_size)
+            @test all(length.(asset_idx[idx]) .== cv.subset_size)
         end
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 42,
                                 n_subsets = 5, subset_size = 7, window_size = 321)
-        train, test, asset, path_ids = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
 
         N = n_splits(cv.cv, rd)
-        @test length(train) == length(train) == N
-        @test all(length.(train) .== cv.cv.train_size)
-        @test all(length.(test) .== cv.cv.test_size)
-        @test all(length.(asset) .== cv.subset_size)
-        @test unique(asset) == asset
-        @test unique.(asset) == asset
-        @test train == UnitRange{Int64}[177:303, 392:518, 520:646, 329:455, 168:294]
-        @test test == UnitRange{Int64}[304:474, 519:689, 647:817, 456:626, 295:465]
+        @test length(train_idx) == length(train_idx) == N
+        @test all(length.(train_idx) .== cv.cv.train_size)
+        @test all(length.(test_idx) .== cv.cv.test_size)
+        @test all(length.(asset_idx) .== cv.subset_size)
+        @test unique(asset_idx) == asset_idx
+        @test unique.(asset_idx) == asset_idx
+        @test train_idx == UnitRange{Int64}[177:303, 392:518, 520:646, 329:455, 168:294]
+        @test test_idx == UnitRange{Int64}[304:474, 519:689, 647:817, 456:626, 295:465]
         @test path_ids == collect(1:5)
     end
     @testset "Cross val predict" begin
