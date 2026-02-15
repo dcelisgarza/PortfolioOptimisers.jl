@@ -49,7 +49,8 @@ function combination_by_index(idx::Integer, N::Integer, k::Integer)
     end
     return combination
 end
-function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer,
+function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
+                              max_comb::Integer = 1_000_000_000,
                               rng::Random.AbstractRNG = Random.default_rng(),
                               seed::Option{<:Integer} = nothing)
     assert_nonempty_nonneg_finite_val(N, :N)
@@ -62,29 +63,19 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer,
     if !isnothing(seed)
         Random.seed!(rng, seed)
     end
-    ranks = StatsBase.sample(rng, 1:N, n_subsets; replace = false)
     subsets = Matrix{typeof(N)}(undef, k, n_subsets)
-    for (i, rank) in enumerate(ranks)
-        subsets[:, i] .= combination_by_index(rank, N, k)
+    if n_comb <= max_comb
+        ranks = StatsBase.sample(rng, 1:n_comb, n_subsets; replace = false)
+        @inbounds for (i, rank) in enumerate(ranks)
+            subsets[:, i] .= combination_by_index(rank, N, k)
+        end
+    else
+        @warn("The number of combinations for `subset_size = $k` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
+        for i in axes(subsets, 2)
+            subsets[:, i] .= sort!(StatsBase.sample(rng, 1:N, k; replace = false))
+        end
     end
     return subsets
-end
-function fallback_sample_assets(N::Integer, k::Integer, n_subsets::Integer,
-                                rng::Random.AbstractRNG, seed::Option{<:Integer})
-    assert_nonempty_nonneg_finite_val(N, :N)
-    assert_nonempty_nonneg_finite_val(k, :k)
-    @argcheck(k <= N)
-    assert_nonempty_finite_val(n_subsets, :n_subsets)
-    n_comb = binomial(N, k)
-    @argcheck(n_subsets <= n_comb,
-              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`.")
-    if !isnothing(seed)
-        Random.seed!(rng, seed)
-    end
-    subsets = Matrix{typeof(N)}(undef, k, n_subsets)
-    for i in axes(subsets, 2)
-        subsets[:, i] .= sort!(StatsBase.sample(rng, 1:N, k; replace = false))
-    end
 end
 function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     T, N = size(rd.X)
@@ -97,12 +88,8 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     n_comb = binomial(N, subset_size)
     @argcheck(n_subsets <= n_comb,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
-    asset_idx = if n_comb <= max_comb
-        sample_unique_assets(N, subset_size, n_subsets, rng, seed)
-    else
-        @warn("The number of combinations for `subset_size = $subset_size` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
-        fallback_sample_assets(N, subset_size, n_subsets, rng, seed)
-    end
+    asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
+                                     rng = rng, seed = seed)
     path_ids = Vector{typeof(n_subsets)}(undef, 0)
     train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
     test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
@@ -116,12 +103,13 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
             idx = start_obs:(start_obs + window_size)
             rdi = returns_result_view(rd, idx, :)
         end
+        start_obs -= 1
         train_idx, test_idx = split(cv, rdi)
-        n_splits = length(train_idx)
-        append!(path_ids, fill(i, n_splits))
-        append!(train_indices, train_idx)
-        append!(test_indices, test_idx)
-        append!(asset_indices, Iterators.repeated(view(asset_idx, :, i), n_splits))
+        num_splits = length(train_idx)
+        append!(path_ids, fill(i, num_splits))
+        append!(train_indices, [t .+ start_obs for t in train_idx])
+        append!(test_indices, [t .+ start_obs for t in test_idx])
+        append!(asset_indices, Iterators.repeated(view(asset_idx, :, i), num_splits))
     end
 
     return train_indices, test_indices, asset_indices, path_ids

@@ -1,5 +1,6 @@
 @safetestset "Cross Validation" begin
-    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, Clarabel, Dates
+    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, Clarabel, Dates,
+          StableRNGs
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252 * 4):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
@@ -436,13 +437,38 @@
                  982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996,
                  997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008]]]
     end
-    #=
-    cv = IndexWalkForward(127, 171)
-    train, test = split(cv, rd)
+    @testset "MultipleRandomised" begin
+        cv = IndexWalkForward(127, 171)
+        train0, test0 = split(cv, rd)
 
-    cv = MultipleRandomised(IndexWalkForward(127, 171))
-    train_indices, test_indices, asset_indices, path_ids = split(cv, rd)
-    =#
+        cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 69)
+        train, test, asset, path_ids = split(cv, rd)
+
+        N = n_splits(cv.cv, rd)
+        @test length(train) == length(train) == cv.n_subsets * N
+        for i in 1:(cv.n_subsets)
+            idx = ((i - 1) * N + 1):(i * N)
+            @test train[idx] == train0
+            @test test[idx] == test0
+            @test all(path_ids[idx] .== i)
+            @test all(length.(asset[idx]) .== cv.subset_size)
+        end
+
+        cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 42,
+                                n_subsets = 5, subset_size = 7, window_size = 321)
+        train, test, asset, path_ids = split(cv, rd)
+
+        N = n_splits(cv.cv, rd)
+        @test length(train) == length(train) == N
+        @test all(length.(train) .== cv.cv.train_size)
+        @test all(length.(test) .== cv.cv.test_size)
+        @test all(length.(asset) .== cv.subset_size)
+        @test unique(asset) == asset
+        @test unique.(asset) == asset
+        @test train == UnitRange{Int64}[177:303, 392:518, 520:646, 329:455, 168:294]
+        @test test == UnitRange{Int64}[304:474, 519:689, 647:817, 456:626, 295:465]
+        @test path_ids == collect(1:5)
+    end
     @testset "Cross val predict" begin
         slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                       check_sol = (; allow_local = true, allow_almost = true),
