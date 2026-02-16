@@ -513,47 +513,70 @@
                                       "reduced_tol_feas" => 1e-4,
                                       "reduced_tol_infeas_abs" => 1e-4,
                                       "reduced_tol_infeas_rel" => 1e-4))]
+        w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
+
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-        kfold_pred = cross_val_predict(mr, rd)
+        cv = KFold(; n = 10)
+        kfold_pred = cross_val_predict(mr, rd, cv)
 
         walkforward_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
-                                          tn = TurnoverEstimator(; val = "AAPL" => 0.005,
-                                                                 dval = Inf,
-                                                                 w = fill(inv(size(rd.X, 2)),
-                                                                          size(rd.X, 2))),
+                                          tn = TurnoverEstimator(; val = "AAPL" => 0.003,
+                                                                 dval = Inf, w = w0),
                                           slv = slv))
-        walkforward_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
-
-        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-        multiple_rand_pred = cross_val_predict(mr, rd,
-                                               MultipleRandomised(IndexWalkForward(127,
-                                                                                   171);
-                                                                  rng = StableRNG(666),
-                                                                  seed = 69))
+        walkforward_serial_1_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
-                                          tn = TurnoverEstimator(; val = "AAPL" => 0.005,
-                                                                 dval = 100000.0,
-                                                                 w = fill(inv(size(rd.X, 2)),
-                                                                          size(rd.X, 2))),
+                                          tn = TurnoverEstimator(; val = 0.003, w = w0),
                                           slv = slv))
-        multiple_rand_pred = cross_val_predict(mr, rd,
-                                               MultipleRandomised(IndexWalkForward(127,
-                                                                                   171);
-                                                                  rng = StableRNG(666),
-                                                                  seed = 69))
+        walkforward_serial_2_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
 
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         n_folds, n_test_folds = optimal_number_folds(1008, 247, 7; train_size_w = 19,
                                                      n_test_paths_w = 11)
-        res = split(CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11), rd)
-        combinatorial_pred = cross_val_predict(mr, rd,
-                                               CombinatorialCrossValidation(n_folds,
-                                                                            n_test_folds,
-                                                                            23, 11))
+        cv = CombinatorialCrossValidation(; n_folds = n_folds, n_test_folds = n_test_folds,
+                                          purged_size = 23, embargo_size = 11)
+        combinatorial_pred = cross_val_predict(mr, rd, cv)
+
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5, n_subsets = 3,
+                                rng = StableRNG(666), seed = 69)
+        multiple_rand_pred = cross_val_predict(mr, rd, cv)
+
+        mr = MeanRisk(;
+                      opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+                                          tn = TurnoverEstimator(; val = "JPM" => 0.003,
+                                                                 dval = 100000.0,
+                                                                 w = fill(1 / 100, 20)),
+                                          slv = slv))
+        cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5, n_subsets = 3,
+                                rng = StableRNG(666), seed = 69)
+        multiple_rand_serial_pred = cross_val_predict(mr, rd, cv)
+
+        # save_pred(multiple_rand_serial_pred, "multiple_rand_serial_pred")
+        # function save_pred(predictions, name)
+        #     df_w = DataFrame(; nx = String[], w = Float64[])
+        #     df_X = DataFrame(; X = Float64[], ts = Date[])
+        #     if isa(predictions, Vector{PredictionResult})
+        #         for pred in predictions
+        #             append!(df_w, (; nx = pred.nx, w = pred.res.w))
+        #             append!(df_X, (; X = pred.X, ts = pred.ts))
+        #         end
+        #     elseif isa(predictions, Vector{Vector{PredictionResult}})
+        #         for pred_vec in predictions
+        #             for pred in pred_vec
+        #                 append!(df_w, (; nx = pred.nx, w = pred.res.w))
+        #                 append!(df_X, (; X = pred.X, ts = pred.ts))
+        #             end
+        #         end
+        #     end
+        #     CSV.write(joinpath(@__DIR__, "assets", "$(name)_w.csv.gz"), df_w; compress = true)
+        #     CSV.write(joinpath(@__DIR__, "assets", "$(name)_X.csv.gz"), df_X; compress = true)
+        #     return nothing
+        # end
+
     end
 end
