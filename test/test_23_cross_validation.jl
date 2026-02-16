@@ -515,6 +515,7 @@
                                       "reduced_tol_infeas_rel" => 1e-4))]
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         kfold_pred = cross_val_predict(mr, rd)
+
         walkforward_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
 
         mr = MeanRisk(;
