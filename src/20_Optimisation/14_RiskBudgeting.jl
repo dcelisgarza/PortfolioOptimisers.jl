@@ -87,6 +87,11 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Var
                        wi::Option{<:VecNum} = nothing, fb::Option{<:OptE_Opt} = nothing)
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
+function needs_previous_weights(opt::RiskBudgeting)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(rb::RiskBudgeting, w::AbstractVector)
     opt = factory(rb.opt, w)
     r = factory(rb.r, w)

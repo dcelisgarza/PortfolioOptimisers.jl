@@ -309,7 +309,7 @@ Alias for an abstract vector of numeric types or JuMP scalar types.
 """
 const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
-    const VecInt = Union{<:AbstractVector{<:Integer}}
+    const VecInt = AbstractVector{<:Integer}
 
 Alias for an abstract vector of integer types.
 
@@ -319,7 +319,7 @@ Alias for an abstract vector of integer types.
   - [`MatNum`](@ref)
   - [`ArrNum`](@ref)
 """
-const VecInt = Union{<:AbstractVector{<:Integer}}
+const VecInt = AbstractVector{<:Integer}
 """
     const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 
@@ -479,6 +479,16 @@ Alias for an abstract vector of integer vectors.
   - [`VecInt`](@ref)
 """
 const VecVecInt = AbstractVector{<:VecInt}
+"""
+    const VecVecVecInt = AbstractVector{<:VecVecInt}
+
+Alias for an abstract vector of abstract vector of integer vectors.
+
+# Related
+
+  - [`VecVecInt`](@ref)
+"""
+const VecVecVecInt = AbstractVector{<:VecVecInt}
 """
     const VecMatNum = AbstractVector{<:MatNum}
 

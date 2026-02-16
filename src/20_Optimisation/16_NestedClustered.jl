@@ -147,6 +147,12 @@ function assert_external_optimiser(opt::NestedClustered)
     end
     return nothing
 end
+function needs_previous_weights(opt::NestedClustered)
+    return (needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.opti) ||
+            needs_previous_weights(opt.opto) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(nco::NestedClustered, w::AbstractVector)
     fees = factory(nco.fees, w)
     opti = factory(nco.opti, w)

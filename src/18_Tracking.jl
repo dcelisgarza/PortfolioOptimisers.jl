@@ -55,6 +55,9 @@ All concrete and/or abstract types representing tracking algorithms (such as wei
   - [`TrackingError`](@ref)
 """
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
+function needs_previous_weights(::AbstractTrackingAlgorithm)
+    return false
+end
 """
     abstract type TrackingFormulation <: AbstractAlgorithm end
 
@@ -426,6 +429,9 @@ struct WeightsTracking{T1, T2, T3} <: AbstractTrackingAlgorithm
 end
 function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
     return WeightsTracking(fees, w, fixed)
+end
+function needs_previous_weights(tr::WeightsTracking)
+    return !tr.fixed
 end
 """
     factory(tr::WeightsTracking, w::VecNum)
@@ -963,6 +969,15 @@ TrackingError
 """
 function factory(tr::TrackingError, w::VecNum)
     return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
+end
+function needs_previous_weights(tr::TrackingError)
+    return needs_previous_weights(tr.tr)
+end
+function factory(tr::VecTr, w::VecNum)
+    return [factory(t, w) for t in tr]
+end
+function needs_previous_weights(tr::VecTr)
+    return any(needs_previous_weights.(tr))
 end
 
 export L2Tracking, SquaredL2Tracking, L1Tracking, LpTracking, LInfTracking,

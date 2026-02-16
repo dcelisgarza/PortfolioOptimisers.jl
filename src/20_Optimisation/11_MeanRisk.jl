@@ -43,6 +43,11 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance
                   fb::Option{<:OptE_Opt} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
 end
+function needs_previous_weights(opt::MeanRisk)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(mr::MeanRisk, w::AbstractVector)
     opt = factory(mr.opt, w)
     r = factory(mr.r, w)

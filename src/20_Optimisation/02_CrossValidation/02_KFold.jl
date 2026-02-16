@@ -16,16 +16,14 @@ end
 struct KFoldResult{T1, T2} <: NonSequentialCrossValidationResult
     train_idx::T1
     test_idx::T2
-    function KFoldResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                         test_idx::AbstractVector{<:AbstractVector{<:Integer}})
+    function KFoldResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
         @argcheck(length(train_idx) == length(test_idx))
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
-function KFoldResult(; train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                     test_idx::AbstractVector{<:AbstractVector{<:Integer}})
+function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return KFoldResult(train_idx, test_idx)
 end
 function Base.split(kf::KFold, rd::ReturnsResult)

@@ -2,16 +2,14 @@ abstract type WalkForwardEstimator <: SequentialCrossValidationEstimator end
 struct WalkForwardResult{T1, T2} <: SequentialCrossValidationResult
     train_idx::T1
     test_idx::T2
-    function WalkForwardResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                               test_idx::AbstractVector{<:AbstractVector{<:Integer}})
+    function WalkForwardResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
         @argcheck(length(train_idx) == length(test_idx))
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
-function WalkForwardResult(; train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                           test_idx::AbstractVector{<:AbstractVector{<:Integer}})
+function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return WalkForwardResult(train_idx, test_idx)
 end
 struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
@@ -316,6 +314,31 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         return 0
     end
     return special_div(last_allowed_start - M, test_size) + 1
+end
+function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                         cv::WalkForwardResult; cols = :,
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    (; train_idx, test_idx) = cv
+    predictions = Vector{PredictionResult}(undef, length(train_idx))
+    if needs_previous_weights(opt)
+        @info("Running walk forward sequentially because the optimiser must use the previous optimisation's weights. This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\nTo enable parallel processing please either mark the weights as fixed or remove the component(s) which use(s) them.")
+        for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
+            if i > 1
+                opt = factory(opt, predictions[i - 1].res.w)
+            end
+            display(opt.opt.tn.w)
+            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
+                                             cols = cols)
+        end
+    else
+        let opt = opt
+            FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
+                predictions[i] = fit_and_predict(opt, rd; train_idx = train,
+                                                 test_idx = test, cols = cols)
+            end
+        end
+    end
+    return predictions
 end
 
 export WalkForwardResult, IndexWalkForward, DateWalkForward, n_splits

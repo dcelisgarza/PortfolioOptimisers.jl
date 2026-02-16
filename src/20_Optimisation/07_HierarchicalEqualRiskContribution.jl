@@ -32,6 +32,12 @@ function HierarchicalEqualRiskContribution(;
                                            fb::Option{<:OptE_Opt} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
+function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.ri) ||
+            needs_previous_weights(opt.ro) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
     opt = factory(hec.opt, w)
     ri = factory(hec.ri, w)

@@ -24,21 +24,19 @@ struct CombinatorialCrossValidationResult{T1, T2, T3} <: NonSequentialCrossValid
     train_idx::T1
     test_idx::T2
     path_ids::T3
-    function CombinatorialCrossValidationResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                                test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}},
+    function CombinatorialCrossValidationResult(train_idx::VecVecInt,
+                                                test_idx::VecVecVecInt,
                                                 path_ids::AbstractMatrix{<:Integer})
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
         @argcheck(!isempty(path_ids))
-        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 1))
+        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 2))
         return new{typeof(train_idx), typeof(test_idx), typeof(path_ids)}(train_idx,
                                                                           test_idx,
                                                                           path_ids)
     end
 end
-function CombinatorialCrossValidationResult(;
-                                            train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                            test_idx::AbstractVector{<:AbstractVector{<:AbstractVector{<:Integer}}},
+function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::VecVecVecInt,
                                             path_ids::AbstractMatrix{<:Integer})
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
@@ -87,11 +85,11 @@ end
 function get_path_ids(ccv::CombinatorialCrossValidation)
     rcp = recombined_paths(ccv)
     num_splits = n_splits(ccv)
-    ids = zeros(Int, num_splits, ccv.n_test_folds)
-    for i in axes(ids, 1)
-        inds = findall(x -> x == i, rcp)
-        for j in axes(ids, 2)
-            ids[i, end - j + 1] = inds[j][2]
+    ids = zeros(Int, ccv.n_test_folds, num_splits)
+    for j in axes(ids, 2)
+        inds = findall(x -> x == j, rcp)
+        for i in axes(ids, 1)
+            ids[end - i + 1, j] = inds[i][2]
         end
     end
     return ids
@@ -138,11 +136,11 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
         test_idx_list[i] = sort!([fold_index[j[1]] for j in findall(x -> x == i, rcp)];
                                  by = x -> x[1])
     end
-    path_ids = zeros(Int, num_splits, n_test_folds)
-    for i in axes(path_ids, 1)
-        inds = findall(x -> x == i, rcp)
-        for j in axes(path_ids, 2)
-            path_ids[i, end - j + 1] = inds[j][2]
+    path_ids = zeros(Int, n_test_folds, num_splits)
+    for j in axes(path_ids, 2)
+        inds = findall(x -> x == j, rcp)
+        for i in axes(path_ids, 1)
+            path_ids[end - i + 1, j] = inds[i][2]
         end
     end
     return CombinatorialCrossValidationResult(; train_idx = train_idx,
@@ -180,6 +178,16 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
     end
     return n_folds_opt, n_test_folds_opt
 end
+#=
+#! Need to implement this
+function sort_predictions(res::CrossValidationResult,
+                          predictions::AbstractVector{<:PredictionResult})
+    test_idx = res.test_idx
+    @argcheck(all(map(x -> allunique(x), test_idx)), "Test indices must be unique.")
+    idx = sortperm(test_idx; by = x -> x[1])
+    return predictions[idx]
+end
+=#
 
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
        optimal_number_folds

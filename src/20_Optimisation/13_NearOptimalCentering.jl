@@ -111,6 +111,11 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
+function needs_previous_weights(opt::NearOptimalCentering)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(noc::NearOptimalCentering, w::AbstractVector)
     opt = factory(noc.opt, w)
     r = factory(noc.r, w)

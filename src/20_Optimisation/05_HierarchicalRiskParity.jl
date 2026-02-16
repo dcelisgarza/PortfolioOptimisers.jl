@@ -17,6 +17,11 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                 fb::Option{<:OptE_Opt} = nothing)
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
+function needs_previous_weights(opt::HierarchicalRiskParity)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(hrp::HierarchicalRiskParity, w::AbstractVector)
     opt = factory(hrp.opt, w)
     r = factory(hrp.r, w)

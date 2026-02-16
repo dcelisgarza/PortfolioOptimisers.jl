@@ -18,6 +18,9 @@ function risk_measure_view(r::TurnoverRiskMeasure, i, args...)
     w = view(r.w, i)
     return TurnoverRiskMeasure(; settings = r.settings, w = w, fixed = r.fixed)
 end
+function needs_previous_weights(r::TurnoverRiskMeasure)
+    return !r.fixed
+end
 function factory(r::TurnoverRiskMeasure, w::VecNum)
     return if r.fixed
         r

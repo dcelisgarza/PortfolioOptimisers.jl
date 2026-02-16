@@ -38,6 +38,9 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               fb::Option{<:OptE_Opt} = nothing)
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
+function needs_previous_weights(opt::RelaxedRiskBudgeting)
+    return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
+end
 function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)
     opt = factory(rrb.opt, w)
     fb = factory(rrb.fb, w)

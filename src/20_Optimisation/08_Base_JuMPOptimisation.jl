@@ -12,6 +12,12 @@ end
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
+function needs_previous_weights(::CustomJuMPConstraint)
+    return false
+end
+function needs_previous_weights(::CustomJuMPObjective)
+    return false
+end
 function custom_constraint_view(::Nothing, args...; kwargs...)
     return nothing
 end

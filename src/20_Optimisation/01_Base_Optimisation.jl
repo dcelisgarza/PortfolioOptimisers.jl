@@ -3,9 +3,6 @@ const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
-function factory(opt::NonFiniteAllocationOptimisationEstimator, ::Any)
-    return opt
-end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
@@ -14,7 +11,19 @@ abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
+function factory(opt::OptE_Opt, ::Any)
+    return opt
+end
+function needs_previous_weights(::OptE_Opt)
+    return false
+end
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
+function factory(opt::VecOptE_Opt, args...)
+    return [factory(opti, args...) for opti in opt]
+end
+function needs_previous_weights(opt::VecOptE_Opt)
+    return any(needs_previous_weights.(opt))
+end
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
@@ -223,8 +232,35 @@ function calc_net_returns(res::NonFiniteAllocationOptimisationResult,
                           fees::Option{<:Fees} = nothing)
     return calc_net_returns(res, pr.X, fees)
 end
+struct PredictionResult{T1, T2, T3} <: AbstractResult
+    res::T1
+    X::T2
+    ts::T3
+    function PredictionResult(res::NonFiniteAllocationOptimisationResult, X::VecNum,
+                              ts::Option{<:VecDate})
+        @argcheck(!isempty(X), IsEmptyError)
+        if !isnothing(ts)
+            @argcheck(!isempty(ts), IsEmptyError)
+        end
+        return new{typeof(res), typeof(X), typeof(ts)}(res, X, ts)
+    end
+end
+function PredictionResult(; res::NonFiniteAllocationOptimisationResult, X::VecNum,
+                          ts::Option{<:VecDate} = nothing)
+    return PredictionResult(res, X, ts)
+end
+function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+    return PredictionResult(; res = res, X = calc_net_returns(res, rd.X), ts = rd.ts)
+end
+function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
+    res = optimise(opt, rd)
+    return predict(res, rd)
+end
+function needs_previous_weights(::Nothing)
+    return false
+end
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
-       JuMPWeightFinaliser
+       JuMPWeightFinaliser, PredictionResult, predict, fit_predict

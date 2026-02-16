@@ -1,4 +1,7 @@
 abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+function needs_previous_weights(opt::NaiveOptimisationEstimator)
+    return needs_previous_weights(opt.fb)
+end
 function assert_internal_optimiser(::NaiveOptimisationEstimator)
     return nothing
 end

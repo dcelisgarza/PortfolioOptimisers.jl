@@ -28,8 +28,12 @@ function factory(tr::RiskTrackingError, pr::AbstractPriorResult, args...; kwargs
     return RiskTrackingError(; tr = tr.tr, r = factory(tr.r, pr, args...; kwargs...),
                              err = tr.err, alg = tr.alg)
 end
+function needs_previous_weights(tr::RiskTrackingError)
+    return (needs_previous_weights(tr.tr) || needs_previous_weights(tr.r))
+end
 function factory(tr::RiskTrackingError, w::VecNum)
-    return RiskTrackingError(; tr = factory(tr.tr, w), r = tr.r, err = tr.err, alg = tr.alg)
+    return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
+                             alg = tr.alg)
 end
 struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
     settings::T1
@@ -55,6 +59,9 @@ function risk_measure_view(r::TrackingRiskMeasure, i, args...)
 end
 function factory(r::TrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     return TrackingRiskMeasure(; settings = r.settings, tr = r.tr, alg = r.alg)
+end
+function needs_previous_weights(r::TrackingRiskMeasure)
+    return needs_previous_weights(r.tr)
 end
 function factory(r::TrackingRiskMeasure, w::VecNum)
     return TrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), alg = r.alg)
@@ -104,9 +111,12 @@ function factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; k
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = r.tr,
                                    r = factory(r.r, pr, args...; kwargs...), alg = r.alg)
 end
+function needs_previous_weights(r::RiskTrackingRiskMeasure)
+    return (needs_previous_weights(r.tr) || needs_previous_weights(r.r))
+end
 function factory(r::RiskTrackingRiskMeasure, w::VecNum)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), r = r.r,
-                                   alg = r.alg)
+    return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
+                                   r = factory(r.r, w), alg = r.alg)
 end
 const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 

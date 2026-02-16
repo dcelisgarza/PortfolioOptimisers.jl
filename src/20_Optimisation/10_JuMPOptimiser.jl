@@ -286,6 +286,13 @@ function JuMPOptimiser(; pr::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, pl, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, strict)
 end
+function needs_previous_weights(opt::JuMPOptimiser)
+    return (needs_previous_weights(opt.tn) ||
+            needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.tr) ||
+            needs_previous_weights(opt.ccnt) ||
+            needs_previous_weights(opt.cobj))
+end
 function factory(opt::JuMPOptimiser, w::AbstractVector)
     tn = factory(opt.tn, w)
     fees = factory(opt.fees, w)

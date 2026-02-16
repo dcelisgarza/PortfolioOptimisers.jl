@@ -71,6 +71,12 @@ function assert_internal_optimiser(opt::Stacking)
     end
     return nothing
 end
+function needs_previous_weights(opt::Stacking)
+    return (needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.opti) ||
+            needs_previous_weights(opt.opto) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(st::Stacking, w::AbstractVector)
     fees = factory(st.fees, w)
     opti = factory(st.opti, w)

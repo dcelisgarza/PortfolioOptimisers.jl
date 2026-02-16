@@ -15,7 +15,13 @@ All concrete risk measures can be used as functors (callable structs) to compute
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
+function needs_previous_weights(::AbstractBaseRiskMeasure)
+    return false
+end
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
+function needs_previous_weights(r::VecBaseRM)
+    return any(needs_previous_weights.(r))
+end
 """
     abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 

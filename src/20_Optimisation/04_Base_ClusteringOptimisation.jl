@@ -47,6 +47,9 @@ function HierarchicalOptimiser(; pr::PrE_Pr = EmpiricalPrior(),
                                strict::Bool = false)
     return HierarchicalOptimiser(pr, clr, slv, wb, fees, sets, wf, strict)
 end
+function needs_previous_weights(opt::HierarchicalOptimiser)
+    return needs_previous_weights(opt.fees)
+end
 function factory(opt::HierarchicalOptimiser, w::AbstractVector)
     return HierarchicalOptimiser(; pr = opt.pr, clr = opt.clr, slv = opt.slv, wb = opt.wb,
                                  fees = factory(opt.fees, w), sets = opt.sets, wf = opt.wf,

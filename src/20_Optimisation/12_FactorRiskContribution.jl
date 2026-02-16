@@ -63,6 +63,11 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 fb::Option{<:OptE_Opt} = nothing)
     return FactorRiskContribution(opt, re, r, obj, pl, sets, wi, flag, fb)
 end
+function needs_previous_weights(opt::FactorRiskContribution)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
 function factory(frc::FactorRiskContribution, w::AbstractVector)
     opt = factory(frc.opt, w)
     r = factory(frc.r, w)

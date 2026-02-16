@@ -34,10 +34,8 @@ struct MultipleRandomisedResult{T1, T2, T3, T4} <: SequentialCrossValidationResu
     test_idx::T2
     asset_idx::T3
     path_ids::T4
-    function MultipleRandomisedResult(train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                      test_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                      asset_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                      path_ids::AbstractVector{<:Integer})
+    function MultipleRandomisedResult(train_idx::VecVecInt, test_idx::VecVecInt,
+                                      asset_idx::VecVecInt, path_ids::VecInt)
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
         @argcheck(!isempty(asset_idx))
@@ -50,10 +48,8 @@ struct MultipleRandomisedResult{T1, T2, T3, T4} <: SequentialCrossValidationResu
                    typeof(path_ids)}(train_idx, test_idx, asset_idx, path_ids)
     end
 end
-function MultipleRandomisedResult(; train_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                  test_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                  asset_idx::AbstractVector{<:AbstractVector{<:Integer}},
-                                  path_ids::AbstractVector{<:Integer})
+function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
+                                  asset_idx::VecVecInt, path_ids::VecInt)
     return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
 end
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
@@ -141,6 +137,70 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
 
     return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
                                     asset_idx = asset_indices, path_ids = path_ids)
+end
+function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
+                              rd::ReturnsResult, train_idx, test_idx; cols = :,
+                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    predictions = Vector{PredictionResult}(undef, length(train_idx))
+    if needs_previous_weights(opt)
+        @info("Running walk forward sequentially because the optimiser must use the previous optimisation's weights. This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\nTo enable parallel processing please either mark the weights as fixed or remove the component(s) which use(s) them.")
+        for (i, (train, test, col)) in enumerate(zip(train_idx, test_idx, cols))
+            opt = opt_view(opt, col)
+            if i > 1
+                opt = factory(opt, predictions[i - 1].res.w)
+            end
+            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
+                                             cols = col)
+        end
+    else
+        let opt = opt
+            FLoops.@floop ex for (i, (train, test, col)) in
+                                 enumerate(zip(train_idx, test_idx, cols))
+                opt = opt_view(opt, col)
+                predictions[i] = fit_and_predict(opt, rd; train_idx = train,
+                                                 test_idx = test, cols = col)
+            end
+        end
+    end
+    return predictions
+end
+function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                         cv::MultipleRandomisedResult; cols = :,
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    (; train_idx, test_idx, asset_idx, path_ids) = cv
+    unique_ids = unique(path_ids)
+    dict = Dict{eltype(path_ids),
+                Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}}(path_id => Vector{Tuple{eltype(train_idx),
+                                                                                                               eltype(test_idx),
+                                                                                                               eltype(asset_idx)}}(undef,
+                                                                                                                                   0)
+                                                                                       for path_id in
+                                                                                           unique_ids)
+    for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
+        if !haskey(dict, path_id)
+            dict[path_id] = [(train, test, asset)]
+        else
+            push!(dict[path_id], (train, test, asset))
+        end
+    end
+    predictions = Vector{Vector{PredictionResult}}(undef, length(unique_ids))
+    for (key, vals) in dict
+        train = map(x -> x[1], vals)
+        test = map(x -> x[2], vals)
+        asset = map(x -> x[3], vals)
+        predictions[key] = path_fit_and_predict(opt, rd, train, test; cols = asset)
+    end
+    return predictions
+end
+function sort_predictions(res::MultipleRandomisedResult,
+                          predictions::AbstractVector{AbstractVector{<:PredictionResult}})
+    test_idx = res.test_idx
+    for (test, pred) in zip(test_idx, predictions)
+        @argcheck(all(map(x -> allunique(x), test)), "Test indices must be unique.")
+        idx = sortperm(test; by = x -> x[1])
+        pred .= pred[idx]
+    end
+    return predictions
 end
 
 export MultipleRandomised, MultipleRandomisedResult
