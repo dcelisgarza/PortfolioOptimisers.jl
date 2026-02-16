@@ -5,6 +5,26 @@
                                      timestamp = :Date)[(end - 252 * 4):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                      timestamp = :Date)[(end - 252 * 4):end])
+    function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
+        for rtol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; rtol = rtol)
+                println("isapprox($name1, $name2, rtol = $(rtol))")
+                break
+            end
+        end
+        for atol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; atol = atol)
+                println("isapprox($name1, $name2, atol = $(atol))")
+                break
+            end
+        end
+    end
     @testset "KFold" begin
         T = size(rd.X, 1)
         n = 5
@@ -514,12 +534,46 @@
                                       "reduced_tol_infeas_abs" => 1e-4,
                                       "reduced_tol_infeas_rel" => 1e-4))]
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
+        function test_pred(predictions, name; rtol = 1e-6)
+            dft_w = CSV.read(joinpath(@__DIR__, "assets", "$(name)_w.csv.gz"), DataFrame)
+            dft_X = CSV.read(joinpath(@__DIR__, "assets", "$(name)_X.csv.gz"), DataFrame)
+            df_w = DataFrame(; nx = String[], w = Float64[])
+            df_X = DataFrame(; X = Float64[], ts = Date[])
+            if isa(predictions, Vector{PredictionResult})
+                for pred in predictions
+                    append!(df_w, (; nx = pred.nx, w = pred.res.w))
+                    append!(df_X, (; X = pred.X, ts = pred.ts))
+                end
+            elseif isa(predictions, Vector{Vector{PredictionResult}})
+                for pred_vec in predictions
+                    for pred in pred_vec
+                        append!(df_w, (; nx = pred.nx, w = pred.res.w))
+                        append!(df_X, (; X = pred.X, ts = pred.ts))
+                    end
+                end
+            end
+            res = isapprox(df_w[!, :w], dft_w[!, :w]; rtol = rtol)
+            if !res
+                find_tol(df_w[!, :w], dft_w[!, :w]; name1 = :df_w, name2 = :dft_w)
+            end
+            @test res
+            res = isapprox(df_X[!, :X], dft_X[!, :X]; rtol = rtol)
+            if !res
+                find_tol(df_X[!, :X], dft_X[!, :X]; name1 = :df_X, name2 = :dft_X)
+            end
+            @test res
+            @test df_X[!, :ts] == dft_X[!, :ts]
+            @test df_w[!, :nx] == dft_w[!, :nx]
+            return nothing
+        end
 
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cv = KFold(; n = 10)
         kfold_pred = cross_val_predict(mr, rd, cv)
+        test_pred(kfold_pred, "kfold_pred"; rtol = 1e-6)
 
         walkforward_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
+        test_pred(walkforward_pred, "walkforward_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
@@ -527,12 +581,14 @@
                                                                  dval = Inf, w = w0),
                                           slv = slv))
         walkforward_serial_1_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
+        test_pred(walkforward_serial_1_pred, "walkforward_serial_1_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
                                           tn = TurnoverEstimator(; val = 0.003, w = w0),
                                           slv = slv))
         walkforward_serial_2_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
+        test_pred(walkforward_serial_2_pred, "walkforward_serial_2_pred"; rtol = 1e-6)
 
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         n_folds, n_test_folds = optimal_number_folds(1008, 247, 7; train_size_w = 19,
@@ -540,11 +596,13 @@
         cv = CombinatorialCrossValidation(; n_folds = n_folds, n_test_folds = n_test_folds,
                                           purged_size = 23, embargo_size = 11)
         combinatorial_pred = cross_val_predict(mr, rd, cv)
+        test_pred(combinatorial_pred, "combinatorial_pred"; rtol = 1e-6)
 
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5, n_subsets = 3,
                                 rng = StableRNG(666), seed = 69)
         multiple_rand_pred = cross_val_predict(mr, rd, cv)
+        test_pred(multiple_rand_pred, "multiple_rand_pred"; rtol = 1e-6)
 
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; sets = AssetSets(; dict = Dict("nx" => rd.nx)),
@@ -555,28 +613,6 @@
         cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5, n_subsets = 3,
                                 rng = StableRNG(666), seed = 69)
         multiple_rand_serial_pred = cross_val_predict(mr, rd, cv)
-
-        # save_pred(multiple_rand_serial_pred, "multiple_rand_serial_pred")
-        # function save_pred(predictions, name)
-        #     df_w = DataFrame(; nx = String[], w = Float64[])
-        #     df_X = DataFrame(; X = Float64[], ts = Date[])
-        #     if isa(predictions, Vector{PredictionResult})
-        #         for pred in predictions
-        #             append!(df_w, (; nx = pred.nx, w = pred.res.w))
-        #             append!(df_X, (; X = pred.X, ts = pred.ts))
-        #         end
-        #     elseif isa(predictions, Vector{Vector{PredictionResult}})
-        #         for pred_vec in predictions
-        #             for pred in pred_vec
-        #                 append!(df_w, (; nx = pred.nx, w = pred.res.w))
-        #                 append!(df_X, (; X = pred.X, ts = pred.ts))
-        #             end
-        #         end
-        #     end
-        #     CSV.write(joinpath(@__DIR__, "assets", "$(name)_w.csv.gz"), df_w; compress = true)
-        #     CSV.write(joinpath(@__DIR__, "assets", "$(name)_X.csv.gz"), df_X; compress = true)
-        #     return nothing
-        # end
-
+        test_pred(multiple_rand_serial_pred, "multiple_rand_serial_pred"; rtol = 1e-6)
     end
 end
