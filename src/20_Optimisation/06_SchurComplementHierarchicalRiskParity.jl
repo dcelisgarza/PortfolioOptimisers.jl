@@ -81,8 +81,7 @@ function SchurComplementHierarchicalRiskParity(;
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
-    return (needs_previous_weights(opt.opt) ||
-            needs_previous_weights(opt.fb))
+    return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
 end
 function factory(sh::SchurComplementHierarchicalRiskParity, w::AbstractVector)
     opt = factory(sh.opt, w)

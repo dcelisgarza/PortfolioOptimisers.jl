@@ -139,34 +139,33 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
                                     asset_idx = asset_indices, path_ids = path_ids)
 end
 function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
-                              rd::ReturnsResult, train_idx, test_idx; cols = :,
+                              rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     if needs_previous_weights(opt)
         @info("Running walk forward sequentially because the optimiser must use the previous optimisation's weights. This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\nTo enable parallel processing please either mark the weights as fixed or remove the component(s) which use(s) them.")
         for (i, (train, test, col)) in enumerate(zip(train_idx, test_idx, cols))
-            opt = opt_view(opt, col)
+            rdi = returns_result_view(rd, col)
+            opti = opt_view(opt, col, rdi.X)
             if i > 1
-                opt = factory(opt, predictions[i - 1].res.w)
+                opti = factory(opti, predictions[i - 1].res.w)
             end
-            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                             cols = col)
+            predictions[i] = fit_and_predict(opti, rdi; train_idx = train, test_idx = test)
         end
     else
         let opt = opt
             FLoops.@floop ex for (i, (train, test, col)) in
                                  enumerate(zip(train_idx, test_idx, cols))
-                opt = opt_view(opt, col)
                 predictions[i] = fit_and_predict(opt, rd; train_idx = train,
                                                  test_idx = test, cols = col)
             end
         end
     end
-    return predictions
+    return sort_predictions!(test_idx, predictions)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::MultipleRandomisedResult; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                         cv::MultipleRandomisedResult;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     (; train_idx, test_idx, asset_idx, path_ids) = cv
     unique_ids = unique(path_ids)
     dict = Dict{eltype(path_ids),
@@ -184,21 +183,11 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
         end
     end
     predictions = Vector{Vector{PredictionResult}}(undef, length(unique_ids))
-    for (key, vals) in dict
+    FLoops.@floop ex for (key, vals) in dict
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
-        predictions[key] = path_fit_and_predict(opt, rd, train, test; cols = asset)
-    end
-    return predictions
-end
-function sort_predictions(res::MultipleRandomisedResult,
-                          predictions::AbstractVector{AbstractVector{<:PredictionResult}})
-    test_idx = res.test_idx
-    for (test, pred) in zip(test_idx, predictions)
-        @argcheck(all(map(x -> allunique(x), test)), "Test indices must be unique.")
-        idx = sortperm(test; by = x -> x[1])
-        pred .= pred[idx]
+        predictions[key] = path_fit_and_predict(opt, rd, train, test, asset)
     end
     return predictions
 end

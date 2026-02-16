@@ -326,7 +326,6 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
             if i > 1
                 opt = factory(opt, predictions[i - 1].res.w)
             end
-            display(opt.opt.tn.w)
             predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                              cols = cols)
         end

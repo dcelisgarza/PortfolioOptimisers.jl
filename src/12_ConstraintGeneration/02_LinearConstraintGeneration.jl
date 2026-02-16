@@ -327,7 +327,7 @@ function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
                        dict::EstValType, arr::VecNum, strict::Bool)
     assets = get(sdict, key, nothing)
     if isnothing(assets)
-        msg = "$(key) is not in $(keys(sdict)).\n$(dict)"
+        msg = "$(key) is not in $(keys(sdict)) or in sets.dict[nx] = $nx.\n$(dict)"
         strict ? throw(ArgumentError(msg)) : @warn(msg)
     else
         unique!(assets)
@@ -889,7 +889,7 @@ ParsingResult
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
 ```    # 1. Identify the comparison operator
-
+    # 1. Identify the comparison operator
 # Related
 
   - [`ParsingResult`](@ref)

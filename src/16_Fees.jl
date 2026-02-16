@@ -698,11 +698,13 @@ Compute the actual proportional fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `fees`: Scalar fee value.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -747,6 +749,7 @@ Compute the actual turnover fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
@@ -843,6 +846,7 @@ Compute the proportional fees for portfolio weights and prices.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -938,7 +942,9 @@ Compute the fixed portfolio fees for assets that have been allocated.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -1028,11 +1034,13 @@ Compute the actual proportional per asset fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `fees`: Scalar fee value.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -1083,6 +1091,7 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
@@ -1180,6 +1189,7 @@ Compute the proportional per asset fees for portfolio weights and prices.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -1282,7 +1292,9 @@ Compute the per asset fixed portfolio fees for assets that have been allocated.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns

@@ -9,7 +9,8 @@ abstract type NonSequentialCrossValidationResult <: CrossValidationResult end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idx::VecInt, cols = :)
     rdi = returns_result_view(rd, test_idx, cols)
-    return PredictionResult(; res = res, X = calc_net_returns(res, rdi.X), ts = rdi.ts)
+    return PredictionResult(; res = res, nx = rdi.nx, X = calc_net_returns(res, rdi.X),
+                            ts = rdi.ts)
 end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  train_idxs::VecVecInt, cols = :)
@@ -18,8 +19,21 @@ end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx, test_idx, cols = :)
     rd_train = returns_result_view(rd, train_idx, cols)
+    if !isa(cols, Colon)
+        opt = opt_view(opt, cols, rd.X)
+    end
     res = optimise(opt, rd_train)
     return predict(res, rd, test_idx, cols)
+end
+function sort_predictions!(test_idx::VecVecInt,
+                           predictions::AbstractVector{<:PredictionResult})
+    @argcheck(all(map(x -> allunique(x), test_idx)), "Test indices must be unique.")
+    idx = sortperm(test_idx; by = x -> x[1])
+    return predictions[idx]
+end
+function sort_predictions!(res::CrossValidationResult,
+                           predictions::AbstractVector{<:PredictionResult})
+    return sort_predictions!(res.test_idx, predictions)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                          cv::NonSequentialCrossValidationResult; cols = :,
@@ -30,12 +44,5 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end
-    return predictions
-end
-function sort_predictions(res::CrossValidationResult,
-                          predictions::AbstractVector{<:PredictionResult})
-    test_idx = res.test_idx
-    @argcheck(all(map(x -> allunique(x), test_idx)), "Test indices must be unique.")
-    idx = sortperm(test_idx; by = x -> x[1])
-    return predictions[idx]
+    return sort_predictions!(test_idx, predictions)
 end

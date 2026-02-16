@@ -11,8 +11,7 @@ function cross_val_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Re
     res = split(cv, rd)
     @argcheck(all(map(x -> x > zero(x), map(x -> diff(x), res.train_idx))),
               "Cross validation estimator must not be shuffled.")
-    predictions = fit_and_predict(opt, rd, res; cols = cols, ex = ex)
-    return sort_predictions(res, predictions)
+    return fit_and_predict(opt, rd, res; ex = ex)
 end
 
 export cross_val_predict

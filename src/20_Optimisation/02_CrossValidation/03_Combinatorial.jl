@@ -178,16 +178,28 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
     end
     return n_folds_opt, n_test_folds_opt
 end
-#=
-#! Need to implement this
-function sort_predictions(res::CrossValidationResult,
-                          predictions::AbstractVector{<:PredictionResult})
-    test_idx = res.test_idx
-    @argcheck(all(map(x -> allunique(x), test_idx)), "Test indices must be unique.")
-    idx = sortperm(test_idx; by = x -> x[1])
-    return predictions[idx]
+function sort_predictions!(res::CombinatorialCrossValidationResult,
+                           predictions::AbstractVector{<:AbstractVector{<:PredictionResult}})
+    path_ids = res.path_ids
+    sorted_preds = [PredictionResult[] for _ in 1:maximum(path_ids)]
+    for (j, prediction) in enumerate(predictions)
+        for (i, pred) in enumerate(prediction)
+            push!(sorted_preds[path_ids[i, j]], pred)
+        end
+    end
+    return sorted_preds
 end
-=#
+function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                         cv::CombinatorialCrossValidationResult; cols = :,
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    (; train_idx, test_idx) = cv
+    predictions = Vector{Vector{PredictionResult}}(undef, length(train_idx))
+    FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
+        predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
+                                         cols = cols)
+    end
+    return sort_predictions!(cv, predictions)
+end
 
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
        optimal_number_folds

@@ -301,6 +301,7 @@ Where:
 
       + When used as a constraint, this value is used to constrain the maximum allowed turnover per asset.
       + When used in [`Fees`](@ref), this value represents the turnover fee per asset.
+
   - `fixed`: Boolean indicating whether the turnover constraint is fixed (does not update with new weights) or variable (updates with new weights).
 
 # Constructor
