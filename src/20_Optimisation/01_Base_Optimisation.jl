@@ -232,36 +232,6 @@ function calc_net_returns(res::NonFiniteAllocationOptimisationResult,
                           fees::Option{<:Fees} = nothing)
     return calc_net_returns(res, pr.X, fees)
 end
-struct PredictionResult{T1, T2, T3, T4} <: AbstractResult
-    res::T1
-    nx::T2
-    X::T3
-    ts::T4
-    function PredictionResult(res::NonFiniteAllocationOptimisationResult,
-                              nx::Option{<:VecStr}, X::VecNum, ts::Option{<:VecDate})
-        @argcheck(!isempty(X), IsEmptyError)
-        if !isnothing(nx)
-            @argcheck(!isempty(nx), IsEmptyError)
-        end
-        if !isnothing(ts)
-            @argcheck(!isempty(ts), IsEmptyError)
-        end
-        return new{typeof(res), typeof(nx), typeof(X), typeof(ts)}(res, nx, X, ts)
-    end
-end
-function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
-                          nx::Option{<:VecStr} = nothing, X::VecNum,
-                          ts::Option{<:VecDate} = nothing)
-    return PredictionResult(res, nx, X, ts)
-end
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
-    return PredictionResult(; res = res, nx = rd.nx, X = calc_net_returns(res, rd.X),
-                            ts = rd.ts)
-end
-function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
-    res = optimise(opt, rd)
-    return predict(res, rd)
-end
 function needs_previous_weights(::Nothing)
     return false
 end
@@ -269,4 +239,4 @@ end
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
-       JuMPWeightFinaliser, PredictionResult, predict, fit_predict
+       JuMPWeightFinaliser
