@@ -280,6 +280,11 @@
                     @test rk1 / rk < 1.07
                 end
             end
+            if isa(r, Union{<:TurnoverRiskMeasure, <:TrackingRiskMeasure})
+                @test PortfolioOptimisers.needs_previous_weights(mr)
+            else
+                @test !PortfolioOptimisers.needs_previous_weights(mr)
+            end
             i += 1
         end
 
@@ -291,6 +296,7 @@
             r1 = RiskTrackingRiskMeasure(; tr = tr, r = r,
                                          alg = DependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
+            @test PortfolioOptimisers.needs_previous_weights(mr)
             res = optimise(mr, rd)
             if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
                 @test isa(res.retcode, OptimisationFailure)
@@ -1459,7 +1465,9 @@
     @testset "Turnover" begin
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), tn = Turnover(; w = w0))
+        @test PortfolioOptimisers.needs_previous_weights(opt)
         mr = MeanRisk(; opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mr)
         @test isapprox(w0, optimise(mr).w)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
@@ -1467,7 +1475,9 @@
                             tn = [TurnoverEstimator(; w = w0,
                                                     val = ["AAPL" => 0, "MRK" => 0.05],
                                                     dval = Inf)])
+        @test PortfolioOptimisers.needs_previous_weights(opt)
         mr = MeanRisk(; opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mr)
         res = optimise(mr)
         @test isapprox(res.w,
                        [0.049999999999993605, -0.04520519208370696, -0.04869401288598486,
@@ -1495,7 +1505,9 @@
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = TrackingError(; tr = ReturnsTracking(; w = wr),
                                                err = 3e-3))
+        @test !PortfolioOptimisers.needs_previous_weights(opt)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        @test !PortfolioOptimisers.needs_previous_weights(mre)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * res.w - wr) / sqrt(size(rd.X, 1)) <= 3e-3
 
@@ -1509,7 +1521,9 @@
         opt = JuMPOptimiser(; pr = pr, slv = slv,
                             tr = TrackingError(; tr = WeightsTracking(; w = w0),
                                                err = 2e-3))
+        @test PortfolioOptimisers.needs_previous_weights(opt)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mre)
         res = optimise(mre)
         @test LinearAlgebra.norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
@@ -1537,7 +1551,9 @@
         tr = RiskTrackingError(; err = 0.0, tr = WeightsTracking(; w = w0),
                                alg = DependentVariableTracking())
         opt = JuMPOptimiser(; pr = pr, slv = slv, tr = tr)
+        @test PortfolioOptimisers.needs_previous_weights(opt)
         mre = MeanRisk(; r = ConditionalValueatRisk(), opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mre)
         res = optimise(mre)
         @test isapprox(res.w,
                        optimise(MeanRisk(; r = ConditionalValueatRisk(),
@@ -1764,7 +1780,10 @@
                              fl = ["HD" => 0.016 / 252], fs = "PFE" => 0.03 / 252)
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
-        res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        @test PortfolioOptimisers.needs_previous_weights(opt)
+        mr = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [-0.049849956175178456, 0.05299448616838142, -0.22771293882094312,
                         -0.08176557902583757, 0.033689114572132625, -0.005373211789678957,
@@ -1777,14 +1796,21 @@
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1),
                             fees = fees_constraints(fees, sets))
-        @test isapprox(res.w, optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w)
+        @test PortfolioOptimisers.needs_previous_weights(opt)
+        mr = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mr)
+        @test isapprox(res.w, optimise(mr).w)
 
         fees = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = Dict("XOM" => 1)),
                              l = Dict("JNJ" => 1), s = "BBY" => 1, fl = ["HD" => 1],
                              fs = "PFE" => 1)
         opt = JuMPOptimiser(; pr = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
-        res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        @test PortfolioOptimisers.needs_previous_weights(opt)
+        mr = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
+        @test PortfolioOptimisers.needs_previous_weights(mr)
+        res = optimise(mr)
+
         @test isapprox(res.w[findfirst(x -> x == "XOM", rd.nx)],
                        w0[findfirst(x -> x == "XOM", rd.nx)])
         @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)

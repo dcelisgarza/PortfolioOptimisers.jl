@@ -57,7 +57,8 @@
                                                      n_test_paths_w = 11)
         @test n_folds == 4
         @test n_test_folds == 3
-        cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11)
+        cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11, 1)
+        @test PortfolioOptimisers.average_train_size(cv, rd) == 252
         (; train_idx, test_idx, path_ids) = split(cv, rd)
         @test length(train_idx) == length(test_idx) == n_splits(cv)
         @test train_idx ==
@@ -318,7 +319,9 @@
                  967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981,
                  982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996,
                  997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008]]]
-        @test path_ids == [1 2 3 3; 1 2 2 3; 1 1 2 3]
+        @test path_ids ==
+              [1 2 3 3; 1 2 2 3; 1 1 2 3] ==
+              PortfolioOptimisers.get_path_ids(cv)
     end
     @testset "Walk forward" begin
         cv = IndexWalkForward(127, 171; reduce_test = false)

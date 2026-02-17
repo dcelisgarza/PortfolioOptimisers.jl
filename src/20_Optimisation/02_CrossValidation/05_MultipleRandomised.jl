@@ -168,26 +168,17 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     (; train_idx, test_idx, asset_idx, path_ids) = cv
     unique_ids = unique(path_ids)
-    dict = Dict{eltype(path_ids),
-                Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}}(path_id => Vector{Tuple{eltype(train_idx),
-                                                                                                               eltype(test_idx),
-                                                                                                               eltype(asset_idx)}}(undef,
-                                                                                                                                   0)
-                                                                                       for path_id in
-                                                                                           unique_ids)
+    dict = [Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}(undef, 0)
+            for _ in unique_ids]
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
-        if !haskey(dict, path_id)
-            dict[path_id] = [(train, test, asset)]
-        else
-            push!(dict[path_id], (train, test, asset))
-        end
+        push!(dict[path_id], (train, test, asset))
     end
     predictions = Vector{MultiPeriodPredictionResult}(undef, length(unique_ids))
-    FLoops.@floop ex for (key, vals) in dict
+    FLoops.@floop ex for (i, vals) in enumerate(dict)
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
-        predictions[key] = path_fit_and_predict(opt, rd, train, test, asset)
+        predictions[i] = path_fit_and_predict(opt, rd, train, test, asset)
     end
     return PopulationPredictionResult(; pred = predictions)
 end

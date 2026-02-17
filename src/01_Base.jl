@@ -81,13 +81,14 @@ macro define_pretty_show(T, flag::Bool = true)
             end
             function Base.show(io::IO, obj::$T)
                 fields = propertynames(obj)
+                tobj = typeof(obj)
                 if isempty(fields)
-                    return print(io, string(typeof(obj), "()"), '\n')
+                    return print(io, string(tobj, "()"), '\n')
                 end
                 if get(io, :compact, false) || get(io, :multiline, false)
-                    return print(io, string(typeof(obj)), '\n')
+                    return print(io, string(tobj), '\n')
                 end
-                name = Base.typename(typeof(obj)).wrapper
+                name = Base.typename(tobj).wrapper
                 print(io, name, '\n')
                 padding = maximum(map(length, map(string, fields))) + 2
                 for (i, field) in enumerate(fields)

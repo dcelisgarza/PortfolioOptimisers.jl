@@ -4,12 +4,13 @@ struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidat
     purged_size::T3
     embargo_size::T4
     function CombinatorialCrossValidation(n_folds::Integer, n_test_folds::Integer,
-                                          purged_size::Integer, embargo_size::Integer)
+                                          purged_size::Integer, embargo_size::Integer,
+                                          warn_comb::Integer = 100_000)
         assert_nonempty_gt0_finite_val(n_folds, :n_folds)
         assert_nonempty_gt0_finite_val(n_test_folds, :n_test_folds)
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
-        if binomial(n_folds, n_test_folds) > 100_000
+        if binomial(n_folds, n_test_folds) > warn_comb
             @warn("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which may be computationally expensive. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`.")
         end
         return new{typeof(n_folds), typeof(n_test_folds), typeof(purged_size),
@@ -17,8 +18,10 @@ struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidat
     end
 end
 function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
-                                      purged_size::Integer = 0, embargo_size::Integer = 0)
-    return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size)
+                                      purged_size::Integer = 0, embargo_size::Integer = 0,
+                                      warn_comb::Integer = 100_000)
+    return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
+                                        warn_comb)
 end
 struct CombinatorialCrossValidationResult{T1, T2, T3} <: NonSequentialCrossValidationResult
     train_idx::T1

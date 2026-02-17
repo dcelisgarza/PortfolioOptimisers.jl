@@ -251,4 +251,7 @@
 
         f = FeesEstimator(; l = "a" => 1, s = ["a" => 1], fl = Dict("a" => 1), fs = 1)
     end
+    # @testset "NonFiniteAllocationOptimisationEstimator" begin
+
+    # end
 end
