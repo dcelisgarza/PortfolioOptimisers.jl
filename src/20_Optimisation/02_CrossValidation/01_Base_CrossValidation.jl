@@ -27,6 +27,29 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
                           ts::Option{<:VecDate} = nothing)
     return PredictionResult(res, nx, X, ts)
 end
+struct MultiPeriodPredictionResult{T1} <: AbstractResult
+    pred::T1
+    function MultiPeriodPredictionResult(pred::AbstractVector{<:PredictionResult})
+        return new{typeof(pred)}(pred)
+    end
+end
+function MultiPeriodPredictionResult(;
+                                     pred::AbstractVector{<:PredictionResult} = Vector{PredictionResult}(undef,
+                                                                                                         0))
+    return MultiPeriodPredictionResult(pred)
+end
+const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+struct PopulationPredictionResult{T1} <: AbstractResult
+    pred::T1
+    function PopulationPredictionResult(pred::AbstractVector{<:PredRes_MultiPredRes})
+        return new{typeof(pred)}(pred)
+    end
+end
+function PopulationPredictionResult(;
+                                    pred::AbstractVector{<:PredRes_MultiPredRes} = Vector{<:PredRes_MultiPredRes}(undef,
+                                                                                                                  0))
+    return PopulationPredictionResult(pred)
+end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     return PredictionResult(; res = res, nx = rd.nx, X = calc_net_returns(res, rd.X),
                             ts = rd.ts)
@@ -73,7 +96,8 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end
-    return sort_predictions!(test_idx, predictions)
+    return MultiPeriodPredictionResult(; pred = predictions)
 end
 
-export PredictionResult, predict, fit_predict
+export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult, predict,
+       fit_predict

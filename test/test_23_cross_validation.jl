@@ -539,14 +539,14 @@
             dft_X = CSV.read(joinpath(@__DIR__, "assets", "$(name)_X.csv.gz"), DataFrame)
             df_w = DataFrame(; nx = String[], w = Float64[])
             df_X = DataFrame(; X = Float64[], ts = Date[])
-            if isa(predictions, Vector{PredictionResult})
-                for pred in predictions
+            if isa(predictions, MultiPeriodPredictionResult)
+                for pred in predictions.pred
                     append!(df_w, (; nx = pred.nx, w = pred.res.w))
                     append!(df_X, (; X = pred.X, ts = pred.ts))
                 end
-            elseif isa(predictions, Vector{Vector{PredictionResult}})
-                for pred_vec in predictions
-                    for pred in pred_vec
+            elseif isa(predictions, PopulationPredictionResult)
+                for pred_vec in predictions.pred
+                    for pred in pred_vec.pred
                         append!(df_w, (; nx = pred.nx, w = pred.res.w))
                         append!(df_X, (; X = pred.X, ts = pred.ts))
                     end

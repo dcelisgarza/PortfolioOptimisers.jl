@@ -337,7 +337,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
             end
         end
     end
-    return predictions
+    return MultiPeriodPredictionResult(; pred = predictions)
 end
 
 export WalkForwardResult, IndexWalkForward, DateWalkForward, n_splits

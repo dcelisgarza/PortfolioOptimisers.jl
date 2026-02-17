@@ -161,7 +161,7 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    return sort_predictions!(test_idx, predictions)
+    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions))
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                          cv::MultipleRandomisedResult;
@@ -182,14 +182,14 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
             push!(dict[path_id], (train, test, asset))
         end
     end
-    predictions = Vector{Vector{PredictionResult}}(undef, length(unique_ids))
+    predictions = Vector{MultiPeriodPredictionResult}(undef, length(unique_ids))
     FLoops.@floop ex for (key, vals) in dict
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
         predictions[key] = path_fit_and_predict(opt, rd, train, test, asset)
     end
-    return predictions
+    return PopulationPredictionResult(; pred = predictions)
 end
 
 export MultipleRandomised, MultipleRandomisedResult

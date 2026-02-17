@@ -181,10 +181,15 @@ end
 function sort_predictions!(res::CombinatorialCrossValidationResult,
                            predictions::AbstractVector{<:AbstractVector{<:PredictionResult}})
     path_ids = res.path_ids
-    sorted_preds = [PredictionResult[] for _ in 1:maximum(path_ids)]
+    sorted_preds = [MultiPeriodPredictionResult(;
+                                                pred = sizehint!(Vector{PredictionResult}(undef,
+                                                                                          0),
+                                                                 count(x -> x == i,
+                                                                       path_ids)))
+                    for i in 1:maximum(path_ids)]
     for (j, prediction) in enumerate(predictions)
         for (i, pred) in enumerate(prediction)
-            push!(sorted_preds[path_ids[i, j]], pred)
+            push!(sorted_preds[path_ids[i, j]].pred, pred)
         end
     end
     return sorted_preds
@@ -198,7 +203,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end
-    return sort_predictions!(cv, predictions)
+    return PopulationPredictionResult(; pred = sort_predictions!(cv, predictions))
 end
 
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
