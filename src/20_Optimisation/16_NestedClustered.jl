@@ -237,9 +237,15 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     else
         transpose(wi) * rdt.ivpa
     end
-    X = hcat([vcat([predictions[j].pred[i].X for i in 1:length(cv_res.test_idx)]...)
-              for j in 1:N]...)
-    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rdt.nf,
+    # X = hcat([vcat([predictions[j].pred[i].X for i in 1:length(cv_res.test_idx)]...)
+    #          for j in 1:N]...)
+    X = sizehint!(Vector{eltype(rdt.X)}(undef, 0), N * size(rdt.X, 1))
+    for prediction in predictions
+        for pred in prediction.pred
+            append!(X, pred.X)
+        end
+    end
+    return ReturnsResult(; nx = ["_$i" for i in 1:N], X = reshape(X, :, N), nf = rdt.nf,
                          F = rdt.F, ts = rdt.ts, iv = iv, ivpa = ivpa)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
