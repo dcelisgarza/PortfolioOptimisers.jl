@@ -544,14 +544,14 @@
             df_X = DataFrame(; X = Float64[], ts = Date[])
             if isa(predictions, MultiPeriodPredictionResult)
                 for pred in predictions.pred
-                    append!(df_w, (; nx = pred.nx, w = pred.res.w))
-                    append!(df_X, (; X = pred.X, ts = pred.ts))
+                    append!(df_w, (; nx = pred.rd.nx, w = pred.res.w))
+                    append!(df_X, (; X = pred.rd.X, ts = pred.rd.ts))
                 end
             elseif isa(predictions, PopulationPredictionResult)
                 for pred_vec in predictions.pred
                     for pred in pred_vec.pred
-                        append!(df_w, (; nx = pred.nx, w = pred.res.w))
-                        append!(df_X, (; X = pred.X, ts = pred.ts))
+                        append!(df_w, (; nx = pred.rd.nx, w = pred.res.w))
+                        append!(df_X, (; X = pred.rd.X, ts = pred.rd.ts))
                     end
                 end
             end
