@@ -27,6 +27,7 @@ const SlvRM = Union{<:EntropicValueatRisk, <:EntropicValueatRiskRange,
                     <:EntropicDrawdownatRisk, <:RelativeEntropicDrawdownatRisk,
                     <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
                     <:RelativisticDrawdownatRisk, <:RelativeRelativisticDrawdownatRisk}
+const PerfRM = Union{<:MeanReturn, <:RiskRatioRiskMeasure}
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return r(calc_net_returns(w, X, fees))

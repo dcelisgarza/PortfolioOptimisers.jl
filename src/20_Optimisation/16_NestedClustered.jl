@@ -207,7 +207,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
     iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
     ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
-    X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
+    X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)
         feesi = fees_view(fees, cl)
@@ -215,6 +215,41 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)
+end
+function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
+                                                                  <:Any, <:Any, <:Any,
+                                                                  <:Any, <:KFold},
+                                             rd::ReturnsResult, pr::AbstractPriorResult,
+                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
+                                             cls::VecVecInt)
+    (; opti, cv, ex) = nco
+    N = length(cls)
+    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    cv = nothing
+    FLoops.@floop ex for (i, cl) in enumerate(cls)
+        predictions[i], cv = cross_val_predict(opti, rd, cv; cols = cl, ex = ex)
+    end
+    rdt = returns_result_view(rd, vcat(cv.test_idx...), :)
+
+    iv = isnothing(rdt.iv) ? rdt.iv : rdt.iv * wi
+    ivpa = if (isnothing(rdt.ivpa) || isa(rdt.ivpa, Number))
+        rdt.ivpa
+    else
+        transpose(wi) * rdt.ivpa
+    end
+    X = Matrix{eltype(pr.X)}(undef, size(rdt.X, 1), size(wi, 2))
+    lengths = length.(cv.test_idx)
+    for (i, pred) in enumerate(predictions)
+        start = 1
+        for (j, p) in enumerate(pred)
+            stop = lengths[j]
+            #! Add fees
+            X[start:stop, i] .= p.X
+            start += stop
+        end
+    end
+    return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rdt.nf,
+                         F = rdt.F, ts = rdt.ts, iv = iv, ivpa = ivpa)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
