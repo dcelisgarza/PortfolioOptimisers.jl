@@ -1,4 +1,5 @@
-struct MultipleRandomised{T1, T2, T3, T4, T5, T6, T7} <: SequentialCrossValidationEstimator
+struct MultipleRandomised{T1, T2, T3, T4, T5, T6, T7} <:
+       SequentialNonOptimisationCrossValidationResult
     cv::T1
     subset_size::T2
     n_subsets::T3

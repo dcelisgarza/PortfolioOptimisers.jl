@@ -1,10 +1,12 @@
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
-abstract type SequentialCrossValidationEstimator <: CrossValidationEstimator end
-abstract type NonSequentialCrossValidationEstimator <: CrossValidationEstimator end
+abstract type OptimisationCrossValidationEstimator <: CrossValidationEstimator end
+abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
+abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
 abstract type SequentialCrossValidationResult <: CrossValidationResult end
 abstract type NonSequentialCrossValidationResult <: CrossValidationResult end
+abstract type SequentialNonOptimisationCrossValidationResult <: CrossValidationResult end
 struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     nx::T1
     X::T2
@@ -72,11 +74,25 @@ function MultiPeriodPredictionResult(;
                                                                                                          0))
     return MultiPeriodPredictionResult(pred)
 end
+function get_multiperiod_returns_result(mpred::MultiPeriodPredictionResult)
+    rd = mpred.rd
+    nx = rd[1].nx
+    X = mapreduce(x -> getproperty(x, :X), vcat, rd)
+    nf = rd[1].nf
+    F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
+    ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
+    iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
+    ivpa = rd[1].ivpa
+    return PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
+                                   ivpa = ivpa)
+end
 function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
     return if sym == :res
         getfield.(getfield(mpred, :pred), :res)
     elseif sym === :rd
         getfield.(getfield(mpred, :pred), :rd)
+    elseif sym == :mrd
+        get_multiperiod_returns_result(mpred)
     else
         getfield(mpred, sym)
     end
@@ -104,11 +120,7 @@ function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idx::VecInt, cols = :)
     rdi = returns_result_view(rd, test_idx, cols)
     iv = isnothing(rdi.iv) ? rdi.iv : rdi.iv * res.w
-    ivpa = if (isnothing(rdi.ivpa) || isa(rdi.ivpa, Number))
-        rdi.ivpa
-    else
-        transpose(res.w) * rdi.ivpa
-    end
+    ivpa = !isa(rdi.ivpa, AbstractVector) ? rdi.ivpa : dot(rdi.ivpa, res.w)
     X = calc_net_returns(res, rdi.X)
     rdi = PredictionReturnsResult(; nx = rdi.nx, X = X, nf = rdi.nf, F = rdi.F, ts = rdi.ts,
                                   iv = iv, ivpa = ivpa)
@@ -142,8 +154,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     (; train_idx, test_idx) = cv
     predictions = Vector{PredictionResult}(undef, length(train_idx))
-    # FLoops.@floop ex
-    for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
+    FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end

@@ -318,7 +318,27 @@
                                                                               opti = MeanRisk(;
                                                                                               opt = jopto),
                                                                               opto = MeanRisk(;
-                                                                                              opt = jopto))))]
+                                                                                              opt = jopto)))),
+                NestedClustered(; cv = KFold(; n = 10), opti = MeanRisk(; opt = jopto),
+                                opto = MeanRisk(; opt = jopto)),
+                NestedClustered(; cv = IndexWalkForward(23, 11),
+                                opti = MeanRisk(; opt = jopto),
+                                opto = MeanRisk(; opt = jopto)),
+                NestedClustered(; cv = KFold(; n = 10),
+                                opti = Stacking(; cv = KFold(; n = 10),
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        MeanRisk(; obj = MaximumRatio(),
+                                                                 opt = jopto)],
+                                                opto = MeanRisk(; opt = jopto)),
+                                opto = Stacking(; cv = IndexWalkForward(23, 11),
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        MeanRisk(; obj = MaximumRatio(),
+                                                                 opt = jopto)],
+                                                opto = MeanRisk(; opt = jopto)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise(opt, rd)
@@ -440,9 +460,3 @@
         @test isapprox(res.w, optimise(opt, rd).w)
     end
 end
-
-# jopti = JuMPOptimiser(; pr = pr, slv = slv, sets = sets)
-#         jopto = JuMPOptimiser(; slv = slv)
-#         opts = NestedClustered(; cv=KFold(),clr = clr, opti = MeanRisk(; opt = jopti),
-#                                 opto = MeanRisk(; opt = jopto))
-#                                 res=optimise(opts, rd)

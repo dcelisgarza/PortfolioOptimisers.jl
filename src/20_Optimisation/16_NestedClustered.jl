@@ -104,6 +104,9 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
         if !(opti === opto)
             assert_internal_optimiser(opti)
         end
+        if !isnothing(cv)
+            assert_external_optimiser(opti)
+        end
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -142,7 +145,7 @@ function assert_external_optimiser(opt::NestedClustered)
     @argcheck(!isa(opt.pr, AbstractPriorResult))
     @argcheck(!isa(opt.clr, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
-    if !(opt.opti === opt.opto)
+    if !(opt.opti === opt.opto) || !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
     end
     return nothing
@@ -206,7 +209,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
     iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    ivpa = !isa(rd.ivpa, AbstractVector) ? rd.ivpa : transpose(wi) * rd.ivpa
     X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)
@@ -218,35 +221,39 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,
-                                                                  <:Any, <:KFold},
+                                                                  <:Any,
+                                                                  <:Union{<:KFold,
+                                                                          <:WalkForwardEstimator}},
                                              rd::ReturnsResult, pr::AbstractPriorResult,
                                              fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
                                              cls::VecVecInt)
     (; opti, cv, ex) = nco
     N = length(cls)
     predictions = Vector{MultiPeriodPredictionResult}(undef, N)
-    cv_res = nothing
     FLoops.@floop ex for (i, cl) in enumerate(cls)
-        predictions[i] = cross_val_predict(opti, rd, cv; cols = cl, ex = ex)
+        cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+        predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
     end
-    cv_res = split(cv, rd)
-    rdt = returns_result_view(rd, vcat(cv_res.test_idx...), :)
-    iv = isnothing(rdt.iv) ? rdt.iv : rdt.iv * wi
-    ivpa = if (isnothing(rdt.ivpa) || isa(rdt.ivpa, Number))
-        rdt.ivpa
-    else
-        transpose(wi) * rdt.ivpa
-    end
-    # X = hcat([vcat([predictions[j].pred[i].X for i in 1:length(cv_res.test_idx)]...)
-    #          for j in 1:N]...)
-    X = sizehint!(Vector{eltype(rdt.X)}(undef, 0), N * size(rdt.X, 1))
-    for prediction in predictions
-        for pred in prediction.pred
-            append!(X, pred.X)
+    iv_flag = !isnothing(rd.iv)
+    ivpa_flag = !isnothing(rd.ivpa)
+    rd1 = predictions[1].mrd
+    X = rd1.X
+    iv = rd1.iv
+    ivpa = ivpa_flag ? [rd1.ivpa] : nothing
+    @inbounds for i in 2:length(predictions)
+        rdi = predictions[i].mrd
+        append!(X, rdi.X)
+        if iv_flag
+            append!(iv, rdi.iv)
+        end
+        if ivpa_flag
+            push!(ivpa, rdi.ivpa)
         end
     end
-    return ReturnsResult(; nx = ["_$i" for i in 1:N], X = reshape(X, :, N), nf = rdt.nf,
-                         F = rdt.F, ts = rdt.ts, iv = iv, ivpa = ivpa)
+    X = reshape(X, :, N)
+    iv = iv_flag ? reshape(iv, :, N) : nothing
+    return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
+                         ts = rd1.ts, iv = iv, ivpa = ivpa)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,

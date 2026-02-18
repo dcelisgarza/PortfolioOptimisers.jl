@@ -35,6 +35,9 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
                       cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
                       strict::Bool, ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt})
         assert_external_optimiser(opto)
+        if !isnothing(cv)
+            assert_external_optimiser(opti)
+        end
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -59,7 +62,7 @@ function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pr, AbstractPriorResult))
     assert_external_optimiser(opt.opto)
-    if !(opt.opti === opt.opto)
+    if !(opt.opti === opt.opto) || !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
     end
     return nothing
@@ -111,6 +114,40 @@ function predict_outer_st_estimator_returns(st::Stacking, rd::ReturnsResult,
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)
+end
+function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any,
+                                                         <:Union{<:KFold,
+                                                                 <:WalkForwardEstimator}},
+                                            rd::ReturnsResult, pr::AbstractPriorResult,
+                                            fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
+    (; opti, cv, ex) = st
+    N = length(opti)
+    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    FLoops.@floop ex for (i, opt) in enumerate(opti)
+        cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+        predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
+    end
+    iv_flag = !isnothing(rd.iv)
+    ivpa_flag = !isnothing(rd.ivpa)
+    rd1 = predictions[1].mrd
+    X = rd1.X
+    iv = rd1.iv
+    ivpa = ivpa_flag ? [rd1.ivpa] : nothing
+    @inbounds for i in 2:length(predictions)
+        rdi = predictions[i].mrd
+        append!(X, rdi.X)
+        if iv_flag
+            append!(iv, rdi.iv)
+        end
+        if ivpa_flag
+            push!(ivpa, rdi.ivpa)
+        end
+    end
+    X = reshape(X, :, N)
+    iv = iv_flag ? reshape(iv, :, N) : nothing
+    return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
+                         ts = rd1.ts, iv = iv, ivpa = ivpa)
 end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
