@@ -225,29 +225,20 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     (; opti, cv, ex) = nco
     N = length(cls)
     predictions = Vector{MultiPeriodPredictionResult}(undef, N)
-    cv = nothing
+    cv_res = nothing
     FLoops.@floop ex for (i, cl) in enumerate(cls)
-        predictions[i], cv = cross_val_predict(opti, rd, cv; cols = cl, ex = ex)
+        predictions[i] = cross_val_predict(opti, rd, cv; cols = cl, ex = ex)
     end
-    rdt = returns_result_view(rd, vcat(cv.test_idx...), :)
-
+    cv_res = split(cv, rd)
+    rdt = returns_result_view(rd, vcat(cv_res.test_idx...), :)
     iv = isnothing(rdt.iv) ? rdt.iv : rdt.iv * wi
     ivpa = if (isnothing(rdt.ivpa) || isa(rdt.ivpa, Number))
         rdt.ivpa
     else
         transpose(wi) * rdt.ivpa
     end
-    X = Matrix{eltype(pr.X)}(undef, size(rdt.X, 1), size(wi, 2))
-    lengths = length.(cv.test_idx)
-    for (i, pred) in enumerate(predictions)
-        start = 1
-        for (j, p) in enumerate(pred)
-            stop = lengths[j]
-            #! Add fees
-            X[start:stop, i] .= p.X
-            start += stop
-        end
-    end
+    X = hcat([vcat([predictions[j].pred[i].X for i in 1:length(cv_res.test_idx)]...)
+              for j in 1:N]...)
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rdt.nf,
                          F = rdt.F, ts = rdt.ts, iv = iv, ivpa = ivpa)
 end

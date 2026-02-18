@@ -92,7 +92,8 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     (; train_idx, test_idx) = cv
     predictions = Vector{PredictionResult}(undef, length(train_idx))
-    FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
+    # FLoops.@floop ex 
+    for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end

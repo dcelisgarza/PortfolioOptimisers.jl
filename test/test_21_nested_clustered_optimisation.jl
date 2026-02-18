@@ -395,11 +395,15 @@
                                        opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
                        rd)
 
-        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[1][i, :]] for i in axes(res.resi[1].smtx[1], 1)])) < 3
-        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[2][i, :]] for i in axes(res.resi[1].smtx[2], 1)])) < 2
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[1][i, :]]
+                             for i in axes(res.resi[1].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[1].w[res.resi[1].smtx[2][i, :]]
+                             for i in axes(res.resi[1].smtx[2], 1)])) < 2
 
-        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]] for i in axes(res.resi[2].smtx[1], 1)])) < 3
-        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]] for i in axes(res.resi[2].smtx[2], 1)])) < 2
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]]
+                             for i in axes(res.resi[2].smtx[1], 1)])) < 3
+        @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]]
+                             for i in axes(res.resi[2].smtx[2], 1)])) < 2
 
         opt = NestedClustered(; clr = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
@@ -440,3 +444,9 @@
         @test isapprox(res.w, optimise(opt, rd).w)
     end
 end
+
+# jopti = JuMPOptimiser(; pr = pr, slv = slv, sets = sets)
+#         jopto = JuMPOptimiser(; slv = slv)
+#         opts = NestedClustered(; cv=KFold(),clr = clr, opti = MeanRisk(; opt = jopti),
+#                                 opto = MeanRisk(; opt = jopto))
+#                                 res=optimise(opts, rd)
