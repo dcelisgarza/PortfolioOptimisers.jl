@@ -569,7 +569,6 @@
             @test df_w[!, :nx] == dft_w[!, :nx]
             return nothing
         end
-
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cv = KFold(; n = 10)
         kfold_pred = cross_val_predict(mr, rd, cv)
@@ -617,5 +616,11 @@
                                 rng = StableRNG(666), seed = 69)
         multiple_rand_serial_pred = cross_val_predict(mr, rd, cv)
         test_pred(multiple_rand_serial_pred, "multiple_rand_serial_pred"; rtol = 1e-6)
+
+        mr = MeanRisk(;
+                      opt = JuMPOptimiser(; slv = slv,
+                                          ret = ArithmeticReturn(; lb = Frontier(; N = 15))))
+        cv = KFold(; n = 10)
+        eff_front = cross_val_predict(mr, rd, cv)
     end
 end

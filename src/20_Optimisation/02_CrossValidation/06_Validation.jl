@@ -1,6 +1,8 @@
 function cross_val_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                            cv::CrossValidationEstimator = KFold(); cols = :,
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    assert_internal_optimiser(opt)
+    assert_external_optimiser(opt)
     if !isa(cols, Colon)
         rd = returns_result_view(rd, cols)
         opt = opt_view(opt, cols, rd.X)
