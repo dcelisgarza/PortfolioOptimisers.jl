@@ -1,5 +1,5 @@
 struct MultipleRandomised{T1, T2, T3, T4, T5, T6, T7} <:
-       SequentialNonOptimisationCrossValidationResult
+       NonOptimisationSequentialCrossValidationEstimator
     cv::T1
     subset_size::T2
     n_subsets::T3
@@ -30,7 +30,8 @@ function MultipleRandomised(cv::WalkForwardEstimator; subset_size::Integer = 1,
                             seed::Option{<:Integer} = nothing)
     return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
 end
-struct MultipleRandomisedResult{T1, T2, T3, T4} <: SequentialCrossValidationResult
+struct MultipleRandomisedResult{T1, T2, T3, T4} <:
+       NonOptimisationSequentialCrossValidationResult
     train_idx::T1
     test_idx::T2
     asset_idx::T3

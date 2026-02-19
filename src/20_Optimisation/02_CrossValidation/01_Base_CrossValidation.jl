@@ -1,12 +1,27 @@
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
+
 abstract type OptimisationCrossValidationEstimator <: CrossValidationEstimator end
 abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
 abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
-abstract type SequentialCrossValidationResult <: CrossValidationResult end
-abstract type NonSequentialCrossValidationResult <: CrossValidationResult end
-abstract type SequentialNonOptimisationCrossValidationResult <: CrossValidationResult end
+
+abstract type OptimisationCrossValidationResult <: CrossValidationResult end
+abstract type SequentialCrossValidationResult <: OptimisationCrossValidationResult end
+abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
+
+abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
+abstract type NonOptimisationSequentialCrossValidationEstimator <:
+              NonOptimisationCrossValidationEstimator end
+abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
+              NonOptimisationCrossValidationEstimator end
+
+abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
+abstract type NonOptimisationSequentialCrossValidationResult <:
+              NonOptimisationCrossValidationResult end
+abstract type NonOptimisationNonSequentialCrossValidationResult <:
+              NonOptimisationCrossValidationResult end
+
 struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     nx::T1
     X::T2
