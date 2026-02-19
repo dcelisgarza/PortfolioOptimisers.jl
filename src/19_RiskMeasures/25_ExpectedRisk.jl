@@ -32,16 +32,16 @@ function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} 
                        kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
-function expected_risk(r::ERkNetRet, w::VecNum, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+function expected_risk(r::ERkNetRet, w::VecNum, pr::Pr_RR, fees::Option{<:Fees} = nothing;
+                       kwargs...)
     return r(calc_net_returns(w, pr.X, fees))
 end
 function expected_risk(r::ERkwXFees, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return r(w, X, fees)
 end
-function expected_risk(r::ERkwXFees, w::VecNum, pr::AbstractPriorResult,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+function expected_risk(r::ERkwXFees, w::VecNum, pr::Pr_RR, fees::Option{<:Fees} = nothing;
+                       kwargs...)
     return r(w, pr.X, fees)
 end
 function expected_risk(r::ERkw, w::VecNum, args...; kwargs...)
@@ -52,7 +52,8 @@ function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, X::MatNum,
     return expected_risk(r.r1, w, X, fees; kwargs...) /
            expected_risk(r.r2, w, X, fees; kwargs...)
 end
-function expected_risk(r::RiskRatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
+function expected_risk(r::RiskRatioRiskMeasure, w::VecNum,
+                       pr::Union{<:AbstractPriorResult <: AbstractReturnsResult},
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_risk(r.r1, w, pr.X, fees; kwargs...) /
            expected_risk(r.r2, w, pr.X, fees; kwargs...)

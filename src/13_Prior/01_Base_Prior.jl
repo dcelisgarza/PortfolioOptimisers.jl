@@ -155,6 +155,7 @@ Abstract supertype for all prior result types.
 """
 abstract type AbstractPriorResult <: AbstractResult end
 const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+const Pr_RR = Union{<:AbstractPriorResult, <:AbstractReturnsResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 
