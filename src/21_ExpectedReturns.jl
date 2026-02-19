@@ -278,6 +278,10 @@ end
 function ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
     return ReturnRiskMeasure(rt)
 end
+function smaller_is_better(::Union{<:ReturnRiskMeasure,
+                                   <:RiskRatioRiskMeasure{<:ReturnRiskMeasure, <:Any}})
+    return false
+end
 """
     factory(r::ReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 

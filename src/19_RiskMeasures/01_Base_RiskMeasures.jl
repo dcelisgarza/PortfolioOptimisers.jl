@@ -18,6 +18,9 @@ abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
 function needs_previous_weights(::AbstractBaseRiskMeasure)
     return false
 end
+function smaller_is_better(::AbstractBaseRiskMeasure)
+    return true
+end
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
 function needs_previous_weights(r::VecBaseRM)
     return any(needs_previous_weights.(r))

@@ -15,40 +15,56 @@ struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsRes
     ts::T5
     iv::T6
     ivpa::T7
-    function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum},
+    function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
-                                     ts::Option{<:VecDate}, iv::Option{<:VecNum},
-                                     ivpa::Option{<:Number})
+                                     ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
+                                     ivpa::Option{<:Num_VecNum})
         _check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
-            @argcheck(length(X) == size(F, 1), DimensionMismatch)
+            if isa(X, VecNum)
+                @argcheck(length(X) == size(F, 1), DimensionMismatch)
+            else
+                @argcheck(all(x -> length(x) == size(F, 1), X))
+            end
         end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
             @argcheck(!(isnothing(X) && isnothing(F)), IsNothingError)
-            if !isnothing(X)
+            if isa(X, VecBaseRM)
                 @argcheck(length(ts) == length(X), DimensionMismatch)
+            elseif isa(X, VecVecNum)
+                @argcheck(all(x -> length(x) == length(ts), X))
             end
             if !isnothing(F)
                 @argcheck(length(ts) == size(F, 1), DimensionMismatch)
             end
         end
-        if !isnothing(iv)
+        if isa(iv, VecNum)
+            @argcheck(isa(ivpa, Option{<:Number}))
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(length(iv) == length(X), DimensionMismatch)
+        elseif isa(iv, VecVecNum)
+            @argcheck(isa(ivpa, Option{<:VecNum}))
+            @argcheck(length(iv) == length(X), DimensionMismatch)
+            @argcheck(length(ivpa) == length(X), DimensionMismatch)
+            for (ivi, ivpai, Xi) in zip(iv, ivpa, X)
+                assert_nonempty_nonneg_finite_val(ivi, :iv)
+                assert_nonempty_gt0_finite_val(ivpai, :ivpa)
+                @argcheck(length(ivi) == length(Xi), DimensionMismatch)
+            end
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts), typeof(iv),
                    typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
     end
 end
 function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
-                                 X::Option{<:VecNum} = nothing,
+                                 X::Option{<:VecNum_VecVecNum} = nothing,
                                  nf::Option{<:VecStr} = nothing,
                                  F::Option{<:MatNum} = nothing,
                                  ts::Option{<:VecDate} = nothing,
-                                 iv::Option{<:VecNum} = nothing,
-                                 ivpa::Option{<:Number} = nothing)
+                                 iv::Option{<:VecNum_VecVecNum} = nothing,
+                                 ivpa::Option{<:Num_VecNum} = nothing)
     return PredictionReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 struct PredictionResult{T1, T2} <: AbstractResult
@@ -116,14 +132,25 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     res = optimise(opt, rd)
     return predict(res, rd)
 end
+function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                        X::VecNum)
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv * res.w
+    ivpa = !isa(rd.ivpa, AbstractVector) ? rd.ivpa : dot(rd.ivpa, res.w)
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
+                                   iv = iv, ivpa = ivpa)
+end
+function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                        X::VecVecNum)
+    iv = isnothing(rd.iv) ? rd.iv : [rd.iv * w for w in res.w]
+    ivpa = !isa(rd.ivpa, AbstractVector) ? rd.ivpa : [dot(rd.ivpa, w) for w in res.w]
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
+                                   iv = iv, ivpa = ivpa)
+end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idx::VecInt, cols = :)
     rdi = returns_result_view(rd, test_idx, cols)
-    iv = isnothing(rdi.iv) ? rdi.iv : rdi.iv * res.w
-    ivpa = !isa(rdi.ivpa, AbstractVector) ? rdi.ivpa : dot(rdi.ivpa, res.w)
     X = calc_net_returns(res, rdi.X)
-    rdi = PredictionReturnsResult(; nx = rdi.nx, X = X, nf = rdi.nf, F = rdi.F, ts = rdi.ts,
-                                  iv = iv, ivpa = ivpa)
+    rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,

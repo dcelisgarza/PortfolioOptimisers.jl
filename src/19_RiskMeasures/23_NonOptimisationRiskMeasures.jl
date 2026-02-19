@@ -10,6 +10,10 @@ end
 function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanReturn(w)
 end
+function smaller_is_better(::Union{<:MeanReturn,
+                                   <:RiskRatioRiskMeasure{<:MeanReturn, <:Any}})
+    return false
+end
 function (r::MeanReturn)(x::VecNum)
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
