@@ -527,9 +527,10 @@ function solver_selector(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
 function expected_risk end
+function predicted_risk end
 function no_bounds_risk_measure end
 function no_bounds_no_risk_expr_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
-       MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure
+       MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, predicted_risk,
+       RiskMeasure, HierarchicalRiskMeasure

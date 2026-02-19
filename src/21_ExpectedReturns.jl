@@ -376,6 +376,19 @@ function expected_risk(r::ReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_return(r.rt, w, pr, fees)
 end
+function predicted_risk(r::ReturnRiskMeasure{<:ArithmeticReturn}, X::AbstractVector;
+                        kwargs...)
+    return Statistics.mean(X)
+end
+function predicted_risk(r::ReturnRiskMeasure{<:LogarithmicReturn}, X::AbstractVector;
+                        kwargs...)
+    w = r.rt.w
+    return if isnothing(w)
+        Statistics.mean(log1p.(X))
+    else
+        Statistics.mean(log1p.(X), w)
+    end
+end
 """
     struct ReturnRiskRatioRiskMeasure{T1, T2, T3} <: NonOptimisationRiskMeasure
         rt::T1
@@ -606,6 +619,10 @@ function expected_risk(r::ReturnRiskRatioRiskMeasure, w::VecNum, pr::AbstractPri
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
 end
+function predicted_risk(r::ReturnRiskRatioRiskMeasure, X::AbstractVector; kwargs...)
+    return (predicted_risk(r.rt, X; kwargs...) - r.rf) / predicted_risk(r.rk, X; kwargs...)
+end
+const PerfRM = Union{<:MeanReturn, <:ReturnRiskMeasure, <:ReturnRiskRatioRiskMeasure}
 """
     brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
                         asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
