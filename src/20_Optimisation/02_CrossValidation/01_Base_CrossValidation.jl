@@ -94,6 +94,23 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
                           rd::PredictionReturnsResult)
     return PredictionResult(res, rd)
 end
+struct SingletonVector{T} <: AbstractVector{T} end
+Base.length(::SingletonVector) = 1
+Base.getindex(::SingletonVector, args...) = 1
+Base.:*(M::AbstractMatrix, ::SingletonVector) = dropdims(M; dims = 2)
+Base.size(::SingletonVector) = (1,)
+function expected_risk(pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecNum}},
+                       r::AbstractBaseRiskMeasure; kwargs...)
+    return expected_risk(r, SingletonVector{Int}(), reshape(pred.rd.X, :, 1); kwargs...)
+end
+function expected_risk(pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecVecNum}},
+                       r::AbstractBaseRiskMeasure; kwargs...)
+    X = pred.rd.X
+    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
+            for Xi in X]
+end
 struct MultiPeriodPredictionResult{T1} <: AbstractResult
     pred::T1
     function MultiPeriodPredictionResult(pred::AbstractVector{<:PredictionResult})
@@ -105,10 +122,21 @@ function MultiPeriodPredictionResult(;
                                                                                                          0))
     return MultiPeriodPredictionResult(pred)
 end
+function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}})
+    return mapreduce(x -> getproperty(x, :X), vcat, rd)
+end
+function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecVecNum}})
+    N = length(rd[1].X)
+    X = [eltype(rd[1].X[1])[] for _ in 1:N]
+    for i in 1:N
+        X[i] = mapreduce(x -> getproperty(x, :X)[i], vcat, rd)
+    end
+    return X
+end
 function get_multiperiod_returns_result(mpred::MultiPeriodPredictionResult)
     rd = mpred.rd
     nx = rd[1].nx
-    X = mapreduce(x -> getproperty(x, :X), vcat, rd)
+    X = mapreduce_X(rd)
     nf = rd[1].nf
     F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
     ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
@@ -128,6 +156,18 @@ function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
         getfield(mpred, sym)
     end
 end
+function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
+    return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
+end
+function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
+    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
+            for Xi in X]
+end
+function expected_risk(mpred::MultiPeriodPredictionResult, r::AbstractBaseRiskMeasure;
+                       kwargs...)
+    X = mpred.mrd.X
+    return _prediction_expected_risk(r, X; kwargs...)
+end
 const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
 struct PopulationPredictionResult{T1} <: AbstractResult
     pred::T1
@@ -139,6 +179,10 @@ function PopulationPredictionResult(;
                                     pred::AbstractVector{<:PredRes_MultiPredRes} = Vector{<:PredRes_MultiPredRes}(undef,
                                                                                                                   0))
     return PopulationPredictionResult(pred)
+end
+function expected_risk(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
+                       kwargs...)
+    return [expected_risk(pred, r; kwargs...) for pred in ppred.pred]
 end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     return PredictionResult(; res = res, rd = rd)

@@ -572,6 +572,14 @@
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cv = KFold(; n = 10)
         kfold_pred = cross_val_predict(mr, rd, cv)
+        for pred in kfold_pred.pred
+            @test expected_risk(pred, ConditionalValueatRisk()) ==
+                  expected_risk(ConditionalValueatRisk(), [1], reshape(pred.rd.X, :, 1))
+        end
+        @test expected_risk(kfold_pred, ConditionalValueatRisk()) ==
+              expected_risk(ConditionalValueatRisk(), [1],
+                            reshape(mapreduce(x -> getproperty(x, :X), vcat, kfold_pred.rd),
+                                    :, 1))
         test_pred(kfold_pred, "kfold_pred"; rtol = 1e-6)
 
         walkforward_pred = cross_val_predict(mr, rd, IndexWalkForward(127, 171))
@@ -599,6 +607,9 @@
                                           purged_size = 23, embargo_size = 11)
         combinatorial_pred = cross_val_predict(mr, rd, cv)
         test_pred(combinatorial_pred, "combinatorial_pred"; rtol = 1e-6)
+        @test expected_risk(combinatorial_pred, ConditionalValueatRisk()) ==
+              [expected_risk(pred, ConditionalValueatRisk())
+               for pred in combinatorial_pred.pred]
 
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5, n_subsets = 3,
@@ -620,7 +631,45 @@
         mr = MeanRisk(;
                       opt = JuMPOptimiser(; slv = slv,
                                           ret = ArithmeticReturn(; lb = Frontier(; N = 15))))
-        cv = KFold(; n = 10)
+        cv = IndexWalkForward(127, 171)
         eff_front = cross_val_predict(mr, rd, cv)
+        @test isapprox(expected_risk(eff_front.pred[1], ConditionalValueatRisk()),
+                       [0.02445047202207013, 0.024723167983048012, 0.025065859868295085,
+                        0.026631678113391014, 0.029766721381127254, 0.0332293310195955,
+                        0.036712641445858216, 0.041343186033996185, 0.04508933221412097,
+                        0.04832582159182713, 0.05116286724387746, 0.05340366889088449,
+                        0.05661788602614313, 0.06099861587054208, 0.06930432398311781],
+                       rtol = 1e-6)
+        @test isapprox(expected_risk(eff_front, ConditionalValueatRisk()),
+                       [0.02851540652586554, 0.028664631977467665, 0.029422606719369717,
+                        0.030689949676504395, 0.03255422722361193, 0.03462849847275322,
+                        0.03693523949033722, 0.03925403546423605, 0.04197140498685578,
+                        0.04527869819980663, 0.04901956314172343, 0.05252909079330294,
+                        0.05670669926916388, 0.06106322096162615, 0.06731010668250322],
+                       rtol = 1e-6)
+
+        n_folds, n_test_folds = optimal_number_folds(1008, 247, 7; train_size_w = 19,
+                                                     n_test_paths_w = 11)
+        cv = CombinatorialCrossValidation(; n_folds = n_folds, n_test_folds = n_test_folds,
+                                          purged_size = 23, embargo_size = 11)
+        eff_front_combinatorial_pred = cross_val_predict(mr, rd, cv)
+        @test isapprox(expected_risk(eff_front_combinatorial_pred,
+                                     ConditionalValueatRisk()),
+                       [[0.028189461440668168, 0.028324623838311042, 0.028498004939646555,
+                         0.028851917898161994, 0.029480890142900992, 0.030659954435494977,
+                         0.03195384396993081, 0.03353114571895959, 0.035679195833321735,
+                         0.038588809950532224, 0.04198339127398519, 0.04640836787204712,
+                         0.05029240073397498, 0.0521903052859613, 0.059790000108136024],
+                        [0.028943015832438614, 0.03023352786611054, 0.03175565309996031,
+                         0.03328993274077097, 0.035551111164567106, 0.037772360863188546,
+                         0.0395886726866072, 0.042075855440506786, 0.045980292956543815,
+                         0.05039837394749322, 0.05528072022328261, 0.06143238599533307,
+                         0.06777483885051272, 0.07744279648123462, 0.0903084408910423],
+                        [0.02702522950042332, 0.027558727174700044, 0.028090889558912514,
+                         0.02948895471886933, 0.031246678417546424, 0.03345701238073598,
+                         0.037007507692138494, 0.04135088455177087, 0.046103649352588316,
+                         0.05130974916339585, 0.05596340594616811, 0.06099995867857651,
+                         0.06630600610829505, 0.07240998627924707, 0.07916366997300678]],
+                       rtol = 1e-6)
     end
 end

@@ -61,19 +61,6 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
-function predicted_risk(r::Union{<:ERkNetRet, <:ERkwXFees}, X::VecNum; kwargs...)
-    return r(X)
-end
-function predicted_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
-    return [r(Xi; kwargs...) for Xi in X]
-end
-function predicted_risk(r::RkRatioRM, X::VecNum; kwargs...)
-    return predicted_risk(r.r1, X; kwargs...) / predicted_risk(r.r2, X; kwargs...)
-end
-function predicted_risk(r::ERkw, args...; kwargs...)
-    throw(MethodError(predicted_risk,
-                      "cannot be computed for $r because the risk measure uses internal quantities and asset weights which are not defined for the result of a prediction of portfolio returns. For:\n- `StandardDeviation`: `LowOrderMoment(; alg = SecondMoment(; alg = Full(), alg2 = SOCRiskExpr())`.\n- Semi `StandardDeviation`: `LowOrderMoment(; alg = SecondMoment(; alg = Semi(), alg2 = SOCRiskExpr())`.\n- Variance: `LowOrderMoment(; alg = SecondMoment(; alg = Full(), alg2 = QuadRiskExpr())`, `alg2` can also be `SquaredSOCRiskExpr()` or `RSOCRiskExpr()`.\n- Semi Variance: `LowOrderMoment(; alg = SecondMoment(; alg = Semi(), alg2 = QuadRiskExpr())`, `alg2` can also be `SquaredSOCRiskExpr()` or `RSOCRiskExpr()`.\n- UncertaintySetVariance: use one of the variance recommendations.\n- NegativeSkewness: the closest is to use `Skewness`.\n- TurnoverRiskMeasure and EqualRiskMeasure: not applicable."))
-end
 function number_effective_assets(w::VecNum)
     return inv(LinearAlgebra.dot(w, w))
 end

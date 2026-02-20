@@ -53,6 +53,14 @@ function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = n
     benchmark = tracking_benchmark(r.tr, X)
     return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
+function (r::TrackingRiskMeasure{ReturnsTracking})(X::VecNum)
+    benchmark = tracking_benchmark(r.tr, X)
+    return norm_tracking(r.alg, X, benchmark, length(X))
+end
+function (r::TrackingRiskMeasure{WeightsTracking})(::VecNum)
+    throw(MethodError(r,
+                      "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
+end
 function risk_measure_view(r::TrackingRiskMeasure, i, args...)
     tr = tracking_view(r.tr, i)
     return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
