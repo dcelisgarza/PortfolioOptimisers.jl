@@ -97,7 +97,7 @@ end
 struct SingletonVector{T} <: AbstractVector{T} end
 Base.length(::SingletonVector) = 1
 Base.getindex(::SingletonVector, args...) = 1
-Base.:*(M::AbstractMatrix, ::SingletonVector) = dropdims(M; dims = 2)
+Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
 Base.size(::SingletonVector) = (1,)
 function expected_risk(pred::PredictionResult{<:Any,
                                               <:PredictionReturnsResult{<:Any, <:VecNum}},
