@@ -828,9 +828,6 @@ function calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any}, :
                             x::VecNum)
     return Statistics.mean(x)
 end
-function calc_prediction_moment_target(::LoHiOrderMoment, X::VecNum)
-    return Statistics.mean(X)
-end
 """
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any},
                        ::Any, x::VecNum)
@@ -856,11 +853,6 @@ Compute the target value for moment calculations when the risk measure provides 
 function calc_moment_target(r::LoHiOrderMoment{<:Any, <:StatsBase.AbstractWeights, Nothing,
                                                <:Any}, ::Any, x::VecNum)
     return Statistics.mean(x, r.w)
-end
-function calc_prediction_moment_target(r::LoHiOrderMoment{<:Any,
-                                                          <:StatsBase.AbstractWeights,
-                                                          Nothing, <:Any}, X::VecNum)
-    return Statistics.mean(X, r.w)
 end
 """
     calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
@@ -940,10 +932,6 @@ Compute the target value for moment calculations when the risk measure provides 
 function calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any}, ::Any, ::Any)
     return r.mu
 end
-function calc_prediction_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
-                                       ::Any)
-    return r.mu
-end
 """
     calc_deviations_vec(r::LoHiOrderMoment, w::VecNum,
                     X::MatNum; fees::Option{<:Fees} = nothing)
@@ -980,16 +968,9 @@ function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
-function calc_prediction_deviations_vec(r::LoHiOrderMoment, X::VecNum)
-    return X .- calc_prediction_moment_target(r, X)
-end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::VecNum, X::MatNum,
                                                                       fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(X::VecNum)
-    val = min.(calc_prediction_deviations_vec(r, X), zero(eltype(X)))
     return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::VecNum,
@@ -998,18 +979,9 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::Ve
     val = abs.(calc_deviations_vec(r, w, X, fees))
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(X::VecNum)
-    val = abs.(calc_prediction_deviations_vec(r, X))
-    return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
-end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::VecNum, X::MatNum,
                                                                        fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    val .= val .^ 3
-    return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
-end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(X::VecNum)
-    val = min.(calc_prediction_deviations_vec(r, X), zero(eltype(X)))
     val .= val .^ 3
     return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
 end
@@ -1023,24 +995,11 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
     return res / (sigma * sqrt(sigma))
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:ThirdLowerMoment}})(X::VecNum)
-    val = min.(calc_prediction_deviations_vec(r, X), zero(eltype(X)))
-    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-    val .= val .^ 3
-    res = isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
-    return res / (sigma * sqrt(sigma))
-end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}})(w::VecNum,
                                                                            X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}})(X::VecNum)
-    val = min.(calc_prediction_deviations_vec(r, X), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
@@ -1051,20 +1010,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Semi, <:QuadSecondMomentFormulations}})(X::VecNum)
-    val = min.(calc_prediction_deviations_vec(r, X), zero(eltype(X)))
-    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}})(w::VecNum,
                                                                            X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
-    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}})(X::VecNum)
-    val = calc_prediction_deviations_vec(r, X)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
@@ -1074,11 +1023,6 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:SecondMoment{<:Any, <:Full, <:QuadSecondMomentFormulations}})(X::VecNum)
-    val = calc_prediction_deviations_vec(r, X)
-    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(w::VecNum,
                                                                            X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
@@ -1086,20 +1030,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(w::Ve
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(X::VecNum)
-    val = min.(calc_prediction_deviations_vec(r, X), zero(eltype(X)))
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Full}})(w::VecNum,
                                                                            X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Full}})(X::VecNum)
-    val = calc_prediction_deviations_vec(r, X)
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
@@ -1114,8 +1048,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     return res / sigma^2
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
-                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Full}}})(X::VecNum)
-    val = calc_prediction_deviations_vec(r, X)
+                             <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Full}}})(w::VecNum,
+                                                                                            X::MatNum,
+                                                                                            fees::Option{<:Fees} = nothing)
+    val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
