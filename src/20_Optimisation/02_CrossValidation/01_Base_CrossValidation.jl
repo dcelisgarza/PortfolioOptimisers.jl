@@ -199,6 +199,22 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseR
     idx = max(1, round(Int, Statistics.quantile(1:length(sorted_predictions), q)))
     return sorted_predictions[idx]
 end
+#! Start: Use these for scoring grid/random search cv
+function _map_to_population_measures(::Val{true}, rks::VecNum, f)
+    return f(rks)
+end
+function _map_to_population_measures(::Val{false}, rks::VecNum, f)
+    return rks'
+end
+function _map_to_population_measures(::Val{false}, rks::VecVecNum, f)
+    return f(reduce(vcat, rks); dims = 1)
+end
+function map_to_population_measures(ppred::PopulationPredictionResult,
+                                    r::AbstractBaseRiskMeasure, f = mean)
+    rks = expected_risk(ppred, r)
+    return _map_to_population_measures(Val(isa(ppred.pred[1].rd[1].X, VecNum)), rks, f)
+end
+#! End: Use these for scoring grid/random search cv
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     return PredictionResult(; res = res, rd = rd)
 end

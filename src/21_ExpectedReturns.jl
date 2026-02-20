@@ -610,7 +610,23 @@ const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
 function bigger_is_better(::PerfRM)
     return true
 end
-function expected_risk(pred::AbstractPredictionResult, r::PrRM; kwargs...)
+function expected_risk(pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecNum}},
+                       r::PrRM; kwargs...)
+    throw(MethodError(expected_risk,
+                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+end
+function expected_risk(pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecVecNum}},
+                       r::PrRM; kwargs...)
+    throw(MethodError(expected_risk,
+                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+end
+function expected_risk(pred::MultiPeriodPredictionResult, r::PrRM; kwargs...)
+    throw(MethodError(expected_risk,
+                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+end
+function expected_risk(pred::PopulationPredictionResult, r::PrRM; kwargs...)
     throw(MethodError(expected_risk,
                       "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
 end

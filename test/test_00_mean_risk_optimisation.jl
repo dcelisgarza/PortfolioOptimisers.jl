@@ -275,7 +275,11 @@
                     else
                         1e-10
                     end
-                    @test rk1 <= rk || abs(rk1 - rk) < tol
+                    res = rk1 <= rk || abs(rk1 - rk) < tol
+                    @test res
+                    if !res
+                        findtol(rk1, rk; name1 = :rk1, name2 = :rk)
+                    end
                 else
                     @test rk1 / rk < 1.07
                 end

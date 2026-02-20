@@ -280,7 +280,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
         end
     end
     if isnothing(score)
-        score = NearestQuantile()
+        score = NearestQuantilePrediction()
     end
     best_predictions = [score(prediction) for prediction in predictions]
     return rebuild_returns_result(rd, best_predictions, N)
