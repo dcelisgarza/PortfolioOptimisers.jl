@@ -215,10 +215,10 @@ Now we can view the pareto surface. For the z-axis and colourbar, we will use th
 
 ````@example 04_Pareto_Surface
 plot_measures(res3.w, pr; x = r1, y = r2,
-              z = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                             rt = ArithmeticReturn(), rf = rf),
-              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                             rt = ArithmeticReturn(), rf = rf),
+              z = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
+                                          rt = ArithmeticReturn(), rf = rf),
+              c = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
+                                          rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Surface", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               zlabel = "CDaR/Return")
 ````
@@ -227,8 +227,8 @@ We can view it in 2D as well.
 
 ````@example 04_Pareto_Surface
 plot_measures(res3.w, pr; x = r1, y = r2,
-              c = ReturnRiskRatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
-                                             rt = ArithmeticReturn(), rf = rf),
+              c = ExpectedReturnRiskRatio(; rk = ConditionalDrawdownatRisk(),
+                                          rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
 ````

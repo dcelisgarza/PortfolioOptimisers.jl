@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/03_Efficient_Frontier.jl"
 ```
@@ -104,8 +105,8 @@ The efficient frontier is just a special case of a pareto front, we have a funct
 
 ````@example 03_Efficient_Frontier
 # Risk-free rate of 4.2/100/252
-plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
+plot_measures(res1.w, res1.pr; x = r, y = ExpectedReturn(; rt = res1.ret),
+              c = ExpectedReturnRiskRatio(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 ````
@@ -122,4 +123,3 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

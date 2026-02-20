@@ -32,7 +32,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     function Stacking(pr::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                       sets::Option{<:AssetSets}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,
-                      cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
+                      cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
                       strict::Bool, ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt})
         assert_external_optimiser(opto)
         if !isnothing(cv)
@@ -52,7 +52,7 @@ end
 function Stacking(; pr::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   fees::Option{<:FeesE_Fees} = nothing, sets::Option{<:AssetSets} = nothing,
                   opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
-                  cv::Option{<:CrossValidationEstimator} = nothing,
+                  cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::Option{<:OptE_Opt} = nothing)
@@ -100,10 +100,11 @@ function opt_view(st::Stacking, i, X::MatNum)
     return Stacking(; pr = pr, wb = wb, fees = fees, opti = opti, opto = opto, cv = st.cv,
                     wf = st.wf, sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
+
 """
 Overload this using st.cv for custom cross-validation prediction
 """
-function predict_outer_st_estimator_returns(st::Stacking, rd::ReturnsResult,
+function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsResult,
                                             pr::AbstractPriorResult, fees::Option{<:Fees},
                                             wi::MatNum, resi::VecOpt)
     iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
@@ -117,37 +118,47 @@ function predict_outer_st_estimator_returns(st::Stacking, rd::ReturnsResult,
 end
 function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any,
-                                                         <:Union{<:KFold,
-                                                                 <:WalkForwardEstimator}},
+                                                         <:OptimisationCrossValidation{<:NonCombOptCV}},
                                             rd::ReturnsResult, pr::AbstractPriorResult,
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
+    if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
+        return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
+    end
+    cv = cv.cv
     N = length(opti)
     predictions = Vector{MultiPeriodPredictionResult}(undef, N)
-    FLoops.@floop ex for (i, opt) in enumerate(opti)
-        cvi = hasproperty(cv, :rng) ? copy(cv) : cv
-        predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
-    end
-    iv_flag = !isnothing(rd.iv)
-    ivpa_flag = !isnothing(rd.ivpa)
-    rd1 = predictions[1].mrd
-    X = rd1.X
-    iv = rd1.iv
-    ivpa = ivpa_flag ? [rd1.ivpa] : nothing
-    @inbounds for i in 2:length(predictions)
-        rdi = predictions[i].mrd
-        append!(X, rdi.X)
-        if iv_flag
-            append!(iv, rdi.iv)
-        end
-        if ivpa_flag
-            push!(ivpa, rdi.ivpa)
+    let cv = cv
+        FLoops.@floop ex for (i, opt) in enumerate(opti)
+            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
-    X = reshape(X, :, N)
-    iv = iv_flag ? reshape(iv, :, N) : nothing
-    return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
-                         ts = rd1.ts, iv = iv, ivpa = ivpa)
+    return rebuild_returns_result(rd, predictions, N)
+end
+function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any,
+                                                         <:OptimisationCrossValidation{<:CombinatorialCrossValidation}},
+                                            rd::ReturnsResult, pr::AbstractPriorResult,
+                                            fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
+    (; opti, cv, ex) = st
+    if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
+        return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
+    end
+    (; cv, score) = cv
+    N = length(opti)
+    predictions = Vector{PopulationPredictionResult}(undef, N)
+    let cv = cv
+        FLoops.@floop ex for (i, opt) in enumerate(opti)
+            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
+        end
+    end
+    if isnothing(score)
+        score = NearestQuantile()
+    end
+    best_predictions = [score(prediction) for prediction in predictions]
+    return rebuild_returns_result(rd, best_predictions, N)
 end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,

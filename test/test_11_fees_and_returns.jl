@@ -92,9 +92,9 @@
         @test all(isapprox.((rk, rt, sric),
                             expected_risk_ret_sric(r, res.ret, res.w, pr; rf = rf)))
 
-        @test isapprox(expected_risk(ReturnRiskMeasure(), res.w, pr, fes[1]),
+        @test isapprox(expected_risk(ExpectedReturn(), res.w, pr, fes[1]),
                        rt - calc_fees(res.w, fes[1]))
-        @test isapprox(expected_risk(factory(ReturnRiskRatioRiskMeasure(; rf = rf), pr),
-                                     res.w, pr, fes[1]), srf)
+        @test isapprox(expected_risk(factory(ExpectedReturnRiskRatio(; rf = rf), pr), res.w,
+                                     pr, fes[1]), srf)
     end
 end

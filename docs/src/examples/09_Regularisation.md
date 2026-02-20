@@ -130,9 +130,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
 No regularisation frontier.
 
 ````@example 09_Regularisation
-plot_measures(ress[1].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, pr; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "No regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -149,9 +148,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
 L1 regularisation frontier. The sparsification makes the pareto front non-smooth.
 
 ````@example 09_Regularisation
-plot_measures(ress[2].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, pr; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L1 regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -168,9 +166,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
 L2 regularisation frontier.
 
 ````@example 09_Regularisation
-plot_measures(ress[3].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, pr; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L2 regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -188,9 +185,8 @@ plot_stacked_area_composition(ress[4].w, rd.nx;
 Lp regularisation frontier.
 
 ````@example 09_Regularisation
-plot_measures(ress[4].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[4].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[4].w, pr; x = r, y = ExpectedReturn(; rt = ress[4].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Lp (p = 5) regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -208,9 +204,8 @@ plot_stacked_area_composition(ress[5].w, rd.nx;
 L-Inf regularisation frontier.
 
 ````@example 09_Regularisation
-plot_measures(ress[5].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[5].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[5].w, pr; x = r, y = ExpectedReturn(; rt = ress[5].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L-Inf regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)

@@ -10,3 +10,6 @@ function OptimisationCrossValidation(; cv::OptimisationCrossValidationEstimator 
                                      score::Option{<:CrossValScorer} = nothing)
     return OptimisationCrossValidation(cv, score)
 end
+const NonCombOptCV = Union{<:KFold, <:WalkForwardEstimator}
+
+export OptimisationCrossValidation

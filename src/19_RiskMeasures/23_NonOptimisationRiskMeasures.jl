@@ -1,21 +1,25 @@
-struct MeanReturn{T1} <: NonOptimisationRiskMeasure
+struct MeanReturn{T1, T2} <: NonOptimisationRiskMeasure
     w::T1
-    function MeanReturn(w::Option{<:StatsBase.AbstractWeights})
+    flag::T2
+    function MeanReturn(w::Option{<:StatsBase.AbstractWeights}, flag::Bool)
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        return MeanReturn(w)
+        return MeanReturn(w, flag)
     end
 end
-function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return MeanReturn(w)
+function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing, flag::Bool = false)
+    return MeanReturn(w, flag)
 end
 function (r::MeanReturn)(x::VecNum)
+    if r.flag
+        x = log1p.(x)
+    end
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
 function factory(r::MeanReturn, pr::AbstractPriorResult, args...)
     w = nothing_scalar_array_selector(r.w, pr.w)
-    return MeanReturn(; w = w)
+    return MeanReturn(; w = w, flag = r.flag)
 end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
     return r
@@ -34,12 +38,15 @@ function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
     return MeanReturnRiskRatio(rt, rk, rf)
 end
 function factory(r::MeanReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
-    rt = nothing_scalar_array_selector(r.rt, pr)
+    rt = factory(r.rt, pr)
     rk = factory(r.rk, pr, args...; kwargs...)
     return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
 function factory(r::MeanReturnRiskRatio, w::VecNum)
     return MeanReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
+end
+function needs_previous_weights(r::MeanReturnRiskRatio)
+    return needs_previous_weights(r.rk)
 end
 struct ThirdCentralMoment{T1, T2} <: NonOptimisationRiskMeasure
     w::T1

@@ -269,9 +269,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
 Vanilla sigma and mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[1].w, prs[1]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[1]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Vanilla sigma and mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -289,9 +288,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
 Fixed denoise covariance.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[2].w, prs[2]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[2]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed denoise sigma and BS(VW) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -309,9 +307,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
 LoGo(MaxDist) covariance.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[3].w, prs[3]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "LoGo(MaxDist) sigma and BS(MSE) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -329,9 +326,8 @@ plot_stacked_area_composition(ress[4].w, rd.nx;
 Shrunk denoise (0.5) covariance.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[4].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[4].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[4].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[4].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[4].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[4].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Shrunk denoise (0.5) sigma and BOP(GM) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -349,9 +345,8 @@ plot_stacked_area_composition(ress[5].w, rd.nx;
 Fixed denoise + LoGo(MaxDist) sigma and BOP(VW) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[5].w, prs[5]; x = r, y = ReturnRiskMeasure(; rt = ress[5].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[5].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[5].w, prs[5]; x = r, y = ExpectedReturn(; rt = ress[5].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[5].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed denoise + LoGo(MaxDist) sigma and BOP(VW) mu",
               xlabel = "Variance", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
@@ -369,9 +364,8 @@ plot_stacked_area_composition(ress[6].w, rd.nx;
 LoGo(ExpDist) sigma and BOP(MSE) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[6].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[6].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[6].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[6].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[6].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[6].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "LoGo(ExpDist) sigma and BOP(MSE) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -432,9 +426,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
 Vanilla V and BOP(GM) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[1].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Vanilla V and BOP(GM) mu", xlabel = "Negative Skewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -452,9 +445,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
 Fixed Denoise V and BOP(VW) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[2].w, prs[5]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[5]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed Denoise V and BOP(VW) mu", xlabel = "Negative Skewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -472,9 +464,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
 Shrunk(0) Denoise + LoGo(MaxDist) V and BOP(MSE) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[3].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Shrunk(0) Denoise + LoGo(MaxDist) V and BOP(MSE) mu",
               xlabel = "Negative Skewness", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
@@ -537,9 +528,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
 Vanilla kt and BOP(GM) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[1].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Vanilla kt and BOP(GM) mu", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -557,9 +547,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
 Fixed Denoise kt and BOP(VW) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[2].w, prs[5]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[5]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed Denoise kt and BOP(VW) mu", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -577,9 +566,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
 Shrunk(0) Denoise + LoGo(MaxDist) kt and BOP(MSE) mu.
 
 ````@example 08_Improving_Moment_Estimation
-plot_measures(ress[3].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Shrunk(0) Denoise + LoGo(MaxDist) kt and BOP(MSE) mu",
               xlabel = "Kurtosis", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)

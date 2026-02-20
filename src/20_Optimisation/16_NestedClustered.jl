@@ -97,7 +97,7 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                              fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
                              opti::NonFiniteAllocationOptimisationEstimator,
                              opto::NonFiniteAllocationOptimisationEstimator,
-                             cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
+                             cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
                              strict::Bool, ex::FLoops.Transducers.Executor,
                              fb::Option{<:OptE_Opt})
         assert_external_optimiser(opto)
@@ -125,7 +125,7 @@ function NestedClustered(; pr::PrE_Pr = EmpiricalPrior(), clr::ClE_Cl = Clusters
                          sets::Option{<:AssetSets} = nothing,
                          opti::NonFiniteAllocationOptimisationEstimator,
                          opto::NonFiniteAllocationOptimisationEstimator,
-                         cv::Option{<:CrossValidationEstimator} = nothing,
+                         cv::Option{<:OptimisationCrossValidation} = nothing,
                          wf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -219,21 +219,9 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)
 end
-function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
-                                                                  <:Any, <:Any, <:Any,
-                                                                  <:Any,
-                                                                  <:Union{<:KFold,
-                                                                          <:WalkForwardEstimator}},
-                                             rd::ReturnsResult, pr::AbstractPriorResult,
-                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
-                                             cls::VecVecInt)
-    (; opti, cv, ex) = nco
-    N = length(cls)
-    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
-    FLoops.@floop ex for (i, cl) in enumerate(cls)
-        cvi = hasproperty(cv, :rng) ? copy(cv) : cv
-        predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
-    end
+function rebuild_returns_result(rd::ReturnsResult,
+                                predictions::AbstractVector{<:MultiPeriodPredictionResult},
+                                N::Integer)
     iv_flag = !isnothing(rd.iv)
     ivpa_flag = !isnothing(rd.ivpa)
     rd1 = predictions[1].mrd
@@ -254,6 +242,48 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     iv = iv_flag ? reshape(iv, :, N) : nothing
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
                          ts = rd1.ts, iv = iv, ivpa = ivpa)
+end
+function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
+                                                                  <:Any, <:Any, <:Any,
+                                                                  <:Any,
+                                                                  <:OptimisationCrossValidation{<:NonCombOptCV}},
+                                             rd::ReturnsResult, pr::AbstractPriorResult,
+                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
+                                             cls::VecVecInt)
+    (; opti, cv, ex) = nco
+    cv = cv.cv
+    N = length(cls)
+    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    let cv = cv
+        FLoops.@floop ex for (i, cl) in enumerate(cls)
+            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
+        end
+    end
+    return rebuild_returns_result(rd, predictions, N)
+end
+function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
+                                                                  <:Any, <:Any, <:Any,
+                                                                  <:Any,
+                                                                  <:OptimisationCrossValidation{<:CombinatorialCrossValidation}},
+                                             rd::ReturnsResult, pr::AbstractPriorResult,
+                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
+                                             cls::VecVecInt)
+    (; opti, cv, ex) = nco
+    (; cv, score) = cv
+    N = length(cls)
+    predictions = Vector{PopulationPredictionResult}(undef, N)
+    let cv = cv
+        FLoops.@floop ex for (i, cl) in enumerate(cls)
+            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
+        end
+    end
+    if isnothing(score)
+        score = NearestQuantile()
+    end
+    best_predictions = [score(prediction) for prediction in predictions]
+    return rebuild_returns_result(rd, best_predictions, N)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,

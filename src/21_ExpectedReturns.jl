@@ -235,13 +235,13 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
     return rk, rt, sr - N / (T * sr)
 end
 """
-    struct ExpectedReturnRiskMeasure{T1} <: NonOptimisationRiskMeasure
+    struct ExpectedReturn{T1} <: NonOptimisationRiskMeasure
         rt::T1
     end
 
 Return-based risk measure.
 
-`ExpectedReturnRiskMeasure` is a risk measure that uses the expected portfolio return as its risk metric. This is useful for algorithms or analyses where the risk is defined as the expected return, used in portfolio performance analysis.
+`ExpectedReturn` is a risk measure that uses the expected portfolio return as its risk metric. This is useful for algorithms or analyses where the risk is defined as the expected return, used in portfolio performance analysis.
 
 # Fields
 
@@ -249,13 +249,13 @@ Return-based risk measure.
 
 # Constructor
 
-    ExpectedReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
+    ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())
 
 # Examples
 
 ```jldoctest
-julia> ExpectedReturnRiskMeasure()
-ExpectedReturnRiskMeasure
+julia> ExpectedReturn()
+ExpectedReturn
   rt ┼ ArithmeticReturn
      │   ucs ┼ nothing
      │    lb ┼ nothing
@@ -269,53 +269,53 @@ ExpectedReturnRiskMeasure
   - [`expected_return`](@ref)
   - [`expected_risk`](@ref)
 """
-struct ExpectedReturnRiskMeasure{T1} <: NonOptimisationRiskMeasure
+struct ExpectedReturn{T1} <: NonOptimisationRiskMeasure
     rt::T1
-    function ExpectedReturnRiskMeasure(rt::JuMPReturnsEstimator)
+    function ExpectedReturn(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
     end
 end
-function ExpectedReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
-    return ExpectedReturnRiskMeasure(rt)
+function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())
+    return ExpectedReturn(rt)
 end
 """
-    factory(r::ExpectedReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+    factory(r::ExpectedReturn, pr::AbstractPriorResult, args...; kwargs...)
 
-Construct a new `ExpectedReturnRiskMeasure` object with an updated return estimator based on the provided prior result.
+Construct a new `ExpectedReturn` object with an updated return estimator based on the provided prior result.
 
-This function creates a new [`ExpectedReturnRiskMeasure`](@ref) instance by updating the internal return estimator using the prior result and any additional arguments or keyword arguments.
+This function creates a new [`ExpectedReturn`](@ref) instance by updating the internal return estimator using the prior result and any additional arguments or keyword arguments.
 
 # Arguments
 
-  - `r`: A [`ExpectedReturnRiskMeasure`](@ref) object containing a return estimator.
+  - `r`: A [`ExpectedReturn`](@ref) object containing a return estimator.
   - `prior`: Prior result used to update the return estimator.
   - `args...`: Additional positional arguments for updating the return estimator.
   - `kwargs...`: Additional keyword arguments for updating the return estimator.
 
 # Returns
 
-  - `r::ExpectedReturnRiskMeasure`: New risk measure object with updated return estimator.
+  - `r::ExpectedReturn`: New risk measure object with updated return estimator.
 
 # Details
 
   - Calls [`factory`](@ref) to update the return estimator using the prior result and arguments.
-  - Returns a new `ExpectedReturnRiskMeasure` object with the updated estimator.
+  - Returns a new `ExpectedReturn` object with the updated estimator.
 
 # Related
 
-  - [`ExpectedReturnRiskMeasure`](@ref)
+  - [`ExpectedReturn`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`factory`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::ExpectedReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ExpectedReturn, pr::AbstractPriorResult, args...; kwargs...)
     rt = factory(r.rt, pr, args...; kwargs...)
-    return ExpectedReturnRiskMeasure(; rt = rt)
+    return ExpectedReturn(; rt = rt)
 end
 """
-    factory(r::ExpectedReturnRiskMeasure, args...; kwargs...)
+    factory(r::ExpectedReturn, args...; kwargs...)
 
-Return the input `ExpectedReturnRiskMeasure` object unchanged.
+Return the input `ExpectedReturn` object unchanged.
 
 This function provides a consistent interface for updating or copying return-based risk measures. It is used for composability in portfolio analytics workflows where the risk measure does not require modification.
 
@@ -327,7 +327,7 @@ This function provides a consistent interface for updating or copying return-bas
 
 # Returns
 
-  - `r::ExpectedReturnRiskMeasure`: The input risk measure object.
+  - `r::ExpectedReturn`: The input risk measure object.
 
 # Details
 
@@ -336,23 +336,23 @@ This function provides a consistent interface for updating or copying return-bas
 
 # Related
 
-  - [`ExpectedReturnRiskMeasure`](@ref)
+  - [`ExpectedReturn`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::ExpectedReturnRiskMeasure, args...; kwargs...)
+function factory(r::ExpectedReturn, args...; kwargs...)
     return r
 end
 """
-    expected_risk(r::ExpectedReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult;
+    expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
 
 Compute the expected risk for a portfolio using a return-based risk measure.
 
-`expected_risk` returns the expected portfolio return as the risk metric, using the specified return estimator in the [`ExpectedReturnRiskMeasure`](@ref). This is useful for algorithms where risk is defined as expected return.
+`expected_risk` returns the expected portfolio return as the risk metric, using the specified return estimator in the [`ExpectedReturn`](@ref). This is useful for algorithms where risk is defined as expected return.
 
 # Arguments
 
-  - `r`: [`ExpectedReturnRiskMeasure`](@ref) containing a return estimator.
+  - `r`: [`ExpectedReturn`](@ref) containing a return estimator.
   - `w`: Portfolio weights.
   - `pr`: Prior result.
   - `fees`: Optional transaction fees.
@@ -364,11 +364,11 @@ Compute the expected risk for a portfolio using a return-based risk measure.
 
 # Related
 
-  - [`ExpectedReturnRiskMeasure`](@ref)
+  - [`ExpectedReturn`](@ref)
   - [`expected_return`](@ref)
   - [`expected_ratio`](@ref)
 """
-function expected_risk(r::ExpectedReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult,
+function expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_return(r.rt, w, pr, fees)
 end
@@ -601,17 +601,18 @@ function expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorR
                        fees::Option{<:Fees} = nothing; kwargs...)
     return expected_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
 end
-const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturnRiskMeasure,
+function needs_previous_weights(r::ExpectedReturnRiskRatio)
+    return needs_previous_weights(r.rk)
+end
+const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
                      <:ExpectedReturnRiskRatio}
+const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
 function bigger_is_better(::PerfRM)
     return true
 end
-function expected_risk(pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecNum}},
-                       r::Union{<:ExpectedReturnRiskMeasure, <:ExpectedReturnRiskRatio};
-                       kwargs...)
+function expected_risk(pred::AbstractPredictionResult, r::PrRM; kwargs...)
     throw(MethodError(expected_risk,
-                      "risk measure $r is incompatible for computing the expected risk of a prediction result, please use $(isa(r, ExpectedReturnRiskMeasure) ? MeanReturn : MeanReturnRiskRatio) instead"))
+                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
 end
 """
     brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
@@ -702,5 +703,4 @@ function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
 end
 
 export expected_return, expected_ratio, expected_risk_ret_ratio, expected_sric,
-       expected_risk_ret_sric, ExpectedReturnRiskMeasure, ExpectedReturnRiskRatio,
-       brinson_attribution
+       expected_risk_ret_sric, ExpectedReturn, ExpectedReturnRiskRatio, brinson_attribution

@@ -729,8 +729,8 @@ These risk measures are unsuitable for optimisation because they can return nega
 - Mean Return [`MeanReturn`]-(@ref)
 - Third Central Moment [`ThirdCentralMoment`]-@(ref)
 - Skewness [`Skewness`]-(@ref)
-- Return Risk Measure [`ReturnRiskMeasure`](@ref)
-- Return Risk Ratio Risk Measure [`ReturnRiskRatioRiskMeasure`](@ref)
+- Return Risk Measure [`ExpectedReturn`](@ref)
+- Return Risk Ratio Risk Measure [`ExpectedReturnRiskRatio`](@ref)
 
 ### Performance metrics
 

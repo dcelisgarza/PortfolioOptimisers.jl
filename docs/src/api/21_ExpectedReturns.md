@@ -3,11 +3,11 @@
 ## Public
 
 ```@docs
-ReturnRiskMeasure
-ReturnRiskRatioRiskMeasure
-expected_risk(r::ReturnRiskMeasure, w::VecNum, pr::AbstractPriorResult,
+ExpectedReturn
+ExpectedReturnRiskRatio
+expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
-expected_risk(r::ReturnRiskRatioRiskMeasure, w::VecNum, pr::AbstractPriorResult,
+expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,
                        fees::Option{<:Fees} = nothing; kwargs...)
 ```
 
@@ -19,12 +19,12 @@ expected_ratio
 expected_risk_ret_ratio
 expected_sric
 expected_risk_ret_sric
-factory(r::ReturnRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-factory(r::ReturnRiskMeasure, args...; kwargs...)
-factory(r::ReturnRiskRatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
+factory(r::ExpectedReturn, pr::AbstractPriorResult, args...; kwargs...)
+factory(r::ExpectedReturn, args...; kwargs...)
+factory(r::ExpectedReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
+factory(r::ExpectedReturnRiskRatio{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
                  kwargs...)
-factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
-factory(r::ReturnRiskRatioRiskMeasure{<:Any, <:TnTrRM}, w::VecNum)
+factory(r::ExpectedReturnRiskRatio{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
+factory(r::ExpectedReturnRiskRatio{<:Any, <:TnTrRM}, w::VecNum)
 brinson_attribution
 ```
