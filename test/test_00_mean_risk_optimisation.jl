@@ -256,13 +256,13 @@
                 rk = expected_risk(factory(r, pr, slv), res.w, rd.X)
                 rt = expected_return(ret, res.w, pr)
                 opt1 = JuMPOptimiser(; pr = pr, slv = slv,
-                                     ret = bounds_returns_estimator(ret, rt))
+                                     ret = bounds_returns_estimator(ret, rt * 1.01))
                 mr = MeanRisk(; r = r, opt = opt1)
                 res = optimise(mr, rd)
                 rt1 = expected_return(ret, res.w, pr)
-                @test rt1 >= rt || abs(rt1 - rt) < 1e-10
-                mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
-                              opt = opt)
+                @test rt1 >= rt * 1.01 || abs(rt1 - rt * 1.01) < 1e-10
+                mr = MeanRisk(; r = bounds_risk_measure(r, rk * 1.01),
+                              obj = MaximumReturn(), opt = opt)
                 res = optimise(mr, rd)
                 rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
                 if !isa(r, Kurtosis) || isa(r, Kurtosis) && isnothing(r.N)
@@ -275,8 +275,8 @@
                     else
                         1e-10
                     end
-                    @test rk1 <= rk || abs(rk1 - rk) < tol
-                    println("rk1: $rk1, rk: $rk")
+                    @test rk1 <= rk * 1.01 || abs(rk1 - rk * 1.01) < tol
+                    println("i: $i, rk1: $rk1, rk: $rk")
                     find_tol(rk1, rk; name1 = :rk1, name2 = :rk)
                 else
                     @test rk1 / rk < 1.07
