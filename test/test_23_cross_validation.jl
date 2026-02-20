@@ -611,6 +611,11 @@
               [expected_risk(pred, ConditionalValueatRisk())
                for pred in combinatorial_pred.pred]
 
+        # r = MeanReturnRiskRatio()
+        # idx = sortperm(expected_risk(combinatorial_pred, r);
+        #                rev = PortfolioOptimisers.bigger_is_better(r))
+        # srt=sort_by_measure(combinatorial_pred,r)
+
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5, n_subsets = 3,
                                 rng = StableRNG(666), seed = 69)

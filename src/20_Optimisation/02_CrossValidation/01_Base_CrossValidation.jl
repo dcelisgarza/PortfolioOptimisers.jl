@@ -95,6 +95,9 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
     return PredictionResult(res, rd)
 end
 struct SingletonVector{T} <: AbstractVector{T} end
+function SingletonVector()
+    return SingletonVector{Int}()
+end
 Base.length(::SingletonVector) = 1
 Base.getindex(::SingletonVector, args...) = 1
 Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
@@ -108,8 +111,7 @@ function expected_risk(pred::PredictionResult{<:Any,
                                               <:PredictionReturnsResult{<:Any, <:VecVecNum}},
                        r::AbstractBaseRiskMeasure; kwargs...)
     X = pred.rd.X
-    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
-            for Xi in X]
+    return [expected_risk(r, SingletonVector(), reshape(Xi, :, 1); kwargs...) for Xi in X]
 end
 struct MultiPeriodPredictionResult{T1} <: AbstractResult
     pred::T1
@@ -184,6 +186,17 @@ function expected_risk(ppred::PopulationPredictionResult, r::AbstractBaseRiskMea
                        kwargs...)
     return [expected_risk(pred, r; kwargs...) for pred in ppred.pred]
 end
+function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
+                         kwargs...)
+    return sort(ppred.pred; by = x -> expected_risk(x, r; kwargs...),
+                rev = bigger_is_better(r))
+end
+function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
+                             q::Real; kwargs...)
+    sorted_predictions = sort_by_measure(ppred, r; kwargs...)
+    filter!(x -> isa(x.res, OptimisationSuccess), sorted_predictions)
+    return sorted_predictions[round(Int, quantile(length(sorted_predictions), q))]
+end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     return PredictionResult(; res = res, rd = rd)
 end
@@ -248,4 +261,4 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
 end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult, predict,
-       fit_predict
+       fit_predict, sort_by_measure

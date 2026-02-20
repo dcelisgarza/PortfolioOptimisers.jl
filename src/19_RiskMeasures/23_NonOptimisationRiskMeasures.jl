@@ -10,10 +10,6 @@ end
 function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanReturn(w)
 end
-function smaller_is_better(::Union{<:MeanReturn,
-                                   <:RiskRatioRiskMeasure{<:MeanReturn, <:Any}})
-    return false
-end
 function (r::MeanReturn)(x::VecNum)
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
@@ -23,6 +19,27 @@ function factory(r::MeanReturn, pr::AbstractPriorResult, args...)
 end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
     return r
+end
+struct MeanReturnRiskRatio{T1, T2, T3} <: NonOptimisationRiskMeasure
+    rt::T1
+    rk::T2
+    rf::T3
+    function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
+        return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
+    end
+end
+function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
+                             rk::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+                             rf::Number = 0.0)
+    return MeanReturnRiskRatio(rt, rk, rf)
+end
+function factory(r::MeanReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
+    rt = nothing_scalar_array_selector(r.rt, pr)
+    rk = factory(r.rk, pr, args...; kwargs...)
+    return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
+end
+function factory(r::MeanReturnRiskRatio, w::VecNum)
+    return MeanReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 struct ThirdCentralMoment{T1, T2} <: NonOptimisationRiskMeasure
     w::T1
@@ -116,4 +133,4 @@ function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     return res / sigma^3
 end
 
-export MeanReturn, ThirdCentralMoment, Skewness
+export MeanReturn, ThirdCentralMoment, Skewness, MeanReturnRiskRatio

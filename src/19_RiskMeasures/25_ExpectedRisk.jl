@@ -58,6 +58,16 @@ function expected_risk(r::RkRatioRM, w::VecNum, pr::Pr_RR, fees::Option{<:Fees} 
     return expected_risk(r.r1, w, pr.X, fees; kwargs...) /
            expected_risk(r.r2, w, pr.X, fees; kwargs...)
 end
+function expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return (expected_risk(r.rt, w, X, fees; kwargs...) - r.rf) /
+           expected_risk(r.rk, w, X, fees; kwargs...)
+end
+function expected_risk(r::MeanReturnRiskRatio, w::VecNum, pr::Pr_RR,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return (expected_risk(r.rt, w, pr.X, fees; kwargs...) - r.rf) /
+           expected_risk(r.rk, w, pr.X, fees; kwargs...)
+end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
