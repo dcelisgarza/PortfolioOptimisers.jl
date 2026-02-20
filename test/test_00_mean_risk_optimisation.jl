@@ -275,11 +275,9 @@
                     else
                         1e-10
                     end
-                    res = rk1 <= rk || abs(rk1 - rk) < tol
-                    @test res
-                    if !res
-                        find_tol(rk1, rk; name1 = :rk1, name2 = :rk)
-                    end
+                    @test rk1 <= rk || abs(rk1 - rk) < tol
+                    println("rk1: $rk1, rk: $rk")
+                    find_tol(rk1, rk; name1 = :rk1, name2 = :rk)
                 else
                     @test rk1 / rk < 1.07
                 end
