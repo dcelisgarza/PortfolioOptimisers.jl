@@ -39,10 +39,12 @@ function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
-function factory(rt::ArithmeticReturn, ucs::UcSE_UcS,
-                 pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
+function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, pr::AbstractPriorResult; kwargs...)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
-                            mu =  mu = nothing_scalar_array_selector(rt.mu, pr.mu) )
+                            mu = nothing_scalar_array_selector(rt.mu, pr.mu))
+end
+function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
+    return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb, mu = rt.mu)
 end
 function jump_returns_view(r::ArithmeticReturn, i, args...)
     uset = ucs_view(r.ucs, i)
