@@ -344,5 +344,23 @@
                        0.011807455957080073)
         @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = 0, w = wt), w, rd.X),
                        0.011807455957080073)
+        @test isapprox(expected_risk(factory(ExpectedReturn(), pr), w, pr),
+                       0.00014724061887437024)
+        @test factory(ExpectedReturn()) === ExpectedReturn()
+        ucs = DeltaUncertaintySet(;)
+        r = factory(ExpectedReturn(), pr)
+        @test r.rt.mu === pr.mu
+        r = factory(ExpectedReturn(), ucs)
+        @test r.rt.ucs === ucs
+        r = factory(ExpectedReturn(), pr, ucs)
+        @test r.rt.mu === pr.mu
+        @test r.rt.ucs === ucs
+
+        r = factory(ExpectedReturn(), ucs, pr)
+        @test r.rt.mu === pr.mu
+        @test r.rt.ucs === ucs
+
+        @test isapprox(expected_risk(factory(ExpectedReturn(; rt = LogarithmicReturn()),
+                                             pr), w, pr), 6.522750683623699e-5)
     end
 end

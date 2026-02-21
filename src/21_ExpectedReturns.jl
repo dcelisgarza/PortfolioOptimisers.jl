@@ -42,9 +42,9 @@ Compute the expected portfolio return using the specified return estimator.
   - [`expected_risk_ret_sric`](@ref)
   - [`calc_fees`](@ref)
 """
-function expected_return(::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
+function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
-    mu = pr.mu
+    mu = ifelse(isnothing(r.mu), pr.mu, r.mu)
     return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
@@ -308,8 +308,8 @@ This function creates a new [`ExpectedReturn`](@ref) instance by updating the in
   - [`factory`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::ExpectedReturn, pr::AbstractPriorResult, args...; kwargs...)
-    rt = factory(r.rt, pr, args...; kwargs...)
+function factory(r::ExpectedReturn, args...; kwargs...)
+    rt = factory(r.rt, args...; kwargs...)
     return ExpectedReturn(; rt = rt)
 end
 """
