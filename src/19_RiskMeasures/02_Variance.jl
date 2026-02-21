@@ -734,9 +734,11 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function factory(r::UncertaintySetVariance, ucs::UcSE_UcS; kwargs...)
+function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
+                 pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = r.sigma)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 function risk_measure_view(r::UncertaintySetVariance, i, args...)
     ucs = ucs_view(r.ucs, i)

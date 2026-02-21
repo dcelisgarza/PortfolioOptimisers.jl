@@ -313,36 +313,6 @@ function factory(r::ExpectedReturn, args...; kwargs...)
     return ExpectedReturn(; rt = rt)
 end
 """
-    factory(r::ExpectedReturn, args...; kwargs...)
-
-Return the input `ExpectedReturn` object unchanged.
-
-This function provides a consistent interface for updating or copying return-based risk measures. It is used for composability in portfolio analytics workflows where the risk measure does not require modification.
-
-# Arguments
-
-  - `r`: Return-based risk measure object.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
-
-# Returns
-
-  - `r::ExpectedReturn`: The input risk measure object.
-
-# Details
-
-  - Returns the input object unchanged.
-  - Ensures interface consistency for factory operations.
-
-# Related
-
-  - [`ExpectedReturn`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::ExpectedReturn, args...; kwargs...)
-    return r
-end
-"""
     expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
 
@@ -464,9 +434,9 @@ This function creates a new [`ExpectedReturnRiskRatio`](@ref) instance by updati
   - [`ExpectedReturnRiskRatio`](@ref)
   - [`AbstractPriorResult`](@ref)
 """
-function factory(r::ExpectedReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
-    rt = factory(r.rt, pr, args...; kwargs...)
-    rk = factory(r.rk, pr, args...; kwargs...)
+function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
+    rt = factory(r.rt, args...; kwargs...)
+    rk = factory(r.rk, args...; kwargs...)
     return ExpectedReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
 """

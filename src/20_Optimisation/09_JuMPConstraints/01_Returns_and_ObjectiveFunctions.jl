@@ -29,15 +29,20 @@ function ArithmeticReturn(; ucs::Option{<:UcSE_UcS} = nothing,
                           mu::Option{<:Num_VecNum} = nothing)
     return ArithmeticReturn(ucs, lb, mu)
 end
-function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
+function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
+    return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
+                            mu = nothing_scalar_array_selector(rt.mu, pr.mu))
+end
+function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
+                 ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
                             mu = nothing_scalar_array_selector(rt.mu, pr.mu))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS,
                  pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb,
-                            mu = mu = nothing_scalar_array_selector(rt.mu, pr.mu))
+                            mu =  mu = nothing_scalar_array_selector(rt.mu, pr.mu) )
 end
 function jump_returns_view(r::ArithmeticReturn, i, args...)
     uset = ucs_view(r.ucs, i)
@@ -211,9 +216,6 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
                  end
              end
          end)
-end
-function factory(r::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs...)
-    return LogarithmicReturn(; w = nothing_scalar_array_selector(r.w, pr.w), lb = r.lb)
 end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1} <: ObjectiveFunction
