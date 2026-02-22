@@ -382,8 +382,7 @@
                 try
                     optimise(opt, rd)
                 catch err
-                    if isa(err, ArgumentError) &&
-                       err.msg == "ArgumentError: matrix contains Infs or NaNs"
+                    if isa(err, ArgumentError)
                         println("Failed iteration: $i\nError: $err\nContinuing with next iteration.")
                         continue
                     else
