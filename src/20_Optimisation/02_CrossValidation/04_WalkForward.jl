@@ -73,7 +73,8 @@ function n_splits(iwf::IndexWalkForward, rd::ReturnsResult)
     return val
 end
 abstract type DateAdjusterEstimator <: AbstractEstimator end
-const IntPeriodDateRange = Union{<:Integer, <:Dates.Period}
+const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
 const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
 struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimator
     train_size::T1
@@ -86,19 +87,13 @@ struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimat
     expend_train::T8
     reduce_test::T9
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
-                             period::Option{<:Union{<:Dates.Period, <:Dates.CompoundPeriod}},
-                             period_offset::Option{<:Union{<:Dates.Period,
-                                                           <:Dates.CompoundPeriod}},
+                             period::DatesUnionPeriod,
+                             period_offset::Option{<:DatesUnionPeriod},
                              purged_size::Integer, adjuster::DateAdjType, previous::Bool,
                              expend_train::Bool, reduce_test::Bool)
         assert_nonempty_nonneg_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
             assert_nonempty_nonneg_finite_val(train_size, :train_size)
-        elseif isa(train_size, AbstractVector)
-            @argcheck(!isempty(train_size), IsEmptyError)
-        end
-        if isnothing(period)
-            @argcheck(isa(train_size, Integer))
         end
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(period),
@@ -115,9 +110,8 @@ struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimat
     end
 end
 function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
-                         period::Option{<:Union{<:Dates.Period, <:Dates.CompoundPeriod}} = nothing,
-                         period_offset::Option{<:Union{<:Dates.Period,
-                                                       <:Dates.CompoundPeriod}} = nothing,
+                         period::DatesUnionPeriod = Dates.Day(1),
+                         period_offset::Option{<:DatesUnionPeriod} = nothing,
                          purged_size::Integer = 0, adjuster::DateAdjType = identity,
                          previous::Bool = false, expend_train::Bool = false,
                          reduce_test::Bool = false)
@@ -139,8 +133,8 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     if po_flag
         date_range += period_offset
     end
-
-    idx = typeof(T)[]
+    tt = typeof(T)
+    idx = Vector{tt}(undef, 0)
     for date in date_range
         i = searchsortedlast(ts, date)
         if !previous && ts[i] != date
@@ -154,8 +148,8 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
 
     N = length(idx)
     i = 1
-    train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
-    test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
+    train_indices = Vector{UnitRange{tt}}(undef, 0)
+    test_indices = Vector{UnitRange{tt}}(undef, 0)
     while true
         if i + train_size > N
             break
