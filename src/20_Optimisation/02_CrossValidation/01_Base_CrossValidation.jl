@@ -217,6 +217,44 @@ function map_to_population_measures(ppred::PopulationPredictionResult,
     return _map_to_population_measures(Val(isa(ppred.pred[1].rd[1].X, VecNum)), rks, f)
 end
 #! End: Use these for scoring grid/random search cv
+function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                        X::VecNum)
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        w = abs.(res.w)
+        if iv_flag
+            iv = iv * w
+        end
+        if ivpa
+            ivpa = LinearAlgebra.dot(rd.ivpa, w)
+        end
+    end
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
+                                   iv = iv, ivpa = ivpa)
+end
+function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                        X::VecVecNum)
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        w = [abs.(wi) for wi in res.w]
+        if iv_flag
+            iv = [iv * w for w in w]
+        end
+        if isa(ivpa, Number)
+            ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
+        elseif isa(ivpa, AbstractVector)
+            ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in w]
+        end
+    end
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
+                                   iv = iv, ivpa = ivpa)
+end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     X = calc_net_returns(res, rd.X)
     rd = reconstruct_rd(res, rd, X)
@@ -225,20 +263,6 @@ end
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     res = optimise(opt, rd)
     return predict(res, rd)
-end
-function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecNum)
-    iv = isnothing(rd.iv) ? rd.iv : rd.iv * res.w
-    ivpa = !isa(rd.ivpa, AbstractVector) ? rd.ivpa : dot(rd.ivpa, res.w)
-    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                                   iv = iv, ivpa = ivpa)
-end
-function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                        X::VecVecNum)
-    iv = isnothing(rd.iv) ? rd.iv : [rd.iv * w for w in res.w]
-    ivpa = !isa(rd.ivpa, AbstractVector) ? rd.ivpa : [dot(rd.ivpa, w) for w in res.w]
-    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                                   iv = iv, ivpa = ivpa)
 end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idx::VecInt, cols = :)

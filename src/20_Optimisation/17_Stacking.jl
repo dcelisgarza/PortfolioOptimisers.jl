@@ -107,8 +107,19 @@ Overload this using st.cv for custom cross-validation prediction
 function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsResult,
                                             pr::AbstractPriorResult, fees::Option{<:Fees},
                                             wi::MatNum, resi::VecOpt)
-    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        wi = abs.(wi)
+        if iv_flag
+            iv = iv * wi
+        end
+        if ivpa_flag
+            ivpa = transpose(wi) * ivpa
+        end
+    end
     X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, pr, fees)

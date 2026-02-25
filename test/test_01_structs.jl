@@ -253,9 +253,9 @@
     end
     @testset "Misc" begin
         sv = PortfolioOptimisers.SingletonVector()
-        sv[1] == 1
-        size(sv) == (1,)
-        length(sv) == 1
+        @test sv[1] == 1
+        @test size(sv) == (1,)
+        @test length(sv) == 1
     end
     # @testset "NonFiniteAllocationOptimisationEstimator" begin
 

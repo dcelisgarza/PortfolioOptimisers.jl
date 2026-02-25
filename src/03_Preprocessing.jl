@@ -442,7 +442,8 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         iv = values(iv)
         assert_nonempty_nonneg_finite_val(iv, :iv)
         assert_nonempty_gt0_finite_val(ivpa, :ivpa)
-        @argcheck(size(iv) == length(nx), DimensionMismatch)
+        @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), DataFrames.DataAPI.ncol(X) - 1),
+                  DimensionMismatch)
         if isa(ivpa, VecNum)
             @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
         end

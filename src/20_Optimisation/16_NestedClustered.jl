@@ -208,8 +208,19 @@ Overload this using nco.cv for custom cross-validation prediction
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
-    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
-    ivpa = !isa(rd.ivpa, AbstractVector) ? rd.ivpa : transpose(wi) * rd.ivpa
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        wi = abs.(wi)
+        if iv_flag
+            iv = iv * wi
+        end
+        if ivpa_flag
+            ivpa = transpose(wi) * ivpa
+        end
+    end
     X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)

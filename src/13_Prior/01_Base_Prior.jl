@@ -237,7 +237,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - [`AbstractPriorResult`](@ref)
   - [`clusterise`](@ref)
 """
-function clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
+function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
 """
