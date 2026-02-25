@@ -203,7 +203,7 @@
                                                            "./assets/SP500.csv.gz"));
                                          timestamp = :Date)[(end - 252):end]; iv = iv,
                                ivpa = ivpa)
-        pr = prior(EmpiricalPrior(), rd)
+        pr = prior(HighOrderPriorEstimator(), rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pr = pr, slv = slv)
