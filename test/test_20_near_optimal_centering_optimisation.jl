@@ -67,12 +67,16 @@
         rk_max = expected_risk(r, res_max.w, pr)
         rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
         rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
-        res1 = optimise(NearOptimalCentering(;
-                                             r = StandardDeviation(;
-                                                                   settings = RiskMeasureSettings(;
-                                                                                                  ub = Frontier(;
-                                                                                                                N = 5))),
-                                             obj = MaximumReturn(), opt = opt))
+        pred = fit_predict(NearOptimalCentering(;
+                                                r = StandardDeviation(;
+                                                                      settings = RiskMeasureSettings(;
+                                                                                                     ub = Frontier(;
+                                                                                                                   N = 5))),
+                                                obj = MaximumReturn(), opt = opt), rd)
+        res1 = pred.res
+        @test pred.rd.nx == rd.nx
+        @test pred.rd.X == calc_net_returns(pred.res, rd.X)
+        @test pred.rd.ts == rd.ts
         res2 = optimise(NearOptimalCentering(;
                                              r = StandardDeviation(;
                                                                    settings = RiskMeasureSettings(;

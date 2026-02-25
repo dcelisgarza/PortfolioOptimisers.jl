@@ -100,7 +100,9 @@ function SingletonVector()
     return SingletonVector{Int}()
 end
 Base.length(::SingletonVector) = 1
-Base.getindex(::SingletonVector, args...) = 1
+function Base.getindex(A::SingletonVector, i::Int)
+    return isone(i) ? 1 : throw(BoundsError(A, i))
+end
 Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
 Base.size(::SingletonVector) = (1,)
 function expected_risk(pred::PredictionResult{<:Any,
@@ -216,6 +218,8 @@ function map_to_population_measures(ppred::PopulationPredictionResult,
 end
 #! End: Use these for scoring grid/random search cv
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+    X = calc_net_returns(res, rd.X)
+    rd = reconstruct_rd(res, rd, X)
     return PredictionResult(; res = res, rd = rd)
 end
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
