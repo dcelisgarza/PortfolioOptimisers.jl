@@ -228,7 +228,7 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         if iv_flag
             iv = iv * w
         end
-        if ivpa
+        if ivpa_flag
             ivpa = LinearAlgebra.dot(rd.ivpa, w)
         end
     end
@@ -246,11 +246,12 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         if iv_flag
             iv = [iv * w for w in w]
         end
-        if isa(ivpa, Number)
-            ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
-        elseif isa(ivpa, AbstractVector)
-            ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in w]
-        end
+    end
+    if ivpa_flag
+        ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in w]
+    end
+    if isa(ivpa, Number)
+        ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
     end
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
                                    iv = iv, ivpa = ivpa)
