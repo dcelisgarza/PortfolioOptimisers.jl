@@ -5,7 +5,7 @@ struct MeanReturn{T1, T2} <: NonOptimisationRiskMeasure
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        return MeanReturn(w, flag)
+        return new{typeof(w), typeof(flag)}(w, flag)
     end
 end
 function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing, flag::Bool = false)

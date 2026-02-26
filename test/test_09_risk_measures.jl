@@ -362,5 +362,42 @@
 
         @test isapprox(expected_risk(factory(ExpectedReturn(; rt = LogarithmicReturn()),
                                              pr), w, pr), 6.522750683623699e-5)
+
+        mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
+        sets = AssetSets(; dict = Dict("nx" => rd.nx))
+        pr2 = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views), rd)
+        rf = 4.2 / 252 / 100
+        Xret = rd.X * w
+
+        r = factory(MeanReturn(; flag = true), pr2)
+        @test r.w === pr2.w
+        @test r.flag == true
+        @test expected_risk(r, w, rd.X) == mean(log1p.(Xret), pr2.w)
+
+        r = factory(MeanReturnRiskRatio(; rt = MeanReturn(; flag = true),
+                                        rk = EntropicValueatRisk(), rf = rf), pr2, slv)
+        @test r.rt.w === pr2.w
+        @test r.rt.flag == true
+        @test r.rk.w === pr2.w
+        @test r.rk.slv === slv
+        @test r.rf == rf
+        @test expected_risk(r, w, rd.X) ==
+              (mean(log1p.(Xret), pr2.w) - rf) /
+              expected_risk(EntropicValueatRisk(; slv = slv, w = pr2.w), w, rd.X)
+
+        r = factory(MeanReturn(), pr)
+        @test r.w === pr.w
+        @test r.flag == false
+        @test expected_risk(r, w, rd.X) == mean(Xret)
+
+        r = factory(MeanReturnRiskRatio(; rf = rf, rk = RelativisticValueatRisk()), pr, slv)
+        @test r.rt.w === pr.w
+        @test r.rt.flag == false
+        @test r.rk.w === pr.w
+        @test r.rk.slv === slv
+        @test r.rf == rf
+        @test expected_risk(r, w, rd.X) ==
+              (mean(Xret) - rf) /
+              expected_risk(RelativisticValueatRisk(; slv = slv), w, rd.X)
     end
 end
