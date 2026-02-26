@@ -279,7 +279,7 @@ function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())
     return ExpectedReturn(rt)
 end
 """
-    factory(r::ExpectedReturn, pr::AbstractPriorResult, args...; kwargs...)
+    factory(r::ExpectedReturn, args...; kwargs...)
 
 Construct a new `ExpectedReturn` object with an updated return estimator based on the provided prior result.
 
@@ -439,6 +439,7 @@ function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
     rk = factory(r.rk, args...; kwargs...)
     return ExpectedReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
+#=
 """
     factory(r::ExpectedReturnRiskRatio{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS; kwargs...)
 
@@ -537,6 +538,7 @@ This function creates a new [`ExpectedReturnRiskRatio`](@ref) instance by updati
 function factory(r::ExpectedReturnRiskRatio{<:Any, <:TnTrRM}, w::VecNum)
     return ExpectedReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
+=#
 """
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)

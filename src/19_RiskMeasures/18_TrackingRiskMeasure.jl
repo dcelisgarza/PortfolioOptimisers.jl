@@ -65,14 +65,19 @@ function risk_measure_view(r::TrackingRiskMeasure, i, args...)
     tr = tracking_view(r.tr, i)
     return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
 end
+#=
 function factory(r::TrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     return TrackingRiskMeasure(; settings = r.settings, tr = r.tr, alg = r.alg)
 end
+=#
 function needs_previous_weights(r::TrackingRiskMeasure)
     return needs_previous_weights(r.tr)
 end
 function factory(r::TrackingRiskMeasure, w::VecNum)
     return TrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), alg = r.alg)
+end
+function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
+    return factory(r, w)
 end
 struct RiskTrackingRiskMeasure{T1, T2, T3, T4} <: RiskMeasure
     settings::T1

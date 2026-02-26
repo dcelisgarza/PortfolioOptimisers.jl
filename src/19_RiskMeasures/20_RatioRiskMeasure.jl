@@ -9,9 +9,9 @@ function RiskRatioRiskMeasure(; r1::OptimisationRiskMeasure = Variance(),
                               r2::OptimisationRiskMeasure = ConditionalValueatRisk())
     return RiskRatioRiskMeasure(r1, r2)
 end
-function factory(r::RiskRatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-    r1 = factory(r.r1, pr, args...; kwargs...)
-    r2 = factory(r.r2, pr, args...; kwargs...)
+function factory(r::RiskRatioRiskMeasure, args...; kwargs...)
+    r1 = factory(r.r1, args...; kwargs...)
+    r2 = factory(r.r2, args...; kwargs...)
     return RiskRatioRiskMeasure(; r1 = r1, r2 = r2)
 end
 function factory(r::RiskRatioRiskMeasure, w::VecNum)
@@ -29,15 +29,16 @@ function NonOptimisationRiskRatioRiskMeasure(; r1::AbstractBaseRiskMeasure = Var
                                              r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())
     return NonOptimisationRiskRatioRiskMeasure(r1, r2)
 end
-function factory(r::NonOptimisationRiskRatioRiskMeasure, pr::AbstractPriorResult, args...;
-                 kwargs...)
-    r1 = factory(r.r1, pr, args...; kwargs...)
-    r2 = factory(r.r2, pr, args...; kwargs...)
+function factory(r::NonOptimisationRiskRatioRiskMeasure, args...; kwargs...)
+    r1 = factory(r.r1, args...; kwargs...)
+    r2 = factory(r.r2, args...; kwargs...)
     return NonOptimisationRiskRatioRiskMeasure(; r1 = r1, r2 = r2)
 end
+#=
 function factory(r::NonOptimisationRiskRatioRiskMeasure, w::VecNum)
     return NonOptimisationRiskRatioRiskMeasure(; r1 = factory(r.r1, w),
                                                r2 = factory(r.r2, w))
 end
+=#
 
 export RiskRatioRiskMeasure, NonOptimisationRiskRatioRiskMeasure

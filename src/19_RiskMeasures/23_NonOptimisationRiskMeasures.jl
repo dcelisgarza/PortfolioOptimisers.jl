@@ -37,9 +37,9 @@ function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
                              rf::Number = 0.0)
     return MeanReturnRiskRatio(rt, rk, rf)
 end
-function factory(r::MeanReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
-    rt = factory(r.rt, pr)
-    rk = factory(r.rk, pr, args...; kwargs...)
+function factory(r::MeanReturnRiskRatio, args...; kwargs...)
+    rt = factory(r.rt, args...)
+    rk = factory(r.rk, args...; kwargs...)
     return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
 function factory(r::MeanReturnRiskRatio, w::VecNum)
