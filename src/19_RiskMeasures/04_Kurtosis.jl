@@ -209,12 +209,11 @@ end
 function risk_measure_view(r::Kurtosis, i, args...)
     mu = r.mu
     kt = r.kt
+    j = nothing
     j = if isa(mu, VecNum)
         length(mu)
     elseif isa(kt, MatNum)
         isqrt(size(kt, 1))
-    else
-        nothing
     end
     if !isnothing(j) && !isnothing(kt)
         idx = fourth_moment_index_generator(j, i)

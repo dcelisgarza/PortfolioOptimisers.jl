@@ -1944,7 +1944,7 @@
                                                                  l_b = 1e-1, r_b = 1e-3),
                ValueatRisk(), ValueatRiskRange(),
                ValueatRisk(; alg = DistributionValueatRisk()),
-               ValueatRiskRange(; alg = DistributionValueatRisk())]
+               ValueatRiskRange(; alg = DistributionValueatRisk()), DrawdownatRisk()]
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
                LowOrderMoment(; mu = 0, w = wp, alg = MeanAbsoluteDeviation()),
                LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg1 = Semi())),
@@ -1968,12 +1968,14 @@
                                                                  w = wp),
                ValueatRisk(; w = wp), ValueatRiskRange(; w = wp),
                ValueatRisk(; alg = DistributionValueatRisk(), w = wp),
-               ValueatRiskRange(; alg = DistributionValueatRisk(), w = wp)]
+               ValueatRiskRange(; alg = DistributionValueatRisk(), w = wp),
+               DrawdownatRisk(; w = wp)]
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
             res1, res2 = if isa(r1,
                                 Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                       <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                         <:MIPValueatRisk}})
+                                                         <:MIPValueatRisk},
+                                      <:DrawdownatRisk})
                 optimise(MeanRisk(; r = r1, opt = mip_opt)),
                 optimise(MeanRisk(; r = r2, opt = mip_opt))
             else
@@ -1993,6 +1995,7 @@
             else
                 1e-6
             end
+            display([res1.w res2.w])
             res = isapprox(res1.w, res2.w; rtol = rtol)
             if !res
                 println("Iteration $i failed:")

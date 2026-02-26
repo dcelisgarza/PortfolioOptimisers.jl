@@ -24,8 +24,10 @@ function tracking_view(tr::RiskTrackingError, i, X::MatNum)
     return RiskTrackingError(; tr = tracking_view(tr.tr, i),
                              r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
 end
-function factory(tr::RiskTrackingError, pr::AbstractPriorResult, args...; kwargs...)
-    return RiskTrackingError(; tr = tr.tr, r = factory(tr.r, pr, args...; kwargs...),
+function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
+                 w::Option{<:VecNum} = nothing, args...; kwargs...)
+    return RiskTrackingError(; tr = factory(tr.tr, w),
+                             r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
                              err = tr.err, alg = tr.alg)
 end
 function needs_previous_weights(tr::RiskTrackingError)

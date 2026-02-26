@@ -601,6 +601,13 @@ function turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType
     return [turnover_constraints(tni, sets; datatype = datatype, strict = strict)
             for tni in tn]
 end
+function factory(tn::VecTnE_Tn, w::VecNum)
+    val = [factory(tni, w) for tni in tn]
+    if isabstracttype(eltype(val))
+        val = concrete_typed_array(val)
+    end
+    return val
+end
 """
     turnover_view(tn::VecTnE_Tn, i)
 
@@ -656,7 +663,9 @@ julia> PortfolioOptimisers.turnover_view(concrete_typed_array([tn1, tn2]), 1:2)
 """
 function turnover_view(tn::VecTnE_Tn, i)
     val = [turnover_view(tni, i) for tni in tn]
-    isconcretetype(eltype(val)) ? nothing : (val = concrete_typed_array(val))
+    if isabstracttype(eltype(val))
+        val = concrete_typed_array(val)
+    end
     return val
 end
 function needs_previous_weights(tn::TnE_Tn)

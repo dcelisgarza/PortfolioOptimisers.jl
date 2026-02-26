@@ -28,7 +28,8 @@ function factory(r::TurnoverRiskMeasure, w::VecNum)
         TurnoverRiskMeasure(; settings = r.settings, w = w, fixed = r.fixed)
     end
 end
-function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
+function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum} = nothing,
+                 args...; kwargs...)
     return factory(r, w)
 end
 

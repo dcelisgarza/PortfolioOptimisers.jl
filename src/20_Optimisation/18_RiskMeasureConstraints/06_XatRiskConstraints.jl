@@ -190,8 +190,8 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
-    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
-    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
+    b = ifelse(!isnothing(r.b), r.b, 1e3)
+    s = ifelse(!isnothing(r.s), r.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:dar_risk_, i)
     sc = model[:sc]

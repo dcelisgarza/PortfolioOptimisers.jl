@@ -202,6 +202,26 @@
         @test tn.val == Dict("A" => 0.1, "B" => 0.2)
         @test tn.dval == 0.2
 
+        tn = concrete_typed_array([TurnoverEstimator(; w = w, fixed = true,
+                                                     val = Dict("A" => 0.1, "B" => 0.2)),
+                                   TurnoverEstimator(; w = w,
+                                                     val = Dict("A" => 0.1, "B" => 0.2)),
+                                   Turnover(; w = w, fixed = true), Turnover(; w = w)])
+        @test PortfolioOptimisers.needs_previous_weights.(tn) == [false, true, false, true]
+        @test PortfolioOptimisers.needs_previous_weights(tn) == true
+        tns = PortfolioOptimisers.factory(tn, [-1, -2, -3])
+        for tn in tns
+            if tn.fixed
+                @test tn.w == w
+            else
+                @test tn.w == [-1, -2, -3]
+            end
+        end
+        tns2 = PortfolioOptimisers.turnover_view(tns, [2, 3])
+        for (tn2, tn) in zip(tns2, tns)
+            @test tn2.w == view(tn.w, [2, 3])
+        end
+
         @test_throws IsEmptyError Turnover(; w = Float64[], val = 0)
 
         @test_throws DomainError Turnover(; w = Float64[Inf], val = 0)
