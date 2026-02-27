@@ -310,9 +310,10 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     return special_div(last_allowed_start - M, test_size) + 1
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::WalkForwardResult; cols = :,
+                         cv::WalkForwardEstimator; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    (; train_idx, test_idx) = cv
+    cv_res = split(cv, rd)
+    (; train_idx, test_idx) = cv_res
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     if needs_previous_weights(opt)
         @info("Running walk forward sequentially because the optimiser must use the previous optimisation's weights. This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\nTo enable parallel processing please either mark the weights as fixed or remove the component(s) which use(s) them.")
@@ -330,6 +331,17 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                                                  test_idx = test, cols = cols)
             end
         end
+    end
+    return MultiPeriodPredictionResult(; pred = predictions)
+end
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                         cv::WalkForwardEstimator;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    cv_res = split(cv, rd)
+    test_idx = cv_res.test_idx
+    predictions = Vector{PredictionResult}(undef, length(test_idx))
+    FLoops.@floop ex for (i, test) in enumerate(test_idx)
+        predictions[i] = predict(res, rd, test)
     end
     return MultiPeriodPredictionResult(; pred = predictions)
 end

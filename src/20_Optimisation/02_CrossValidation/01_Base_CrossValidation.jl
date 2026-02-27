@@ -272,9 +272,13 @@ function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
+                         test_idx, kwargs...)
+    return predict(res, rd, test_idx)
+end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                 train_idxs::VecVecInt, cols = :)
-    return [predict(res, rd, test_idx, cols) for test_idx in train_idxs]
+                 test_idxs::VecVecInt, cols = :)
+    return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx, test_idx, cols = :)
@@ -295,10 +299,15 @@ function sort_predictions!(res::CrossValidationResult,
                            predictions::AbstractVector{<:PredictionResult})
     return sort_predictions!(res.test_idx, predictions)
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::NonSequentialCrossValidationResult; cols = :,
+function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
+                         cv::NonSequentialCrossValidationEstimator; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    (; train_idx, test_idx) = cv
+    @argcheck(!(hasproperty(cv, :shuffle) && cv.shuffle),
+              "Cross validation estimator must not be shuffled.")
+    cv_res = split(cv, rd)
+    (; train_idx, test_idx) = cv_res
+    @argcheck(all(map(x -> x > zero(x), map(x -> diff(x), train_idx))),
+              "Cross validation estimator must not be shuffled.")
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,

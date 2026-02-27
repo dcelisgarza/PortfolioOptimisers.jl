@@ -37,7 +37,7 @@ end
 function assert_rc_pl(::Any)
     return nothing
 end
-function assert_rc_pl(opt::RiskJuMPOptimisationEstimator)
+function assert_rc_pl(opt::FactorRiskContribution)
     @argcheck(!isa(opt.pl, AbstractPhylogenyConstraintResult) ||
               isa(opt.pl, AbstractVector) &&
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.pl))
@@ -111,8 +111,10 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
                              strict::Bool, ex::FLoops.Transducers.Executor,
                              fb::Option{<:OptE_Opt})
         assert_external_optimiser(opto)
+        assert_special_nco_requirements(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)
+            assert_special_nco_requirements(opti)
         end
         if !isnothing(cv)
             assert_external_optimiser(opti)

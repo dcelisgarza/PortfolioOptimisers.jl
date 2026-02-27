@@ -58,6 +58,9 @@ function Stacking(; pr::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
                   fb::Option{<:OptE_Opt} = nothing)
     return Stacking(pr, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
 end
+function assert_special_nco_requirements(opt::Stacking)
+    @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti))
+end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pr, AbstractPriorResult))
@@ -133,9 +136,9 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
                                             rd::ReturnsResult, pr::AbstractPriorResult,
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
-    if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
-        return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
-    end
+    # if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
+    #     return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
+    # end
     cv = cv.cv
     N = length(opti)
     predictions = Vector{MultiPeriodPredictionResult}(undef, N)
@@ -153,9 +156,9 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
                                             rd::ReturnsResult, pr::AbstractPriorResult,
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
-    if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
-        return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
-    end
+    # if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
+    #     return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
+    # end
     (; cv, score) = cv
     N = length(opti)
     predictions = Vector{PopulationPredictionResult}(undef, N)

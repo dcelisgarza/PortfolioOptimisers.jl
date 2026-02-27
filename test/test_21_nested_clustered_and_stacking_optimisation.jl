@@ -169,6 +169,7 @@
     clr = clusterise(ClustersEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
+        resi = optimise(MeanRisk(; opt = jopto), rd)
         jopti = JuMPOptimiser(; pr = pr, slv = slv, sets = sets)
         jopto = JuMPOptimiser(; slv = slv)
         hopti = HierarchicalOptimiser(; pr = pr, slv = slv)
@@ -381,7 +382,36 @@
                                 opti = NestedClustered(; opti = MeanRisk(; opt = jopti),
                                                        opto = MeanRisk(; opt = jopto)),
                                 opto = NestedClustered(; opti = MeanRisk(; opt = jopto),
-                                                       opto = MeanRisk(; opt = jopto)))]
+                                                       opto = MeanRisk(; opt = jopto))),
+                Stacking(;
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                Stacking(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                Stacking(;
+                         cv = OptimisationCrossValidation(;
+                                                          cv = CombinatorialCrossValidation(;
+                                                                                            n_folds = 4,
+                                                                                            n_test_folds = 3)),
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                Stacking(;
+                         cv = OptimisationCrossValidation(; cv = IndexWalkForward(23, 11)),
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = if Sys.isapple()

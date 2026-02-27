@@ -166,9 +166,10 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions))
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::MultipleRandomisedResult;
+                         cv::MultipleRandomised;
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
-    (; train_idx, test_idx, asset_idx, path_ids) = cv
+    cv_res = split(cv, rd)
+    (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     unique_ids = unique(path_ids)
     dict = [Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}(undef, 0)
             for _ in unique_ids]

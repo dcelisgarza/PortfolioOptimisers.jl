@@ -198,15 +198,27 @@ function sort_predictions!(res::CombinatorialCrossValidationResult,
     return sorted_preds
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::CombinatorialCrossValidationResult; cols = :,
+                         cv::CombinatorialCrossValidation; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    (; train_idx, test_idx) = cv
+    cv_res = split(cv, rd)
+    (; train_idx, test_idx) = cv_res
     predictions = Vector{Vector{PredictionResult}}(undef, length(train_idx))
     FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end
-    return PopulationPredictionResult(; pred = sort_predictions!(cv, predictions))
+    return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
+end
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                         cv::CombinatorialCrossValidation;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    cv_res = split(cv, rd)
+    test_idx = cv_res.test_idx
+    predictions = Vector{Vector{PredictionResult}}(undef, length(test_idx))
+    FLoops.@floop ex for (i, test) in enumerate(test_idx)
+        predictions[i] = predict(res, rd, test)
+    end
+    return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
 
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,

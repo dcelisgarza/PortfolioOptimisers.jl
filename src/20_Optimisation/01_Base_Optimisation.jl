@@ -11,6 +11,9 @@ abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
+function assert_special_nco_requirements(::OptE_Opt)
+    return nothing
+end
 function factory(opt::OptE_Opt, ::Any)
     return opt
 end
@@ -20,6 +23,9 @@ end
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
+end
+function assert_special_nco_requirements(opt::VecOptE_Opt)
+    return assert_special_nco_requirements.(opt)
 end
 function needs_previous_weights(opt::VecOptE_Opt)
     return any(needs_previous_weights.(opt))
