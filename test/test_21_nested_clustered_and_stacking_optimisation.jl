@@ -169,11 +169,11 @@
     clr = clusterise(ClustersEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
-        resi = optimise(MeanRisk(; opt = jopto), rd)
         jopti = JuMPOptimiser(; pr = pr, slv = slv, sets = sets)
         jopto = JuMPOptimiser(; slv = slv)
         hopti = HierarchicalOptimiser(; pr = pr, slv = slv)
         hopto = HierarchicalOptimiser(; slv = slv)
+        resi = optimise(MeanRisk(; opt = jopto), rd)
         opts = [NestedClustered(; clr = clr, opti = MeanRisk(; opt = jopti),
                                 opto = MeanRisk(; opt = jopto)),
                 NestedClustered(; clr = clr, opti = NearOptimalCentering(; opt = jopti),
