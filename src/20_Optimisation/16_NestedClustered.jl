@@ -34,8 +34,18 @@ function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)
     end
     return nothing
 end
+function assert_rc_pl(::Any)
+    return nothing
+end
+function assert_rc_pl(opt::RiskJuMPOptimisationEstimator)
+    @argcheck(!isa(opt.pl, AbstractPhylogenyConstraintResult) ||
+              isa(opt.pl, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.pl))
+    return nothing
+end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_rc_variance(opt)
+    assert_rc_pl(opt)
     @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
                 isa(opt.opt.lcs, AbstractVector) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
@@ -145,7 +155,10 @@ function assert_external_optimiser(opt::NestedClustered)
     @argcheck(!isa(opt.pr, AbstractPriorResult))
     @argcheck(!isa(opt.clr, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
-    if !(opt.opti === opt.opto) || !isnothing(opt.cv)
+    if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
+    if !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
     end
     return nothing

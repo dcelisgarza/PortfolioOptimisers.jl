@@ -1995,7 +1995,6 @@
             else
                 1e-6
             end
-            display([res1.w res2.w])
             res = isapprox(res1.w, res2.w; rtol = rtol)
             if !res
                 println("Iteration $i failed:")

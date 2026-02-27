@@ -10,6 +10,10 @@ struct SchurComplementHierarchicalRiskParityResult{T1, T2, T3, T4, T5, T6, T7, T
     w::T7
     fb::T8
 end
+function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
+    return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
+                                                       res.gamma, res.retcode, res.w, fb)
+end
 abstract type SchurComplementAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
 struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
