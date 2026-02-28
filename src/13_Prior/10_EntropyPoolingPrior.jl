@@ -237,7 +237,7 @@ end
                         sc2::Number = 1e3,
                         alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
-Ke`word arguments correspond to the fields above.
+Keyword arguments correspond to the fields above.
 
 ## Validation
 
