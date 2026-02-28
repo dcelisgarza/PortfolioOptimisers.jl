@@ -464,10 +464,12 @@ EntropyPoolingPrior
               │        ce ┼ PortfolioOptimisersCovariance
               │           │   ce ┼ Covariance
               │           │      │    me ┼ SimpleExpectedReturns
-              │           │      │       │   w ┴ nothing
+              │           │      │       │     w ┼ nothing
+              │           │      │       │   idx ┴ nothing
               │           │      │    ce ┼ GeneralCovariance
-              │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-              │           │      │       │    w ┴ nothing
+              │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+              │           │      │       │     w ┼ nothing
+              │           │      │       │   idx ┴ nothing
               │           │      │   alg ┴ Full()
               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
               │           │      │     pdm ┼ Posdef
@@ -478,7 +480,8 @@ EntropyPoolingPrior
               │           │      │     alg ┼ nothing
               │           │      │   order ┴ DenoiseDetoneAlg()
               │        me ┼ SimpleExpectedReturns
-              │           │   w ┴ nothing
+              │           │     w ┼ nothing
+              │           │   idx ┴ nothing
               │   horizon ┴ nothing
      mu_views ┼ LinearConstraintEstimator
               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]

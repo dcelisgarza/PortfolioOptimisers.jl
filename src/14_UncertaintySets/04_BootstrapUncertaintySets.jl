@@ -126,7 +126,7 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
 
 # Constructors
 
-    ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+    ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                        n_sim::Integer = 3_000, block_size::Integer = 3, q::Number = 0.05,
                        seed::Option{<:Integer} = nothing,
@@ -149,10 +149,12 @@ ARCHUncertaintySet
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │   w ┴ nothing
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │    w ┴ nothing
+             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -163,7 +165,8 @@ ARCHUncertaintySet
              │           │      │     alg ┼ nothing
              │           │      │   order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
-             │           │   w ┴ nothing
+             │           │     w ┼ nothing
+             │           │   idx ┴ nothing
              │   horizon ┴ nothing
          alg ┼ BoxUncertaintySetAlgorithm()
        n_sim ┼ Int64: 3000
@@ -191,7 +194,7 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
     q::T5
     seed::T6
     bootstrap::T7
-    function ARCHUncertaintySet(pe::AbstractPriorEstimator,
+    function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, seed::Option{<:Integer},
                                 bootstrap::ARCHBootstrapSet)
@@ -203,7 +206,7 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
                                                     bootstrap)
     end
 end
-function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
                             q::Number = 0.05, seed::Option{<:Integer} = nothing,

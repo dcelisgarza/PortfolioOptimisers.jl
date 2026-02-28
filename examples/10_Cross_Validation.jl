@@ -23,12 +23,12 @@ end;
 #=
 ## 1. Setting up
 
-For this example we will use 10 years of daily price data. This is because we want to have significant enough training and testing periods.
+For this example we will use 4 years of daily price data. This is because we want to have significant enough training and testing periods.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 10):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 4):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns

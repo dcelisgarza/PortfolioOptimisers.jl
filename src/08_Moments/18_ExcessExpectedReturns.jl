@@ -26,7 +26,8 @@ Keyword arguments correspond to the fields above.
 julia> ExcessExpectedReturns()
 ExcessExpectedReturns
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
   rf ┴ Float64: 0.0
 ```
 

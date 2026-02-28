@@ -34,7 +34,8 @@ julia> MutualInfoCovariance()
 MutualInfoCovariance
          ve ┼ SimpleVariance
             │          me ┼ SimpleExpectedReturns
-            │             │   w ┴ nothing
+            │             │     w ┼ nothing
+            │             │   idx ┴ nothing
             │           w ┼ nothing
             │   corrected ┴ Bool: true
        bins ┼ HacineGharbiRavier()

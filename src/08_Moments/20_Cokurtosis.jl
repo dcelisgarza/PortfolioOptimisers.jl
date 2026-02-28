@@ -42,7 +42,8 @@ Keyword arguments correspond to the fields above.
 julia> Cokurtosis()
 Cokurtosis
    me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
+      │     w ┼ nothing
+      │   idx ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

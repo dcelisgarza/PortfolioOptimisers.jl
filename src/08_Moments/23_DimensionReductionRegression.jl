@@ -187,10 +187,12 @@ Keyword arguments correspond to the fields above.
 julia> DimensionReductionRegression()
 DimensionReductionRegression
      me ┼ SimpleExpectedReturns
-        │   w ┴ nothing
+        │     w ┼ nothing
+        │   idx ┴ nothing
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
-        │             │   w ┴ nothing
+        │             │     w ┼ nothing
+        │             │   idx ┴ nothing
         │           w ┼ nothing
         │   corrected ┴ Bool: true
   drtgt ┼ PCA

@@ -15,7 +15,7 @@ Estimator for box uncertainty sets using delta bounds on mean and covariance sta
 
 # Constructor
 
-    DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
+    DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
                         dsigma::Number = 0.1)
 
 Keyword arguments correspond to the fields above.
@@ -34,10 +34,12 @@ DeltaUncertaintySet
          │        ce ┼ PortfolioOptimisersCovariance
          │           │   ce ┼ Covariance
          │           │      │    me ┼ SimpleExpectedReturns
-         │           │      │       │   w ┴ nothing
+         │           │      │       │     w ┼ nothing
+         │           │      │       │   idx ┴ nothing
          │           │      │    ce ┼ GeneralCovariance
-         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │           │      │       │    w ┴ nothing
+         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │     w ┼ nothing
+         │           │      │       │   idx ┴ nothing
          │           │      │   alg ┴ Full()
          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
          │           │      │     pdm ┼ Posdef
@@ -48,7 +50,8 @@ DeltaUncertaintySet
          │           │      │     alg ┼ nothing
          │           │      │   order ┴ DenoiseDetoneAlg()
          │        me ┼ SimpleExpectedReturns
-         │           │   w ┴ nothing
+         │           │     w ┼ nothing
+         │           │   idx ┴ nothing
          │   horizon ┴ nothing
      dmu ┼ Float64: 0.1
   dsigma ┴ Float64: 0.1
@@ -64,13 +67,14 @@ struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
     pe::T1
     dmu::T2
     dsigma::T3
-    function DeltaUncertaintySet(pe::AbstractPriorEstimator, dmu::Number, dsigma::Number)
+    function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
+                                 dsigma::Number)
         @argcheck(dmu >= 0.0)
         @argcheck(dsigma >= 0.0)
         return new{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu, dsigma)
     end
 end
-function DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+function DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                              dmu::Number = 0.1, dsigma::Number = 0.1)
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end

@@ -1,7 +1,8 @@
 """
-    struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
+    struct GeneralCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
         ce::T1
         w::T2
+        idx::T3
     end
 
 A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrary covariance estimators and optional observation weights.
@@ -12,19 +13,22 @@ A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrar
 
   - `ce`: Covariance estimator.
   - `w`: Optional weights for each observation. If `nothing`, the estimator is unweighted.
+  - `idx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.
 
 # Constructor
 
     GeneralCovariance(;
                       ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                      corrected = true),
-                      w::Option{<:StatsBase.AbstractWeights} = nothing)
+                      w::Option{<:StatsBase.AbstractWeights} = nothing,
+                      idx::Option{<:VecInt} = nothing)
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
   - If `w` is not `nothing`, `!isempty(w)`.
+  - If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.
 
 # Details
 
@@ -35,13 +39,15 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> gwc = GeneralCovariance()
 GeneralCovariance
-  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-   w ┴ nothing
+   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+    w ┼ nothing
+  idx ┴ nothing
 
 julia> gwc = GeneralCovariance(; w = StatsBase.Weights([0.1, 0.2, 0.7]))
 GeneralCovariance
-  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+  idx ┴ nothing
 ```
 
 # Related
@@ -52,20 +58,24 @@ GeneralCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-struct GeneralCovariance{T1, T2} <: AbstractCovarianceEstimator
+struct GeneralCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ce::T1
     w::T2
+    idx::T3
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
-                               w::Option{<:StatsBase.AbstractWeights})
+                               w::Option{<:StatsBase.AbstractWeights},
+                               idx::Option{<:VecInt})
         assert_nonempty_finite_val(w, :w)
-        return new{typeof(ce), typeof(w)}(ce, w)
+        assert_nonempty_gt0_finite_val(idx, :idx)
+        return new{typeof(ce), typeof(w), typeof(idx)}(ce, w, idx)
     end
 end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return GeneralCovariance(ce, w)
+                           w::Option{<:StatsBase.AbstractWeights} = nothing,
+                           idx::Option{<:VecInt} = nothing)
+    return GeneralCovariance(ce, w, idx)
 end
 """
     Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
@@ -93,8 +103,17 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
   - [`robust_cov`](@ref)
   - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    return if isnothing(ce.w)
+        robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
+    else
+        robust_cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+    end
+end
+function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    X = view(X, ce.idx, :)
     return if isnothing(ce.w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
@@ -156,7 +175,7 @@ Return a new `GeneralCovariance` estimator with observation weights `w`.
   - [`factory`](@ref)
 """
 function factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
-    return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
+    return GeneralCovariance(; ce = factory(ce.ce, w), w = w, idx = ce.idx)
 end
 """
     struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
@@ -189,10 +208,12 @@ Keyword arguments correspond to the fields above.
 julia> Covariance()
 Covariance
    me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
+      │     w ┼ nothing
+      │   idx ┴ nothing
    ce ┼ GeneralCovariance
-      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │    w ┴ nothing
+      │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │     w ┼ nothing
+      │   idx ┴ nothing
   alg ┴ Full()
 ```
 
@@ -251,19 +272,23 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 julia> ce = Covariance()
 Covariance
    me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
+      │     w ┼ nothing
+      │   idx ┴ nothing
    ce ┼ GeneralCovariance
-      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │    w ┴ nothing
+      │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │     w ┼ nothing
+      │   idx ┴ nothing
   alg ┴ Full()
 
 julia> ce_w = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
 Covariance
    me ┼ SimpleExpectedReturns
-      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │   idx ┴ nothing
    ce ┼ GeneralCovariance
-      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │   idx ┴ nothing
   alg ┴ Full()
 ```
 """

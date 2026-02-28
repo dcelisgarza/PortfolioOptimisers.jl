@@ -37,10 +37,12 @@ FactorPrior
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │   w ┴ nothing
+      │           │      │       │     w ┼ nothing
+      │           │      │       │   idx ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │    w ┴ nothing
+      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │     w ┼ nothing
+      │           │      │       │   idx ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
@@ -51,7 +53,8 @@ FactorPrior
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │   w ┴ nothing
+      │           │     w ┼ nothing
+      │           │   idx ┴ nothing
       │   horizon ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
@@ -69,7 +72,8 @@ FactorPrior
       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │   w ┴ nothing
+      │             │     w ┼ nothing
+      │             │   idx ┴ nothing
       │           w ┼ nothing
       │   corrected ┴ Bool: true
   rsd ┴ Bool: true

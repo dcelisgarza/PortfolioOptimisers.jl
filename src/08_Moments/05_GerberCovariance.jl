@@ -150,7 +150,8 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedGerber0()
 StandardisedGerber0
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
 ```
 
 # Related
@@ -199,7 +200,8 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedGerber1()
 StandardisedGerber1
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
 ```
 
 # Related
@@ -248,7 +250,8 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedGerber2()
 StandardisedGerber2
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
 ```
 
 # Related
@@ -348,12 +351,14 @@ for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, Standardise
     julia> alg = StandardisedGerber0()
     StandardisedGerber0
       me ┼ SimpleExpectedReturns
-         │   w ┴ nothing
+         │     w ┼ nothing
+         │   idx ┴ nothing
 
     julia> factory(alg, StatsBase.Weights([0.2, 0.3, 0.5]))
     StandardisedGerber0
       me ┼ SimpleExpectedReturns
-         │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+         │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+         │   idx ┴ nothing
     ```
     """
     else

@@ -59,10 +59,12 @@ BayesianBlackLittermanPrior
              │       │        ce ┼ PortfolioOptimisersCovariance
              │       │           │   ce ┼ Covariance
              │       │           │      │    me ┼ SimpleExpectedReturns
-             │       │           │      │       │   w ┴ nothing
+             │       │           │      │       │     w ┼ nothing
+             │       │           │      │       │   idx ┴ nothing
              │       │           │      │    ce ┼ GeneralCovariance
-             │       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │           │      │       │    w ┴ nothing
+             │       │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │       │           │      │       │     w ┼ nothing
+             │       │           │      │       │   idx ┴ nothing
              │       │           │      │   alg ┴ Full()
              │       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       │           │      │     pdm ┼ Posdef
@@ -76,10 +78,12 @@ BayesianBlackLittermanPrior
              │       │           │   ce ┼ PortfolioOptimisersCovariance
              │       │           │      │   ce ┼ Covariance
              │       │           │      │      │    me ┼ SimpleExpectedReturns
-             │       │           │      │      │       │   w ┴ nothing
+             │       │           │      │      │       │     w ┼ nothing
+             │       │           │      │      │       │   idx ┴ nothing
              │       │           │      │      │    ce ┼ GeneralCovariance
-             │       │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │           │      │      │       │    w ┴ nothing
+             │       │           │      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │       │           │      │      │       │     w ┼ nothing
+             │       │           │      │      │       │   idx ┴ nothing
              │       │           │      │      │   alg ┴ Full()
              │       │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │       │           │      │      │     pdm ┼ Posdef
@@ -108,7 +112,8 @@ BayesianBlackLittermanPrior
              │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │    ve ┼ SimpleVariance
              │       │          me ┼ SimpleExpectedReturns
-             │       │             │   w ┴ nothing
+             │       │             │     w ┼ nothing
+             │       │             │   idx ┴ nothing
              │       │           w ┼ nothing
              │       │   corrected ┴ Bool: true
              │   rsd ┴ Bool: true

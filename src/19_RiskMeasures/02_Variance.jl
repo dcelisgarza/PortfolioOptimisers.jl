@@ -600,10 +600,12 @@ UncertaintySetVariance
            │         │        ce ┼ PortfolioOptimisersCovariance
            │         │           │   ce ┼ Covariance
            │         │           │      │    me ┼ SimpleExpectedReturns
-           │         │           │      │       │   w ┴ nothing
+           │         │           │      │       │     w ┼ nothing
+           │         │           │      │       │   idx ┴ nothing
            │         │           │      │    ce ┼ GeneralCovariance
-           │         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │         │           │      │       │    w ┴ nothing
+           │         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │         │           │      │       │     w ┼ nothing
+           │         │           │      │       │   idx ┴ nothing
            │         │           │      │   alg ┴ Full()
            │         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
            │         │           │      │     pdm ┼ Posdef
@@ -614,13 +616,15 @@ UncertaintySetVariance
            │         │           │      │     alg ┼ nothing
            │         │           │      │   order ┴ DenoiseDetoneAlg()
            │         │        me ┼ SimpleExpectedReturns
-           │         │           │   w ┴ nothing
+           │         │           │     w ┼ nothing
+           │         │           │   idx ┴ nothing
            │         │   horizon ┴ nothing
            │     alg ┼ BoxUncertaintySetAlgorithm()
            │   n_sim ┼ Int64: 3000
            │       q ┼ Float64: 0.05
            │     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-           │    seed ┴ nothing
+           │    seed ┼ nothing
+           │     ens ┴ nothing
      sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
