@@ -889,6 +889,7 @@ ParsingResult
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
 ```
+
 # Related
 
   - [`ParsingResult`](@ref)
