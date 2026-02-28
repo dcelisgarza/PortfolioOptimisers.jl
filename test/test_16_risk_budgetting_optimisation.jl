@@ -74,7 +74,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/AssetRiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pr = pr, slv = slv)
         for (i, r) in enumerate(rs)
-            r = factory(r, pr, slv)
+            r = factory(r; pr = pr, slv = slv)
             rb = RiskBudgeting(; r = r, opt = opt)
             res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
@@ -132,7 +132,7 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/AssetRiskBudgeting2.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
-            r = factory(r, pr, slv)
+            r = factory(r; pr = pr, slv = slv)
             rb = RiskBudgeting(; r = r, opt = opt,
                                rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:20)))
             res = optimise(rb, rd)
@@ -193,7 +193,7 @@
             @test success
         end
 
-        r = factory(Variance(), pr, slv)
+        r = factory(Variance(); pr = pr, slv = slv)
         rb = RiskBudgeting(;
                            rba = AssetRiskBudgeting(;
                                                     rkb = RiskBudgetEstimator(;
@@ -349,7 +349,7 @@
             @test success
         end
 
-        r = factory(Variance(), pr, slv)
+        r = factory(Variance(); pr = pr, slv = slv)
         rb = RiskBudgeting(;
                            rba = FactorRiskBudgeting(; re = rr,
                                                      rkb = RiskBudgetEstimator(;

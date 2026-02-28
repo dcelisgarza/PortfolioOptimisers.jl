@@ -144,7 +144,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                                                 <:NonMonotonicSchurComplement,
                                                                 <:Any},
                                   gamma::Option{<:Number} = nothing)
-    r = factory(params.r, pr)
+    r = factory(params.r; pr = pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
     w = ones(eltype(pr.X), size(pr.X, 2))
@@ -227,7 +227,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                                                 <:MonotonicSchurComplement,
                                                                 <:Any})
     max_gamma = params.gamma
-    r = factory(params.r, pr)
+    r = factory(params.r; pr = pr)
     if iszero(max_gamma)
         nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                           alg = NonMonotonicSchurComplement(),

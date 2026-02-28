@@ -36,13 +36,16 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
     return LinearAlgebra.dot(w, r.V, w)
 end
-function factory(r::NegativeSkewness, pr::HighOrderPrior, args...; kwargs...)
+function _factory(r::NegativeSkewness, pr::HighOrderPrior)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
     V = nothing_scalar_array_selector(r.V, pr.V)
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg)
 end
-function factory(r::NegativeSkewness, ::LowOrderPrior, args...; kwargs...)
+function _factory(r::NegativeSkewness, ::LowOrderPrior)
     return r
+end
+function factory(r::NegativeSkewness; pr::AbstractPriorResult, kwargs...)
+    return _factory(r, pr)
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any}, ::Any,
                            args...)

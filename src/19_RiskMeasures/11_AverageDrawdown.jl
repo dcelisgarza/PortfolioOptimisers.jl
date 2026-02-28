@@ -39,7 +39,7 @@ function (r::RelativeAverageDrawdown)(x::VecNum)
 end
 for r in (AverageDrawdown, RelativeAverageDrawdown)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+             function factory(r::$(r); pr::AbstractPriorResult, kwargs...)
                  w = nothing_scalar_array_selector(r.w, pr.w)
                  return $(r)(; settings = r.settings, w = w)
              end

@@ -70,7 +70,7 @@
     @testset "Asset Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedAssetRiskBudgeting1.csv.gz"),
                       DataFrame)
-        r = factory(StandardDeviation(), pr, slv)
+        r = factory(StandardDeviation(); pr = pr, slv = slv)
         for (i, alg) in enumerate(algs)
             opt = JuMPOptimiser(; pr = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
@@ -145,7 +145,7 @@
         @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
-        r = factory(StandardDeviation(), pr, slv)
+        r = factory(StandardDeviation(); pr = pr, slv = slv)
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedFactorRiskBudgeting1.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pr = pr, slv = slv,

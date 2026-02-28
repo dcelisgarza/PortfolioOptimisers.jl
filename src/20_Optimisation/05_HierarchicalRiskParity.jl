@@ -24,7 +24,7 @@ function needs_previous_weights(opt::HierarchicalRiskParity)
 end
 function factory(hrp::HierarchicalRiskParity, w::AbstractVector)
     opt = factory(hrp.opt, w)
-    r = factory(hrp.r, w)
+    r = factory(hrp.r; w = w)
     fb = factory(hrp.fb, w)
     return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
 end
@@ -54,7 +54,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pr, rd; dims = dims)
     clr = clusterise(hrp.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
-    r = factory(hrp.r, pr, hrp.opt.slv)
+    r = factory(hrp.r; pr = pr, slv = hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
                             datatype = eltype(pr.X))
@@ -175,7 +175,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pr, rd; dims = dims)
     clr = clusterise(hrp.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
-    r = factory(hrp.r, pr, hrp.opt.slv)
+    r = factory(hrp.r; pr = pr, slv = hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))

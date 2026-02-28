@@ -754,5 +754,31 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt,
                           f_sk, f_V)
 end
+function prior_view(pr::HighOrderPrior, i)
+    idx = fourth_moment_index_generator(length(pr.mu), i)
+    kt = pr.kt
+    L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
+    sk = pr.sk
+    skmp = pr.skmp
+    sk = nothing_scalar_array_view_odd_order(sk, i, idx)
+    if !isnothing(sk)
+        V = negative_spectral_coskewness(sk, view(pr.X, :, i), skmp)
+    else
+        V = nothing
+    end
+    return HighOrderPrior(; pr = prior_view(pr.pr, i),
+                          kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
+                          sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt, f_sk = pr.f_sk,
+                          f_V = pr.f_V)
+end
+function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
+    return if sym in propertynames(obj)
+        getfield(obj, sym)
+    elseif sym in propertynames(obj.pr)
+        getproperty(obj.pr, sym)
+    else
+        getfield(obj, sym)
+    end
+end
 
 export prior, LowOrderPrior, HighOrderPrior

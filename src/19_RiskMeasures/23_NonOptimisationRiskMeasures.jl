@@ -17,11 +17,11 @@ function (r::MeanReturn)(x::VecNum)
     end
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
-function factory(r::MeanReturn, pr::AbstractPriorResult, args...)
+function factory(r::MeanReturn; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MeanReturn(; w = w, flag = r.flag)
 end
-function risk_measure_view(r::MeanReturn, ::Any, args...)
+function risk_measure_view(r::MeanReturn, args...)
     return r
 end
 struct MeanReturnRiskRatio{T1, T2, T3} <: NonOptimisationRiskMeasure
@@ -38,12 +38,9 @@ function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
     return MeanReturnRiskRatio(rt, rk, rf)
 end
 function factory(r::MeanReturnRiskRatio, args...; kwargs...)
-    rt = factory(r.rt, args...)
+    rt = factory(r.rt, args...; kwargs...)
     rk = factory(r.rk, args...; kwargs...)
     return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
-end
-function factory(r::MeanReturnRiskRatio, w::VecNum)
-    return MeanReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 function needs_previous_weights(r::MeanReturnRiskRatio)
     return needs_previous_weights(r.rk)
@@ -109,7 +106,7 @@ function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
-function factory(r::ThirdCentralMoment, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ThirdCentralMoment; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
@@ -123,7 +120,7 @@ function (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = no
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function factory(r::Skewness, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::Skewness; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)

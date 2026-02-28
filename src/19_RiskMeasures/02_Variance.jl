@@ -286,7 +286,7 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
   - [`Variance`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::Variance; pr::AbstractPriorResult, kwargs...)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
@@ -438,7 +438,7 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
   - [`StandardDeviation`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::StandardDeviation; pr::AbstractPriorResult, kwargs...)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
@@ -644,7 +644,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
-    function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
+    function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::UcSE_UcS,
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
@@ -653,7 +653,7 @@ struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
     end
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
+                                ucs::UcSE_UcS = NormalUncertaintySet(),
                                 sigma::Option{<:MatNum} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
@@ -726,20 +726,8 @@ Create an instance of [`UncertaintySetVariance`](@ref) by selecting the uncertai
   - [`ucs_selector`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
-                 ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
-    ucs = ucs_selector(r.ucs, ucs)
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
-end
-function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
-                 ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
-    ucs = ucs_selector(r.ucs, ucs)
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
-end
-function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
-                 pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
+function factory(r::UncertaintySetVariance; pr::Option{<:AbstractPriorResult} = nothing,
+                 ucs::Option{<:UcSE_UcS} = nothing, kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = if isnothing(pr)
         r.sigma

@@ -24,18 +24,14 @@ function tracking_view(tr::RiskTrackingError, i, X::MatNum)
     return RiskTrackingError(; tr = tracking_view(tr.tr, i),
                              r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
 end
-function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
-                 w::Option{<:VecNum} = nothing, args...; kwargs...)
+function factory(tr::RiskTrackingError; pr::Option{<:AbstractPriorResult} = nothing,
+                 w::Option{<:VecNum} = nothing, kwargs...)
     return RiskTrackingError(; tr = factory(tr.tr, w),
-                             r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
-                             err = tr.err, alg = tr.alg)
+                             r = factory(tr.r; pr = pr, w = w, kwargs...), err = tr.err,
+                             alg = tr.alg)
 end
 function needs_previous_weights(tr::RiskTrackingError)
     return (needs_previous_weights(tr.tr) || needs_previous_weights(tr.r))
-end
-function factory(tr::RiskTrackingError, w::VecNum)
-    return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
-                             alg = tr.alg)
 end
 struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
     settings::T1
@@ -67,19 +63,11 @@ function risk_measure_view(r::TrackingRiskMeasure, i, args...)
     tr = tracking_view(r.tr, i)
     return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
 end
-#=
-function factory(r::TrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-    return TrackingRiskMeasure(; settings = r.settings, tr = r.tr, alg = r.alg)
-end
-=#
 function needs_previous_weights(r::TrackingRiskMeasure)
     return needs_previous_weights(r.tr)
 end
-function factory(r::TrackingRiskMeasure, w::VecNum)
+function factory(r::TrackingRiskMeasure; w::Option{<:VecNum} = nothing, kwargs...)
     return TrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), alg = r.alg)
-end
-function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
-    return factory(r, w)
 end
 struct RiskTrackingRiskMeasure{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
@@ -122,16 +110,13 @@ function risk_measure_view(r::RiskTrackingRiskMeasure, i, X::MatNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
                                    r = risk_measure_view(r.r, i, X), alg = r.alg)
 end
-function factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = r.tr,
-                                   r = factory(r.r, pr, args...; kwargs...), alg = r.alg)
+function factory(r::RiskTrackingRiskMeasure; pr::Option{<:AbstractPriorResult} = nothing,
+                 w::Option{<:VecNum} = nothing, kwargs...)
+    return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
+                                   r = factory(r.r; pr = pr, w = w, kwargs...), alg = r.alg)
 end
 function needs_previous_weights(r::RiskTrackingRiskMeasure)
     return (needs_previous_weights(r.tr) || needs_previous_weights(r.r))
-end
-function factory(r::RiskTrackingRiskMeasure, w::VecNum)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
-                                   r = factory(r.r, w), alg = r.alg)
 end
 const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 

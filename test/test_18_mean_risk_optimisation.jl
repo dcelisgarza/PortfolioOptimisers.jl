@@ -457,7 +457,7 @@
     end
     @testset "Formulations" begin
         opt = JuMPOptimiser(; pr = pr, slv = slv)
-        r = factory(Variance(), pr)
+        r = factory(Variance(); pr = pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
@@ -551,7 +551,7 @@
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
         opt = JuMPOptimiser(; pr = pr, slv = slv)
-        r = factory(LowOrderMoment(; alg = SecondMoment(; alg2 = QuadRiskExpr())), pr)
+        r = factory(LowOrderMoment(; alg = SecondMoment(; alg2 = QuadRiskExpr())); pr = pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
@@ -694,7 +694,7 @@
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv[7:end])
-        r = factory(NegativeSkewness(; alg = SquaredSOCRiskExpr()), pr)
+        r = factory(NegativeSkewness(; alg = SquaredSOCRiskExpr()); pr = pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
@@ -811,7 +811,8 @@
         @test isapprox(res9.w, res11.w; rtol = 1e-3)
 
         opt = JuMPOptimiser(; pr = pr, slv = slv)
-        r = factory(LowOrderMoment(; mu = VecScalar(; v = pr.mu, s = 4.2 / 252 / 100)), pr)
+        r = factory(LowOrderMoment(; mu = VecScalar(; v = pr.mu, s = 4.2 / 252 / 100));
+                    pr = pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)

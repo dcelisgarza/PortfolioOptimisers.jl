@@ -390,7 +390,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     pl = phylogeny_constraints(opt.pl, pr.X; iv = rd.iv, ivpa = rd.ivpa)
-    ret = factory(opt.ret, pr)
+    ret = factory(opt.ret; pr = pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx,
                                             sgmtx, slt, sst, sglt, sgst, tn, fees, pl, ret)
 end

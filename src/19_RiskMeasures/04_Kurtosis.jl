@@ -192,19 +192,21 @@ function (r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi,
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
+function _factory(r::Kurtosis, pr::HighOrderPrior)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
-function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)
+function _factory(r::Kurtosis, pr::LowOrderPrior)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    kt = nothing_scalar_array_selector(r.kt, nothing)
-    return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
+    return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = r.kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
+end
+function factory(r::Kurtosis; pr::AbstractPriorResult, kwargs...)
+    return _factory(r, pr)
 end
 function risk_measure_view(r::Kurtosis, i, args...)
     mu = r.mu

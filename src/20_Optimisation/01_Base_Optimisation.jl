@@ -14,15 +14,15 @@ const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
 function assert_special_nco_requirements(::OptE_Opt)
     return nothing
 end
-function factory(opt::OptE_Opt, ::Any)
+function factory(opt::OptE_Opt, args...; kwargs...)
     return opt
 end
 function needs_previous_weights(::OptE_Opt)
     return false
 end
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
-function factory(opt::VecOptE_Opt, args...)
-    return [factory(opti, args...) for opti in opt]
+function factory(opt::VecOptE_Opt, args...; kwargs...)
+    return [factory(opti, args...; kwargs...) for opti in opt]
 end
 function assert_special_nco_requirements(opt::VecOptE_Opt)
     return assert_special_nco_requirements.(opt)

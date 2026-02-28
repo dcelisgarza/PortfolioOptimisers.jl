@@ -54,7 +54,7 @@ function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  dist::Distributions.Distribution = Distributions.Normal())
     return DistributionValueatRisk(mu, sigma, chol, dist)
 end
-function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult)
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     sigma = nothing_scalar_array_selector(alg.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(alg.chol, pr.chol)
@@ -87,9 +87,9 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
-function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ValueatRisk; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
-    alg = factory(r.alg, pr, args...; kwargs...)
+    alg = factory(r.alg, pr)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
 end
 function risk_measure_view(r::ValueatRisk, i, args...)
@@ -135,9 +135,9 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
-function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ValueatRiskRange; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
-    alg = factory(r.alg, pr, args...; kwargs...)
+    alg = factory(r.alg, pr)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
                             alg = alg)
 end
@@ -206,7 +206,7 @@ function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
-function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::DrawdownatRisk; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w, b = r.b, s = r.s)
 end
@@ -283,7 +283,7 @@ function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
 end
-function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::RelativeDrawdownatRisk; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end

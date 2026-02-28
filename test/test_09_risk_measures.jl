@@ -221,9 +221,9 @@
         end
     end
     @testset "Expected risk" begin
-        r1 = factory(NegativeSkewness(), pr)
-        r2 = factory(NegativeSkewness(; alg = SquaredSOCRiskExpr()), pr)
-        r3 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
+        r1 = factory(NegativeSkewness(); pr = pr)
+        r2 = factory(NegativeSkewness(; alg = SquaredSOCRiskExpr()); pr = pr)
+        r3 = factory(NegativeSkewness(; alg = QuadRiskExpr()); pr = pr)
         @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
         @test isapprox(expected_risk(r3, w, rd.X), expected_risk(r2, w, rd.X))
         @test isapprox(expected_risk(Kurtosis(; alg1 = Semi()), w, rd.X),
@@ -348,20 +348,20 @@
                        0.00014724061887437024)
         @test factory(ExpectedReturn()) === ExpectedReturn()
         ucs = DeltaUncertaintySet(;)
-        r = factory(ExpectedReturn(), pr)
+        r = factory(ExpectedReturn(); pr = pr)
         @test r.rt.mu === pr.mu
-        r = factory(ExpectedReturn(), ucs)
+        r = factory(ExpectedReturn(); ucs = ucs)
         @test r.rt.ucs === ucs
-        r = factory(ExpectedReturn(), pr, ucs)
-        @test r.rt.mu === pr.mu
-        @test r.rt.ucs === ucs
-
-        r = factory(ExpectedReturn(), ucs, pr)
+        r = factory(ExpectedReturn(); pr = pr, ucs = ucs)
         @test r.rt.mu === pr.mu
         @test r.rt.ucs === ucs
 
-        @test isapprox(expected_risk(factory(ExpectedReturn(; rt = LogarithmicReturn()),
-                                             pr), w, pr), 6.522750683623699e-5)
+        r = factory(ExpectedReturn(); ucs = ucs, pr = pr)
+        @test r.rt.mu === pr.mu
+        @test r.rt.ucs === ucs
+
+        @test isapprox(expected_risk(factory(ExpectedReturn(; rt = LogarithmicReturn());
+                                             pr = pr), w, pr), 6.522750683623699e-5)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
         sets = AssetSets(; dict = Dict("nx" => rd.nx))
@@ -369,13 +369,14 @@
         rf = 4.2 / 252 / 100
         Xret = rd.X * w
 
-        r = factory(MeanReturn(; flag = true), pr2)
+        r = factory(MeanReturn(; flag = true); pr = pr2)
         @test r.w === pr2.w
         @test r.flag == true
         @test expected_risk(r, w, rd.X) == mean(log1p.(Xret), pr2.w)
 
         r = factory(MeanReturnRiskRatio(; rt = MeanReturn(; flag = true),
-                                        rk = EntropicValueatRisk(), rf = rf), pr2, slv)
+                                        rk = EntropicValueatRisk(), rf = rf); pr = pr2,
+                    slv = slv)
         @test r.rt.w === pr2.w
         @test r.rt.flag == true
         @test r.rk.w === pr2.w
@@ -385,12 +386,13 @@
               (mean(log1p.(Xret), pr2.w) - rf) /
               expected_risk(EntropicValueatRisk(; slv = slv, w = pr2.w), w, rd.X)
 
-        r = factory(MeanReturn(), pr)
+        r = factory(MeanReturn(); pr = pr)
         @test r.w === pr.w
         @test r.flag == false
         @test expected_risk(r, w, rd.X) == mean(Xret)
 
-        r = factory(MeanReturnRiskRatio(; rf = rf, rk = RelativisticValueatRisk()), pr, slv)
+        r = factory(MeanReturnRiskRatio(; rf = rf, rk = RelativisticValueatRisk()); pr = pr,
+                    slv = slv)
         @test r.rt.w === pr.w
         @test r.rt.flag == false
         @test r.rk.w === pr.w

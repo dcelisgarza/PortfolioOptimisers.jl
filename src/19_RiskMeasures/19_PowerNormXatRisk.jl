@@ -102,9 +102,9 @@ end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
 end
-function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
+function factory(r::PowerNormValueatRiskRange; pr::Option{<:AbstractPriorResult} = nothing,
+                 slv::Option{<:Slv_VecSlv} = nothing, kwargs...)
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return PowerNormValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                      beta = r.beta, pa = r.pa, pb = r.pb, w = w)
@@ -179,17 +179,12 @@ function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
 end
 for r in (PowerNormValueatRisk, PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                              args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
+             function factory(r::$(r); pr::Option{<:AbstractPriorResult} = nothing,
+                              slv::Option{<:Slv_VecSlv} = nothing, kwargs...)
+                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, p = r.p,
                              w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             p = r.p, slv = slv)
              end
          end)
 end

@@ -94,7 +94,7 @@ function needs_previous_weights(opt::RiskBudgeting)
 end
 function factory(rb::RiskBudgeting, w::AbstractVector)
     opt = factory(rb.opt, w)
-    r = factory(rb.r, w)
+    r = factory(rb.r; w = w)
     fb = factory(rb.fb, w)
     return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end

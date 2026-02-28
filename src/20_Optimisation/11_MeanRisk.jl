@@ -50,7 +50,7 @@ function needs_previous_weights(opt::MeanRisk)
 end
 function factory(mr::MeanRisk, w::AbstractVector)
     opt = factory(mr.opt, w)
-    r = factory(mr.r, w)
+    r = factory(mr.r; w = w)
     fb = factory(mr.fb, w)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
@@ -134,7 +134,7 @@ function rebuild_risk_frontier(model::JuMP.Model,
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
     JuMP.unregister(model, :obj_expr)
-    r = factory(view(mr.r, idx), pr, mr.opt.slv)
+    r = factory(view(mr.r, idx); pr = pr, slv = mr.opt.slv)
     for (i, ri) in zip(idx, r)
         risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, sol_min.w,
                                                   sol_max.w, i)
@@ -152,7 +152,7 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @argcheck(isa(retcode, OptimisationSuccess))
     JuMP.unregister(model, :obj_expr)
-    r = factory(mr.r, pr, mr.opt.slv)
+    r = factory(mr.r; pr = pr, slv = mr.opt.slv)
     return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)
 end
 function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,

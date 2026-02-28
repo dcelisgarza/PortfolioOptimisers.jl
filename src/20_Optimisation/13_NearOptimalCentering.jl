@@ -118,7 +118,7 @@ function needs_previous_weights(opt::NearOptimalCentering)
 end
 function factory(noc::NearOptimalCentering, w::AbstractVector)
     opt = factory(noc.opt, w)
-    r = factory(noc.r, w)
+    r = factory(noc.r; w = w)
     fb = factory(noc.fb, w)
     return NearOptimalCentering(; opt = opt, r = r, obj = noc.obj, bins = noc.bins,
                                 w_min = noc.w_min, w_min_ini = noc.w_min_ini,
@@ -145,7 +145,7 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
                                       fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
                                       w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
-    r = factory(r, pr, slv)
+    r = factory(r; pr = pr, slv = slv)
     scale = r.settings.scale
     risk_min = expected_risk(r, w_min, X, fees) * scale
     risk_opt = expected_risk(r, w_opt, X, fees) * scale
@@ -156,7 +156,7 @@ function near_optimal_centering_risks(::SumScalariser, rs::VecRM, pr::AbstractPr
                                       fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
                                       w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
-    rs = factory(rs, pr, slv)
+    rs = factory(rs; pr = pr, slv = slv)
     datatype = eltype(X)
     risk_min = zero(datatype)
     flag = isa(w_opt, VecNum)
@@ -175,7 +175,7 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::Ve
                                       slv::Slv_VecSlv, w_min::VecNum,
                                       w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
-    rs = factory(rs, pr, slv)
+    rs = factory(rs; pr = pr, slv = slv)
     datatype = eltype(X)
     N = length(rs)
     risk_min = zeros(datatype, N)
@@ -212,7 +212,7 @@ function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPr
                                       fees::Option{<:Fees}, slv::Option{<:Slv_VecSlv},
                                       w_min::VecNum, w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
-    rs = factory(rs, pr, slv)
+    rs = factory(rs; pr = pr, slv = slv)
     datatype = eltype(X)
     risk_min = typemin(datatype)
     flag = isa(w_opt, VecNum)
@@ -443,7 +443,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
                                risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
                                idx::VecInt)
     risk_frontier = copy(risk_frontier)
-    r = factory(view(noc.r, idx), pr, noc.opt.slv)
+    r = factory(view(noc.r, idx); pr = pr, slv = noc.opt.slv)
     for (i, ri) in zip(idx, r)
         risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max,
                                                   i)
@@ -458,7 +458,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
                                risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,
                                args...)
     risk_frontier = copy(risk_frontier)
-    r = factory(noc.r, pr, noc.opt.slv)
+    r = factory(noc.r; pr = pr, slv = noc.opt.slv)
     return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
 end
 function compute_risk_ubs(model::JuMP.Model,

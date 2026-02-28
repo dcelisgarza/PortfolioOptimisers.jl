@@ -21,16 +21,12 @@ end
 function needs_previous_weights(r::TurnoverRiskMeasure)
     return !r.fixed
 end
-function factory(r::TurnoverRiskMeasure, w::VecNum)
-    return if r.fixed
+function factory(r::TurnoverRiskMeasure; w::Option{<:VecNum} = nothing, kwargs...)
+    return if r.fixed || isnothing(w)
         r
     else
         TurnoverRiskMeasure(; settings = r.settings, w = w, fixed = r.fixed)
     end
-end
-function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum} = nothing,
-                 args...; kwargs...)
-    return factory(r, w)
 end
 
 export TurnoverRiskMeasure

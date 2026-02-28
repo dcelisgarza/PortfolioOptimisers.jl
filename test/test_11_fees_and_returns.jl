@@ -73,7 +73,7 @@
         @test all(iszero, calc_asset_fees(res.w, vec(values(X[end])), Fees()))
     end
     @testset "Expected Returns" begin
-        r = factory(Variance(), pr, slv)
+        r = factory(Variance(); pr = pr, slv = slv)
         f = calc_fees(res.w, fes[1])
         rt = expected_return(res.ret, res.w, pr)
         rtf = expected_return(res.ret, res.w, pr, fes[1])

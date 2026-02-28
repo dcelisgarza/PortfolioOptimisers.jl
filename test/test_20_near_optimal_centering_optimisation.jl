@@ -115,7 +115,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier1.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pr = pr, slv = slv)
-        r = factory(StandardDeviation(), pr)
+        r = factory(StandardDeviation(); pr = pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
@@ -207,7 +207,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pr = pr, slv = slv)
-        r = factory(StandardDeviation(), pr)
+        r = factory(StandardDeviation(); pr = pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
@@ -287,7 +287,8 @@
         end
         @test success
 
-        r1 = factory(StandardDeviation(; settings = RiskMeasureSettings(; scale = 2e2)), pr)
+        r1 = factory(StandardDeviation(; settings = RiskMeasureSettings(; scale = 2e2));
+                     pr = pr)
         r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
         res_min = optimise(MeanRisk(; r = [r1, r2], opt = opt))
         res_max = optimise(MeanRisk(; r = [r1, r2], obj = MaximumReturn(), opt = opt))

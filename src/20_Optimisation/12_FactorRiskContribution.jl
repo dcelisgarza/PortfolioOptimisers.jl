@@ -70,7 +70,7 @@ function needs_previous_weights(opt::FactorRiskContribution)
 end
 function factory(frc::FactorRiskContribution, w::AbstractVector)
     opt = factory(frc.opt, w)
-    r = factory(frc.r, w)
+    r = factory(frc.r; w = w)
     fb = factory(frc.fb, w)
     return FactorRiskContribution(; opt = opt, re = frc.re, r = r, obj = frc.obj,
                                   pl = frc.pl, sets = frc.sets, wi = frc.wi,

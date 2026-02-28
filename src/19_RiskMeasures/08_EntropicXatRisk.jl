@@ -86,9 +86,9 @@ end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
-function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
+function factory(r::EntropicValueatRiskRange; pr::Option{<:AbstractPriorResult} = nothing,
+                 slv::Option{<:Slv_VecSlv} = nothing, kwargs...)
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                     beta = r.beta, w = w)
@@ -153,15 +153,11 @@ function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
 end
 for r in (EntropicValueatRisk, EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                              args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
+             function factory(r::$(r); pr::Option{<:AbstractPriorResult} = nothing,
+                              slv::Option{<:Slv_VecSlv} = nothing, kwargs...)
+                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = r.w)
              end
          end)
 end

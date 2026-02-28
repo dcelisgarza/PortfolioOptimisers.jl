@@ -29,7 +29,7 @@ function MedianAbsoluteDeviation(;
                                  mu::MedAbsDevMu = MedianCentering(), flag::Bool = true)
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
-function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::MedianAbsoluteDeviation; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end

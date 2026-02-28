@@ -98,8 +98,7 @@ function ConditionalValueatRiskRange(;
                                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
-function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
-                 kwargs...)
+function factory(r::ConditionalValueatRiskRange; pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                        beta = r.beta, w = w)
@@ -145,8 +144,8 @@ function DistributionallyRobustConditionalValueatRiskRange(;
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
-function factory(r::DistributionallyRobustConditionalValueatRiskRange,
-                 pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::DistributionallyRobustConditionalValueatRiskRange;
+                 pr::AbstractPriorResult, kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return DistributionallyRobustConditionalValueatRiskRange(; settings = r.settings,
                                                              alpha = r.alpha, l_a = r.l_a,
@@ -341,7 +340,7 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:StatsBase.Abstrac
 end
 for r in (ConditionalValueatRisk, ConditionalDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+             function factory(r::$(r); pr::AbstractPriorResult, kwargs...)
                  w = nothing_scalar_array_selector(r.w, pr.w)
                  return $(r)(; settings = r.settings, alpha = r.alpha, w = w)
              end
@@ -350,7 +349,7 @@ end
 for r in (DistributionallyRobustConditionalValueatRisk,
           DistributionallyRobustConditionalDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
+             function factory(r::$(r); pr::AbstractPriorResult, kwargs...)
                  w = nothing_scalar_array_selector(r.w, pr.w)
                  return $(r)(; settings = r.settings, alpha = r.alpha, l = r.l, r = r.r,
                              w = w)

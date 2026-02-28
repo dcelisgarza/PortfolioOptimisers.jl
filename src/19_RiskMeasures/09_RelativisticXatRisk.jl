@@ -148,12 +148,14 @@ end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
-function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+function factory(r::RelativisticValueatRiskRange;
+                 pr::Option{<:AbstractPriorResult} = nothing,
+                 slv::Option{<:Slv_VecSlv} = nothing, kwargs...)
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
-                                        kappa_b = r.kappa_b, slv = slv)
+                                        kappa_b = r.kappa_b, slv = slv, w = w)
 end
 struct RelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
@@ -228,17 +230,12 @@ end
 for r in (RelativisticValueatRisk, RelativisticDrawdownatRisk,
           RelativeRelativisticDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                              args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
+             function factory(r::$(r); pr::Option{<:AbstractPriorResult} = nothing,
+                              slv::Option{<:Slv_VecSlv} = nothing, kwargs...)
+                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha,
                              kappa = r.kappa, w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             slv = slv)
              end
          end)
 end
