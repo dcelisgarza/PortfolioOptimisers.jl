@@ -120,6 +120,7 @@ end
 function Statistics.mean(me::SimpleExpectedReturns{<:Any, <:VecInt}, X::MatNum;
                          dims::Int = 1, kwargs...)
     X = view(X, me.idx, :)
+    display(X)
     return if isnothing(me.w)
         Statistics.mean(X; dims = dims)
     else

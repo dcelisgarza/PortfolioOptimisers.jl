@@ -96,6 +96,13 @@
         me = PortfolioOptimisers.factory(me0, ew)
         @test me.me.w === ew
         @test me.rf == me0.rf
+
+        @test isapprox(mean(SimpleExpectedReturns(; idx = ((252 - 100):252)), rd.X),
+                       mean(SimpleExpectedReturns(), rd.X[((end - 100):end), :]))
+
+        me = factory(SimpleExpectedReturns(; idx = ((252 - 100):252)), ew)
+        @test me.idx == ((252 - 100):252)
+        @test me.w === ew
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -395,6 +402,16 @@
                        cov(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
         @test isapprox(cor(ProcessedCovariance(; alg = LoGo()), rd.X),
                        cor(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
+
+        @test isapprox(cov(GeneralCovariance(; idx = ((252 - 100):252)), rd.X),
+                       cov(GeneralCovariance(), rd.X[((end - 100):end), :]))
+
+        ce0 = PortfolioOptimisersCovariance(;
+                                            ce = Covariance(;
+                                                            ce = GeneralCovariance(;
+                                                                                   idx = 300:305)))
+        ce = PortfolioOptimisers.factory(ce0, ew)
+        @test ce.ce.ce.idx === 300:305
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
