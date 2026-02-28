@@ -41,7 +41,7 @@ function Base.split(kf::KFold, rd::ReturnsResult)
         push!(test_idx, idx[start:(stop - 1)])
         current = stop
     end
-    train_idx = Vector{Vector{eltype(T)}}(undef, 0)
+    train_idx = Vector{Vector{typeof(T)}}(undef, 0)
     idx = 1:n
     for i in idx
         tidx = setdiff(idx, i)
