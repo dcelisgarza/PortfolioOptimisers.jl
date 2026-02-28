@@ -888,12 +888,10 @@ ParsingResult
     op ┼ String: "<="
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
-```    # 1. Identify the comparison operator
-    # 1. Identify the comparison operator
+```
 # Related
 
   - [`ParsingResult`](@ref)
-```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)
