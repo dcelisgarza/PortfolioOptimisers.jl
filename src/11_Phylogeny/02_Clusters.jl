@@ -24,7 +24,7 @@ All concrete and/or abstract types implementing specific clustering algorithms s
   - [`AbstractClusteringResult`](@ref)
 """
 abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
-function factory(alg::AbstractClustersAlgorithm, args...)
+function factory(alg::AbstractClustersAlgorithm, args...; kwargs...)
     return alg
 end
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end

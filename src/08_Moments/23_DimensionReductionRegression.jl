@@ -15,7 +15,7 @@ These types are used to specify the dimension reduction method when constructing
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
-function factory(drtgt::DimensionReductionTarget, args...)
+function factory(drtgt::DimensionReductionTarget, args...; kwargs...)
     return drtgt
 end
 """

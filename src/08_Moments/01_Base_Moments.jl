@@ -1,12 +1,13 @@
 """
-    factory(ce::StatsBase.CovarianceEstimator, args...)
+    factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
 
 Fallback for covariance estimator factory methods.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `args...`: Optional arguments (ignored for base covariance estimators).
+  - `args...`: Optional arguments (ignored).
+  - `kwargs...`: Optional keyword arguments (ignored).
 
 # Returns
 
@@ -18,7 +19,7 @@ Fallback for covariance estimator factory methods.
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function factory(ce::StatsBase.CovarianceEstimator, args...)
+function factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
     return ce
 end
 """
