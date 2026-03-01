@@ -146,9 +146,18 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
   - [`robust_cor`](@ref)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
     if isnothing(ce.w)
+        robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
+    else
+        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+    end
+end
+function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    X = view(X, ce.idx, :)
+    return if isnothing(ce.w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
