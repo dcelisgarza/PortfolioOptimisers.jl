@@ -233,7 +233,7 @@ ress = optimise.(mrs)
 #=
 Let's plot the efficient frontiers.
 =#
-using GraphRecipes, StatsPlots
+using Plots
 
 r = Variance()
 # Vanilla sigma and mu.

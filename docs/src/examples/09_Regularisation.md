@@ -114,7 +114,7 @@ ress = optimise.(nocs)
 Let's plot the efficient frontiers.
 
 ````@example 09_Regularisation
-using GraphRecipes, StatsPlots
+using Plots
 
 r = Variance()
 ````
