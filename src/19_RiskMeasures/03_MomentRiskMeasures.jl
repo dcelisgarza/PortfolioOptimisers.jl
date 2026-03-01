@@ -1059,11 +1059,17 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
 end
 for rt in (LowOrderMoment, HighOrderMoment)
     eval(quote
-             function factory(r::$(rt); pr::AbstractPriorResult, kwargs...)
+             function _factory(r::$(rt), ::Nothing)
+                return r
+             end
+             function _factory(r::$(rt), pr::AbstractPriorResult)
                  w = nothing_scalar_array_selector(r.w, pr.w)
                  mu = nothing_scalar_array_selector(r.mu, pr.mu)
                  alg = factory(r.alg, w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
+             end
+             function factory(r::$(rt); pr::Option{<:AbstractPriorResult} = nothing, kwargs...)
+                 return _factory(r, pr)
              end
              function risk_measure_view(r::$(rt), i, args...)
                  mu = nothing_scalar_array_view(r.mu, i)
