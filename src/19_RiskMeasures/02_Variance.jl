@@ -260,7 +260,15 @@ end
 function (r::Variance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
 end
-"""
+function _factory(r::Variance, ::Nothing)
+    return r
+end
+function _factory(r::Variance, pr::AbstractPriorResult)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    chol = nothing_scalar_array_selector(r.chol, pr.chol)
+    return Variance(; settings = r.settings, sigma = sigma, chol = chol)
+end
+    """
     factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
 
 Create an instance of [`Variance`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
@@ -286,11 +294,8 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
   - [`Variance`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Variance; pr::AbstractPriorResult, kwargs...)
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    chol = nothing_scalar_array_selector(r.chol, pr.chol)
-    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg)
+function factory(r::Variance; pr::Option{<:AbstractPriorResult} = nothing, kwargs...)
+   _factory(r, pr)
 end
 function risk_measure_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
@@ -412,6 +417,14 @@ end
 function (r::StandardDeviation)(w::VecNum)
     return sqrt(LinearAlgebra.dot(w, r.sigma, w))
 end
+function _factory(r::StandardDeviation, ::Nothing)
+    return r
+end
+function _factory(r::StandardDeviation, pr::AbstractPriorResult, kwargs...)
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
+    chol = nothing_scalar_array_selector(r.chol, pr.chol)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
+end
 """
     factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
 
@@ -438,10 +451,8 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
   - [`StandardDeviation`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::StandardDeviation; pr::AbstractPriorResult, kwargs...)
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    chol = nothing_scalar_array_selector(r.chol, pr.chol)
-    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
+function factory(r::StandardDeviation; pr::Option{<:AbstractPriorResult} = nothing, kwargs...)
+    return _factory(r, pr)
 end
 function risk_measure_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
