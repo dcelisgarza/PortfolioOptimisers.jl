@@ -233,7 +233,7 @@
             rb = RiskBudgeting(; r = r, opt = opt, rba = FactorRiskBudgeting(; re = rr))
             res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
-            rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
+            rkc = factor_risk_contribution(factory(r; pr = pr, slv = slv), res.w, pr.X;
                                            re = res.prb.rr)
             v1 = minimum(rkc[1:5])
             v2 = maximum(rkc[1:5])
@@ -294,7 +294,7 @@
                                                          rkb = RiskBudget(; val = 1:5)))
             res = optimise(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
-            rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
+            rkc = factor_risk_contribution(factory(r; pr = pr, slv = slv), res.w, pr.X;
                                            re = res.prb.rr)
             v1, m1 = findmin(rkc[1:5])
             v2, m2 = findmax(rkc[1:5])

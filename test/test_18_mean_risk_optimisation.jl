@@ -311,7 +311,7 @@
             end
             @test success
             if isa(obj, MaximumRatio)
-                rk = expected_risk(factory(r, pr, slv), res.w, rd.X)
+                rk = expected_risk(factory(r; pr = pr, slv = slv), res.w, rd.X)
                 rt = expected_return(ret, res.w, pr)
                 opt1 = JuMPOptimiser(; pr = pr, slv = slv,
                                      ret = bounds_returns_estimator(ret, rt))
@@ -324,7 +324,7 @@
                 mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
                               opt = opt)
                 res = optimise(mr, rd)
-                rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
+                rk1 = expected_risk(factory(r; pr = pr, slv = slv), res.w, rd.X)
                 if !isa(r, Kurtosis) && !isnothing(r.N)
                     tol = if i == 161
                         5e-10
@@ -1917,7 +1917,7 @@
         obj = MaximumRatio()
         mr = MeanRisk(; obj = obj, opt = opt, r = r)
         res = optimise(mr)
-        rkc = risk_contribution(factory(r, pr, slv), res.w, pr)
+        rkc = risk_contribution(factory(r; pr = pr, slv = slv), res.w, pr)
         rkc = rkc / sum(rkc)
         @test all(rkc .- 0.2 .- 20 * sqrt(eps()) .< 0)
         @test abs(sum(rkc[3:3:end]) - 0.1) < 20 * sqrt(eps())

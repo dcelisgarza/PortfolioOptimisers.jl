@@ -64,7 +64,7 @@
     obj = MaximumRatio()
     frc = FactorRiskContribution(; r = r, obj = obj, opt = opt, flag = false, sets = sets)
     res = optimise(frc, rd)
-    rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X; rd = rd)
+    rkc = factor_risk_contribution(factory(r; pr = pr, slv = slv), res.w, pr.X; rd = rd)
     rkc = rkc / sum(rkc)
     @test rkc[2] >= -0.07
     @test rkc[5] <= 0.74
