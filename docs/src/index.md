@@ -238,7 +238,7 @@ Furthermore, we can also plot the risk contribution per asset. For this, we must
 
 ```@example 0_index
 # Plot the risk contribution per asset.
-plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
+plot_risk_contribution(factory(Variance(); pr = res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
 ```
 

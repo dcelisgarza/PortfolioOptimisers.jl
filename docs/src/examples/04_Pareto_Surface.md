@@ -143,8 +143,8 @@ res2 = optimise(opt2)
 In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `Kurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
 
 ````@example 04_Pareto_Surface
-r1 = factory(r1, pr)
-r2 = factory(r2, pr)
+r1 = factory(r1; pr = pr)
+r2 = factory(r2; pr = pr)
 ````
 
 Let's compute the risk bounds for the pareto surface. We need to compute four risks because we have two risk measures and two optimisations. This will let us pick the lower and upper bounds for each risk measure, as we explore the pareto surface from one optimisation to the other.
@@ -170,13 +170,14 @@ r1 = factory(NegativeSkewness(;
                                                                                     sk_rk2),
                                                                         stop = max(sk_rk1,
                                                                                    sk_rk2),
-                                                                        length = 5))), pr);
+                                                                        length = 5)));
+             pr = pr);
 r2 = factory(Kurtosis(;
                       settings = RiskMeasureSettings(;
                                                      ub = range(;
                                                                 start = min(kt_rk1, kt_rk2),
                                                                 stop = max(kt_rk1, kt_rk2),
-                                                                length = 5))), pr);
+                                                                length = 5))); pr = pr);
 nothing #hide
 ````
 

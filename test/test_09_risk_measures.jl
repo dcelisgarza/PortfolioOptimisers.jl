@@ -344,7 +344,7 @@
                        0.011807455957080073)
         @test isapprox(expected_risk(MedianAbsoluteDeviation(; mu = 0, w = wt), w, rd.X),
                        0.011807455957080073)
-        @test isapprox(expected_risk(factory(ExpectedReturn(), pr), w, pr),
+        @test isapprox(expected_risk(factory(ExpectedReturn(); pr = pr), w, pr),
                        0.00014724061887437024)
         @test factory(ExpectedReturn()) === ExpectedReturn()
         ucs = DeltaUncertaintySet(;)
