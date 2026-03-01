@@ -252,7 +252,7 @@ ress = optimise.(mrs)
 Let's plot the efficient frontiers.
 
 ````@example 08_Improving_Moment_Estimation
-using GraphRecipes, StatsPlots
+using Plots
 
 r = Variance()
 ````
@@ -593,7 +593,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla kt + BOP(GM) mu" => ress[1].w
              formatters = [resfmt])
 ````
 
-Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with cross validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures), or to impose constraints on the maximum risk without adding them to the objective function. There are also other ways of directly mitigating these instabilities, such as making use of:
+Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with grid search cross-validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures), or to impose constraints on the maximum risk without adding them to the objective function. There are also other ways of directly mitigating these instabilities, such as making use of:
 
 1. Estimators like [`Stacking`]-(@ref), [`NearOptimalCentering`]-(@ref), and [`NestedClusters`]-(@ref).
 2. Uncertainty sets for the expected returns and covariance matrices.

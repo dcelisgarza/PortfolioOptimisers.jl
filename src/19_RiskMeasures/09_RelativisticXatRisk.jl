@@ -235,10 +235,13 @@ for r in (RelativisticValueatRisk, RelativisticDrawdownatRisk,
                  return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha,
                              kappa = r.kappa, w = w)
              end
-             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
+             function factory(r::$(r), slv::Slv_VecSlv,
+                              pr::Option{<:AbstractPriorResult} = nothing, args...;
+                              kwargs...)
+                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             slv = slv)
+                             slv = slv, w = w)
              end
          end)
 end

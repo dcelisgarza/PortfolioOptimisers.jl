@@ -179,17 +179,19 @@ function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
 end
 for r in (PowerNormValueatRisk, PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk)
     eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                              args...; kwargs...)
+             function factory(r::$(r), pr::AbstractPriorResult,
+                              slv::Option{<:Slv_VecSlv} = nothing, args...; kwargs...)
                  w = nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, p = r.p,
                              w = w)
              end
-             function factory(r::$(r), slv::Slv_VecSlv; kwargs...)
+             function factory(r::$(r), slv::Slv_VecSlv,
+                              pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
+                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
                  slv = solver_selector(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             p = r.p, slv = slv)
+                             p = r.p, slv = slv, w = w)
              end
          end)
 end

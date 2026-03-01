@@ -44,14 +44,14 @@ The library is quite powerful and extremely flexible. Here is what a very basic 
 
 First we import the packages we will need for the example.
 
-- `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
+- `Plots` is needed to load the `Plots.jl` extension.
 - `Clarabel` and `HiGHS` are the optimisers we will use.
 - `YFinance` and `TimeSeries` for downloading and preprocessing price data.
 - `PrettyTables` and `DataFrames` for displaying the results.
 
 ```julia
 # Import module and plotting extension.
-using PortfolioOptimisers, StatsPlots, GraphRecipes
+using PortfolioOptimisers, Plots
 # Import optimisers.
 using Clarabel, HiGHS
 # Download data and pretty printing

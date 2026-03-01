@@ -406,6 +406,9 @@
         @test isapprox(cov(GeneralCovariance(; idx = ((252 - 100):252)), rd.X),
                        cov(GeneralCovariance(), rd.X[((end - 100):end), :]))
 
+        @test isapprox(cor(GeneralCovariance(; idx = ((252 - 100):252)), rd.X),
+                       cor(GeneralCovariance(), rd.X[((end - 100):end), :]))
+
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = Covariance(;
                                                             ce = GeneralCovariance(;

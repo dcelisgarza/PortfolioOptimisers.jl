@@ -106,7 +106,7 @@ ress = optimise.(nocs)
 #=
 Let's plot the efficient frontiers.
 =#
-using GraphRecipes, StatsPlots
+using Plots
 
 r = Variance()
 # No regularisation portfolio weights.
