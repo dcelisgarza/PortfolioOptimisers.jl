@@ -630,7 +630,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tr.w
-    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
+    rb = expected_risk(factory(ri; pr = pr, slv = opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
     tracking_risk = model[key] = JuMP.@variable(model)

@@ -163,7 +163,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     ri = tr.r
     wb = tr.tr.w
     err = tr.err
-    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
+    rb = expected_risk(factory(ri; pr = pr, slv = opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
     key = Symbol(:t_dr_, i)
