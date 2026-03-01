@@ -1,7 +1,7 @@
 module PortfolioOptimisersPlotsExt
 
-using PortfolioOptimisers, Plots, LinearAlgebra, Statistics, StatsBase, Clustering,
-      Distributions, StatsAPI
+using PortfolioOptimisers, Plots, StatsPlots, GraphRecipes, LinearAlgebra, Statistics,
+      StatsBase, Clustering, Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
                             MatNum_Pr, PrE_Pr, HClE_HCl, VecVecNum, RegE_Reg
