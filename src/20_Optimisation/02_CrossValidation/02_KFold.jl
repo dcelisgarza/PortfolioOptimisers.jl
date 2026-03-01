@@ -1,3 +1,44 @@
+"""
+    struct KFold{T1, T2, T3} <: NonSequentialCrossValidationEstimator
+        n::T1
+        purged_size::T2
+        embargo_size::T3
+    end
+
+Implements non-sequential k-fold cross-validation with optional purging and embargoing of training samples.
+
+# Fields
+
+  - `n`: Number of folds to split the data into.
+  - `purged_size`: Number of observations to exclude from the start/end of each train set adjacent to a test set.
+  - `embargo_size`: Number of observations to exclude from the start of each train set after a test set.
+
+# Constructors
+
+```julia
+KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `n` must be non-empty, greater than zero, and finite.
+  - `purged_size` and `embargo_size` must be non-empty and finite.
+
+# Examples
+
+```jldoctest
+kf = KFold(; n = 5, purged_size = 7, embargo_size = 11)
+```
+
+# Related
+
+  - [`NonSequentialCrossValidationEstimator`]-(@ref)
+  - [`KFoldResult`]-(@ref)
+  - [`split`]-(@ref)
+  - [`n_splits`]-(@ref)
+"""
 struct KFold{T1, T2, T3} <: NonSequentialCrossValidationEstimator
     n::T1
     purged_size::T2

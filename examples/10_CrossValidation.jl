@@ -66,4 +66,14 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 ### 2.1 KFold
 
 The simplest form of cross validation is KFold. This method splits the data into K folds, and then iteratively trains on K-1 folds and tests on the remaining fold. This process is repeated K times, with each fold being used as the test set once.
+
+The [KFold](@ref) indices can be generated independently of the optimisation. Lets say we want to perform 5-fold cross validation, this works out to be roughly one per year.
 =#
+
+kfold = KFold(; n = 5)
+
+#=
+For demonstration purposes we can generate the splits using the [`split`]-(@ref) method. This is not necessary as the cross validation will generate them internally.
+=#
+
+kfold_res = split(kfold, rd)
