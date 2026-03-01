@@ -29,7 +29,11 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-kf = KFold(; n = 5, purged_size = 7, embargo_size = 11)
+julia> KFold(; n = 5, purged_size = 7, embargo_size = 11)
+KFold
+             n ┼ Int64: 5
+   purged_size ┼ Int64: 7
+  embargo_size ┴ Int64: 11
 ```
 
 # Related

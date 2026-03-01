@@ -1,3 +1,56 @@
+"""
+    struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidationEstimator
+        n_folds::T1
+        n_test_folds::T2
+        purged_size::T3
+        embargo_size::T4
+    end
+
+Implements combinatorial non-sequential cross-validation with purging and embargoing, allowing for all possible combinations of test folds.
+
+# Fields
+
+  - `n_folds`: Number of folds to split the data into.
+  - `n_test_folds`: Number of folds to use as test set in each split.
+  - `purged_size`: Number of observations to exclude from the start/end of each train set adjacent to a test set.
+  - `embargo_size`: Number of observations to exclude from the start of each train set after a test set.
+
+# Constructors
+
+```julia
+CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
+                             purged_size::Integer = 0, embargo_size::Integer = 0,
+                             warn_comb::Integer = 100_000)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `n_folds` must be non-empty, greater than zero, and finite.
+  - `n_test_folds` must be non-empty, greater than zero, and finite.
+  - `purged_size` and `embargo_size` must be non-empty and finite.
+  - Warns if the number of combinations exceeds `warn_comb`.
+
+# Examples
+
+```jldoctest
+julia> CombinatorialCrossValidation(; n_folds = 10, n_test_folds = 8, purged_size = 2,
+                                    embargo_size = 1)
+CombinatorialCrossValidation
+       n_folds ┼ Int64: 10
+  n_test_folds ┼ Int64: 8
+   purged_size ┼ Int64: 2
+  embargo_size ┴ Int64: 1
+```
+
+# Related
+
+  - [`NonSequentialCrossValidationEstimator`]-(@ref)
+  - [`CombinatorialCrossValidationResult`]-(@ref)
+  - [`split`]-(@ref)
+  - [`n_splits`]-(@ref)
+"""
 struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidationEstimator
     n_folds::T1
     n_test_folds::T2
@@ -184,18 +237,14 @@ end
 function sort_predictions!(res::CombinatorialCrossValidationResult,
                            predictions::AbstractVector{<:AbstractVector{<:PredictionResult}})
     path_ids = res.path_ids
-    sorted_preds = [MultiPeriodPredictionResult(;
-                                                pred = sizehint!(Vector{PredictionResult}(undef,
-                                                                                          0),
-                                                                 count(x -> x == i,
-                                                                       path_ids)))
-                    for i in 1:maximum(path_ids)]
+    sorted_preds = [sizehint!(Vector{PredictionResult}(undef, 0),
+                              count(x -> x == i, path_ids)) for i in 1:maximum(path_ids)]
     for (j, prediction) in enumerate(predictions)
         for (i, pred) in enumerate(prediction)
-            push!(sorted_preds[path_ids[i, j]].pred, pred)
+            push!(sorted_preds[path_ids[i, j]], pred)
         end
     end
-    return sorted_preds
+    return [MultiPeriodPredictionResult(; pred = pred) for pred in sorted_preds]
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                          cv::CombinatorialCrossValidation; cols = :,

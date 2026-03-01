@@ -116,10 +116,21 @@ function expected_risk(pred::PredictionResult{<:Any,
     X = pred.rd.X
     return [expected_risk(r, SingletonVector(), reshape(Xi, :, 1); kwargs...) for Xi in X]
 end
-struct MultiPeriodPredictionResult{T1} <: AbstractPredictionResult
+struct MultiPeriodPredictionResult{T1, T2} <: AbstractPredictionResult
     pred::T1
+    mrd::T2
     function MultiPeriodPredictionResult(pred::AbstractVector{<:PredictionResult})
-        return new{typeof(pred)}(pred)
+        rd = getfield.(pred, :rd)
+        nx = rd[1].nx
+        X = mapreduce_X(rd)
+        nf = rd[1].nf
+        F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
+        ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
+        iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
+        ivpa = rd[1].ivpa
+        mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
+                                      ivpa = ivpa)
+        return new{typeof(pred), typeof(mrd)}(pred, mrd)
     end
 end
 function MultiPeriodPredictionResult(;
@@ -138,25 +149,25 @@ function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecVe
     end
     return X
 end
-function get_multiperiod_returns_result(mpred::MultiPeriodPredictionResult)
-    rd = mpred.rd
-    nx = rd[1].nx
-    X = mapreduce_X(rd)
-    nf = rd[1].nf
-    F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
-    ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
-    iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
-    ivpa = rd[1].ivpa
-    return PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
-                                   ivpa = ivpa)
-end
+# function get_multiperiod_returns_result(mpred::MultiPeriodPredictionResult)
+#     rd = mpred.rd
+#     nx = rd[1].nx
+#     X = mapreduce_X(rd)
+#     nf = rd[1].nf
+#     F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
+#     ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
+#     iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
+#     ivpa = rd[1].ivpa
+#     return PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
+#                                    ivpa = ivpa)
+# end
 function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
     return if sym == :res
         getfield.(getfield(mpred, :pred), :res)
     elseif sym === :rd
         getfield.(getfield(mpred, :pred), :rd)
-    elseif sym == :mrd
-        get_multiperiod_returns_result(mpred)
+        # elseif sym == :mrd
+        #     get_multiperiod_returns_result(mpred)
     else
         getfield(mpred, sym)
     end
@@ -316,5 +327,5 @@ function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
     return MultiPeriodPredictionResult(; pred = predictions)
 end
 
-export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult, predict,
-       fit_predict, sort_by_measure
+export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,
+       PredictionReturnsResult, predict, fit_predict, sort_by_measure
