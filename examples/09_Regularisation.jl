@@ -1,7 +1,7 @@
 #=
 # Example 9: Regularisation
 
-This example shows one of the simplest ways to imporve the robustness of portfolios, regularisation penalties.
+This example shows one of the simplest ways to improve the robustness of portfolios, regularisation penalties.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -106,7 +106,7 @@ ress = optimise.(nocs)
 #=
 Let's plot the efficient frontiers.
 =#
-using Plots
+using StatsPlots, GraphRecipes
 
 r = Variance()
 # No regularisation portfolio weights.

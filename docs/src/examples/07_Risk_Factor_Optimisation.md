@@ -251,7 +251,7 @@ ress = optimise.(mrs)
 Let's plot the efficient frontiers.
 
 ````@example 07_Risk_Factor_Optimisation
-using Plots
+using StatsPlots, GraphRecipes
 ````
 
 Empirical prior composition.

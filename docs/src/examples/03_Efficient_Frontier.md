@@ -93,10 +93,10 @@ pretty_table(DataFrame([rd.nx hcat(res1.w...)], Symbol.([:assets; 1:30]));
 
 ## 3. Visualising the efficient frontier
 
-Perhaps it is time to introduce some visualisations, which are implemented as a package extesion. For this we need to import the `Plots`.
+Perhaps it is time to introduce some visualisations, which are implemented as a package extesion. For this we need to import the `StatsPlots` and `GraphRecipes` packages.
 
 ````@example 03_Efficient_Frontier
-using Plots
+using StatsPlots, GraphRecipes
 
 plot_stacked_area_composition(res1.w, rd.nx)
 ````

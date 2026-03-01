@@ -6,7 +6,7 @@ EditURL = "../../../examples/09_Regularisation.jl"
 
 # Example 9: Regularisation
 
-This example shows one of the simplest ways to imporve the robustness of portfolios, regularisation penalties.
+This example shows one of the simplest ways to improve the robustness of portfolios, regularisation penalties.
 
 ````@example 09_Regularisation
 using PortfolioOptimisers, PrettyTables
@@ -114,7 +114,7 @@ ress = optimise.(nocs)
 Let's plot the efficient frontiers.
 
 ````@example 09_Regularisation
-using Plots
+using StatsPlots, GraphRecipes
 
 r = Variance()
 ````

@@ -197,7 +197,7 @@ isa(res3.retcode, OptimisationSuccess)
 Let's view how the weights evolve along the pareto surface.
 =#
 
-using Plots
+using StatsPlots, GraphRecipes
 plot_stacked_area_composition(res3.w, rd.nx)
 
 #=

@@ -233,7 +233,7 @@ ress = optimise.(mrs)
 #=
 Let's plot the efficient frontiers.
 =#
-using Plots
+using StatsPlots, GraphRecipes
 # Empirical prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",

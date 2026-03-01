@@ -252,7 +252,7 @@ ress = optimise.(mrs)
 Let's plot the efficient frontiers.
 
 ````@example 08_Improving_Moment_Estimation
-using Plots
+using StatsPlots, GraphRecipes
 
 r = Variance()
 ````
