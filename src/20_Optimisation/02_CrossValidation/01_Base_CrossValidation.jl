@@ -105,16 +105,15 @@ function Base.getindex(A::SingletonVector, i::Int)
 end
 Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
 Base.size(::SingletonVector) = (1,)
-function expected_risk(pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecNum}},
-                       r::AbstractBaseRiskMeasure; kwargs...)
-    return expected_risk(r, SingletonVector{Int}(), reshape(pred.rd.X, :, 1); kwargs...)
+function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
+    return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
 end
-function expected_risk(pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecVecNum}},
-                       r::AbstractBaseRiskMeasure; kwargs...)
-    X = pred.rd.X
-    return [expected_risk(r, SingletonVector(), reshape(Xi, :, 1); kwargs...) for Xi in X]
+function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
+    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
+            for Xi in X]
+end
+function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
+    return _prediction_expected_risk(r, pred.rd.X, kwargs...)
 end
 struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
     pred::T1
@@ -174,14 +173,7 @@ function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
         getfield(mpred, sym)
     end
 end
-function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
-    return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
-end
-function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
-    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
-            for Xi in X]
-end
-function expected_risk(mpred::MultiPeriodPredictionResult, r::AbstractBaseRiskMeasure;
+function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionResult;
                        kwargs...)
     X = mpred.mrd.X
     return _prediction_expected_risk(r, X; kwargs...)
@@ -198,38 +190,40 @@ function PopulationPredictionResult(;
                                                                                                                   0))
     return PopulationPredictionResult(pred)
 end
-function expected_risk(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
+function expected_risk(r::AbstractBaseRiskMeasure,
+                       preds::Vector{<:MultiPeriodPredictionResult}; kwargs...)
+    return [expected_risk(r, pred; kwargs...) for pred in preds]
+end
+function expected_risk(r::AbstractBaseRiskMeasure, ppred::PopulationPredictionResult;
                        kwargs...)
-    return [expected_risk(pred, r; kwargs...) for pred in ppred.pred]
+    return expected_risk(r, ppred.pred; kwargs...)
 end
 function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
                          kwargs...)
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
-    return sort(pred; by = x -> expected_risk(x, r; kwargs...), rev = bigger_is_better(r))
+    return sort(pred; by = x -> expected_risk(r, x; kwargs...), rev = bigger_is_better(r))
 end
 function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
                              q::Real; kwargs...)
-    sorted_predictions = sort_by_measure(ppred, r; kwargs...)
-    idx = max(1, round(Int, Statistics.quantile(1:length(sorted_predictions), q)))
-    return sorted_predictions[idx]
+    pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
+                  ppred.pred)
+    rks = [expected_risk(r, p; kwargs...) for p in pred]
+    rkq = Statistics.quantile(rks, q)
+    rk_min = typemax(eltype(rks))
+    idx = 1
+    for (i, rk) in enumerate(rks)
+        rkd = abs(rk - rkq)
+        if rkd < rk_min
+            rk_min = rkd
+            idx = i
+        end
+    end
+    return pred[idx]
+    # sorted_predictions = sort_by_measure(ppred, r; kwargs...)
+    # idx = max(1, round(Int, Statistics.quantile(1:length(sorted_predictions), q)))
+    # return sorted_predictions[idx]
 end
-#! Start: Use these for scoring grid/random search cv
-function _map_to_population_measures(::Val{true}, rks::VecNum, f)
-    return f(rks)
-end
-function _map_to_population_measures(::Val{false}, rks::VecNum, f)
-    return rks'
-end
-function _map_to_population_measures(::Val{false}, rks::VecVecNum, f)
-    return f(reduce(vcat, rks); dims = 1)
-end
-function map_to_population_measures(ppred::PopulationPredictionResult,
-                                    r::AbstractBaseRiskMeasure, f = mean)
-    rks = expected_risk(ppred, r)
-    return _map_to_population_measures(Val(isa(ppred.pred[1].rd[1].X, VecNum)), rks, f)
-end
-#! End: Use these for scoring grid/random search cv
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum)
     iv = rd.iv

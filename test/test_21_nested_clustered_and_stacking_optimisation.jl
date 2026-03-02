@@ -414,20 +414,17 @@
                          opto = MeanRisk(; opt = jopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
-            res = if Sys.isapple()
-                try
-                    optimise(opt, rd)
-                catch err
-                    if isa(err, ArgumentError)
-                        println("Failed iteration: $i\nError: $err\nContinuing with next iteration.")
-                        continue
-                    else
-                        rethrow(err)
-                    end
-                end
-            else
+            res = try
                 optimise(opt, rd)
+            catch err
+                if isa(err, ArgumentError)
+                    println("Failed iteration: $i\nError: $err\nContinuing with next iteration.")
+                    continue
+                else
+                    rethrow(err)
+                end
             end
+
             if i == 3
                 @test isapprox(optimise(NestedClustered(; clr = clr,
                                                         opti = RiskBudgeting(; opt = jopti),

@@ -31,7 +31,7 @@ For this example, we will use 5 years of daily data. This is so that we have eno
 Cross validation cannot have precomputed values like we have done in previous examples. This is because the training and testing sets are generated on the fly, and the performance metrics are computed based on the results of the optimization on these sets.
 =#
 
-using CSV, TimeSeries, DataFrames, Clarabel
+using CSV, TimeSeries, DataFrames, Clarabel, Statistics
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
@@ -109,10 +109,10 @@ We can also compute performance metrics (risk measures) on the predicted returns
 Here we will compute the variance.
 =#
 
-println("KFold(5) prediction variance = $(expected_risk(kfold_pred, LowOrderMoment(; alg = SecondMoment())))")
+println("KFold(5) prediction variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), kfold_pred))")
 
 #=
-2.2 Combinatorial
+### 2.2 Combinatorial
 
 The [`CombinatorialCrossValidation`](@ref) method generates all possible combinations of the data into training and testing sets. This method is computationally expensive, but provides a more comprehensive evaluation of the model's performance on unseen data.
 
@@ -148,19 +148,67 @@ We can now perform the cross validation.
 cfold_pred = cross_val_predict(mr, rd, cfold)
 
 #=
-We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model. However, for evaluating the performance, we can use a sample or the median of the predictions. The median is a good representative of the performance, as it is not affected by outliers, and it is a good measure of central tendency. We can do this with custom function, or a functor of a subtype of [`AbstractCrossValidationScorer`]-(@ref). We've implemented a simple one called [`NearestQuantilePrediction`]-(@ref) which takes the prediction with the nearest quantile to the desired quantile of the distribution of predictions, it defaults to the median.
+We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model. However, for evaluating the performance, we can use a sample or the median of the predictions. The median is a good representative of the performance, as it is not affected by outliers, and it is a good measure of central tendency. We can do this with custom function, or a functor of a subtype of [`PredictionScorer`]-(@ref). We've implemented a simple one called [`NearestQuantilePrediction`]-(@ref) which takes the prediction with the nearest quantile to the desired quantile of the distribution of predictions, it defaults to the median.
 
 We will use the risk return ratio of the variance as our performance metric. The paths are sorted according to their expected risk, return based risk measures sort them based on descending order, while true risk measures sort them in ascending order.
 =#
 
-scorer = NearestQuantilePrediction(;
-                                   r = MeanReturnRiskRatio(;
-                                                           rk = LowOrderMoment(;
-                                                                               alg = SecondMoment())))
+sharpe_scorer = NearestQuantilePrediction(;
+                                          r = MeanReturnRiskRatio(;
+                                                                  rk = LowOrderMoment(;
+                                                                                      alg = SecondMoment())))
 
 #=
 Scorer is a functor which takes a population as an input and outputs a tuple of the single prediction and the index in the population which matches the desired quantile of the distribution of predictions. In this case, we are using the mean return risk ratio with the variance as the risk measure, and we are looking for the prediction with the nearest quantile to 0.5, which is the median.
 =#
 
-median_pred = scorer(cfold_pred)
-median_pred === cfold_pred.pred[median_pred.id]
+median_pred_max_sharpe = sharpe_scorer(cfold_pred)
+
+#=
+The prediction `id` corresponds to the index/path id of the prediction in the population.
+=#
+median_pred_max_sharpe === cfold_pred.pred[median_pred_max_sharpe.id]
+
+#=
+Similarty to the KFold, the timestamps of the predicted returns should be the same as the timestamps of the original returns result, since the embargo and purged sizes are zero.
+=#
+isequal(median_pred_max_sharpe.mrd.ts, rd.ts)
+
+#=
+We can further verify this by computing the risk return ratio of the variance for all predictions and seeing that the prediction with a risk value closest to the median is indeed the same as the one we found with the scorer. Note that the scorer also filters out predictions whose optimisations failed, so in order to be truly rigorous we'd need to skip NaN values in the array of risks, while keeping the indices aligned, but for demonstration purposes this is sufficient.
+=#
+
+sharpe_ratios = expected_risk(MeanReturnRiskRatio(;
+                                                  rk = LowOrderMoment(;
+                                                                      alg = SecondMoment())),
+                              cfold_pred)
+argmin(abs.(sharpe_ratios .- median(sharpe_ratios))) == median_pred_max_sharpe.id
+
+#=
+We can choose any compatible risk measure as outlined above, for demonstration purposes we will now rank them based on the variance.
+=#
+
+variance_scorer = NearestQuantilePrediction(; r = LowOrderMoment(; alg = SecondMoment()))
+median_pred_min_variance = variance_scorer(cfold_pred)
+
+#=
+Again the id matches the prediction with the nearest quantile to the median of the distribution of predictions.
+=#
+median_pred_min_variance === cfold_pred.pred[median_pred_min_variance.id]
+
+#=
+As always, the timestamps match.
+=#
+isequal(median_pred_min_variance.mrd.ts, rd.ts)
+
+#=
+### 2.3 WalkForward
+
+We offer two different walkforward estimators, [`IndexWalkForward`](@ref) and [`DateWalkForward`](@ref). The former splits the data based on the number of observations, while the latter splits the data based on the timestamps, and can be used with Julia's `Dates` module to adjust periods to specific times.
+
+The walkforward method is a more realistic evaluation of the model's performance on unseen data, as it mimics the way the model would be used in practice. It can also dynamically use the previous optimisation weights in constraints and risk measures if so desired.
+
+#### 2.3.1 IndexWalkForward
+
+The simpler estimator is [`IndexWalkForward`](@ref) so we will start with this one.
+=#

@@ -12,6 +12,58 @@ end
 function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return WalkForwardResult(train_idx, test_idx)
 end
+"""
+    struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
+        train_size
+        test_size
+        purged_size
+        expend_train
+        reduce_test
+    end
+
+Implements index-based walk-forward cross-validation for time series, supporting purging and flexible train/test windowing.
+
+# Fields
+
+  - `train_size`: Number of observations in each training set.
+  - `test_size`: Number of observations in each test set.
+  - `purged_size`: Number of observations to exclude from the end of each train set adjacent to a test set.
+  - `expend_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
+  - `reduce_test`: If true, reduces the last test set to fit remaining data; otherwise, drops incomplete test sets.
+
+# Constructors
+
+```julia
+IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::Integer = 0,
+                 expend_train::Bool = false, reduce_test::Bool = false)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `train_size`, `test_size`, and `purged_size` must be non-empty, non-negative, and finite.
+  - Ensures `train_size + purged_size < T` where `T` is the total number of observations.
+
+# Examples
+
+```jldoctest
+julia> IndexWalkForward(100, 20; purged_size = 5, expend_train = true, reduce_test = false)
+IndexWalkForward
+    train_size ┼ Int64: 100
+     test_size ┼ Int64: 20
+   purged_size ┼ Int64: 5
+  expend_train ┼ Bool: true
+   reduce_test ┴ Bool: false
+```
+
+# Related
+
+  - [`WalkForwardEstimator`]-(@ref)
+  - [`WalkForwardResult`]-(@ref)
+  - [`split`]-(@ref)
+  - [`n_splits`]-(@ref)
+"""
 struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
     train_size::T1
     test_size::T2
@@ -76,6 +128,74 @@ abstract type DateAdjusterEstimator <: AbstractEstimator end
 const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
 const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
 const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
+"""
+    struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimator
+        train_size::T1
+        test_size::T2
+        period::T3
+        period_offset::T4
+        purged_size::T5
+        adjuster::T6
+        previous::T7
+        expend_train::T8
+        reduce_test::T9
+    end
+
+Implements date-based walk-forward cross-validation for time series, supporting flexible windowing, purging, and custom date adjustment.
+
+# Fields
+
+  - `train_size`: Number of periods or length of training window (integer or date period).
+  - `test_size`: Number of observations in each test set.
+  - `period`: Step size for each split.
+  - `period_offset`: Optional offset to shift the split dates.
+  - `purged_size`: Number of observations to exclude from the end of each train set adjacent to a test set.
+  - `adjuster`: Function or estimator to adjust the date range (e.g., for business days).
+  - `previous`: If true, allows test indices to use previous available date if exact match not found, else use the next available date.
+  - `expend_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
+  - `reduce_test`: If true, reduces the last test set to fit remaining data; otherwise, drops incomplete test sets.
+
+# Constructors
+
+```julia
+DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
+                period::DatesUnionPeriod = Dates.Day(1),
+                period_offset::Option{<:DatesUnionPeriod} = nothing,
+                purged_size::Integer = 0, adjuster::DateAdjType = identity,
+                previous::Bool = false, expend_train::Bool = false,
+                reduce_test::Bool = false)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `test_size` and `purged_size` must be non-empty, non-negative, and finite.
+  - If `train_size` is an integer, it must be non-empty, non-negative, and finite.
+
+# Examples
+
+```jldoctest
+julia> DateWalkForward(252, 21; period = Dates.Day(1), purged_size = 5, expend_train = true)
+DateWalkForward
+   train_size   ┼ Int64: 252
+    test_size   ┼ Int64: 21
+    period      ┼ Day(1)
+ period_offset  ┼ nothing
+   purged_size  ┼ Int64: 5
+    adjuster    ┼ identity
+    previous    ┼ Bool: false
+  expend_train  ┼ Bool: true
+  reduce_test   ┴ Bool: false
+```
+
+# Related
+
+  - [`WalkForwardEstimator`]-(@ref)
+  - [`WalkForwardResult`]-(@ref)
+  - [`split`]-(@ref)
+  - [`n_splits`]-(@ref)
+"""
 struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimator
     train_size::T1
     test_size::T2
