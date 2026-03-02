@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase, DocumenterVitepress
+      Handcalcs, StatsBase, DocumenterVitepress, Dates
 
 exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)
@@ -13,8 +13,8 @@ for sym in private_symbols
 end
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
-                    :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra);
-                    recursive = true)
+                    :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
+                            Dates); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)

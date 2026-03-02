@@ -235,7 +235,7 @@ function optimal_number_folds(T::Integer, target_train_size::Integer,
     return n_folds_opt, n_test_folds_opt
 end
 function sort_predictions!(res::CombinatorialCrossValidationResult,
-                           predictions::AbstractVector{<:AbstractVector{<:PredictionResult}})
+                           predictions::VecVecPredRes)
     path_ids = res.path_ids
     sorted_preds = [sizehint!(Vector{PredictionResult}(undef, 0),
                               count(x -> x == i, path_ids)) for i in 1:maximum(path_ids)]

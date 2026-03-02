@@ -245,9 +245,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)
 end
-function rebuild_returns_result(rd::ReturnsResult,
-                                predictions::AbstractVector{<:MultiPeriodPredictionResult},
-                                N::Integer)
+function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::Integer)
     iv_flag = !isnothing(rd.iv)
     ivpa_flag = !isnothing(rd.ivpa)
     rd1 = predictions[1].mrd

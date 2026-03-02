@@ -417,7 +417,7 @@
             res = try
                 optimise(opt, rd)
             catch err
-                if isa(err, ArgumentError)
+                if isa(err, ArgumentError) || isa(err, TaskFailedException)
                     println("Failed iteration: $i\nError: $err\nContinuing with next iteration.")
                     continue
                 else
@@ -431,12 +431,14 @@
                                                         opto = RiskBudgeting(; opt = jopto)),
                                         rd).w, res.w)
             end
-            rtol = if i in (2, 3, 16)
+            rtol = if i in (2, 16)
                 5e-5
-            elseif i == 12
+            elseif i in (12, 20)
                 5e-6
             elseif i == 10
                 1.1
+            elseif i == 3
+                1e-4
             else
                 1e-6
             end

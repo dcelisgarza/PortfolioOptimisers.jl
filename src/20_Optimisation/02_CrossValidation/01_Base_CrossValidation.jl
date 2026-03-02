@@ -95,6 +95,8 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
                           rd::PredictionReturnsResult)
     return PredictionResult(res, rd)
 end
+const VecPredRes = AbstractVector{<:PredictionResult}
+const VecVecPredRes = AbstractVector{<:VecPredRes}
 struct SingletonVector{T} <: AbstractVector{T} end
 function SingletonVector()
     return SingletonVector{Int}()
@@ -119,7 +121,7 @@ struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
     pred::T1
     mrd::T2
     id::T3
-    function MultiPeriodPredictionResult(pred::AbstractVector{<:PredictionResult}, id::Any)
+    function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
         X = mapreduce_X(rd)
@@ -134,11 +136,11 @@ struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
     end
 end
 function MultiPeriodPredictionResult(;
-                                     pred::AbstractVector{<:PredictionResult} = Vector{PredictionResult}(undef,
-                                                                                                         0),
+                                     pred::VecPredRes = Vector{PredictionResult}(undef, 0),
                                      id::Any = nothing)
     return MultiPeriodPredictionResult(pred, id)
 end
+const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}})
     return mapreduce(x -> getproperty(x, :X), vcat, rd)
 end
@@ -179,19 +181,19 @@ function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionR
     return _prediction_expected_risk(r, X; kwargs...)
 end
 const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 struct PopulationPredictionResult{T1} <: AbstractPredictionResult
     pred::T1
-    function PopulationPredictionResult(pred::AbstractVector{<:PredRes_MultiPredRes})
+    function PopulationPredictionResult(pred::VecPredRes_MultiPredRes)
         return new{typeof(pred)}(pred)
     end
 end
 function PopulationPredictionResult(;
-                                    pred::AbstractVector{<:PredRes_MultiPredRes} = Vector{<:PredRes_MultiPredRes}(undef,
-                                                                                                                  0))
+                                    pred::VecPredRes_MultiPredRes = Vector{<:PredRes_MultiPredRes}(undef,
+                                                                                                   0))
     return PopulationPredictionResult(pred)
 end
-function expected_risk(r::AbstractBaseRiskMeasure,
-                       preds::Vector{<:MultiPeriodPredictionResult}; kwargs...)
+function expected_risk(r::AbstractBaseRiskMeasure, preds::VecMPredRes; kwargs...)
     return [expected_risk(r, pred; kwargs...) for pred in preds]
 end
 function expected_risk(r::AbstractBaseRiskMeasure, ppred::PopulationPredictionResult;
@@ -296,14 +298,12 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     res = optimise(opt, rd_train)
     return predict(res, rd, test_idx, cols)
 end
-function sort_predictions!(test_idx::VecVecInt,
-                           predictions::AbstractVector{<:PredictionResult})
+function sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
     @argcheck(all(map(x -> allunique(x), test_idx)), "Test indices must be unique.")
     idx = sortperm(test_idx; by = x -> x[1])
     return predictions[idx]
 end
-function sort_predictions!(res::CrossValidationResult,
-                           predictions::AbstractVector{<:PredictionResult})
+function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
     return sort_predictions!(res.test_idx, predictions)
 end
 function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
