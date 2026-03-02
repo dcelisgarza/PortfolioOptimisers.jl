@@ -244,7 +244,8 @@ function sort_predictions!(res::CombinatorialCrossValidationResult,
             push!(sorted_preds[path_ids[i, j]], pred)
         end
     end
-    return [MultiPeriodPredictionResult(; pred = pred) for pred in sorted_preds]
+    return [MultiPeriodPredictionResult(; pred = pred, id = i)
+            for (i, pred) in enumerate(sorted_preds)]
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                          cv::CombinatorialCrossValidation; cols = :,

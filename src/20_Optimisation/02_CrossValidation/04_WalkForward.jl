@@ -311,7 +311,8 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                          cv::WalkForwardEstimator; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         id = nothing)
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     predictions = Vector{PredictionResult}(undef, length(train_idx))
@@ -332,18 +333,19 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
             end
         end
     end
-    return MultiPeriodPredictionResult(; pred = predictions)
+    return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                          cv::WalkForwardEstimator;
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         id = nothing)
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     predictions = Vector{PredictionResult}(undef, length(test_idx))
     FLoops.@floop ex for (i, test) in enumerate(test_idx)
         predictions[i] = predict(res, rd, test)
     end
-    return MultiPeriodPredictionResult(; pred = predictions)
+    return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
 
 export WalkForwardResult, IndexWalkForward, DateWalkForward, n_splits

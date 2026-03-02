@@ -142,7 +142,8 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
 end
 function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               rd::ReturnsResult, train_idx, test_idx, cols;
-                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                              id = nothing)
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     if needs_previous_weights(opt)
         @info("Running walk forward sequentially because the optimiser must use the previous optimisation's weights. This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\nTo enable parallel processing please either mark the weights as fixed or remove the component(s) which use(s) them.")
@@ -163,7 +164,8 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions))
+    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
+                                       id = id)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
                          cv::MultipleRandomised;
@@ -181,7 +183,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
-        predictions[i] = path_fit_and_predict(opt, rd, train, test, asset)
+        predictions[i] = path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i)
     end
     return PopulationPredictionResult(; pred = predictions)
 end

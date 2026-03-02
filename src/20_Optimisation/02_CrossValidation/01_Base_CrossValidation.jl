@@ -116,10 +116,11 @@ function expected_risk(pred::PredictionResult{<:Any,
     X = pred.rd.X
     return [expected_risk(r, SingletonVector(), reshape(Xi, :, 1); kwargs...) for Xi in X]
 end
-struct MultiPeriodPredictionResult{T1, T2} <: AbstractPredictionResult
+struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
     pred::T1
     mrd::T2
-    function MultiPeriodPredictionResult(pred::AbstractVector{<:PredictionResult})
+    id::T3
+    function MultiPeriodPredictionResult(pred::AbstractVector{<:PredictionResult}, id::Any)
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
         X = mapreduce_X(rd)
@@ -130,13 +131,14 @@ struct MultiPeriodPredictionResult{T1, T2} <: AbstractPredictionResult
         ivpa = rd[1].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
                                       ivpa = ivpa)
-        return new{typeof(pred), typeof(mrd)}(pred, mrd)
+        return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id)
     end
 end
 function MultiPeriodPredictionResult(;
                                      pred::AbstractVector{<:PredictionResult} = Vector{PredictionResult}(undef,
-                                                                                                         0))
-    return MultiPeriodPredictionResult(pred)
+                                                                                                         0),
+                                     id::Any = nothing)
+    return MultiPeriodPredictionResult(pred, id)
 end
 function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}})
     return mapreduce(x -> getproperty(x, :X), vcat, rd)
@@ -312,7 +314,8 @@ function sort_predictions!(res::CrossValidationResult,
 end
 function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
                          cv::NonSequentialCrossValidationEstimator; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         id = nothing)
     @argcheck(!(hasproperty(cv, :shuffle) && cv.shuffle),
               "Cross validation estimator must not be shuffled.")
     cv_res = split(cv, rd)
@@ -324,7 +327,7 @@ function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
         predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
                                          cols = cols)
     end
-    return MultiPeriodPredictionResult(; pred = predictions)
+    return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,

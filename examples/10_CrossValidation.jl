@@ -109,7 +109,7 @@ We can also compute performance metrics (risk measures) on the predicted returns
 Here we will compute the variance.
 =#
 
-println("KFold(5) prediction variance = $(expected_risk(kfold_pred, LowOrderMoment(alg=SecondMoment())))")
+println("KFold(5) prediction variance = $(expected_risk(kfold_pred, LowOrderMoment(; alg = SecondMoment())))")
 
 #=
 2.2 Combinatorial
@@ -148,5 +148,19 @@ We can now perform the cross validation.
 cfold_pred = cross_val_predict(mr, rd, cfold)
 
 #=
-We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model, but we must select one.
+We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model. However, for evaluating the performance, we can use a sample or the median of the predictions. The median is a good representative of the performance, as it is not affected by outliers, and it is a good measure of central tendency. We can do this with custom function, or a functor of a subtype of [`AbstractCrossValidationScorer`]-(@ref). We've implemented a simple one called [`NearestQuantilePrediction`]-(@ref) which takes the prediction with the nearest quantile to the desired quantile of the distribution of predictions, it defaults to the median.
+
+We will use the risk return ratio of the variance as our performance metric. The paths are sorted according to their expected risk, return based risk measures sort them based on descending order, while true risk measures sort them in ascending order.
 =#
+
+scorer = NearestQuantilePrediction(;
+                                   r = MeanReturnRiskRatio(;
+                                                           rk = LowOrderMoment(;
+                                                                               alg = SecondMoment())))
+
+#=
+Scorer is a functor which takes a population as an input and outputs a tuple of the single prediction and the index in the population which matches the desired quantile of the distribution of predictions. In this case, we are using the mean return risk ratio with the variance as the risk measure, and we are looking for the prediction with the nearest quantile to 0.5, which is the median.
+=#
+
+median_pred = scorer(cfold_pred)
+median_pred === cfold_pred.pred[median_pred.id]
