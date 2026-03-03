@@ -178,15 +178,15 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> DateWalkForward(252, 21; period = Dates.Day(1), purged_size = 5, expend_train = true)
 DateWalkForward
-   train_size   ┼ Int64: 252
-    test_size   ┼ Int64: 21
-    period      ┼ Day(1)
- period_offset  ┼ nothing
-   purged_size  ┼ Int64: 5
-    adjuster    ┼ identity
-    previous    ┼ Bool: false
-  expend_train  ┼ Bool: true
-  reduce_test   ┴ Bool: false
+     train_size ┼ Int64: 252
+      test_size ┼ Int64: 21
+         period ┼ Day: Dates.Day(1)
+  period_offset ┼ nothing
+    purged_size ┼ Int64: 5
+       adjuster ┼ typeof(identity): identity
+       previous ┼ Bool: false
+   expend_train ┼ Bool: true
+    reduce_test ┴ Bool: false
 ```
 
 # Related
@@ -257,7 +257,7 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     idx = Vector{tt}(undef, 0)
     for date in date_range
         i = searchsortedlast(ts, date)
-        if !previous && ts[i] != date
+        if iszero(i) || !previous && ts[i] != date
             i += 1
         end
         if i > length(ts)
@@ -338,10 +338,10 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         date_range += period_offset
     end
 
-    idx = typeof(T)[]
+    idx = Vector{typeof(T)}(undef, 0)
     for date in date_range
         i = searchsortedlast(ts, date)
-        if !previous && ts[i] != date
+        if iszero(i) || !previous && ts[i] != date
             i += 1
         end
         if i > length(ts)

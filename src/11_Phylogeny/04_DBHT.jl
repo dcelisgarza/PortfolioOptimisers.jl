@@ -447,7 +447,7 @@ function distance_wei(L::MatNum)
             end
 
             dus = D[u, S]
-            minD = !isempty(dus) ? minimum(dus) : Float64[]
+            minD = !isempty(dus) ? minimum(dus) : eltype(D)[]
 
             # isempty: all nodes reached
             # isinf: some nodes cannot be reached

@@ -225,7 +225,112 @@ The walkforward method is a more realistic evaluation of the model's performance
 
 #### 2.3.1 IndexWalkForward
 
-The simpler estimator is [`IndexWalkForward`](@ref) so we will start with this one.
+The simpler estimator is [`IndexWalkForward`](@ref) so we will start with this one. We will use training sets of one full year and test sets of 3 months. Note that a year has roughly 252 trading days. We will again not use any purging, meaning that the test set will immediately follow the training set, and there will be no gap between them. This means that the timestamps of the predicted returns should be the same as the timestamps of the original returns result minus the first 252 entries.
+
+````@example 10_CrossValidation
+idx_walk_forward = IndexWalkForward(252, round(Int, 252 / 4))
+idx_walk_forward_res = split(idx_walk_forward, rd)
+display(idx_walk_forward_res.train_idx)
+display(idx_walk_forward_res.test_idx)
+````
+
+We can generate the prediction now.
+
+````@example 10_CrossValidation
+idx_walkforward_pred = cross_val_predict(mr, rd, idx_walk_forward)
+````
+
+Let's check the timestamps.
+
+````@example 10_CrossValidation
+isequal(idx_walkforward_pred.mrd.ts, rd.ts[253:end])
+````
+
+Now let's see the evolution of the weights across the different splits.
+
+````@example 10_CrossValidation
+pretty_table(hcat(DataFrame(:tickers => rd.nx),
+                  DataFrame(reduce(hcat, getproperty.(idx_walkforward_pred.res, :w)),
+                            Symbol.(1:16))); formatters = [resfmt])
+````
+
+As we can see, the weights can evolve in a fairly volatile manner. We can avoid this by adding a non-fixed turnover constraint, fee, risk measure, or weight based tracking. For demonstration purposes we will use a turnover constraint with a maximum turnover of 2% per period for all assets from an equal weight starting point, we will provide the [`Turnover`](@ref) directly, which is non-fixed by default, meaning it will be updated every period.
+
+````@example 10_CrossValidation
+N = size(rd.X, 2)
+tn = Turnover(; w = range(; start = 1 / N, stop = 1 / N, length = N), val = 0.02)
+````
+
+We can generate the optimiser with the turnover constraint and then perform the walkforward cross validation again.
+
+````@example 10_CrossValidation
+mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, tn = tn))
+idx_tn_walkforward_pred = cross_val_predict(mr, rd, idx_walk_forward)
+````
+
+Now let's see the evolution of the weights across the different splits. We can see how the weights change at most 2% per period.
+
+````@example 10_CrossValidation
+pretty_table(hcat(DataFrame(:tickers => rd.nx),
+                  DataFrame(reduce(hcat, getproperty.(idx_tn_walkforward_pred.res, :w)),
+                            Symbol.(1:16))); formatters = [resfmt])
+````
+
+#### 2.3.2 DateWalkForward
+
+The [`DateWalkForward`](@ref) estimator is similar to the [`IndexWalkForward`](@ref) estimator, but it allows us to specify the training and test periods in terms of dates. This can be useful if we want to align our training and test sets with specific calendar periods, such as fiscal years or quarters.
+
+The `Dates` module provides a large amount of functionality to manipulate dates, but we will keep it simple. For this we will define an adjuster function that takes a date range generates a new one made up only of the last day of the month.
+
+````@example 10_CrossValidation
+function ldm(x)
+    val = lastdayofmonth.(x)
+    while !isempty(val)
+        if val[end] > x[end]
+            val = val[1:(end - 1)]
+        else
+            break
+        end
+    end
+    return val
+end;
+nothing #hide
+````
+
+This estimator can take a few options, the first argument can also be a date period or compound period, but if we leave it as an integer it will take on that many periods. The second argument is always an integer and is the value of that many periods. Combining both gives us a fully determined mixture of training and test set lengths as both can be set to an arbitrarily defined training and testing period.
+
+To keep it simple, we will keep the period unit the same for both. We will again train for a year and test for a quarter, but the dates will now align with the end of calendar months. The date boundaries are determined by searching for the last date in the timestamps less than a value in the date boundary. If the date of the timestamp is not found in the date range, the `previous` flag is used to determine whether to take the last date found (previous = true), or the next available date is used (previous = false). This means that in order to guarantee alignment of the first date of each test set with the last day of the month we need to set `previous` to true.
+
+````@example 10_CrossValidation
+date_walk_forward = DateWalkForward(12, 3; period = Month(1), adjuster = ldm,
+                                    previous = true)
+````
+
+We can see what the splits look like.
+
+````@example 10_CrossValidation
+date_walk_forward_res = split(date_walk_forward, rd)
+display(date_walk_forward_res.train_idx)
+display(date_walk_forward_res.test_idx)
+````
+
+We will once more use the turnover constraint, but with this new cross validation method.
+
+````@example 10_CrossValidation
+date_tn_walkforward_pred = cross_val_predict(mr, rd, date_walk_forward)
+````
+
+We can see the evolution of the weights across the different splits. We can see how the weights change at most 2% per period.
+
+````@example 10_CrossValidation
+pretty_table(hcat(DataFrame(:tickers => rd.nx),
+                  DataFrame(reduce(hcat, getproperty.(date_tn_walkforward_pred.res, :w)),
+                            Symbol.(1:15))); formatters = [resfmt])
+````
+
+The splits are different to the index walkforward method, so the weights are also different, but we can see there's not too much variation. That's because the training periods are roughly the same. However, the turnover constraint also helps in stabilising the weights.
+
+There is another cross validation method called [`MultipleRandomised`]-(@ref) which uses a walk forward estimator, but also randomly samples the asset universe. Since it is more complex to analyse and understand, we will cover it in a future example.
 
 ---
 

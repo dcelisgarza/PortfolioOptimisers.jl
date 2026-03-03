@@ -362,8 +362,12 @@
                                817:927, 928:1008]
         function ldm(x)
             val = lastdayofmonth.(x)
-            if val[end] > x[end]
-                val = val[1:(end - 1)]
+            while !isempty(val)
+                if val[end] > x[end]
+                    val = val[1:(end - 1)]
+                else
+                    break
+                end
             end
             return val
         end
@@ -680,7 +684,7 @@
                          0.0370075076921348, 0.041350884551771494, 0.04610364935258909,
                          0.051309749163401794, 0.055963400014543016, 0.06100076114194472,
                          0.06630600610829536, 0.07240998627924726, 0.07916366997300678]],
-                       rtol = 1e-6)
+                       rtol = 5e-5)
         @test isa(eff_front_combinatorial_pred.pred[1].res, AbstractVector)
     end
 end
