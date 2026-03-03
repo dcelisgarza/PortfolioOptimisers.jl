@@ -258,9 +258,15 @@ plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 
 There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 
+## Roadmap
+
+- For a roadmap of planned and desired features in no particular order please refer to Issue [#37](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/37).
+
+- Some docstrings are incomplete and/or outdated, please refer to Issue [#58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
+
 ## Features
 
-This section is under active development and any [`<name>`]-(@ref) lack docstrings. Some docstrings are also outdated, please refer to [Issue #58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
+This section is under active development so any [`<name>`]-(@ref) lacks docstrings.
 
 ### Preprocessing
 
@@ -898,7 +904,14 @@ Schur complementary hierarchical risk parity provides a bridge between mean vari
 
 ##### Nested clusters optimisation
 
-Nested clustered optimisation breaks the asset universe into smaller subsets and treats every subset as an individual portfolio. Then it creates a synthetic asset out of each portfolio, optimises the portfolio of synthetic assets. The final weights are the inner product between the individual portfolio weights and outer portfolio.
+Nested clustered optimisation breaks the asset universe of size `N` into `C` smaller subsets and treats every subset as an individual portfolio. The weights assigned to each asset are placed in an `N×C` matrix. In each column, non-zero values correspond to assets assigned to that subset, this means that assets only contribute to the column (and therefore synthetic asset) corresponding to their assigned subset. In other words, each row of the matrix contains a single non-zero value and each row contains as many non-zero values as there are assets in that subset.
+
+From here there are two options:
+
+1. Compute the returns matrix of the synthetic assets directly by multiplying the original `T×N` matrix by the `N×C` matrix of asset weights to produce a `T×C` matrix of predicted returns, where `T` is the number of observations.
+2. For each subset perform a cross validation prediction, yielding a vector of returns for that subset. These vectors are then horizontally concatenated into a `Y×C` matrix of cross-validation predicted returns, where `Y ≤ T` because the cross validation may not use the full history.
+
+This matrix of predicted returns is then used by the outer optimisation estimator to generate an optimisation of the synthetic assets. This produces a `C×1` vector, essentially optimising a portfolio of asset clusters. The final weights are the product of the original `N×C` matrix of asset weights per cluster by the `C×1` vector of optimal synthetic asset weights to produce the final `N×1` vector of asset weights.
 
 - Nested Clustered [`NestedClustered`]-(@ref) returns a [`NestedClusteredResult`]-(@ref)
 
@@ -917,7 +930,7 @@ Nested clustered optimisation breaks the asset universe into smaller subsets and
 
 #### Ensemble optimisation
 
-These work similar to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided, all of which are optimised, and each result is treated as a synthetic asset from which a synthetic portfolio is created and optimised according to an outer estimator. The final weights are the inner product between the individual portfolio weights and outer portfolio.
+These work similar to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided. The procedure is then exactly the same as the nested clusters optimisation, only instead of an `N×C` matrix of asset weights where each column corresponds to a subset of assets, each column corresponds to a completely independent and isolated inner estimator, which also means there is no enforced sparsity pattern on this matrix.
 
 - Stacking [`Stacking`]-(@ref) returns a [`StackingResult`]-(@ref)
 
@@ -947,6 +960,17 @@ Unlike all other estimators, finite allocation does not yield an "optimal" value
       - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
       - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 - Greedy [`GreedyAllocation`]
+
+### Cross validation
+
+- Prediction on unseen data [`PredictionReturnsResult`]-(@ref), [`PredictionResult`]-(@ref), [`MultiPeriodPredictionResult`]-(@ref), [`PopulationPredictionResult`]-(@ref) via [`predict`]-(@ref), [`fit_and_predict`]-(@ref)
+- Prediction scoring via [`PredictionCrossValScorer`]-(@ref), [`NearestQuantilePrediction`]-(@ref), and [`quantile_by_measure`]-(@ref)
+- ::: details Cross validation estimators used via [`split`]-(@ref) and [`cross_val_predict`]-(@ref)
+  - K-Fold [`KFold`](@ref) returns a [`KFoldResult`]-(@ref)
+  - Combinatorial [`CombinatorialCrossValidation`](@ref) returns a [`CombinatorialCrossValidationResult`]-(@ref)
+  - ::: details Walk forward [`WalkForward`]-(@ref) return a [`WalkForwardResult`]-(@ref)
+    - Index-based [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref)
+  - Multiple randomised [`MultipleRandomised`]-(@ref) returns a [`MultipleRandomisedResult`]-(@ref)
 
 ### Plotting
 

@@ -20,12 +20,14 @@ end
 function needs_previous_weights(::OptE_Opt)
     return false
 end
+#! Start: Overload these for all estimators which can use time-dependent constraints.
 function is_time_dependent(::OptE_Opt)
     return false
 end
 function update_time_dependent_estimator(opt::OptE_Opt, args...)
     return opt
 end
+#! End: Overload these for all estimators which can use time-dependent constraints.
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
