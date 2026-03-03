@@ -180,7 +180,7 @@ julia> DateWalkForward(252, 21; period = Dates.Day(1), purged_size = 5, expend_t
 DateWalkForward
      train_size ┼ Int64: 252
       test_size ┼ Int64: 21
-         period ┼ Day: Dates.Day(1)
+         period ┼ Dates.Day: Dates.Day(1)
   period_offset ┼ nothing
     purged_size ┼ Int64: 5
        adjuster ┼ typeof(identity): identity
