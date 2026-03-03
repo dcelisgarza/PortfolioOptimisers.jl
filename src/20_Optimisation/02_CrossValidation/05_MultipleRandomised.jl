@@ -145,13 +145,21 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
     predictions = Vector{PredictionResult}(undef, length(train_idx))
-    if needs_previous_weights(opt)
-        @info("Running walk forward sequentially because the optimiser must use the previous optimisation's weights. This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\nTo enable parallel processing please either mark the weights as fixed or remove the component(s) which use(s) them.")
+    prev_w_flag = needs_previous_weights(opt)
+    time_dep_flag = is_time_dependent(opt)
+    if prev_w_flag || time_dep_flag
+        @info("Running walk forward sequentially because the optimiser must either use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag), and/or is time dependent (is_time_dependent(opt) == $time_dep_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.-\n\t Or there is a time dependent constraint or objective penalty.\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s).")
         for (i, (train, test, col)) in enumerate(zip(train_idx, test_idx, cols))
             rdi = returns_result_view(rd, col)
             opti = opt_view(opt, col, rdi.X)
             if i > 1
-                opti = factory(opti, predictions[i - 1].res.w)
+                if prev_w_flag
+                    opti = factory(opti, predictions[i - 1].res.w)
+                end
+                if time_dep_flag
+                    opti = update_time_dependent_estimator(opti, i, rdi, train_idx,
+                                                           test_idx)
+                end
             end
             predictions[i] = fit_and_predict(opti, rdi; train_idx = train, test_idx = test)
         end

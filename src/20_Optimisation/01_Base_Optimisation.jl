@@ -20,6 +20,12 @@ end
 function needs_previous_weights(::OptE_Opt)
     return false
 end
+function is_time_dependent(::OptE_Opt)
+    return false
+end
+function update_time_dependent_estimator(opt::OptE_Opt, args...)
+    return opt
+end
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
@@ -29,6 +35,12 @@ function assert_special_nco_requirements(opt::VecOptE_Opt)
 end
 function needs_previous_weights(opt::VecOptE_Opt)
     return any(needs_previous_weights.(opt))
+end
+function is_time_dependent(opt::VecOptE_Opt)
+    return any(is_time_dependent.(opt))
+end
+function update_time_dependent_estimator(opt::VecOptE_Opt, args...)
+    return [update_time_dependent_estimator(opti, args...) for opti in opt]
 end
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
