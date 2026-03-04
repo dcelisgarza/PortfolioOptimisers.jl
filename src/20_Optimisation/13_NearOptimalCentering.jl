@@ -564,7 +564,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                        opt.sgmtx, opt.slt,
                                                                        opt.sst, opt.sglt,
                                                                        opt.sgst, opt.tn,
-                                                                       opt.fees, opt.pl,
+                                                                       opt.fees, opt.ple,
                                                                        opt.ret),
                                       w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, retcode, sol,
@@ -586,22 +586,22 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, opt.ct, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.pl, opt.lt, opt.st,
+    set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.ple, opt.lt, opt.st,
                          opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
                           opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
-    set_tracking_error_constraints!(model, opt.pe, opt.tr, noc, opt.pl, opt.fees; rd = rd)
+    set_tracking_error_constraints!(model, opt.pe, opt.tr, noc, opt.ple, opt.fees; rd = rd)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
     set_linf_regularisation!(model, opt.linf)
     set_lp_regularisation!(model, opt.lp)
     set_non_fixed_fees!(model, opt.fees)
-    set_risk_constraints!(model, r, noc, opt.pe, opt.pl, opt.fees; rd = rd)
+    set_risk_constraints!(model, r, noc, opt.pe, opt.ple, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    set_sdp_phylogeny_constraints!(model, opt.pl)
+    set_sdp_phylogeny_constraints!(model, opt.ple)
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
                                   w_max, Val(haskey(model, :ret_frontier)),
@@ -616,7 +616,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                        opt.sgmtx, opt.slt,
                                                                        opt.sst, opt.sglt,
                                                                        opt.sgst, opt.tn,
-                                                                       opt.fees, opt.pl,
+                                                                       opt.fees, opt.ple,
                                                                        opt.ret),
                                       w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, retcode, sol,

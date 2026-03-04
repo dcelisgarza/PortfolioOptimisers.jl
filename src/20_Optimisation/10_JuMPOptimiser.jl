@@ -16,7 +16,7 @@ struct ProcessedJuMPOptimiserAttributes{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,
     sgst::T14
     tn::T15
     fees::T16
-    pl::T17
+    plr::T17
     ret::T18
 end
 function assert_finite_nonnegative_real_or_vec(val::Number)
@@ -54,7 +54,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     fees::T19
     sets::T20
     tr::T21 # TrackingError
-    pl::T22
+    ple::T22
     ret::T23
     sca::T24
     ccnt::T25
@@ -83,7 +83,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            sgst::Option{<:BtE_Bt_VecOptBtE_Bt},
                            tn::Option{<:TnE_Tn_VecTnE_Tn}, fees::Option{<:FeesE_Fees},
                            sets::Option{<:AssetSets}, tr::Option{<:Tr_VecTr},
-                           pl::Option{<:PlCE_PhC_VecPlCE_PlC}, ret::JuMPReturnsEstimator,
+                           ple::Option{<:PlCE_PhC_VecPlCE_PlC}, ret::JuMPReturnsEstimator,
                            sca::NonHierarchicalScalariser,
                            ccnt::Option{<:CustomJuMPConstraint},
                            cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
@@ -243,14 +243,14 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(lt), typeof(st), typeof(lcs), typeof(ct), typeof(gcard),
                    typeof(sgcard), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
                    typeof(sglt), typeof(sgst), typeof(tn), typeof(fees), typeof(sets),
-                   typeof(tr), typeof(pl), typeof(ret), typeof(sca), typeof(ccnt),
+                   typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
                    typeof(lp), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcs, ct,
                                                gcard, sgcard, smtx, sgmtx, slt, sst, sglt,
-                                               sgst, tn, fees, sets, tr, pl, ret, sca, ccnt,
-                                               cobj, sc, so, ss, card, scard, nea, l1, l2,
-                                               linf, lp, strict)
+                                               sgst, tn, fees, sets, tr, ple, ret, sca,
+                                               ccnt, cobj, sc, so, ss, card, scard, nea, l1,
+                                               l2, linf, lp, strict)
     end
 end
 function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -271,7 +271,7 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        fees::Option{<:FeesE_Fees} = nothing,
                        sets::Option{<:AssetSets} = nothing,
                        tr::Option{<:Tr_VecTr} = nothing,
-                       pl::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+                       ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sca::NonHierarchicalScalariser = SumScalariser(),
                        ccnt::Option{<:CustomJuMPConstraint} = nothing,
@@ -283,7 +283,7 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
                        lp::Option{<:LpReg_VecLpReg} = nothing, strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, ct, gcard, sgcard, smtx,
-                         sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, pl, ret, sca,
+                         sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, strict)
 end
 function needs_previous_weights(opt::JuMPOptimiser)
@@ -304,7 +304,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)
                          ct = opt.ct, gcard = opt.gcard, sgcard = opt.sgcard,
                          smtx = opt.smtx, sgmtx = opt.sgmtx, slt = opt.slt, sst = opt.sst,
                          sglt = opt.sglt, sgst = opt.sgst, tn = tn, fees = fees,
-                         sets = opt.sets, tr = tr, pl = opt.pl, ret = opt.ret,
+                         sets = opt.sets, tr = tr, ple = opt.ple, ret = opt.ret,
                          sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
@@ -346,7 +346,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          lt = lt, st = st, lcs = opt.lcs, ct = opt.ct, gcard = opt.gcard,
                          sgcard = opt.sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt,
                          sst = sst, sglt = sglt, sgst = sgst, tn = tn, fees = fees,
-                         sets = sets, tr = tr, pl = opt.pl, ret = ret, sca = opt.sca,
+                         sets = sets, tr = tr, ple = opt.ple, ret = ret, sca = opt.sca,
                          ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, scard = opt.scard, nea = opt.nea, l1 = opt.l1,
                          l2 = opt.l2, linf = opt.linf, lp = opt.lp, strict = opt.strict)
@@ -389,10 +389,10 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
-    pl = phylogeny_constraints(opt.pl, pr.X; iv = rd.iv, ivpa = rd.ivpa)
+    plr = phylogeny_constraints(opt.ple, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx,
-                                            sgmtx, slt, sst, sglt, sgst, tn, fees, pl, ret)
+                                            sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret)
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
@@ -400,14 +400,14 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          NamedTuple{pnames}(getproperty.(opt, pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, pl, ret) = processed_jump_optimiser_attributes(opt,
-                                                                                                                                           rd;
-                                                                                                                                           dims = dims)
+    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = processed_jump_optimiser_attributes(opt,
+                                                                                                                                            rd;
+                                                                                                                                            dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, ct = ct, gcard = gcard,
                          sgcard = sgcard, smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst,
                          sglt = sglt, sgst = sgst, tn = tn, fees = fees, sets = opt.sets,
-                         tr = opt.tr, pl = pl, ret = ret, sca = opt.sca, ccnt = opt.ccnt,
+                         tr = opt.tr, ple = plr, ret = ret, sca = opt.sca, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
                          card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
                          linf = opt.linf, lp = opt.lp, strict = opt.strict)

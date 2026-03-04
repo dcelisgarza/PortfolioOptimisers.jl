@@ -38,9 +38,9 @@ function assert_rc_pl(::Any)
     return nothing
 end
 function assert_rc_pl(opt::FactorRiskContribution)
-    @argcheck(!isa(opt.pl, AbstractPhylogenyConstraintResult) ||
-              isa(opt.pl, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.pl))
+    @argcheck(!isa(opt.ple, AbstractPhylogenyConstraintResult) ||
+              isa(opt.ple, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.ple))
     return nothing
 end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
@@ -56,9 +56,9 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
                 isa(opt.opt.sgcard, AbstractVector) &&
                 any(x -> isa(x, LinearConstraint), opt.opt.sgcard)))
-    @argcheck(!isa(opt.opt.pl, AbstractPhylogenyConstraintResult) ||
-              isa(opt.opt.pl, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.pl))
+    @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) ||
+              isa(opt.opt.ple, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple))
     return nothing
 end
 function assert_internal_optimiser(opt::VecOptE_Opt)
