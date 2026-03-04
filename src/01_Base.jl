@@ -334,18 +334,6 @@ Alias for an abstract matrix of numeric types or JuMP scalar types.
 """
 const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
-    const MatInt = AbstractMatrix{<:Integer}
-
-Alias for an abstract matrix of integer types.
-
-# Related
-
-  - [`VecInt`](@ref)
-  - [`MatNum`](@ref)
-  - [`ArrNum`](@ref)
-"""
-const MatInt = AbstractMatrix{<:Integer}
-"""
     const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 
 Alias for an abstract array of numeric types or JuMP scalar types.
@@ -575,17 +563,6 @@ Alias for a union of an integer or a vector of integers.
   - [`VecInt`](@ref)
 """
 const Int_VecInt = Union{<:Integer, <:VecInt}
-"""
-    const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
-
-Alias for a union of an abstract vector of integers or an abstract vector of abstract vectors of integers.
-
-# Related
-
-  - [`VecInt`](@ref)
-  - [`VecVecInt`](@ref)
-"""
-const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
 """
     const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
 

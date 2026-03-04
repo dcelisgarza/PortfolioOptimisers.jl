@@ -429,9 +429,10 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     end
     return special_div(last_allowed_start - M, test_size) + 1
 end
-function fit_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                     cv::WalkForwardEstimator; cols = :,
-                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), id = nothing)
+function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                         cv::WalkForwardEstimator; cols = :,
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         id = nothing)
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     predictions = Vector{PredictionResult}(undef, length(train_idx))
@@ -448,20 +449,23 @@ function fit_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsR
                     opt = update_time_dependent_estimator(opt, i, rd, train_idx, test_idx)
                 end
             end
-            predictions[i] = fit_predict(opt, rd, train, test, cols)
+            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
+                                             cols = cols)
         end
     else
         let opt = opt
             FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-                predictions[i] = fit_predict(opt, rd, train, test, cols)
+                predictions[i] = fit_and_predict(opt, rd; train_idx = train,
+                                                 test_idx = test, cols = cols)
             end
         end
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
-function fit_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                     cv::WalkForwardEstimator;
-                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), id = nothing)
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                         cv::WalkForwardEstimator;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         id = nothing)
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     predictions = Vector{PredictionResult}(undef, length(test_idx))
