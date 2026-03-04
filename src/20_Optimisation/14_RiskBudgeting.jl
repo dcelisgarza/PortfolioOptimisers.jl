@@ -146,17 +146,17 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                                            rd;
-                                                                                                                                            dims = dims)
+    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                                                rd;
+                                                                                                                                                dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
-    set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, rb.opt.card, gcard, plr, lt, st, fees, rb.opt.ss)
-    set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, wb, rb.opt.card, gcardr, plr, lt, st, fees, rb.opt.ss)
+    set_smip_constraints!(model, wb, rb.opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt,
                           sgst, rb.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, rb.opt.tr, rb, plr, fees; rd = rd)
@@ -174,10 +174,10 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return RiskBudgetingResult(typeof(rb),
-                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct,
-                                                                gcard, sgcard, smtx, sgmtx,
-                                                                slt, sst, sglt, sgst, tn,
-                                                                fees, plr, ret), prb,
+                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr,
+                                                                gcardr, sgcardr, smtx,
+                                                                sgmtx, slt, sst, sglt, sgst,
+                                                                tn, fees, plr, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

@@ -241,19 +241,19 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
 end
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
-                                                                                                                                            rd;
-                                                                                                                                            dims = dims)
+    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
+                                                                                                                                                rd;
+                                                                                                                                                dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
     set_w!(model, pr.X, mr.wi)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
-    set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, mr.opt.card, gcard, plr, lt, st, fees, mr.opt.ss)
-    set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, wb, mr.opt.card, gcardr, plr, lt, st, fees, mr.opt.ss)
+    set_smip_constraints!(model, wb, mr.opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt,
                           sgst, mr.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, mr.opt.tr, mr, plr, fees; rd = rd)
@@ -271,10 +271,11 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
     return MeanRiskResult(typeof(mr),
-                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard,
-                                                           sgcard, smtx, sgmtx, slt, sst,
-                                                           sglt, sgst, tn, fees, plr, ret),
-                          retcode, sol, ifelse(save, model, nothing), nothing)
+                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr,
+                                                           gcardr, sgcardr, smtx, sgmtx,
+                                                           slt, sst, sglt, sgst, tn, fees,
+                                                           plr, ret), retcode, sol,
+                          ifelse(save, model, nothing), nothing)
 end
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

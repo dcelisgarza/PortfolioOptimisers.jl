@@ -558,14 +558,14 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return NearOptimalCenteringResult(typeof(noc),
                                       ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
                                                                        opt.lt, opt.st,
-                                                                       opt.lcs, opt.ct,
-                                                                       opt.gcard,
-                                                                       opt.sgcard, opt.smtx,
-                                                                       opt.sgmtx, opt.slt,
-                                                                       opt.sst, opt.sglt,
-                                                                       opt.sgst, opt.tn,
-                                                                       opt.fees, opt.ple,
-                                                                       opt.ret),
+                                                                       opt.lcse, opt.cte,
+                                                                       opt.gcarde,
+                                                                       opt.sgcarde,
+                                                                       opt.smtx, opt.sgmtx,
+                                                                       opt.slt, opt.sst,
+                                                                       opt.sglt, opt.sgst,
+                                                                       opt.tn, opt.fees,
+                                                                       opt.ple, opt.ret),
                                       w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, retcode, sol,
                                       ifelse(save, model, nothing), nothing)
@@ -584,11 +584,11 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
-    set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, opt.ct, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.ple, opt.lt, opt.st,
+    set_linear_weight_constraints!(model, opt.lcse, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, opt.cte, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, opt.wb, opt.card, opt.gcarde, opt.ple, opt.lt, opt.st,
                          opt.fees, opt.ss)
-    set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
+    set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcarde, opt.smtx, opt.sgmtx,
                           opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
     set_tracking_error_constraints!(model, opt.pe, opt.tr, noc, opt.ple, opt.fees; rd = rd)
@@ -610,14 +610,14 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return NearOptimalCenteringResult(typeof(noc),
                                       ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
                                                                        opt.lt, opt.st,
-                                                                       opt.lcs, opt.ct,
-                                                                       opt.gcard,
-                                                                       opt.sgcard, opt.smtx,
-                                                                       opt.sgmtx, opt.slt,
-                                                                       opt.sst, opt.sglt,
-                                                                       opt.sgst, opt.tn,
-                                                                       opt.fees, opt.ple,
-                                                                       opt.ret),
+                                                                       opt.lcse, opt.cte,
+                                                                       opt.gcarde,
+                                                                       opt.sgcarde,
+                                                                       opt.smtx, opt.sgmtx,
+                                                                       opt.slt, opt.sst,
+                                                                       opt.sglt, opt.sgst,
+                                                                       opt.tn, opt.fees,
+                                                                       opt.ple, opt.ret),
                                       w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, retcode, sol,
                                       ifelse(save, model, nothing), nothing)

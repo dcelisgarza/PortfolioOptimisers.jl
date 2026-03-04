@@ -38,24 +38,24 @@ function assert_rc_pl(::Any)
     return nothing
 end
 function assert_rc_pl(opt::FactorRiskContribution)
-    @argcheck(!isa(opt.ple, AbstractPhylogenyConstraintResult) ||
-              isa(opt.ple, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.ple))
+    @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) ||
+              isa(opt.frc_ple, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple))
     return nothing
 end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_rc_variance(opt)
     assert_rc_pl(opt)
-    @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
-                isa(opt.opt.lcs, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
-    @argcheck(!(isa(opt.opt.ct, LinearConstraint) ||
-                isa(opt.opt.ct, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.ct)))
-    @argcheck(!isa(opt.opt.gcard, LinearConstraint))
-    @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
-                isa(opt.opt.sgcard, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.sgcard)))
+    @argcheck(!(isa(opt.opt.lcse, LinearConstraint) ||
+                isa(opt.opt.lcse, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.lcse)))
+    @argcheck(!(isa(opt.opt.cte, LinearConstraint) ||
+                isa(opt.opt.cte, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.cte)))
+    @argcheck(!isa(opt.opt.gcarde, LinearConstraint))
+    @argcheck(!(isa(opt.opt.sgcarde, LinearConstraint) ||
+                isa(opt.opt.sgcarde, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.sgcarde)))
     @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) ||
               isa(opt.opt.ple, AbstractVector) &&
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple))
