@@ -93,10 +93,9 @@ For demonstration purposes we can generate the splits using the [`split`]-(@ref)
 
 ````@example 10_CrossValidation
 kfold_res = split(kfold, rd)
-#==#
-kfold_res.train_idx
-#==#
-kfold_res.test_idx
+
+show(kfold_res.train_idx)
+show(kfold_res.test_idx)
 ````
 
 Let's perform the cross validation.
@@ -232,10 +231,8 @@ The simpler estimator is [`IndexWalkForward`](@ref) so we will start with this o
 ````@example 10_CrossValidation
 idx_walk_forward = IndexWalkForward(252, round(Int, 252 / 4))
 idx_walk_forward_res = split(idx_walk_forward, rd)
-#==#
-idx_walk_forward_res.train_idx
-#==#
-idx_walk_forward_res.test_idx
+show(idx_walk_forward_res.train_idx)
+show(idx_walk_forward_res.test_idx)
 ````
 
 We can generate the prediction now.
@@ -314,10 +311,8 @@ We can see what the splits look like.
 
 ````@example 10_CrossValidation
 date_walk_forward_res = split(date_walk_forward, rd)
-#==#
-date_walk_forward_res.train_idx
-#==#
-date_walk_forward_res.test_idx
+show(date_walk_forward_res.train_idx)
+show(date_walk_forward_res.test_idx)
 ````
 
 We will once more use the turnover constraint, but with this new cross validation method.
