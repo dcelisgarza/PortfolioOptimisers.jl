@@ -1050,31 +1050,31 @@
         @test count(abs.(w) .> 1e-10) <= 7
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            gcard = LinearConstraintEstimator(;
-                                                              val = [:(XOM + MRK + WMT <= 2),
-                                                                     :(group2 == 5)]),
+                            gcarde = LinearConstraintEstimator(;
+                                                               val = [:(XOM + MRK + WMT <=
+                                                                        2), :(group2 == 5)]),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise(mre)
         w = res.w
-        @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
-        @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
-        @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
-        @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 5
+        @test rd.nx[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
+        @test rd.nx[.!iszero.(vec(res.gcardr.A_eq[1, :]))] == rd.nx[2:2:end]
+        @test count(w[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] .> 1e-10) <= 2
+        @test count(w[.!iszero.(vec(res.gcardr.A_eq[1, :]))] .> 1e-10) == 5
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
                             sbgt = 1, bgt = 1,
-                            gcard = LinearConstraintEstimator(;
-                                                              val = [:(XOM + MRK + WMT <= 2),
-                                                                     :(group2 == 3)]),
+                            gcarde = LinearConstraintEstimator(;
+                                                               val = [:(XOM + MRK + WMT <=
+                                                                        2), :(group2 == 3)]),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise(mre)
         w = res.w
-        @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
-        @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
-        @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
-        @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
+        @test rd.nx[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
+        @test rd.nx[.!iszero.(vec(res.gcardr.A_eq[1, :]))] == rd.nx[2:2:end]
+        @test count(w[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] .> 1e-10) <= 2
+        @test count(w[.!iszero.(vec(res.gcardr.A_eq[1, :]))] .> 1e-10) == 3
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
                             smtx = AssetSetsMatrixEstimator(; val = "clusters1"),
@@ -1152,39 +1152,39 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(nx ==
-                                                                                              8)))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(nx ==
+                                                                                               8)))),
                        rd)
 
-        @test count(res.w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 8
-
-        res = optimise(MeanRisk(;
-                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(nx >=
-                                                                                              11)))),
-                       rd)
-        @test count(res.w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) >= 20
+        @test count(res.w[.!iszero.(vec(res.gcardr.A_eq[1, :]))] .> 1e-10) == 8
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(JNJ +
-                                                                                              MRK <=
-                                                                                              1)))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(nx >=
+                                                                                               11)))),
                        rd)
-        @test count(res.w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 1
+        @test count(res.w[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] .> 1e-10) >= 20
+
+        res = optimise(MeanRisk(;
+                                opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(JNJ +
+                                                                                               MRK <=
+                                                                                               1)))),
+                       rd)
+        @test count(res.w[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] .> 1e-10) <= 1
         @test count(res.w[rd.nx .== "JNJ" .|| rd.nx .== "MRK"] .> 1e-10) <= 1
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
                                                     lt = Threshold(; val = 0.000001),
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(JNJ <=
-                                                                                              BAC)))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(JNJ <=
+                                                                                               BAC)))),
                        rd)
-        @test count(res.w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) >= 2
+        @test count(res.w[.!iszero.(vec(res.gcardr.A_ineq[1, :]))] .> 1e-10) >= 2
         @test count(res.w[rd.nx .== "JNJ" .|| rd.nx .== "BAC"] .> 1e-10) >= 2
 
         res = optimise(MeanRisk(;
@@ -1282,11 +1282,11 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(4 *
-                                                                                              MRK +
-                                                                                              Consumer_Staples ==
-                                                                                              4)))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(4 *
+                                                                                               MRK +
+                                                                                               Consumer_Staples ==
+                                                                                               4)))),
                        rd)
         @test (all(res.w[rd.nx .== "MRK"] .<= 1e-10) &&
                all(res.w[sets.dict["nx_industries"] .== "Consumer_Staples"] .> 1e-10) ||
@@ -1295,11 +1295,11 @@
 
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(3 *
-                                                                                              JNJ +
-                                                                                              Energy ==
-                                                                                              3)))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(3 *
+                                                                                               JNJ +
+                                                                                               Energy ==
+                                                                                               3)))),
                        rd)
         @test (all(res.w[rd.nx .== "JNJ"] .<= 1e-10) &&
                all(res.w[sets.dict["nx_industries"] .== "Energy"] .> 1e-10) ||
@@ -1309,15 +1309,15 @@
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
                                                     lt = Threshold(0.05),
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = [:(4 *
-                                                                                               BAC +
-                                                                                               Consumer_Staples ==
-                                                                                               4),
-                                                                                             :(4 *
-                                                                                               JPM +
-                                                                                               Consumer_Staples ==
-                                                                                               4)]))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = [:(4 *
+                                                                                                BAC +
+                                                                                                Consumer_Staples ==
+                                                                                                4),
+                                                                                              :(4 *
+                                                                                                JPM +
+                                                                                                Consumer_Staples ==
+                                                                                                4)]))),
                        rd)
         @test (all(res.w[sets.dict["nx_industries"] .== "Financials"] .<= 1e-10) &&
                all(res.w[sets.dict["nx_industries"] .== "Consumer_Staples"] .> 1e-10) ||
@@ -1327,10 +1327,10 @@
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
                                                     lt = Threshold(0.05),
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = :(AMD +
-                                                                                              Consumer_Staples >=
-                                                                                              5)))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = :(AMD +
+                                                                                               Consumer_Staples >=
+                                                                                               5)))),
                        rd)
         @test all(res.w[rd.nx .== "AMD" .|| sets.dict["nx_industries"] .== "Consumer_Staples"] .>=
                   0.05)
@@ -1338,16 +1338,16 @@
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; slv = mip_slv, sets = sets,
                                                     lt = Threshold(0.05),
-                                                    gcard = LinearConstraintEstimator(;
-                                                                                      val = [:(AMD +
-                                                                                               Consumer_Staples >=
-                                                                                               5),
-                                                                                             :(AAPL +
-                                                                                               Consumer_Staples >=
-                                                                                               5),
-                                                                                             :(MSFT +
-                                                                                               Consumer_Staples >=
-                                                                                               5)]))),
+                                                    gcarde = LinearConstraintEstimator(;
+                                                                                       val = [:(AMD +
+                                                                                                Consumer_Staples >=
+                                                                                                5),
+                                                                                              :(AAPL +
+                                                                                                Consumer_Staples >=
+                                                                                                5),
+                                                                                              :(MSFT +
+                                                                                                Consumer_Staples >=
+                                                                                                5)]))),
                        rd)
         @test all(res.w[sets.dict["nx_industries"] .== "Technology" .|| sets.dict["nx_industries"] .== "Consumer_Staples"] .>=
                   0.05)
