@@ -481,6 +481,17 @@ Alias for an abstract vector of integer vectors.
 """
 const VecVecInt = AbstractVector{<:VecInt}
 """
+    const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
+
+Alias for a union of an abstract vector of integers or an abstract vector of integer vectors.
+
+# Related
+
+  - [`VecInt`](@ref)
+  - [`VecVecInt`](@ref)
+"""
+const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
+"""
     const VecVecVecInt = AbstractVector{<:VecVecInt}
 
 Alias for an abstract vector of abstract vector of integer vectors.

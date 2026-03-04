@@ -281,16 +281,16 @@ function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end
-function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
-                         test_idx, kwargs...)
-    return predict(res, rd, test_idx)
-end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idxs::VecVecInt, cols = :)
     return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
+                         test_idx::VecInt_VecVecInt, cols = :, kwargs...)
+    return predict(res, rd, test_idx, cols)
+end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
-                         train_idx, test_idx, cols = :)
+                         train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
     rd_train = returns_result_view(rd, train_idx, cols)
     if !isa(cols, Colon)
         opt = opt_view(opt, cols, rd.X)
