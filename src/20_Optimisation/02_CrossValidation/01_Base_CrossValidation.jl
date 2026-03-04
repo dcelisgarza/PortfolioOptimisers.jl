@@ -281,16 +281,16 @@ function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end
-function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
-                         test_idx, kwargs...)
+function fit_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                     test_idx::VecInt, args...)
     return predict(res, rd, test_idx)
 end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idxs::VecVecInt, cols = :)
     return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
-                         train_idx, test_idx, cols = :)
+function fit_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                     train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
     rd_train = returns_result_view(rd, train_idx, cols)
     if !isa(cols, Colon)
         opt = opt_view(opt, cols, rd.X)
@@ -306,10 +306,9 @@ end
 function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
     return sort_predictions!(res.test_idx, predictions)
 end
-function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
-                         cv::NonSequentialCrossValidationEstimator; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         id = nothing)
+function fit_predict(opt::OptE_Opt, rd::ReturnsResult,
+                     cv::NonSequentialCrossValidationEstimator; cols = :,
+                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), id = nothing)
     @argcheck(!(hasproperty(cv, :shuffle) && cv.shuffle),
               "Cross validation estimator must not be shuffled.")
     cv_res = split(cv, rd)
@@ -318,8 +317,7 @@ function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
               "Cross validation estimator must not be shuffled.")
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-        predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                         cols = cols)
+        predictions[i] = fit_predict(opt, rd, train, test, cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

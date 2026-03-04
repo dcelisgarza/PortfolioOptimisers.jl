@@ -81,8 +81,7 @@ struct CombinatorialCrossValidationResult{T1, T2, T3} <: NonSequentialCrossValid
     test_idx::T2
     path_ids::T3
     function CombinatorialCrossValidationResult(train_idx::VecVecInt,
-                                                test_idx::VecVecVecInt,
-                                                path_ids::AbstractMatrix{<:Integer})
+                                                test_idx::VecVecVecInt, path_ids::MatInt)
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
         @argcheck(!isempty(path_ids))
@@ -93,7 +92,7 @@ struct CombinatorialCrossValidationResult{T1, T2, T3} <: NonSequentialCrossValid
     end
 end
 function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::VecVecVecInt,
-                                            path_ids::AbstractMatrix{<:Integer})
+                                            path_ids::MatInt)
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
 function n_splits(n_folds::Integer, n_test_folds::Integer)
@@ -247,21 +246,20 @@ function sort_predictions!(res::CombinatorialCrossValidationResult,
     return [MultiPeriodPredictionResult(; pred = pred, id = i)
             for (i, pred) in enumerate(sorted_preds)]
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::CombinatorialCrossValidation; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+function fit_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                     cv::CombinatorialCrossValidation; cols = :,
+                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     predictions = Vector{Vector{PredictionResult}}(undef, length(train_idx))
     FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-        predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                         cols = cols)
+        predictions[i] = fit_predict(opt, rd, train, test, cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
-function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                         cv::CombinatorialCrossValidation;
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+function fit_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                     cv::CombinatorialCrossValidation;
+                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     predictions = Vector{Vector{PredictionResult}}(undef, length(test_idx))

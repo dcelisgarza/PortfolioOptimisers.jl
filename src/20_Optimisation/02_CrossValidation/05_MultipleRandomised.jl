@@ -140,10 +140,10 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
                                     asset_idx = asset_indices, path_ids = path_ids)
 end
-function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
-                              rd::ReturnsResult, train_idx, test_idx, cols;
-                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                              id = nothing)
+function path_fit_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                          train_idx, test_idx, cols;
+                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                          id = nothing)
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     prev_w_flag = needs_previous_weights(opt)
     time_dep_flag = is_time_dependent(opt)
@@ -161,23 +161,22 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                                                            test_idx)
                 end
             end
-            predictions[i] = fit_and_predict(opti, rdi; train_idx = train, test_idx = test)
+            predictions[i] = fit_predict(opti, rdi, train, test)
         end
     else
         let opt = opt
             FLoops.@floop ex for (i, (train, test, col)) in
                                  enumerate(zip(train_idx, test_idx, cols))
-                predictions[i] = fit_and_predict(opt, rd; train_idx = train,
-                                                 test_idx = test, cols = col)
+                predictions[i] = fit_predict(opt, rd, train, test, col)
             end
         end
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::MultipleRandomised;
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
+function fit_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                     cv::MultipleRandomised;
+                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     cv_res = split(cv, rd)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     unique_ids = unique(path_ids)
@@ -191,7 +190,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
-        predictions[i] = path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i)
+        predictions[i] = path_fit_predict(opt, rd, train, test, asset; ex = ex, id = i)
     end
     return PopulationPredictionResult(; pred = predictions)
 end
