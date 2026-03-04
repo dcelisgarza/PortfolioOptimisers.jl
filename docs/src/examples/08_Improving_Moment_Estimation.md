@@ -229,17 +229,17 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false, "max_step_fraction" => 0.7))]
 
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[2], slv = slv,
+        JuMPOptimiser(; pe = prs[2], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[3], slv = slv,
+        JuMPOptimiser(; pe = prs[3], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[4], slv = slv,
+        JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[5], slv = slv,
+        JuMPOptimiser(; pe = prs[5], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[6], slv = slv,
+        JuMPOptimiser(; pe = prs[6], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 # Mean-Risk estimators using the variance.
@@ -374,9 +374,9 @@ plot_measures(ress[6].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[6].ret),
 This example is a nice way to show how sensitive moment-based optimisations are to the moment estimation. For now, let's examine how the maximum risk return ratio portfolios differ. An actual analysis would isolate the effect of the covariance and expected returns separately, the point of this example is to show how different ways to improve their estimation and how much the results can be affected by them.
 
 ````@example 08_Improving_Moment_Estimation
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv), JuMPOptimiser(; pr = prs[2], slv = slv),
-        JuMPOptimiser(; pr = prs[3], slv = slv), JuMPOptimiser(; pr = prs[4], slv = slv),
-        JuMPOptimiser(; pr = prs[5], slv = slv), JuMPOptimiser(; pr = prs[6], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv), JuMPOptimiser(; pe = prs[2], slv = slv),
+        JuMPOptimiser(; pe = prs[3], slv = slv), JuMPOptimiser(; pe = prs[4], slv = slv),
+        JuMPOptimiser(; pe = prs[5], slv = slv), JuMPOptimiser(; pe = prs[6], slv = slv)]
 
 # Mean-Risk estimators using the variance.
 mrs = [MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt) for opt in opts]
@@ -397,11 +397,11 @@ Portfolios that emphasise expected returns are more sensitive to the expected re
 
 ````@example 08_Improving_Moment_Estimation
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[5], slv = slv,
+        JuMPOptimiser(; pe = prs[5], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[6], slv = slv,
+        JuMPOptimiser(; pe = prs[6], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 r = NegativeSkewness()
@@ -476,8 +476,8 @@ In this case we can se that in this case, these techniques denoising and sparsif
 Now let's examine how the maximum risk return ratio portfolios differ.
 
 ````@example 08_Improving_Moment_Estimation
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[5], slv = slv),
-        JuMPOptimiser(; pr = prs[6], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[5], slv = slv),
+        JuMPOptimiser(; pe = prs[6], slv = slv)]
 
 # Mean-Risk estimators using the Negative Skewness.
 mrs = [MeanRisk(; r = r, obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt)
@@ -499,11 +499,11 @@ Finally, we will see how the cokurtosis estimation improvements affect the mean-
 
 ````@example 08_Improving_Moment_Estimation
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[5], slv = slv,
+        JuMPOptimiser(; pe = prs[5], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[6], slv = slv,
+        JuMPOptimiser(; pe = prs[6], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 r = Kurtosis()
@@ -578,8 +578,8 @@ Again, the efficient frontier is smoother, but the kurtosis is inherently less s
 Finally let's see what the maximum risk return ratio portfolios look like.
 
 ````@example 08_Improving_Moment_Estimation
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[5], slv = slv),
-        JuMPOptimiser(; pr = prs[6], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[5], slv = slv),
+        JuMPOptimiser(; pe = prs[6], slv = slv)]
 
 # Mean-Risk estimators using the Kurtosis.
 mrs = [MeanRisk(; r = r, obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt)

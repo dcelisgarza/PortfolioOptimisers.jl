@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/02_Mean_Risk_Objectives.jl"
 ```
@@ -67,7 +68,7 @@ pr = prior(EmpiricalPrior(), rd)
 We can provide the prior result to `JuMPOptimiser`.
 
 ````@example 02_Mean_Risk_Objectives
-opt = JuMPOptimiser(; pr = pr, slv = slv)
+opt = JuMPOptimiser(; pe = pr, slv = slv)
 ````
 
 Here we define the estimators for different objective functions.
@@ -91,7 +92,7 @@ res1 = optimise(mr1)
 res2 = optimise(mr2)
 res3 = optimise(mr3)
 res4 = optimise(mr4)
-res0 = optimise(InverseVolatility(; pr = pr))
+res0 = optimise(InverseVolatility(; pe = pr))
 ````
 
 Let's view the results as pretty tables.
@@ -130,4 +131,3 @@ We can see that indeed, the minimum risk produces the portfolio with minimum ris
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

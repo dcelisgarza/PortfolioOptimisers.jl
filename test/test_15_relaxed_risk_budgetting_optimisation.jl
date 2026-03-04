@@ -72,7 +72,7 @@
                       DataFrame)
         r = factory(StandardDeviation(), pr, slv)
         for (i, alg) in enumerate(algs)
-            opt = JuMPOptimiser(; pr = pe, slv = slv)
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
             res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)

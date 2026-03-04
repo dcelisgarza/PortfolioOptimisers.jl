@@ -95,14 +95,14 @@ push!(rs, Variance(; sigma = all_sigmas))
 #=
 We'll minimise the variance for each individual risk measure and then we'll minimise the equally weighted sum of all risk measures.
 =#
-results = [optimise(MeanRisk(; r = r, opt = JuMPOptimiser(; pr = pr, slv = slv)))
+results = [optimise(MeanRisk(; r = r, opt = JuMPOptimiser(; pe = pr, slv = slv)))
            for r in rs]
 mean_w = zeros(length(results[1].w))
 for res in results[1:5]
     mean_w .+= res.w
 end
 mean_w ./= 5
-res = optimise(MeanRisk(; r = rs, opt = JuMPOptimiser(; pr = pr, slv = slv)))
+res = optimise(MeanRisk(; r = rs, opt = JuMPOptimiser(; pe = pr, slv = slv)))
 pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
                        :distance => results[5].w, :mean_w => mean_w,
@@ -112,14 +112,14 @@ pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => r
 For extra credit we can do the same but maximising the risk-adjusted return ratio.
 =#
 results = [optimise(MeanRisk(; r = r, obj = MaximumRatio(),
-                             opt = JuMPOptimiser(; pr = pr, slv = slv))) for r in rs]
+                             opt = JuMPOptimiser(; pe = pr, slv = slv))) for r in rs]
 mean_w = zeros(length(results[1].w))
 for res in results[1:5]
     mean_w .+= res.w
 end
 mean_w ./= 5
 res = optimise(MeanRisk(; r = rs, obj = MaximumRatio(),
-                        opt = JuMPOptimiser(; pr = pr, slv = slv)))
+                        opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
@@ -147,30 +147,30 @@ r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
                                                       ro = r[1],  # outer (inter-cluster) risk measure
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,#
                                                       scai = SumScalariser(),# inner (intra-cluster)
                                                       scao = SumScalariser(),# outer (inter-cluster)
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MaxScalariser(),
                                                       scao = MaxScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MinScalariser(),
                                                       scao = MinScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = LogSumExpScalariser(),
                                                       scao = LogSumExpScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr)))]
+                                                                                  cle = clr)))]
 
 pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :neg_skew => results[2].w, :sum_sca => results[3].w,
@@ -186,30 +186,30 @@ r = [Variance(), NegativeSkewness()]
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
                                                       ro = r[1],  # outer (inter-cluster) risk measure
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r[2], ro = r[2],
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,#
                                                       scai = SumScalariser(),# inner (intra-cluster)
                                                       scao = SumScalariser(),# outer (inter-cluster)
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MaxScalariser(),
                                                       scao = MaxScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = MinScalariser(),
                                                       scao = MinScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr))),
+                                                                                  cle = clr))),
            optimise(HierarchicalEqualRiskContribution(; ri = r, ro = r,
                                                       scai = LogSumExpScalariser(),
                                                       scao = LogSumExpScalariser(),
                                                       opt = HierarchicalOptimiser(; pe = pr,
-                                                                                  clr = clr)))]
+                                                                                  cle = clr)))]
 
 pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :neg_skew => results[2].w, :sum_sca => results[3].w,

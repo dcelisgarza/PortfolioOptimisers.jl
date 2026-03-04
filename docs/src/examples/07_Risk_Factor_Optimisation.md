@@ -234,11 +234,11 @@ First let's examine the mean-standard deviation efficient frontier using the emp
 
 ````@example 07_Risk_Factor_Optimisation
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[2], slv = slv,
+        JuMPOptimiser(; pe = prs[2], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[3], slv = slv,
+        JuMPOptimiser(; pe = prs[3], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 # Mean-Risk estimators using the standard deviation.
@@ -312,8 +312,8 @@ plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
 Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 
 ````@example 07_Risk_Factor_Optimisation
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv), JuMPOptimiser(; pr = prs[2], slv = slv),
-        JuMPOptimiser(; pr = prs[3], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv), JuMPOptimiser(; pe = prs[2], slv = slv),
+        JuMPOptimiser(; pe = prs[3], slv = slv)]
 
 # Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
@@ -334,11 +334,11 @@ Here we will perform the exact same procedure as before, but using the negative 
 
 ````@example 07_Risk_Factor_Optimisation
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[7], slv = slv,
+        JuMPOptimiser(; pe = prs[7], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[8], slv = slv,
+        JuMPOptimiser(; pe = prs[8], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 # Mean-Risk estimators using the standard deviation.
@@ -411,8 +411,8 @@ plot_measures(ress[3].w, prs[8]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
 Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 
 ````@example 07_Risk_Factor_Optimisation
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[7], slv = slv),
-        JuMPOptimiser(; pr = prs[8], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
+        JuMPOptimiser(; pe = prs[8], slv = slv)]
 
 # Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
@@ -433,11 +433,11 @@ Again we will do the same as before but with the kurtosis.
 
 ````@example 07_Risk_Factor_Optimisation
 # JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[7], slv = slv,
+        JuMPOptimiser(; pe = prs[7], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[8], slv = slv,
+        JuMPOptimiser(; pe = prs[8], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 # Mean-Risk estimators using the standard deviation.
@@ -508,8 +508,8 @@ plot_measures(ress[3].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
 Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 
 ````@example 07_Risk_Factor_Optimisation
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[7], slv = slv),
-        JuMPOptimiser(; pr = prs[8], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
+        JuMPOptimiser(; pe = prs[8], slv = slv)]
 
 # Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
