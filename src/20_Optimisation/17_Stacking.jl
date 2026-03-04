@@ -18,7 +18,7 @@ function factory(res::StackingResult, fb::Option{<:OptE_Opt})
 end
 struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
        BaseStackingOptimisationEstimator
-    pr::T1
+    pe::T1
     wb::T2
     fees::T3
     sets::T4
@@ -29,7 +29,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     strict::T9
     ex::T10
     fb::T11
-    function Stacking(pr::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
+    function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                       sets::Option{<:AssetSets}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,
                       cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
@@ -44,26 +44,26 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pr), typeof(wb), typeof(fees), typeof(sets), typeof(opti),
+        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opti),
                    typeof(opto), typeof(cv), typeof(wf), typeof(strict), typeof(ex),
-                   typeof(fb)}(pr, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
+                   typeof(fb)}(pe, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
     end
 end
-function Stacking(; pr::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
+function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   fees::Option{<:FeesE_Fees} = nothing, sets::Option{<:AssetSets} = nothing,
                   opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::Option{<:OptE_Opt} = nothing)
-    return Stacking(pr, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
+    return Stacking(pe, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_special_nco_requirements(opt::Stacking)
     @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti))
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pr, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_external_optimiser(opt.opto)
     if !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
@@ -88,19 +88,19 @@ function factory(st::Stacking, w::AbstractVector)
     opti = factory(st.opti, w)
     opto = factory(st.opto, w)
     fb = factory(st.fb, w)
-    return Stacking(; pr = st.pr, wb = st.wb, fees = fees, sets = st.sets, opti = opti,
+    return Stacking(; pe = st.pe, wb = st.wb, fees = fees, sets = st.sets, opti = opti,
                     opto = opto, cv = st.cv, wf = st.wf, strict = st.strict, ex = st.ex,
                     fb = fb)
 end
 function opt_view(st::Stacking, i, X::MatNum)
-    X = isa(st.pr, AbstractPriorResult) ? st.pr.X : X
-    pr = prior_view(st.pr, i)
+    X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
+    pe = prior_view(st.pe, i)
     wb = weight_bounds_view(st.wb, i)
     fees = fees_view(st.fees, i)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
-    return Stacking(; pr = pr, wb = wb, fees = fees, opti = opti, opto = opto, cv = st.cv,
+    return Stacking(; pe = pe, wb = wb, fees = fees, opti = opti, opto = opto, cv = st.cv,
                     wf = st.wf, sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
 end
 
@@ -177,7 +177,7 @@ end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
-    pr = prior(st.pr, rd; dims = dims)
+    pr = prior(st.pe, rd; dims = dims)
     fees = fees_constraints(st.fees, st.sets; datatype = eltype(pr.X), strict = st.strict)
     opti = st.opti
     Ni = length(opti)

@@ -84,7 +84,7 @@ res1 = optimise(mr1)
 res2 = optimise(mr2)
 res3 = optimise(mr3)
 res4 = optimise(mr4)
-res0 = optimise(InverseVolatility(; pr = pr))
+res0 = optimise(InverseVolatility(; pe = pr))
 
 #=
 Let's view the results as pretty tables.

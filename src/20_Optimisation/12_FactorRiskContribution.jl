@@ -77,7 +77,7 @@ function factory(frc::FactorRiskContribution, w::AbstractVector)
                                   flag = frc.flag, fb = fb)
 end
 function opt_view(frc::FactorRiskContribution, i, X::MatNum)
-    X = isa(frc.opt.pr, AbstractPriorResult) ? frc.opt.pr.X : X
+    X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
     r = risk_measure_view(frc.r, i, X)

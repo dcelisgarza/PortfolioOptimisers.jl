@@ -171,7 +171,7 @@
     @testset "Mix optimisers" begin
         jopti = JuMPOptimiser(; pr = pr, slv = slv, sets = sets)
         jopto = JuMPOptimiser(; slv = slv)
-        hopti = HierarchicalOptimiser(; pr = pr, slv = slv)
+        hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
         hopto = HierarchicalOptimiser(; slv = slv)
         resi = optimise(MeanRisk(; opt = jopto), rd)
         opts = [NestedClustered(; clr = clr, opti = MeanRisk(; opt = jopti),

@@ -99,7 +99,7 @@ function factory(rb::RiskBudgeting, w::AbstractVector)
     return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::MatNum)
-    X = isa(rb.opt.pr, AbstractPriorResult) ? rb.opt.pr.X : X
+    X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
     rba = risk_budgeting_algorithm_view(rb.rba, i)

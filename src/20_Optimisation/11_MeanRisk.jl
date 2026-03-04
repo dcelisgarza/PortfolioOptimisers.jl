@@ -55,7 +55,7 @@ function factory(mr::MeanRisk, w::AbstractVector)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
 function opt_view(mr::MeanRisk, i, X::MatNum)
-    X = isa(mr.opt.pr, AbstractPriorResult) ? mr.opt.pr.X : X
+    X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
