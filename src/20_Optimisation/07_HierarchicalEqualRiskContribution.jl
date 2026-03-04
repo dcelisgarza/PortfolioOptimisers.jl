@@ -47,7 +47,7 @@ function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
                                              scao = hec.scao, ex = hec.ex, fb = fb)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
-    X = isa(hec.opt.pr, AbstractPriorResult) ? hec.opt.pr.X : X
+    X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro
     if ri === ro
@@ -485,8 +485,8 @@ end
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
-    pr = prior(hec.opt.pr, rd; dims = dims)
-    clr = clusterise(hec.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    pr = prior(hec.opt.pe, rd; dims = dims)
+    clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

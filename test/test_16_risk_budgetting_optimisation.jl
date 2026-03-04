@@ -72,7 +72,7 @@
     fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Asset Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/AssetRiskBudgeting1.csv.gz"), DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
             rb = RiskBudgeting(; r = r, opt = opt)
@@ -200,7 +200,7 @@
                                                                               val = ["AAPL" => 0.5,
                                                                                      "MSFT" => 0.25,
                                                                                      "LLY" => 0.125])),
-                           opt = JuMPOptimiser(; pr = pr, slv = slv, sets = sets))
+                           opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets))
         res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = risk_contribution(r, res.w, pr.X)
@@ -212,17 +212,17 @@
                                      rba = AssetRiskBudgeting(;
                                                               rkb = RiskBudgetEstimator(;
                                                                                         val = ["AAPL" => 0.5])),
-                                     opt = JuMPOptimiser(; pr = pr, sets = sets,
+                                     opt = JuMPOptimiser(; pe = pr, sets = sets,
                                                          slv = Solver(;
                                                                       solver = Clarabel.Optimizer,
                                                                       settings = ["verbose" => false,
                                                                                   "max_iter" => 1])),
-                                     fb = InverseVolatility(; pr = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+                                     fb = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
                             sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
                             wb = WeightBounds(; lb = nothing, ub = nothing))
         rr = regression(StepwiseRegression(), rd)
@@ -288,7 +288,7 @@
             if i == 25
                 continue
             end
-            opt = JuMPOptimiser(; pr = pr, slv = slv)
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RiskBudgeting(; r = r, opt = opt,
                                rba = FactorRiskBudgeting(; flag = true, re = rr,
                                                          rkb = RiskBudget(; val = 1:5)))
@@ -354,7 +354,7 @@
                            rba = FactorRiskBudgeting(; re = rr,
                                                      rkb = RiskBudgetEstimator(;
                                                                                val = "MTUM" => 0.5)),
-                           opt = JuMPOptimiser(; pr = pr, slv = slv,
+                           opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                sbgt = BudgetRange(; lb = 0, ub = nothing),
                                                bgt = 1,
                                                wb = WeightBounds(; lb = nothing,

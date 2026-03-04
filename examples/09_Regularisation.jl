@@ -86,18 +86,18 @@ We will use the same small penalty for all regularisations to illustrate how the
 ### 2.1 Efficient frontier
 =#
 
-opts = [JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, ret = ArithmeticReturn(; lb = Frontier(; N = 50))),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       l1 = 4e-4),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       l2 = 4e-4),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       lp = LpRegularisation(; p = 5, val = 4e-4)),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       linf = 4e-4)]
 nocs = [MeanRisk(; opt = opt) for opt in opts]
@@ -172,15 +172,15 @@ plot_measures(ress[5].w, pr; x = r, y = ExpectedReturn(; rt = ress[5].ret),
 Lets view only the minimum risk portfolios for each regularisation to get more insight into what regularisation does.
 =#
 
-opts = [JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1),# no regularisation
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, l1 = 4e-4),# L1 regularisation
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, l2 = 4e-4),# L2 regularisation
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),# Lp regularisation with p = 5
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, linf = 4e-4)]# L-Inf regularisation
 nocs = [MeanRisk(; opt = opt) for opt in opts]
 

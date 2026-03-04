@@ -99,7 +99,7 @@ function factory(rb::RiskBudgeting, w::AbstractVector)
     return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
 function opt_view(rb::RiskBudgeting, i, X::MatNum)
-    X = isa(rb.opt.pr, AbstractPriorResult) ? rb.opt.pr.X : X
+    X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
     rba = risk_budgeting_algorithm_view(rb.rba, i)
@@ -146,38 +146,38 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                                           rd;
-                                                                                                                                           dims = dims)
+    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                                                rd;
+                                                                                                                                                dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
-    set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, rb.opt.card, gcard, pl, lt, st, fees, rb.opt.ss)
-    set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, wb, rb.opt.card, gcardr, plr, lt, st, fees, rb.opt.ss)
+    set_smip_constraints!(model, wb, rb.opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt,
                           sgst, rb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rb.opt.tr, rb, pl, fees; rd = rd)
+    set_tracking_error_constraints!(model, pr, rb.opt.tr, rb, plr, fees; rd = rd)
     set_number_effective_assets!(model, rb.opt.nea)
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)
     set_linf_regularisation!(model, rb.opt.linf)
     set_lp_regularisation!(model, rb.opt.lp)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, rb.r, rb, pr, pl, fees; rd = rd)
+    set_risk_constraints!(model, rb.r, rb, pr, plr, fees; rd = rd)
     scalarise_risk_expression!(model, rb.opt.sca)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, pl)
+    set_sdp_phylogeny_constraints!(model, plr)
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return RiskBudgetingResult(typeof(rb),
-                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct,
-                                                                gcard, sgcard, smtx, sgmtx,
-                                                                slt, sst, sglt, sgst, tn,
-                                                                fees, pl, ret), prb,
+                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr,
+                                                                gcardr, sgcardr, smtx,
+                                                                sgmtx, slt, sst, sglt, sgst,
+                                                                tn, fees, plr, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
