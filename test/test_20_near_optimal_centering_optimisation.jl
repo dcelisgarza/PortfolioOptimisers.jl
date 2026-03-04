@@ -114,7 +114,7 @@
     @testset "Unconstrained" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier1.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = factory(StandardDeviation(), pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
@@ -151,10 +151,10 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
@@ -167,17 +167,17 @@
         @test success
 
         res = optimise(NearOptimalCentering(;
-                                            opt = JuMPOptimiser(; pr = pr,
+                                            opt = JuMPOptimiser(; pe = pr,
                                                                 slv = Solver(;
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pr = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+                                            fb = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
 
         w0 = range(; start = inv(length(pr.mu)), stop = inv(length(pr.mu)),
                    length = length(pr.mu))
-        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         res = optimise(NearOptimalCentering(; w_min_ini = w0,
                                             w_min = optimise(MeanRisk(; opt = opt)).w,
                                             w_opt_ini = w0,
@@ -189,13 +189,13 @@
                                                                       obj = MaximumReturn(),
                                                                       opt = opt)).w,
                                             bins = 20,
-                                            opt = JuMPOptimiser(; pr = pr,
+                                            opt = JuMPOptimiser(; pe = pr,
                                                                 slv = Solver(;
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pr = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+                                            fb = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Constrained" begin
         ivpa = rand(StableRNG(123))
@@ -206,7 +206,7 @@
         pr = prior(HighOrderPriorEstimator(), rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = factory(StandardDeviation(), pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
@@ -242,11 +242,11 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier4.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
@@ -260,16 +260,16 @@
         @test success
 
         res = optimise(NearOptimalCentering(; alg = ConstrainedNearOptimalCentering(),
-                                            opt = JuMPOptimiser(; pr = pr,
+                                            opt = JuMPOptimiser(; pe = pr,
                                                                 slv = Solver(;
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pr = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+                                            fb = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Pareto Surface" begin
-        opt = JuMPOptimiser(; pr = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/NearOptimalCenteringParetoSurface1.csv.gz"),
                       DataFrame)
@@ -301,7 +301,7 @@
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/NearOptimalCenteringParetoSurface2.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr,
+        opt = JuMPOptimiser(; pe = pr,
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_min +
@@ -332,7 +332,7 @@
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/NearOptimalCenteringParetoSurface3.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv, sca = MaxScalariser())
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sca = MaxScalariser())
         r1 = StandardDeviation(;
                                settings = RiskMeasureSettings(; scale = 2e2,
                                                               ub = Frontier(; N = 3)))
@@ -354,21 +354,21 @@
         r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
 
         res_m1 = optimise(NearOptimalCentering(; r = r1, obj = MaximumRatio(; rf = rf),
-                                               opt = JuMPOptimiser(; pr = pr, slv = slv)))
+                                               opt = JuMPOptimiser(; pe = pr, slv = slv)))
         res_m2 = optimise(NearOptimalCentering(; r = r2, obj = MaximumRatio(; rf = rf),
-                                               opt = JuMPOptimiser(; pr = pr, slv = slv)))
+                                               opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
         res1 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
-                                             opt = JuMPOptimiser(; pr = pr, slv = slv)))
+                                             opt = JuMPOptimiser(; pe = pr, slv = slv)))
         res2 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
-                                             opt = JuMPOptimiser(; pr = pr, slv = slv,
+                                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                                  sca = MaxScalariser())))
         res3 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
-                                             opt = JuMPOptimiser(; pr = pr, slv = slv,
+                                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                                  sca = LogSumExpScalariser(;
                                                                                            gamma = 8.5e-4))))
         res4 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
-                                             opt = JuMPOptimiser(; pr = pr, slv = slv,
+                                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                                  sca = LogSumExpScalariser(;
                                                                                            gamma = 500))))
         @test isapprox(res2.w, res_m1.w, rtol = 1e-4)
