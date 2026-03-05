@@ -450,6 +450,7 @@ The function computes the OWA weights as follows:
     phis[i] = e / factorial(i + 1)
 
  2. The vector `phis` is normalised to sum to one.
+
  3. The final OWA weights are computed as a weighted sum of the input `weights` and `phis`, with monotonicity enforced by taking the maximum up to each index.
 
 # Examples

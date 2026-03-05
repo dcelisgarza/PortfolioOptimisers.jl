@@ -11,7 +11,39 @@ abstract type OptimisationReturnCode <: AbstractResult end
 abstract type OptimisationModelResult <: AbstractResult end
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
+function assert_special_nco_requirements(::OptE_Opt)
+    return nothing
+end
+function factory(opt::OptE_Opt, ::Any)
+    return opt
+end
+function needs_previous_weights(::OptE_Opt)
+    return false
+end
+#! Start: Overload these for all estimators which can use time-dependent constraints.
+function is_time_dependent(::OptE_Opt)
+    return false
+end
+function update_time_dependent_estimator(opt::OptE_Opt, args...)
+    return opt
+end
+#! End: Overload these for all estimators which can use time-dependent constraints.
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
+function factory(opt::VecOptE_Opt, args...)
+    return [factory(opti, args...) for opti in opt]
+end
+function assert_special_nco_requirements(opt::VecOptE_Opt)
+    return assert_special_nco_requirements.(opt)
+end
+function needs_previous_weights(opt::VecOptE_Opt)
+    return any(needs_previous_weights.(opt))
+end
+function is_time_dependent(opt::VecOptE_Opt)
+    return any(is_time_dependent.(opt))
+end
+function update_time_dependent_estimator(opt::VecOptE_Opt, args...)
+    return [update_time_dependent_estimator(opti, args...) for opti in opt]
+end
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
@@ -208,12 +240,30 @@ end
 """
 fees takes precedence over res.fees if both are provided
 """
-function calc_net_returns(res::NonFiniteAllocationOptimisationResult,
-                          pr::AbstractPriorResult, fees::Option{<:Fees} = nothing)
+function calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
+                          fees::Option{<:Fees} = nothing)
     if isnothing(fees) && hasproperty(res, :fees)
         fees = res.fees
     end
-    return calc_net_returns(res.w, pr.X, fees)
+    return calc_net_returns(res.w, X, fees)
+end
+function calc_net_returns(res::NonFiniteAllocationOptimisationResult, pr::Pr_RR,
+                          fees::Option{<:Fees} = nothing)
+    return calc_net_returns(res, pr.X, fees)
+end
+function expected_risk(res::OptimisationResult, r::ERkNetRet, X::MatNum,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    if isnothing(fees) && hasproperty(res, :fees)
+        fees = res.fees
+    end
+    return expected_risk(r, res.w, X; fees = fees, kwargs...)
+end
+function expected_risk(res::OptimisationResult, r::ERkNetRet, pr::Pr_RR,
+                       fees::Option{<:Fees} = nothing; kwargs...)
+    return expected_risk(r, res.w, pr.X; fees = fees, kwargs...)
+end
+function needs_previous_weights(::Nothing)
+    return false
 end
 
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,

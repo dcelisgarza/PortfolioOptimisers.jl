@@ -87,8 +87,11 @@ This method computes the correlation matrix using the provided covariance estima
       + `de::Distance{<:Any, <:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
 
   - `ce`: Covariance estimator.
+
   - `X`: Data matrix (observations × features).
-  - `dims`: Dimension along which to compute the correlation.
+
+  - $(arg_dict[:dims])
+
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
 # Returns
@@ -171,7 +174,7 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
   - `de::Distance{<:Any, <:LogDistance}`: Distance estimator with [`LogDistance`](@ref) algorithm.
   - `ce`: LTD covariance estimator or a PortfolioOptimisersCovariance wrapping an LTD estimator.
   - `X`: Data matrix (observations × features).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
 # Returns
@@ -205,7 +208,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
   - `de::Distance{<:Any, <:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
   - `::Any`: Covariance estimator placeholder for API compatibility (ignored).
   - `X`: Data matrix (observations × features).
-  - `dims`: Dimension along which to compute the distance. If `2`, the data is transposed.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
@@ -263,7 +266,9 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
       + `de::Distance{<:Any, <:CanonicalDistance}`: Use the [`CanonicalDistance`](@ref) algorithm.
 
   - `rho`: Correlation or covariance matrix.
+
   - `args...`: Additional arguments (ignored).
+
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -387,7 +392,7 @@ Compute and return the correlation and distance matrices. The distance matrix de
   - `de`: Distance estimator.
   - `ce`: Covariance estimator.
   - `X`: Data matrix (observations × features).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
 # Validation
@@ -542,7 +547,7 @@ Compute the canonical distance matrix using the covariance estimator and data ma
   - `de::Distance{<:Any, <:CanonicalDistance}`: Distance estimator using the [`CanonicalDistance`](@ref) algorithm.
   - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
   - `X`: Data matrix (observations × features).
-  - `dims`: Dimension along which to compute the distance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns

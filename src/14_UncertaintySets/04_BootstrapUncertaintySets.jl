@@ -126,7 +126,7 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
 
 # Constructors
 
-    ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+    ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                        n_sim::Integer = 3_000, block_size::Integer = 3, q::Number = 0.05,
                        seed::Option{<:Integer} = nothing,
@@ -149,10 +149,12 @@ ARCHUncertaintySet
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │   w ┴ nothing
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │    w ┴ nothing
+             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -163,7 +165,8 @@ ARCHUncertaintySet
              │           │      │     alg ┼ nothing
              │           │      │   order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
-             │           │   w ┴ nothing
+             │           │     w ┼ nothing
+             │           │   idx ┴ nothing
              │   horizon ┴ nothing
          alg ┼ BoxUncertaintySetAlgorithm()
        n_sim ┼ Int64: 3000
@@ -191,7 +194,7 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
     q::T5
     seed::T6
     bootstrap::T7
-    function ARCHUncertaintySet(pe::AbstractPriorEstimator,
+    function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, seed::Option{<:Integer},
                                 bootstrap::ARCHBootstrapSet)
@@ -203,7 +206,7 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
                                                     bootstrap)
     end
 end
-function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
                             q::Number = 0.05, seed::Option{<:Integer} = nothing,
@@ -335,7 +338,7 @@ Constructs box uncertainty sets for expected returns and covariance statistics u
   - `ue`: ARCH uncertainty set estimator.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -394,7 +397,7 @@ Constructs a box uncertainty set for expected returns using bootstrap resampling
   - `ue`: ARCH uncertainty set estimator.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -444,7 +447,7 @@ Constructs a box uncertainty set for covariance using bootstrap resampling for t
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, box algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -496,7 +499,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -559,7 +562,7 @@ Constructs an ellipsoidal uncertainty set for expected returns using bootstrap r
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -613,7 +616,7 @@ Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampl
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns

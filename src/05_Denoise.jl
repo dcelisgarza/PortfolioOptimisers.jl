@@ -499,6 +499,7 @@ For matrices without unit diagonal, the function converts them into correlation 
       + `::Nothing`: No-op.
 
   - $(arg_dict[:sigrhoX])
+
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
 # Returns

@@ -12,6 +12,12 @@ end
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
+function needs_previous_weights(::CustomJuMPConstraint)
+    return false
+end
+function needs_previous_weights(::CustomJuMPObjective)
+    return false
+end
 function custom_constraint_view(::Nothing, args...; kwargs...)
     return nothing
 end
@@ -60,14 +66,14 @@ function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNum_VecVecNum})
     set_initial_w!(w, wi)
     return nothing
 end
-function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
-    if JuMP.termination_status(model) == JuMP.OPTIMIZE_NOT_CALLED
-        return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
-    end
+function process_model(model::JuMP.Model, ::OptimisationSuccess)
     k = JuMP.value(model[:k])
     ik = !iszero(k) ? inv(k) : 1
     w = JuMP.value.(model[:w]) * ik
     return JuMPOptimisationSolution(; w = w)
+end
+function process_model(model::JuMP.Model, ::OptimisationFailure)
+    return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::DataType = Float64)
@@ -109,7 +115,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
         @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
         OptimisationFailure(; res = trials)
     end
-    return retcode, process_model(model, opt)
+    return retcode, process_model(model, retcode)
 end
 function set_portfolio_returns!(model::JuMP.Model, X::MatNum)
     if haskey(model, :X)

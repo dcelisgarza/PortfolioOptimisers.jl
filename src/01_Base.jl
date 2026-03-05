@@ -81,13 +81,14 @@ macro define_pretty_show(T, flag::Bool = true)
             end
             function Base.show(io::IO, obj::$T)
                 fields = propertynames(obj)
+                tobj = typeof(obj)
                 if isempty(fields)
-                    return print(io, string(typeof(obj), "()"), '\n')
+                    return print(io, string(tobj, "()"), '\n')
                 end
                 if get(io, :compact, false) || get(io, :multiline, false)
-                    return print(io, string(typeof(obj)), '\n')
+                    return print(io, string(tobj), '\n')
                 end
-                name = Base.typename(typeof(obj)).wrapper
+                name = Base.typename(tobj).wrapper
                 print(io, name, '\n')
                 padding = maximum(map(length, map(string, fields))) + 2
                 for (i, field) in enumerate(fields)
@@ -121,7 +122,8 @@ macro define_pretty_show(T, flag::Bool = true)
                     elseif isa(val, AbstractMatrix)
                         print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))",
                               '\n')
-                    elseif isa(val, AbstractVector) && length(val) > 6
+                    elseif isa(val, AbstractVector) && length(val) > 6 ||
+                           isa(val, AbstractVector{<:AbstractArray})
                         print(io, "$(sym1) $(length(val))-element $(typeof(val))", '\n')
                     elseif isa(val, DataType)
                         tval = typeof(val)
@@ -308,7 +310,7 @@ Alias for an abstract vector of numeric types or JuMP scalar types.
 """
 const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
-    const VecInt = Union{<:AbstractVector{<:Integer}}
+    const VecInt = AbstractVector{<:Integer}
 
 Alias for an abstract vector of integer types.
 
@@ -318,7 +320,7 @@ Alias for an abstract vector of integer types.
   - [`MatNum`](@ref)
   - [`ArrNum`](@ref)
 """
-const VecInt = Union{<:AbstractVector{<:Integer}}
+const VecInt = AbstractVector{<:Integer}
 """
     const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 
@@ -478,6 +480,27 @@ Alias for an abstract vector of integer vectors.
   - [`VecInt`](@ref)
 """
 const VecVecInt = AbstractVector{<:VecInt}
+"""
+    const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
+
+Alias for a union of an abstract vector of integers or an abstract vector of integer vectors.
+
+# Related
+
+  - [`VecInt`](@ref)
+  - [`VecVecInt`](@ref)
+"""
+const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
+"""
+    const VecVecVecInt = AbstractVector{<:VecVecInt}
+
+Alias for an abstract vector of abstract vector of integer vectors.
+
+# Related
+
+  - [`VecVecInt`](@ref)
+"""
+const VecVecVecInt = AbstractVector{<:VecVecInt}
 """
     const VecMatNum = AbstractVector{<:MatNum}
 
@@ -817,7 +840,9 @@ const arg_dict = Dict(
                       :sk => "`sk`: Coskewness matrix.",#
                       :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
                       :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.", :Xv => "`X`: Data vector.")
+                      :F => "`F`: Data matrix.",#
+                      :Xv => "`X`: Data vector.",#
+                      :dims => "`dims`: Dimensions along which to perform the computation.")
 
 """
     val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")

@@ -8,7 +8,7 @@ struct GreedyAllocationResult{T1, T2, T3, T4, T5, T6, T7} <:
     cash::T6
     fb::T7
 end
-function factory(res::GreedyAllocationResult, fb)
+function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
     return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
                                   res.cash, fb)
 end
@@ -18,13 +18,13 @@ struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
     kwargs::T3
     fb::T4
     function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
-                              fb::Option{<:FiniteAllocationOptimisationEstimator} = nothing)
+                              fb::Option{<:FOptE_FOpt} = nothing)
         return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,
                                                                            kwargs, fb)
     end
 end
 function GreedyAllocation(; unit::Number = 1, args::Tuple = (), kwargs::NamedTuple = (;),
-                          fb::Option{<:FiniteAllocationOptimisationEstimator} = nothing)
+                          fb::Option{<:FOptE_FOpt} = nothing)
     return GreedyAllocation(unit, args, kwargs, fb)
 end
 function roundmult(val::Number, prec::Number, args...; kwargs...)

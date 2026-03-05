@@ -37,21 +37,24 @@ FactorPrior
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │   w ┴ nothing
+      │           │      │       │     w ┼ nothing
+      │           │      │       │   idx ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │    w ┴ nothing
+      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │     w ┼ nothing
+      │           │      │       │   idx ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
-      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton    
+      │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │      dn ┼ nothing
       │           │      │      dt ┼ nothing
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │   w ┴ nothing
+      │           │     w ┼ nothing
+      │           │   idx ┴ nothing
       │   horizon ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
@@ -69,7 +72,8 @@ FactorPrior
       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │   w ┴ nothing
+      │             │     w ┼ nothing
+      │             │   idx ┴ nothing
       │           w ┼ nothing
       │   corrected ┴ Bool: true
   rsd ┴ Bool: true
@@ -132,7 +136,7 @@ Compute factor-based prior moments for asset returns using a factor model.
   - `pe`: Factor prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
 # Returns

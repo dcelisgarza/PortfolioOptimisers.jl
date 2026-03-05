@@ -44,7 +44,7 @@ The library is quite powerful and extremely flexible. Here is what a very basic 
 
 First we import the packages we will need for the example.
 
-- `StatsPlots` and `GraphRecipes` are needed to load the `Plots.jl` extension.
+- `StatsPlots` and `GraphRecipes` is needed to load the plotting extension.
 - `Clarabel` and `HiGHS` are the optimisers we will use.
 - `YFinance` and `TimeSeries` for downloading and preprocessing price data.
 - `PrettyTables` and `DataFrames` for displaying the results.

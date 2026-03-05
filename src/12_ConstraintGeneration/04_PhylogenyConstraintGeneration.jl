@@ -68,10 +68,12 @@ SemiDefinitePhylogenyEstimator
      │    ce ┼ PortfolioOptimisersCovariance
      │       │   ce ┼ Covariance
      │       │      │    me ┼ SimpleExpectedReturns
-     │       │      │       │   w ┴ nothing
+     │       │      │       │     w ┼ nothing
+     │       │      │       │   idx ┴ nothing
      │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │    w ┴ nothing
+     │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │      │       │     w ┼ nothing
+     │       │      │       │   idx ┴ nothing
      │       │      │   alg ┴ Full()
      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
      │       │      │     pdm ┼ Posdef
@@ -292,10 +294,12 @@ IntegerPhylogenyEstimator
         │    ce ┼ PortfolioOptimisersCovariance
         │       │   ce ┼ Covariance
         │       │      │    me ┼ SimpleExpectedReturns
-        │       │      │       │   w ┴ nothing
+        │       │      │       │     w ┼ nothing
+        │       │      │       │   idx ┴ nothing
         │       │      │    ce ┼ GeneralCovariance
-        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │       │      │       │    w ┴ nothing
+        │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │       │      │       │     w ┼ nothing
+        │       │      │       │   idx ┴ nothing
         │       │      │   alg ┴ Full()
         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
         │       │      │     pdm ┼ Posdef
@@ -423,7 +427,7 @@ If a vector broadcasts the function over each element, returning a vector of con
 
   - `plc`: A phylogeny constraint estimator, result, or `nothing`.
   - `X`: Data matrix of asset features or returns (ignored when `plc` is not an estimator).
-  - `dims`: Dimension along which to compute the phylogeny (ignored when `plc` is not an estimator).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny matrix routine (ignored when `est` is not an estimator).
 
 # Returns
@@ -495,10 +499,12 @@ CentralityConstraint
        │      │    ce ┼ PortfolioOptimisersCovariance
        │      │       │   ce ┼ Covariance
        │      │       │      │    me ┼ SimpleExpectedReturns
-       │      │       │      │       │   w ┴ nothing
+       │      │       │      │       │     w ┼ nothing
+       │      │       │      │       │   idx ┴ nothing
        │      │       │      │    ce ┼ GeneralCovariance
-       │      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │      │       │      │       │    w ┴ nothing
+       │      │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │      │       │      │       │     w ┼ nothing
+       │      │       │      │       │   idx ┴ nothing
        │      │       │      │   alg ┴ Full()
        │      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
        │      │       │      │     pdm ┼ Posdef
@@ -557,7 +563,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 
   - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of such estimators.
   - `X`: Data matrix of asset features or returns.
-  - `dims`: Dimension along which to compute centrality.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
 
 # Returns

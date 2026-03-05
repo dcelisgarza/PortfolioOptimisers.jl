@@ -53,10 +53,12 @@ BlackLittermanPrior
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │   w ┴ nothing
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │    w ┴ nothing
+             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -70,15 +72,17 @@ BlackLittermanPrior
              │           │   ce ┼ PortfolioOptimisersCovariance
              │           │      │   ce ┼ Covariance
              │           │      │      │    me ┼ SimpleExpectedReturns
-             │           │      │      │       │   w ┴ nothing
+             │           │      │      │       │     w ┼ nothing
+             │           │      │      │       │   idx ┴ nothing
              │           │      │      │    ce ┼ GeneralCovariance
-             │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │      │       │    w ┴ nothing
+             │           │      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │      │       │     w ┼ nothing
+             │           │      │      │       │   idx ┴ nothing
              │           │      │      │   alg ┴ Full()
              │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │      │     pdm ┼ Posdef
              │           │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │           │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()    
+             │           │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │           │      │      │      dn ┼ nothing
              │           │      │      │      dt ┼ nothing
              │           │      │      │     alg ┼ nothing
@@ -179,6 +183,7 @@ This method constructs the view uncertainty matrix `Ω` for the Black-Litterman 
       + `::VecNum`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
 
   - `P`: The view matrix (views × assets).
+
   - `sigma`: The prior covariance matrix (assets × assets).
 
 # Returns
@@ -253,7 +258,7 @@ Compute the Black-Litterman prior moments for asset returns.
   - `pe`: Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F{Nothing, <:MatNum}`: Optional factor matrix (default: `nothing`).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

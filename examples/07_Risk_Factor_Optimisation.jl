@@ -217,11 +217,11 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
 First let's examine the mean-standard deviation efficient frontier using the empirical and factor priors. We will compute the efficient fronteir with 50 points for all relevant priors.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[2], slv = slv,
+        JuMPOptimiser(; pe = prs[2], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[3], slv = slv,
+        JuMPOptimiser(; pe = prs[3], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 ## Mean-Risk estimators using the standard deviation.
@@ -233,16 +233,15 @@ ress = optimise.(mrs)
 #=
 Let's plot the efficient frontiers.
 =#
-using GraphRecipes, StatsPlots
+using StatsPlots, GraphRecipes
 # Empirical prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "EmpiricalPrior", legend = :outerright))
 # Empirical prior frontier.
 r = StandardDeviation()
-plot_measures(ress[1].w, prs[1]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[1]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "EmpiricalPrior", xlabel = "SD", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 
@@ -252,9 +251,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                                         title = "FactorPrior(Step)", legend = :outerright))
 # Factor prior frontier with stepwise regression.
 r = StandardDeviation()
-plot_measures(ress[2].w, prs[2]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[2]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "SD", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 # Factor prior using dimensionality reduction.
@@ -264,17 +262,16 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                                         legend = :outerright))
 # Factor prior frontier with stepwise regression.
 r = StandardDeviation()
-plot_measures(ress[3].w, prs[3]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(DimRed)", xlabel = "SD", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 
 #=
 Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 =#
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv), JuMPOptimiser(; pr = prs[2], slv = slv),
-        JuMPOptimiser(; pr = prs[3], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv), JuMPOptimiser(; pe = prs[2], slv = slv),
+        JuMPOptimiser(; pe = prs[3], slv = slv)]
 
 ## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
@@ -293,11 +290,11 @@ We can see that the factor model portfolios are more diversified than the empiri
 Here we will perform the exact same procedure as before, but using the negative skewness as the risk measure.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[7], slv = slv,
+        JuMPOptimiser(; pe = prs[7], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[8], slv = slv,
+        JuMPOptimiser(; pe = prs[8], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 ## Mean-Risk estimators using the standard deviation.
@@ -316,9 +313,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
                                         title = "EmpiricalPrior", legend = :outerright))
 # Empirical prior frontier.
 r = NegativeSkewness()
-plot_measures(ress[1].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "EmpiricalPrior", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -329,9 +325,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                                         title = "FactorPrior(Step)", legend = :outerright))
 # Factor prior frontier with stepwise regression.
 r = NegativeSkewness()
-plot_measures(ress[2].w, prs[7]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[7]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -342,9 +337,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                                         legend = :outerright))
 # Factor prior frontier with stepwise regression.
 r = NegativeSkewness()
-plot_measures(ress[3].w, prs[8]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[8]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(DimRed)", xlabel = "NegativeSkewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -352,8 +346,8 @@ plot_measures(ress[3].w, prs[8]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret
 #=
 Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 =#
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[7], slv = slv),
-        JuMPOptimiser(; pr = prs[8], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
+        JuMPOptimiser(; pe = prs[8], slv = slv)]
 
 ## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),
@@ -372,11 +366,11 @@ Here we have the opposite effect to before, this follows from the fact that for 
 Again we will do the same as before but with the kurtosis.
 =#
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[7], slv = slv,
+        JuMPOptimiser(; pe = prs[7], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[8], slv = slv,
+        JuMPOptimiser(; pe = prs[8], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 ## Mean-Risk estimators using the standard deviation.
@@ -394,9 +388,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
                                         title = "EmpiricalPrior", legend = :outerright))
 # Empirical prior frontier.
 r = Kurtosis()
-plot_measures(ress[1].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "EmpiricalPrior", xlabel = "Kurtosis", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 
@@ -406,9 +399,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                                         title = "FactorPrior(Step)", legend = :outerright))
 # Factor prior frontier with stepwise regression.
 r = Kurtosis()
-plot_measures(ress[2].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(Step)", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -419,9 +411,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                                         legend = :outerright))
 # Factor prior frontier with stepwise regression.
 r = Kurtosis()
-plot_measures(ress[3].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "FactorPrior(DimRed)", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -429,8 +420,8 @@ plot_measures(ress[3].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret
 #=
 Let's optimise the maximum risk-adjusted return ratio of the three to see how a single portfolio differs.
 =#
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[7], slv = slv),
-        JuMPOptimiser(; pr = prs[8], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[7], slv = slv),
+        JuMPOptimiser(; pe = prs[8], slv = slv)]
 
 ## Mean-Risk estimators using the standard deviation.
 mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 252),

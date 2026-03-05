@@ -150,7 +150,8 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedGerber0()
 StandardisedGerber0
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
 ```
 
 # Related
@@ -199,7 +200,8 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedGerber1()
 StandardisedGerber1
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
 ```
 
 # Related
@@ -248,7 +250,8 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedGerber2()
 StandardisedGerber2
   me ┼ SimpleExpectedReturns
-     │   w ┴ nothing
+     │     w ┼ nothing
+     │   idx ┴ nothing
 ```
 
 # Related
@@ -348,12 +351,14 @@ for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, Standardise
     julia> alg = StandardisedGerber0()
     StandardisedGerber0
       me ┼ SimpleExpectedReturns
-         │   w ┴ nothing
+         │     w ┼ nothing
+         │   idx ┴ nothing
 
     julia> factory(alg, StatsBase.Weights([0.2, 0.3, 0.5]))
     StandardisedGerber0
       me ┼ SimpleExpectedReturns
-         │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+         │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+         │   idx ┴ nothing
     ```
     """
     else
@@ -458,7 +463,9 @@ The algorithm proceeds as follows:
       + `D`: Entries where `X` is less than `-t * std_vec`.
 
  2. Compute `UmD = U - D` and `UpD = U + D`.
+
  3. The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
+
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -514,7 +521,9 @@ The algorithm proceeds as follows:
       + `D`: Entries where `X` is less than `-ce.t`.
 
  2. Compute `UmD = U - D` and `UpD = U + D`.
+
  3. The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
+
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -571,7 +580,9 @@ The algorithm proceeds as follows:
       + `N`: Entries where `X` is within `[-t * std_vec, t * std_vec]` (i.e., neither up nor down).
 
  2. Compute `UmD = U - D`.
+
  3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
+
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -629,7 +640,9 @@ The algorithm proceeds as follows:
       + `N`: Entries where `X` is within `[-ce.t, ce.t]` (i.e., neither up nor down).
 
  2. Compute `UmD = U - D`.
+
  3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
+
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -686,8 +699,11 @@ The algorithm proceeds as follows:
       + `D`: Entries where `X` is less than `-t * std_vec`.
 
  2. Compute the signed indicator matrix `UmD = U - D`.
+
  3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
+
  4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+
  5. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -744,8 +760,11 @@ The algorithm proceeds as follows:
       + `D`: Entries where `X` is less than `-ce.t`.
 
  2. Compute the signed indicator matrix `UmD = U - D`.
+
  3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
+
  4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+
  5. The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -787,7 +806,9 @@ Compute the Gerber correlation matrix using an unstandardised Gerber covariance 
       + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber correlation matrix.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+
+  - $(arg_dict[:dims])
+
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns
@@ -856,7 +877,9 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
       + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber covariance matrix.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+
+  - $(arg_dict[:dims])
+
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns

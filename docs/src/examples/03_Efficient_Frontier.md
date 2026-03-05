@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/03_Efficient_Frontier.jl"
 ```
@@ -67,7 +68,7 @@ pr = prior(EmpiricalPrior(), rd)
 Let's create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
 
 ````@example 03_Efficient_Frontier
-opt = JuMPOptimiser(; pr = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
 ````
 
 We can now use `opt` to create the `MeanRisk` estimator. In order to get the entire frontier, we need to minimise the risk (which is the default value).
@@ -92,7 +93,7 @@ pretty_table(DataFrame([rd.nx hcat(res1.w...)], Symbol.([:assets; 1:30]));
 
 ## 3. Visualising the efficient frontier
 
-Perhaps it is time to introduce some visualisations, which are implemented as a package extesion. For this we need to import the `Plots` and `GraphRecipes` packages.
+Perhaps it is time to introduce some visualisations, which are implemented as a package extesion. For this we need to import the `StatsPlots` and `GraphRecipes` packages.
 
 ````@example 03_Efficient_Frontier
 using StatsPlots, GraphRecipes
@@ -104,8 +105,8 @@ The efficient frontier is just a special case of a pareto front, we have a funct
 
 ````@example 03_Efficient_Frontier
 # Risk-free rate of 4.2/100/252
-plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
+plot_measures(res1.w, res1.pr; x = r, y = ExpectedReturn(; rt = res1.ret),
+              c = ExpectedReturnRiskRatio(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 ````
@@ -122,4 +123,3 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

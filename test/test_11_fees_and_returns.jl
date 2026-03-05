@@ -46,7 +46,7 @@
     T, N = size(pr.X)
     res = optimise(MeanRisk(;
                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
-                                                sbgt = 1, bgt = 1, pr = pr, slv = slv)))
+                                                sbgt = 1, bgt = 1, pe = pr, slv = slv)))
     @testset "Fees" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
         f1s = [0.02002313426946848, 0.12149580659357644]
@@ -92,9 +92,9 @@
         @test all(isapprox.((rk, rt, sric),
                             expected_risk_ret_sric(r, res.ret, res.w, pr; rf = rf)))
 
-        @test isapprox(expected_risk(ReturnRiskMeasure(), res.w, pr, fes[1]),
+        @test isapprox(expected_risk(ExpectedReturn(), res.w, pr, fes[1]),
                        rt - calc_fees(res.w, fes[1]))
-        @test isapprox(expected_risk(factory(ReturnRiskRatioRiskMeasure(; rf = rf), pr),
-                                     res.w, pr, fes[1]), srf)
+        @test isapprox(expected_risk(factory(ExpectedReturnRiskRatio(; rf = rf), pr), res.w,
+                                     pr, fes[1]), srf)
     end
 end

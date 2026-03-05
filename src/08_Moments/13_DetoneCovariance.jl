@@ -29,10 +29,12 @@ julia> DetoneCovariance()
 DetoneCovariance
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
-      │       │   w ┴ nothing
+      │       │     w ┼ nothing
+      │       │   idx ┴ nothing
       │    ce ┼ GeneralCovariance
-      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │    w ┴ nothing
+      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │     w ┼ nothing
+      │       │   idx ┴ nothing
       │   alg ┴ Full()
    dt ┼ Detone
       │     n ┼ Int64: 1
@@ -75,7 +77,7 @@ Compute the detoned and positive definite projected covariance matrix for the da
 
   - `ce`: The `DetoneCovariance` estimator specifying the base covariance estimator, detoning algorithm, and positive definite projection.
   - `X`: The data matrix (observations × assets).
-  - `dims`: The dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
 # Returns
@@ -124,7 +126,7 @@ Compute the detoned and positive definite projected correlation matrix for the d
 
   - `ce`: The `DetoneCovariance` estimator specifying the base covariance estimator, detoning algorithm, and positive definite projection.
   - `X`: The data matrix (observations × assets).
-  - `dims`: The dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
 # Returns

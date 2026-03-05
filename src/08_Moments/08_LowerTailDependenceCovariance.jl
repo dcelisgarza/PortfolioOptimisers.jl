@@ -33,7 +33,8 @@ julia> LowerTailDependenceCovariance()
 LowerTailDependenceCovariance
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
-        │             │   w ┴ nothing
+        │             │     w ┼ nothing
+        │             │   idx ┴ nothing
         │           w ┼ nothing
         │   corrected ┴ Bool: true
   alpha ┼ Float64: 0.05
@@ -129,7 +130,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
   - `ce`: Lower tail dependence covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -164,7 +165,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 
   - `ce`: Lower tail dependence covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns

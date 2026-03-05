@@ -33,14 +33,16 @@ Keyword arguments correspond to the fields above.
 julia> SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
 julia> SimpleVariance(; w = StatsBase.Weights([0.2, 0.3, 0.5]), corrected = false)
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: false
 ```
@@ -83,7 +85,7 @@ This method computes the standard deviation of the input array `X` using the con
 
   - `ve`: Variance estimator specifying the mean estimator, weights, and bias correction.
   - `X`: Data array (vector or matrix) for which to compute the standard deviation.
-  - `dims`: Dimension along which to compute the standard deviation (for matrices).
+  - $(arg_dict[:dims])
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
@@ -97,7 +99,8 @@ This method computes the standard deviation of the input array `X` using the con
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
@@ -148,7 +151,8 @@ This method computes the standard deviation of the input vector `X` using the co
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
@@ -160,7 +164,8 @@ julia> std(sv, X)
 julia> svw = SimpleVariance(; w = StatsBase.Weights([0.2, 0.3, 0.5]), corrected = false)
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: false
 
@@ -194,7 +199,7 @@ This method computes the variance of the input array `X` using the configuration
 
   - `ve`: Variance estimator specifying the mean estimator, weights, and bias correction.
   - `X`: Data array (vector or matrix) for which to compute the variance.
-  - `dims`: Dimension along which to compute the variance (for matrices).
+  - $(arg_dict[:dims])
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
@@ -208,7 +213,8 @@ This method computes the variance of the input array `X` using the configuration
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
@@ -259,7 +265,8 @@ This method computes the variance of the input vector `X` using the configuratio
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
@@ -271,7 +278,8 @@ julia> var(sv, X)
 julia> svw = SimpleVariance(; w = StatsBase.Weights([0.2, 0.3, 0.5]), corrected = false)
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: false
 
@@ -326,14 +334,16 @@ Return a new `SimpleVariance` estimator with the specified observation weights.
 julia> sv = SimpleVariance()
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
+            │     w ┼ nothing
+            │   idx ┴ nothing
           w ┼ nothing
   corrected ┴ Bool: true
 
 julia> svw = factory(sv, StatsBase.Weights([0.2, 0.3, 0.5]))
 SimpleVariance
          me ┼ SimpleExpectedReturns
-            │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+            │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+            │   idx ┴ nothing
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: true
 ```

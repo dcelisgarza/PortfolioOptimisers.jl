@@ -34,7 +34,8 @@ julia> MutualInfoCovariance()
 MutualInfoCovariance
          ve ┼ SimpleVariance
             │          me ┼ SimpleExpectedReturns
-            │             │   w ┴ nothing
+            │             │     w ┼ nothing
+            │             │   idx ┴ nothing
             │           w ┼ nothing
             │   corrected ┴ Bool: true
        bins ┼ HacineGharbiRavier()
@@ -77,7 +78,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
   - `ce`: Mutual information-based covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
@@ -112,7 +113,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
   - `ce`: Mutual information-based covariance estimator.
   - `X`: Data matrix of asset returns (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns

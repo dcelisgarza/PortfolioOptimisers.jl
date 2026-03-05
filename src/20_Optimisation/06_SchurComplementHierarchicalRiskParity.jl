@@ -10,6 +10,10 @@ struct SchurComplementHierarchicalRiskParityResult{T1, T2, T3, T4, T5, T6, T7, T
     w::T7
     fb::T8
 end
+function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
+    return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
+                                                       res.gamma, res.retcode, res.w, fb)
+end
 abstract type SchurComplementAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
 struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
@@ -67,7 +71,7 @@ struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisati
     fb::T3
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
-                                                   fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                                                   fb::Option{<:OptE_Opt})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params))
         end
@@ -77,11 +81,19 @@ end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),
-                                               fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                                               fb::Option{<:OptE_Opt} = nothing)
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
+function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
+    return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
+end
+function factory(sh::SchurComplementHierarchicalRiskParity, w::AbstractVector)
+    opt = factory(sh.opt, w)
+    fb = factory(sh.fb, w)
+    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
+end
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
-    X = isa(sh.opt.pr, AbstractPriorResult) ? sh.opt.pr.X : X
+    X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_complement_params_view(sh.params, i, X)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
@@ -256,8 +268,8 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(sh.opt.pr, rd; dims = dims)
-    clr = clusterise(sh.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    pr = prior(sh.opt.pe, rd; dims = dims)
+    clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
                                    strict = sh.opt.strict, datatype = eltype(pr.X))
@@ -268,8 +280,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(sh.opt.pr, rd; dims = dims)
-    clr = clusterise(sh.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    pr = prior(sh.opt.pe, rd; dims = dims)
+    clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
                                    strict = sh.opt.strict, datatype = eltype(pr.X))

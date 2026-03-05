@@ -6,7 +6,7 @@ struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: NonFiniteAllocationOptimisation
     model::T5
     fb::T6
 end
-function factory(res::MeanRiskResult, fb)
+function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
     return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
 function Base.getproperty(r::MeanRiskResult, sym::Symbol)
@@ -27,8 +27,7 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     wi::T4
     fb::T5
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
-                      wi::Option{<:VecNum},
-                      fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                      wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -41,11 +40,22 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
-                  fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                  fb::Option{<:OptE_Opt} = nothing)
     return MeanRisk(opt, r, obj, wi, fb)
 end
+function needs_previous_weights(opt::MeanRisk)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
+function factory(mr::MeanRisk, w::AbstractVector)
+    opt = factory(mr.opt, w)
+    r = factory(mr.r, w)
+    fb = factory(mr.fb, w)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
+end
 function opt_view(mr::MeanRisk, i, X::MatNum)
-    X = isa(mr.opt.pr, AbstractPriorResult) ? mr.opt.pr.X : X
+    X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
@@ -231,40 +241,41 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
 end
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, ct, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, pl, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
-                                                                                                                                           rd;
-                                                                                                                                           dims = dims)
+    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
+                                                                                                                                                rd;
+                                                                                                                                                dims = dims)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
     set_w!(model, pr.X, mr.wi)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
-    set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ct, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, mr.opt.card, gcard, pl, lt, st, fees, mr.opt.ss)
-    set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
+    set_mip_constraints!(model, wb, mr.opt.card, gcardr, plr, lt, st, fees, mr.opt.ss)
+    set_smip_constraints!(model, wb, mr.opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt,
                           sgst, mr.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, mr.opt.tr, mr, pl, fees; rd = rd)
+    set_tracking_error_constraints!(model, pr, mr.opt.tr, mr, plr, fees; rd = rd)
     set_number_effective_assets!(model, mr.opt.nea)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_linf_regularisation!(model, mr.opt.linf)
     set_lp_regularisation!(model, mr.opt.lp)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, mr.r, mr, pr, pl, fees; rd = rd)
+    set_risk_constraints!(model, mr.r, mr, pr, plr, fees; rd = rd)
     scalarise_risk_expression!(model, mr.opt.sca)
     set_return_constraints!(model, ret, mr.obj, pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, pl)
+    set_sdp_phylogeny_constraints!(model, plr)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
     return MeanRiskResult(typeof(mr),
-                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, ct, gcard,
-                                                           sgcard, smtx, sgmtx, slt, sst,
-                                                           sglt, sgst, tn, fees, pl, ret),
-                          retcode, sol, ifelse(save, model, nothing), nothing)
+                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr,
+                                                           gcardr, sgcardr, smtx, sgmtx,
+                                                           slt, sst, sglt, sgst, tn, fees,
+                                                           plr, ret), retcode, sol,
+                          ifelse(save, model, nothing), nothing)
 end
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

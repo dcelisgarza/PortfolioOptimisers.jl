@@ -84,10 +84,12 @@ AugmentedBlackLittermanPrior
                │        ce ┼ PortfolioOptimisersCovariance
                │           │   ce ┼ Covariance
                │           │      │    me ┼ SimpleExpectedReturns
-               │           │      │       │   w ┴ nothing
+               │           │      │       │     w ┼ nothing
+               │           │      │       │   idx ┴ nothing
                │           │      │    ce ┼ GeneralCovariance
-               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               │           │      │       │    w ┴ nothing
+               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │           │      │       │     w ┼ nothing
+               │           │      │       │   idx ┴ nothing
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │     pdm ┼ Posdef
@@ -98,16 +100,19 @@ AugmentedBlackLittermanPrior
                │           │      │     alg ┼ nothing
                │           │      │   order ┴ DenoiseDetoneAlg()
                │        me ┼ SimpleExpectedReturns
-               │           │   w ┴ nothing
+               │           │     w ┼ nothing
+               │           │   idx ┴ nothing
                │   horizon ┴ nothing
           f_pe ┼ EmpiricalPrior
                │        ce ┼ PortfolioOptimisersCovariance
                │           │   ce ┼ Covariance
                │           │      │    me ┼ SimpleExpectedReturns
-               │           │      │       │   w ┴ nothing
+               │           │      │       │     w ┼ nothing
+               │           │      │       │   idx ┴ nothing
                │           │      │    ce ┼ GeneralCovariance
-               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               │           │      │       │    w ┴ nothing
+               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │           │      │       │     w ┼ nothing
+               │           │      │       │   idx ┴ nothing
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │     pdm ┼ Posdef
@@ -118,7 +123,8 @@ AugmentedBlackLittermanPrior
                │           │      │     alg ┼ nothing
                │           │      │   order ┴ DenoiseDetoneAlg()
                │        me ┼ SimpleExpectedReturns
-               │           │   w ┴ nothing
+               │           │     w ┼ nothing
+               │           │   idx ┴ nothing
                │   horizon ┴ nothing
             mp ┼ DenoiseDetoneAlgMatrixProcessing
                │     pdm ┼ Posdef
@@ -143,7 +149,7 @@ AugmentedBlackLittermanPrior
         a_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   ukey ┼ String: "ux"
-               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])        
+               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
         f_sets ┼ AssetSets
                │    key ┼ String: "nx"
                │   ukey ┼ String: "ux"
@@ -274,7 +280,7 @@ Compute augmented Black-Litterman prior moments for asset returns.
   - `pe`: Augmented Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

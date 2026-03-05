@@ -464,10 +464,12 @@ EntropyPoolingPrior
               │        ce ┼ PortfolioOptimisersCovariance
               │           │   ce ┼ Covariance
               │           │      │    me ┼ SimpleExpectedReturns
-              │           │      │       │   w ┴ nothing
+              │           │      │       │     w ┼ nothing
+              │           │      │       │   idx ┴ nothing
               │           │      │    ce ┼ GeneralCovariance
-              │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-              │           │      │       │    w ┴ nothing
+              │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+              │           │      │       │     w ┼ nothing
+              │           │      │       │   idx ┴ nothing
               │           │      │   alg ┴ Full()
               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
               │           │      │     pdm ┼ Posdef
@@ -478,7 +480,8 @@ EntropyPoolingPrior
               │           │      │     alg ┼ nothing
               │           │      │   order ┴ DenoiseDetoneAlg()
               │        me ┼ SimpleExpectedReturns
-              │           │   w ┴ nothing
+              │           │     w ┼ nothing
+              │           │   idx ┴ nothing
               │   horizon ┴ nothing
      mu_views ┼ LinearConstraintEstimator
               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
@@ -691,9 +694,13 @@ Replace prior references in view parsing results with their corresponding prior 
   - `res`: Parsed view constraint containing variables and coefficients.
 
   - `pr`: Prior result object containing prior values.
+
   - `sets`: Asset set mapping asset names to indices.
+
   - `key`: Moment type key (`:mu`, `:var`, `:cvar`, etc.).
+
   - `alpha`: Optional confidence level for VaR/CVaR views.
+
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
@@ -1056,6 +1063,7 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
   - `w`: Prior weights (length = number of observations).
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+
   - `opt: Optim.jl-based entropy pooling optimiser with exponential objective.
 
       + `::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
@@ -1114,15 +1122,23 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     end
     function f(x)
         common_op(x)
-        return opt.sc1 * sum(y) + LinearAlgebra.dot(x, B)
+        return opt.sc1 * (sum(y) + LinearAlgebra.dot(x, B))
     end
     function g!(G, x)
         common_op(x)
         G .= grad
         return opt.sc1 * G
     end
-    result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
-                            opt.kwargs...)
+    #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
+    @static if pkgversion(Optim) == v"2.0.1"
+        args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
+                                opt.kwargs...)
+    else
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
+                                opt.kwargs...)
+    end
+    #! End: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
@@ -1174,8 +1190,16 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         G .= grad
         return opt.sc1 * G
     end
-    result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
-                            opt.kwargs...)
+    #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
+    @static if pkgversion(Optim) == v"2.0.1"
+        args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
+                                opt.kwargs...)
+    else
+        result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, opt.args...;
+                                opt.kwargs...)
+    end
+    #! End: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
@@ -1193,6 +1217,7 @@ Solve the primal of the exponential entropy pooling formulation using JuMP.jl.
   - `w`: Prior weights (length = number of observations).
 
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+
   - `opt`: JuMP.jl-based entropy pooling optimiser with exponential objective.
 
       + `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Use the exponential formulation.
@@ -1478,7 +1503,8 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
         else
-            LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) -
+            LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(view(X, :,
+                                                                                     i)) -
                                 B[i] for i in 1:N]) / sqrt(N)
         end
         return wi, err
@@ -2020,7 +2046,7 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
   - `pe`: Entropy pooling prior estimator with iterative algorithm .
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix (default: `nothing`).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - If `true`, throws error for missing assets; otherwise, issue warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 
@@ -2151,7 +2177,7 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
   - `pe`: Entropy pooling prior estimator with single-shot algorithm.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor matrix.
-  - `dims`: Dimension along which to compute moments,
+  - $(arg_dict[:dims])
   - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and solvers.
 

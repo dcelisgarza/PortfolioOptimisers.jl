@@ -24,7 +24,7 @@ All concrete and/or abstract types implementing specific clustering algorithms s
   - [`AbstractClusteringResult`](@ref)
 """
 abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
-function factory(alg::AbstractClustersAlgorithm, args...)
+function factory(alg::AbstractClustersAlgorithm, args...; kwargs...)
     return alg
 end
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
@@ -398,10 +398,12 @@ ClustersEstimator
    ce ┼ PortfolioOptimisersCovariance
       │   ce ┼ Covariance
       │      │    me ┼ SimpleExpectedReturns
-      │      │       │   w ┴ nothing
+      │      │       │     w ┼ nothing
+      │      │       │   idx ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │    w ┴ nothing
+      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │     w ┼ nothing
+      │      │       │   idx ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │      │     pdm ┼ Posdef

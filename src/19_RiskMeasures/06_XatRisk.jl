@@ -12,10 +12,10 @@ struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
-            @argcheck(b > zero(b))
+            assert_nonempty_gt0_finite_val(b, :b)
         end
         if sflag
-            @argcheck(s > zero(s))
+            assert_nonempty_gt0_finite_val(s, :s)
         end
         if bflag && sflag
             @argcheck(b > s)
@@ -92,7 +92,7 @@ function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
     alg = factory(r.alg, pr, args...; kwargs...)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
 end
-function risk_measure_view(r::ValueatRisk, i)
+function risk_measure_view(r::ValueatRisk, i, args...)
     alg = valueat_risk_formulation_view(r.alg, i)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w, alg = alg)
 end
@@ -141,7 +141,7 @@ function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs..
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
                             alg = alg)
 end
-function risk_measure_view(r::ValueatRiskRange, i)
+function risk_measure_view(r::ValueatRiskRange, i, args...)
     alg = valueat_risk_formulation_view(r.alg, i)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
                             w = r.w, alg = alg)
@@ -170,27 +170,45 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})
     gain = -sorted_x[idx]
     return loss - gain
 end
-struct DrawdownatRisk{T1, T2, T3} <: RiskMeasure
+struct DrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
+    b::T4
+    s::T5
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
-                            w::Option{<:StatsBase.AbstractWeights})
+                            w::Option{<:StatsBase.AbstractWeights}, b::Option{<:Number},
+                            s::Option{<:Number})
         @argcheck(zero(alpha) < alpha < one(alpha))
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
+        bflag = !isnothing(b)
+        sflag = !isnothing(s)
+        if bflag
+            assert_nonempty_gt0_finite_val(b, :b)
+        end
+        if sflag
+            assert_nonempty_gt0_finite_val(s, :s)
+        end
+        if bflag && sflag
+            @argcheck(b > s)
+        end
+        return new{typeof(settings), typeof(alpha), typeof(w), typeof(b), typeof(s)}(settings,
+                                                                                     alpha,
+                                                                                     w, b,
+                                                                                     s)
     end
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         alpha::Number = 0.05,
-                        w::Option{<:StatsBase.AbstractWeights} = nothing)
-    return DrawdownatRisk(settings, alpha, w)
+                        w::Option{<:StatsBase.AbstractWeights} = nothing,
+                        b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
+    return DrawdownatRisk(settings, alpha, w, b, s)
 end
 function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
-    return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
+    return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w, b = r.b, s = r.s)
 end
 function absolute_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))

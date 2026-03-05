@@ -42,7 +42,8 @@ Keyword arguments correspond to the fields above.
 julia> Cokurtosis()
 Cokurtosis
    me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
+      │     w ┼ nothing
+      │   idx ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -125,8 +126,11 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
       + `ke::Nothing`: No-op, returns `nothing`.
 
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the mean.
+
+  - $(arg_dict[:dims])
+
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
+
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Validation

@@ -11,48 +11,56 @@ struct HierarchicalResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
     w::T7
     fb::T8
 end
-function factory(res::HierarchicalResult, fb)
+function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
     return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
                               fb)
 end
 struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
        BaseClusteringOptimisationEstimator
-    pr::T1
-    clr::T2
+    pe::T1
+    cle::T2
     slv::T3
     wb::T4
     fees::T5
     sets::T6
     wf::T7
     strict::T8
-    function HierarchicalOptimiser(pr::PrE_Pr, clr::HClE_HCl, slv::Option{<:Slv_VecSlv},
+    function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,
                                    strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pr), typeof(clr), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(strict)}(pr, clr, slv, wb, fees, sets,
+        return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
+                   typeof(sets), typeof(wf), typeof(strict)}(pe, cle, slv, wb, fees, sets,
                                                              wf, strict)
     end
 end
-function HierarchicalOptimiser(; pr::PrE_Pr = EmpiricalPrior(),
-                               clr::HClE_HCl = ClustersEstimator(),
+function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
+                               cle::HClE_HCl = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::Option{<:WbE_Wb} = WeightBounds(),
                                fees::Option{<:FeesE_Fees} = nothing,
                                sets::Option{<:AssetSets} = nothing,
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
-    return HierarchicalOptimiser(pr, clr, slv, wb, fees, sets, wf, strict)
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, strict)
+end
+function needs_previous_weights(opt::HierarchicalOptimiser)
+    return needs_previous_weights(opt.fees)
+end
+function factory(opt::HierarchicalOptimiser, w::AbstractVector)
+    return HierarchicalOptimiser(; pe = opt.pe, cle = opt.cle, slv = opt.slv, wb = opt.wb,
+                                 fees = factory(opt.fees, w), sets = opt.sets, wf = opt.wf,
+                                 strict = opt.strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i)
-    pr = prior_view(hco.pr, i)
+    pe = prior_view(hco.pe, i)
     wb = weight_bounds_view(hco.wb, i)
     fees = fees_view(hco.fees, i)
     sets = nothing_asset_sets_view(hco.sets, i)
-    return HierarchicalOptimiser(; pr = pr, clr = hco.clr, slv = hco.slv, wb = wb,
+    return HierarchicalOptimiser(; pe = pe, cle = hco.cle, slv = hco.slv, wb = wb,
                                  fees = fees, wf = hco.wf, sets = sets, strict = hco.strict)
 end
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,

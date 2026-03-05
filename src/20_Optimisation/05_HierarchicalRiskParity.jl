@@ -4,8 +4,7 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     sca::T3
     fb::T4
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
-                                    sca::Scalariser,
-                                    fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                                    sca::Scalariser, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
         end
@@ -15,11 +14,22 @@ end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
                                 sca::Scalariser = SumScalariser(),
-                                fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                                fb::Option{<:OptE_Opt} = nothing)
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
+function needs_previous_weights(opt::HierarchicalRiskParity)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.r) ||
+            needs_previous_weights(opt.fb))
+end
+function factory(hrp::HierarchicalRiskParity, w::AbstractVector)
+    opt = factory(hrp.opt, w)
+    r = factory(hrp.r, w)
+    fb = factory(hrp.fb, w)
+    return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
+end
 function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
-    X = isa(hrp.opt.pr, AbstractPriorResult) ? hrp.opt.pr.X : X
+    X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
@@ -42,8 +52,8 @@ function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::Vec
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(hrp.opt.pr, rd; dims = dims)
-    clr = clusterise(hrp.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    pr = prior(hrp.opt.pe, rd; dims = dims)
+    clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
@@ -163,8 +173,8 @@ function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, r
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(hrp.opt.pr, rd; dims = dims)
-    clr = clusterise(hrp.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    pr = prior(hrp.opt.pe, rd; dims = dims)
+    clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     wk = zeros(eltype(pr.X), size(pr.X, 2))

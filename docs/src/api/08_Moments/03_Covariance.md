@@ -5,8 +5,8 @@ The covariance is an important measure of risk used in portfolio selection and p
 ```@docs
 GeneralCovariance
 factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
-cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cov(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 Covariance
 factory(ce::Covariance, w::StatsBase.AbstractWeights)
 cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)

@@ -166,6 +166,7 @@ This function dispatches on the type of `se` to apply the appropriate similarity
       + `se::GeneralExponentialSimilarity`: Uses a generalised exponential transformation.
 
   - `D`: Distance matrix.
+
   - `kwargs...`: Additional keyword arguments (not used).
 
 # Returns
@@ -446,7 +447,7 @@ function distance_wei(L::MatNum)
             end
 
             dus = D[u, S]
-            minD = !isempty(dus) ? minimum(dus) : Float64[]
+            minD = !isempty(dus) ? minimum(dus) : eltype(D)[]
 
             # isempty: all nodes reached
             # isinf: some nodes cannot be reached
@@ -1726,7 +1727,7 @@ This method computes the similarity and distance matrices from the input data ma
   - `cle`: A `ClustersEstimator` whose algorithm is a [`DBHT`](@ref) instance.
   - `X`: Data matrix (`observations × assets` or `assets × observations` depending on `dims`).
   - `branchorder`: Symbol specifying the dendrogram branch ordering method. Accepts `:optimal` (default), `:barjoseph`, or `:r`.
-  - `dims`: Integer specifying the dimension along which to compute statistics (`1` for columns/assets, `2` for rows).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
 
 # Details
@@ -1889,7 +1890,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
   - `je`: LoGo algorithm instance.
   - `sigma`: Covariance matrix (`N × N`), updated in-place with the LoGo sparse inverse covariance.
   - `X`: Data matrix (`T × N`).
-  - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to distance and similarity estimators.
 
 # Details
@@ -1957,7 +1958,7 @@ This method provides a standard interface for applying the LoGo algorithm to a c
   - `pdm`: Optional positive definite matrix estimator (e.g., `Posdef()`), or `nothing`.
   - `sigma`: Covariance matrix (`N × N`), updated in-place.
   - `X`: Data matrix (`T × N` or `N × T`).
-  - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to distance and similarity estimators.
 
 # Details

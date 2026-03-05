@@ -55,6 +55,9 @@ All concrete and/or abstract types representing tracking algorithms (such as wei
   - [`TrackingError`](@ref)
 """
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
+function needs_previous_weights(::AbstractTrackingAlgorithm)
+    return false
+end
 """
     abstract type TrackingFormulation <: AbstractAlgorithm end
 
@@ -372,9 +375,10 @@ function tracking_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
+    struct WeightsTracking{T1, T2, T3} <: AbstractTrackingAlgorithm
         fees::T1
         w::T2
+        fixed::T3
     end
 
 Asset weights-based tracking algorithm.
@@ -385,10 +389,11 @@ Asset weights-based tracking algorithm.
 
   - `fees`: Optional fees estimator or result to apply to the weights tracking.
   - `w`: Portfolio weights (vector of real numbers).
+  - `fixed`: Boolean indicating whether the algorithm is fixed (does not update with new weights) or variable (updates with new weights).
 
 # Constructor
 
-    WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum)
+    WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
 
 ## Validation
 
@@ -399,8 +404,9 @@ Asset weights-based tracking algorithm.
 ```jldoctest
 julia> WeightsTracking(; w = [0.5, 0.5])
 WeightsTracking
-  fees ┼ nothing
-     w ┴ Vector{Float64}: [0.5, 0.5]
+   fees ┼ nothing
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: false
 ```
 
 # Related
@@ -412,16 +418,20 @@ WeightsTracking
   - [`Option`](@ref)
   - [`tracking_benchmark`](@ref)
 """
-struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
+struct WeightsTracking{T1, T2, T3} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
-    function WeightsTracking(fees::Option{<:Fees}, w::VecNum)
+    fixed::T3
+    function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)
         assert_nonempty_finite_val(w, :w)
-        return new{typeof(fees), typeof(w)}(fees, w)
+        return new{typeof(fees), typeof(w), typeof(fixed)}(fees, w, fixed)
     end
 end
-function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum)
-    return WeightsTracking(fees, w)
+function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
+    return WeightsTracking(fees, w, fixed)
+end
+function needs_previous_weights(tr::WeightsTracking)
+    return !tr.fixed
 end
 """
     factory(tr::WeightsTracking, w::VecNum)
@@ -449,25 +459,51 @@ This function creates a new [`WeightsTracking`](@ref) instance by copying the fe
 ```jldoctest
 julia> tr = WeightsTracking(; fees = Fees(; l = 0.002), w = [0.5, 0.5])
 WeightsTracking
-  fees ┼ Fees
-       │       tn ┼ nothing
-       │        l ┼ Float64: 0.002
-       │        s ┼ nothing
-       │       fl ┼ nothing
-       │       fs ┼ nothing
-       │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-     w ┴ Vector{Float64}: [0.5, 0.5]
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: false
 
 julia> PortfolioOptimisers.factory(tr, [0.6, 0.4])
 WeightsTracking
-  fees ┼ Fees
-       │       tn ┼ nothing
-       │        l ┼ Float64: 0.002
-       │        s ┼ nothing
-       │       fl ┼ nothing
-       │       fs ┼ nothing
-       │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-     w ┴ Vector{Float64}: [0.6, 0.4]
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.6, 0.4]
+  fixed ┴ Bool: false
+
+julia> tr = WeightsTracking(; fees = Fees(; l = 0.002), w = [0.5, 0.5], fixed = true)
+WeightsTracking
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: true
+
+julia> PortfolioOptimisers.factory(tr, [0.1, 0.1])
+WeightsTracking
+   fees ┼ Fees
+        │       tn ┼ nothing
+        │        l ┼ Float64: 0.002
+        │        s ┼ nothing
+        │       fl ┼ nothing
+        │       fs ┼ nothing
+        │   kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+      w ┼ Vector{Float64}: [0.5, 0.5]
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -477,7 +513,11 @@ WeightsTracking
   - [`factory`](@ref)
 """
 function factory(tr::WeightsTracking, w::VecNum)
-    return WeightsTracking(; fees = factory(tr.fees, w), w = w)
+    return if tr.fixed
+        tr
+    else
+        WeightsTracking(; fees = factory(tr.fees, tr.w), w = w, fixed = tr.fixed)
+    end
 end
 """
     tracking_view(tr::WeightsTracking, i)
@@ -508,8 +548,17 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
 
 julia> PortfolioOptimisers.tracking_view(tr, 2:3)
 WeightsTracking
-  fees ┼ nothing
-     w ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+   fees ┼ nothing
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+  fixed ┴ Bool: false
+
+julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6], fixed = true);
+
+julia> PortfolioOptimisers.tracking_view(tr, 2:3)
+WeightsTracking
+   fees ┼ nothing
+      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+  fixed ┴ Bool: true
 ```
 
 # Related
@@ -521,7 +570,7 @@ WeightsTracking
 function tracking_view(tr::WeightsTracking, i)
     fees = fees_view(tr.fees, i)
     w = view(tr.w, i)
-    return WeightsTracking(; fees = fees, w = w)
+    return WeightsTracking(; fees = fees, w = w, fixed = tr.fixed)
 end
 """
     tracking_benchmark(tr::WeightsTracking, X::MatNum)
@@ -742,8 +791,9 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5]);
 julia> TrackingError(; tr = tr, err = 0.01)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ Vector{Float64}: [0.5, 0.5]
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.5, 0.5]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
@@ -801,8 +851,9 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
 julia> err = TrackingError(; tr = tr, err = 0.01)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ Vector{Float64}: [0.5, 0.5, 0.6]
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.5, 0.5, 0.6]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
@@ -810,8 +861,9 @@ TrackingError
 julia> PortfolioOptimisers.tracking_view(err, 2:3)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+      │    fees ┼ nothing
+      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
@@ -890,17 +942,19 @@ julia> tr = WeightsTracking(; w = [0.5, 0.5]);
 julia> err = TrackingError(; tr = tr, err = 0.01)
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ Vector{Float64}: [0.5, 0.5]
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.5, 0.5]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
 
-julia> PortfolioOptimisers.factory(err, [0.6, 0.4])
+julia> factory(err, [0.6, 0.4])
 TrackingError
    tr ┼ WeightsTracking
-      │   fees ┼ nothing
-      │      w ┴ Vector{Float64}: [0.6, 0.4]
+      │    fees ┼ nothing
+      │       w ┼ Vector{Float64}: [0.6, 0.4]
+      │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
   alg ┼ L2Tracking
       │   ddof ┴ Int64: 1
@@ -915,6 +969,15 @@ TrackingError
 """
 function factory(tr::TrackingError, w::VecNum)
     return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
+end
+function needs_previous_weights(tr::TrackingError)
+    return needs_previous_weights(tr.tr)
+end
+function factory(tr::VecTr, w::VecNum)
+    return [factory(t, w) for t in tr]
+end
+function needs_previous_weights(tr::VecTr)
+    return any(needs_previous_weights.(tr))
 end
 
 export L2Tracking, SquaredL2Tracking, L1Tracking, LpTracking, LInfTracking,

@@ -35,10 +35,12 @@ EmpiricalPrior
        ce ┼ PortfolioOptimisersCovariance
           │   ce ┼ Covariance
           │      │    me ┼ SimpleExpectedReturns
-          │      │       │   w ┴ nothing
+          │      │       │     w ┼ nothing
+          │      │       │   idx ┴ nothing
           │      │    ce ┼ GeneralCovariance
-          │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-          │      │       │    w ┴ nothing
+          │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          │      │       │     w ┼ nothing
+          │      │       │   idx ┴ nothing
           │      │   alg ┴ Full()
           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
           │      │     pdm ┼ Posdef
@@ -49,7 +51,8 @@ EmpiricalPrior
           │      │     alg ┼ nothing
           │      │   order ┴ DenoiseDetoneAlg()
        me ┼ SimpleExpectedReturns
-          │   w ┴ nothing
+          │     w ┼ nothing
+          │   idx ┴ nothing
   horizon ┴ nothing
 ```
 
@@ -97,7 +100,7 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
   - `pe`: Empirical prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `args...`: Additional positional arguments (ignored).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Returns
@@ -137,7 +140,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
   - `pe`: Empirical prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `args...`: Additional positional arguments (ignored).
-  - `dims`: Dimension along which to compute moments.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Returns

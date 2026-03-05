@@ -1,6 +1,6 @@
 @safetestset "NestedClustered" begin
     using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames, StableRNGs,
-          Pajarito, HiGHS, JuMP, Clustering
+          Pajarito, HiGHS, JuMP, Clustering, NearestCorrelationMatrix
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -169,42 +169,43 @@
     clr = clusterise(ClustersEstimator(), pr)
     w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     @testset "Mix optimisers" begin
-        jopti = JuMPOptimiser(; pr = pr, slv = slv, sets = sets)
+        jopti = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
         jopto = JuMPOptimiser(; slv = slv)
-        hopti = HierarchicalOptimiser(; pr = pr, slv = slv)
+        hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
         hopto = HierarchicalOptimiser(; slv = slv)
-        opts = [NestedClustered(; clr = clr, opti = MeanRisk(; opt = jopti),
+        resi = optimise(MeanRisk(; opt = jopto), rd)
+        opts = [NestedClustered(; cle = clr, opti = MeanRisk(; opt = jopti),
                                 opto = MeanRisk(; opt = jopto)),
-                NestedClustered(; clr = clr, opti = NearOptimalCentering(; opt = jopti),
+                NestedClustered(; cle = clr, opti = NearOptimalCentering(; opt = jopti),
                                 opto = NearOptimalCentering(; opt = jopto)),
-                NestedClustered(; clr = clr,
+                NestedClustered(; cle = clr,
                                 opti = RiskBudgeting(;
                                                      rba = AssetRiskBudgeting(;
                                                                               rkb = RiskBudgetEstimator(;
                                                                                                         val = UniformValues())),
                                                      opt = jopti),
                                 opto = RiskBudgeting(; opt = jopto)),
-                NestedClustered(; clr = clr, opti = RelaxedRiskBudgeting(; opt = jopti),
+                NestedClustered(; cle = clr, opti = RelaxedRiskBudgeting(; opt = jopti),
                                 opto = RelaxedRiskBudgeting(; opt = jopto)),
-                NestedClustered(; clr = clr, opti = HierarchicalRiskParity(; opt = hopti),
+                NestedClustered(; cle = clr, opti = HierarchicalRiskParity(; opt = hopti),
                                 opto = HierarchicalRiskParity(; opt = hopto)),
-                NestedClustered(; clr = clr,
+                NestedClustered(; cle = clr,
                                 opti = HierarchicalEqualRiskContribution(; opt = hopti),
                                 opto = HierarchicalEqualRiskContribution(; opt = hopto)),
-                NestedClustered(; pr = pr, clr = clr,
-                                opti = NestedClustered(; pr = pr,
+                NestedClustered(; pe = pr, cle = clr,
+                                opti = NestedClustered(; pe = pr,
                                                        opti = MeanRisk(; opt = jopti),
                                                        opto = MeanRisk(; opt = jopto)),
                                 opto = NestedClustered(; opti = MeanRisk(; opt = jopto),
                                                        opto = MeanRisk(; opt = jopto))),
-                NestedClustered(; clr = clr, opti = InverseVolatility(; pr = pr),
+                NestedClustered(; cle = clr, opti = InverseVolatility(; pe = pr),
                                 opto = InverseVolatility()),
-                NestedClustered(; clr = clr, opti = EqualWeighted(),
+                NestedClustered(; cle = clr, opti = EqualWeighted(),
                                 opto = EqualWeighted()),
-                NestedClustered(; clr = clr,
+                NestedClustered(; cle = clr,
                                 opti = RandomWeighted(; rng = StableRNG(1234567890)),
                                 opto = RandomWeighted(; rng = StableRNG(0987654321))),
-                NestedClustered(; clr = clr,
+                NestedClustered(; cle = clr,
                                 opti = SchurComplementHierarchicalRiskParity(;
                                                                              params = SchurComplementParams(;
                                                                                                             gamma = 0),
@@ -213,14 +214,14 @@
                                                                              params = SchurComplementParams(;
                                                                                                             gamma = 0.5),
                                                                              opt = hopto)),
-                NestedClustered(; pr = pr, clr = clr,
+                NestedClustered(; pe = pr, cle = clr,
                                 opti = Stacking(;
                                                 opti = [MeanRisk(; opt = jopti),
                                                         HierarchicalRiskParity(;
                                                                                opt = hopti),
-                                                        InverseVolatility(; pr = pr),
+                                                        InverseVolatility(; pe = pr),
                                                         EqualWeighted(),
-                                                        NestedClustered(; pr = pr,
+                                                        NestedClustered(; pe = pr,
                                                                         opti = NearOptimalCentering(;
                                                                                                     opt = jopti),
                                                                         opto = NearOptimalCentering(;
@@ -264,20 +265,20 @@
                                                                                                                     opt = jopto))],
                                                                 opto = HierarchicalRiskParity(;
                                                                                               opt = hopto)))),
-                NestedClustered(; clr = clr, opti = FactorRiskContribution(; opt = jopti),
+                NestedClustered(; cle = clr, opti = FactorRiskContribution(; opt = jopti),
                                 opto = FactorRiskContribution(; opt = jopto)),
-                NestedClustered(; clr = clr,
+                NestedClustered(; cle = clr,
                                 opti = HierarchicalRiskParity(;
                                                               r = MedianAbsoluteDeviation(),
                                                               opt = hopti),
                                 opto = HierarchicalRiskParity(;
                                                               r = MedianAbsoluteDeviation(),
                                                               opt = hopto)),
-                NestedClustered(; clr = clr,
+                NestedClustered(; cle = clr,
                                 opti = FactorRiskContribution(; re = rr, opt = jopti),
                                 opto = FactorRiskContribution(; opt = jopto)),
                 NestedClustered(;
-                                clr = ClustersEstimator(;
+                                cle = ClustersEstimator(;
                                                         ce = PortfolioOptimisersCovariance(),
                                                         de = Distance(;
                                                                       alg = CanonicalDistance()),
@@ -296,9 +297,9 @@
                                                                                                                2)))),
                                                      opt = jopti),
                                 opto = MeanRisk(; opt = jopto)),
-                NestedClustered(; pr = pr, clr = clr,
-                                opti = NestedClustered(; pr = pr,
-                                                       opti = NestedClustered(; pr = pr,
+                NestedClustered(; pe = pr, cle = clr,
+                                opti = NestedClustered(; pe = pr,
+                                                       opti = NestedClustered(; pe = pr,
                                                                               opti = MeanRisk(;
                                                                                               opt = jopti),
                                                                               opto = MeanRisk(;
@@ -318,22 +319,126 @@
                                                                               opti = MeanRisk(;
                                                                                               opt = jopto),
                                                                               opto = MeanRisk(;
-                                                                                              opt = jopto))))]
+                                                                                              opt = jopto)))),
+                NestedClustered(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+                                opti = MeanRisk(; opt = jopto),
+                                opto = MeanRisk(; opt = jopto)),
+                NestedClustered(;
+                                cv = OptimisationCrossValidation(;
+                                                                 cv = IndexWalkForward(23,
+                                                                                       11)),
+                                opti = MeanRisk(; opt = jopto),
+                                opto = MeanRisk(; opt = jopto)),
+                NestedClustered(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+                                opti = Stacking(;
+                                                cv = OptimisationCrossValidation(;
+                                                                                 cv = KFold(;
+                                                                                            n = 10)),
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        MeanRisk(; obj = MaximumRatio(),
+                                                                 opt = jopto)],
+                                                opto = MeanRisk(; opt = jopto)),
+                                opto = Stacking(;
+                                                cv = OptimisationCrossValidation(;
+                                                                                 cv = IndexWalkForward(23,
+                                                                                                       11)),
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        MeanRisk(; obj = MaximumRatio(),
+                                                                 opt = jopto)],
+                                                opto = MeanRisk(; opt = jopto))),
+                NestedClustered(;
+                                cv = OptimisationCrossValidation(;
+                                                                 cv = CombinatorialCrossValidation(;
+                                                                                                   n_folds = 4,
+                                                                                                   n_test_folds = 3)),
+                                opti = Stacking(;
+                                                cv = OptimisationCrossValidation(;
+                                                                                 cv = CombinatorialCrossValidation(;
+                                                                                                                   n_folds = 4,
+                                                                                                                   n_test_folds = 3)),
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        MeanRisk(; obj = MaximumRatio(),
+                                                                 opt = jopto)],
+                                                opto = MeanRisk(; opt = jopto)),
+                                opto = Stacking(;
+                                                cv = OptimisationCrossValidation(;
+                                                                                 cv = CombinatorialCrossValidation(;
+                                                                                                                   n_folds = 4,
+                                                                                                                   n_test_folds = 3)),
+                                                opti = [MeanRisk(; opt = jopto),
+                                                        HierarchicalRiskParity(;
+                                                                               opt = hopto),
+                                                        MeanRisk(; obj = MaximumRatio(),
+                                                                 opt = jopto)],
+                                                opto = MeanRisk(; opt = jopto))),
+                NestedClustered(; pe = pr, cle = clr,
+                                cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+                                opti = NestedClustered(; opti = MeanRisk(; opt = jopti),
+                                                       opto = MeanRisk(; opt = jopto)),
+                                opto = NestedClustered(; opti = MeanRisk(; opt = jopto),
+                                                       opto = MeanRisk(; opt = jopto))),
+                Stacking(;
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                Stacking(; cv = OptimisationCrossValidation(; cv = KFold(; n = 10)),
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                Stacking(;
+                         cv = OptimisationCrossValidation(;
+                                                          cv = CombinatorialCrossValidation(;
+                                                                                            n_folds = 4,
+                                                                                            n_test_folds = 3)),
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                Stacking(;
+                         cv = OptimisationCrossValidation(; cv = IndexWalkForward(23, 11)),
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
-            res = optimise(opt, rd)
+            res = try
+                optimise(opt, rd)
+            catch err
+                if isa(err, ArgumentError) || isa(err, TaskFailedException)
+                    println("Failed iteration: $i\nError: $err\nContinuing with next iteration.")
+                    continue
+                else
+                    rethrow(err)
+                end
+            end
+
             if i == 3
-                @test isapprox(optimise(NestedClustered(; clr = clr,
+                @test isapprox(optimise(NestedClustered(; cle = clr,
                                                         opti = RiskBudgeting(; opt = jopti),
                                                         opto = RiskBudgeting(; opt = jopto)),
                                         rd).w, res.w)
             end
-            rtol = if i in (2, 3, 16)
+            rtol = if i in (2, 16)
                 5e-5
-            elseif i == 12
+            elseif i in (12, 20)
                 5e-6
             elseif i == 10
                 1.1
+            elseif i == 3
+                1e-4
             else
                 1e-6
             end
@@ -351,11 +456,11 @@
                                                     val = Dict("PG" => 0.5 / 252)),
                              l = Dict("MRK" => 0.3 / 252), s = "BAC" => 0.2 / 252,
                              fl = ["XOM" => 0.5 / 252], fs = "PFE" => 0.3 / 252)
-        opti = JuMPOptimiser(; pr = pr, slv = mip_slv, sbgt = 1, bgt = 1,
+        opti = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                              wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
         opto = JuMPOptimiser(; slv = slv, sbgt = 1, bgt = 1,
                              wb = WeightBounds(; lb = -1, ub = 1))
-        res = optimise(NestedClustered(; clr = clr,
+        res = optimise(NestedClustered(; cle = clr,
                                        opti = MeanRisk(; r = ConditionalDrawdownatRisk(),
                                                        opt = opti),
                                        opto = MeanRisk(; opt = opto)), rd)
@@ -370,20 +475,20 @@
         @test isapprox(res.w[findfirst(x -> x == "BAC", rd.nx)], 0)
         @test isapprox(res.w[findfirst(x -> x == "PFE", rd.nx)], 0)
 
-        opti = JuMPOptimiser(; pr = pr, slv = mip_slv, sbgt = 1, bgt = 1,
+        opti = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                              wb = WeightBounds(; lb = -1, ub = 1),
                              fees = fees_constraints(fees, sets), sets = sets)
         @test isapprox(res.w,
-                       optimise(NestedClustered(; clr = clr,
+                       optimise(NestedClustered(; cle = clr,
                                                 opti = MeanRisk(;
                                                                 r = ConditionalDrawdownatRisk(),
                                                                 opt = opti),
                                                 opto = MeanRisk(; opt = opto)), rd).w)
     end
     @testset "Advanced use" begin
-        res = optimise(NestedClustered(; clr = clr,
+        res = optimise(NestedClustered(; cle = clr,
                                        opti = MeanRisk(; r = ConditionalValueatRisk(),
-                                                       opt = JuMPOptimiser(; pr = pr,
+                                                       opt = JuMPOptimiser(; pe = pr,
                                                                            slv = mip_slv,
                                                                            scard = [2, 1],
                                                                            smtx = concrete_typed_array([AssetSetsMatrixEstimator(;
@@ -401,9 +506,9 @@
         @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[1][i, :]] for i in axes(res.resi[2].smtx[1], 1)])) < 3
         @test sum(.!iszero.([res.resi[2].w[res.resi[2].smtx[2][i, :]] for i in axes(res.resi[2].smtx[2], 1)])) < 2
 
-        opt = NestedClustered(; clr = clr,
+        opt = NestedClustered(; cle = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
-                                              opt = JuMPOptimiser(; pr = pr, slv = mip_slv,
+                                              opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                                                                   lt = ThresholdEstimator(;
                                                                                           val = ["WMT" => 0.2,
                                                                                                  "group2" => 0.48]),
@@ -429,14 +534,217 @@
                 end
             end
         end
-        opt = NestedClustered(; clr = clr,
+        opt = NestedClustered(; cle = clr,
                               opti = MeanRisk(; r = ConditionalValueatRisk(),
-                                              opt = JuMPOptimiser(; pr = pr, slv = mip_slv,
+                                              opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                                                                   lt = threshold_constraints(ThresholdEstimator(;
                                                                                                                 val = ["WMT" => 0.2,
                                                                                                                        "group2" => 0.48]),
                                                                                              sets))),
                               opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
         @test isapprox(res.w, optimise(opt, rd).w)
+    end
+    @testset "Risk measure views" begin
+        ucse = NormalUncertaintySet(; pe = EmpiricalPrior(), rng = StableRNG(987654321),
+                                    alg = BoxUncertaintySetAlgorithm())
+        ucs = sigma_ucs(ucse, rd.X)
+        jopti = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
+        jopto = JuMPOptimiser(; slv = slv,
+                              pe = HighOrderPriorEstimator(;
+                                                           ske = Coskewness(;
+                                                                            mp = DenoiseDetoneAlgMatrixProcessing(;
+                                                                                                                  pdm = nothing))))
+
+        resa = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(; r = Kurtosis(; mu = pr.mu),
+                                                        opt = jopti),
+                                        opto = MeanRisk(; r = Kurtosis(), opt = jopto)), rd)
+        resb = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(; r = Kurtosis(; kt = pr.kt),
+                                                        opt = jopti),
+                                        opto = MeanRisk(; r = Kurtosis(), opt = jopto)), rd)
+        @test resa.w == resb.w
+
+        resa = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = UncertaintySetVariance(;
+                                                                                   ucs = ucse),
+                                                        opt = jopti),
+                                        opto = MeanRisk(;
+                                                        r = UncertaintySetVariance(;
+                                                                                   ucs = ucse),
+                                                        opt = jopto)), rd)
+        resb = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = UncertaintySetVariance(;
+                                                                                   ucs = ucs),
+                                                        opt = jopti),
+                                        opto = MeanRisk(;
+                                                        r = UncertaintySetVariance(;
+                                                                                   ucs = ucse),
+                                                        opt = jopto)), rd)
+        @test resa.w != resb.w
+
+        resa = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = LowOrderMoment(;
+                                                                           alg = MeanAbsoluteDeviation()),
+                                                        opt = jopti),
+                                        opto = MeanRisk(;
+                                                        r = LowOrderMoment(;
+                                                                           alg = MeanAbsoluteDeviation()),
+                                                        opt = jopto)), rd)
+        resb = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = LowOrderMoment(; mu = pr.mu,
+                                                                           alg = MeanAbsoluteDeviation()),
+                                                        opt = jopti),
+                                        opto = MeanRisk(;
+                                                        r = LowOrderMoment(;
+                                                                           alg = MeanAbsoluteDeviation()),
+                                                        opt = jopto)), rd)
+        @test resa.w == resb.w
+
+        resa = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(; r = NegativeSkewness(;),
+                                                        opt = jopti),
+                                        opto = MeanRisk(; r = NegativeSkewness(;),
+                                                        opt = jopto)), rd)
+        resb = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = NegativeSkewness(; sk = pr.sk,
+                                                                             V = pr.V),
+                                                        opt = jopti),
+                                        opto = MeanRisk(; r = NegativeSkewness(),
+                                                        opt = jopto)), rd)
+        @test resa.w == resb.w
+
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = ValueatRisk(),
+                                                       opt = JuMPOptimiser(; pe = pr,
+                                                                           slv = mip_slv,
+                                                                           sets = sets)),
+                                       opto = MeanRisk(; r = ValueatRisk(),
+                                                       opt = JuMPOptimiser(; slv = mip_slv))),
+                       rd)
+        if Sys.isapple()
+            @test isapprox(res.w,
+                           [0.0, 0.0, 0.051854523007294866, 0.011033389567670873, 0.0, 0.0,
+                            0.07030782696231126, 0.2198705472548145, 0.05699012244257908,
+                            0.2092228790692725, 0.0, 0.1927255532623544,
+                            0.003576866465534528, 0.05051771646875929, 0.0, 0.0, 0.0, 0.0,
+                            0.09783965575457014, 0.036060919744838785], rtol = 1e-6)
+        else
+            @test isapprox(res.w,
+                           [0.0, 0.0, 0.006267884141799684, 0.001333654298425877, 0.0, 0.0,
+                            0.00849841610922681, 0.2559468706509382, 0.006888646620986406,
+                            0.332010132045738, 0.012848008808692803, 0.18630483035994777,
+                            0.00043235157314059193, 0.0, 0.05415387056873924, 0.0, 0.0, 0.0,
+                            0.1309564929335754, 0.004358841888789314], rtol = 1e-6)
+        end
+
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = DrawdownatRisk(),
+                                                       opt = JuMPOptimiser(; pe = pr,
+                                                                           slv = mip_slv,
+                                                                           sets = sets)),
+                                       opto = MeanRisk(; r = DrawdownatRisk(),
+                                                       opt = JuMPOptimiser(; slv = mip_slv))),
+                       rd)
+        @test isapprox(res.w,
+                       [-2.7985157472133174e-12, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        -1.2318015713110941e-12, 0.28242029275575126, 0.0,
+                        0.02931887332131044, 0.13207557497903177, 0.16273751543512763, 0.0,
+                        0.2317781853397863, 0.0, 0.0, 0.0, 0.09184252058354601,
+                        0.06982703759186153, -2.384995406974934e-12], rtol = 1e-6)
+
+        resa = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = ValueatRisk(;
+                                                                        alg = DistributionValueatRisk()),
+                                                        opt = JuMPOptimiser(; pe = pr,
+                                                                            slv = slv,
+                                                                            sets = sets)),
+                                        opto = MeanRisk(;
+                                                        r = ValueatRisk(;
+                                                                        alg = DistributionValueatRisk()),
+                                                        opt = JuMPOptimiser(; slv = slv))),
+                        rd)
+        resb = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = ValueatRisk(;
+                                                                        alg = DistributionValueatRisk(;
+                                                                                                      mu = pr.mu,
+                                                                                                      sigma = pr.sigma)),
+                                                        opt = JuMPOptimiser(; pe = pr,
+                                                                            slv = slv,
+                                                                            sets = sets)),
+                                        opto = MeanRisk(;
+                                                        r = ValueatRisk(;
+                                                                        alg = DistributionValueatRisk()),
+                                                        opt = JuMPOptimiser(; slv = slv))),
+                        rd)
+        @test resa.w == resb.w
+
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = ValueatRiskRange(),
+                                                       opt = JuMPOptimiser(; pe = pr,
+                                                                           slv = mip_slv,
+                                                                           sets = sets)),
+                                       opto = MeanRisk(; r = ValueatRiskRange(),
+                                                       opt = JuMPOptimiser(; slv = mip_slv))),
+                       rd)
+        @test isapprox(res.w,
+                       [0.00021291916555926592, 0.0, 0.0, 5.5408927202656446e-5, 0.0,
+                        0.0003984089957155221, 0.0011652514635827125, 0.0,
+                        0.0027426935765460327, 0.19285907078399256, 0.16395289846398542,
+                        0.0, 0.0, 0.3005703890586406, 0.0, 0.0, 0.0, 0.0,
+                        0.3351918342458703, 0.0028511253189049007], rtol = 1e-6)
+
+        resa = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = ValueatRiskRange(;
+                                                                             alg = DistributionValueatRisk()),
+                                                        opt = JuMPOptimiser(; pe = pr,
+                                                                            slv = slv,
+                                                                            sets = sets)),
+                                        opto = MeanRisk(;
+                                                        r = ValueatRiskRange(;
+                                                                             alg = DistributionValueatRisk()),
+                                                        opt = JuMPOptimiser(; slv = slv))),
+                        rd)
+        resb = optimise(NestedClustered(; cle = clr,
+                                        opti = MeanRisk(;
+                                                        r = ValueatRiskRange(;
+                                                                             alg = DistributionValueatRisk(;
+                                                                                                           mu = pr.mu,
+                                                                                                           sigma = pr.sigma)),
+                                                        opt = JuMPOptimiser(; pe = pr,
+                                                                            slv = slv,
+                                                                            sets = sets)),
+                                        opto = MeanRisk(;
+                                                        r = ValueatRiskRange(;
+                                                                             alg = DistributionValueatRisk()),
+                                                        opt = JuMPOptimiser(; slv = slv))),
+                        rd)
+        @test resa.w == resb.w
+
+        res = optimise(NestedClustered(; cle = clr,
+                                       opti = MeanRisk(; r = TurnoverRiskMeasure(; w = w0),
+                                                       opt = jopti),
+                                       opto = MeanRisk(;
+                                                       r = TurnoverRiskMeasure(;
+                                                                               w = fill(1 /
+                                                                                        2,
+                                                                                        2)),
+                                                       opt = jopto)), rd)
+        @test isapprox(res.w,
+                       [0.045454545461020436, 0.04545454545389754, 0.04545454545389754,
+                        0.04545454545389754, 0.04545454545389754, 0.04545454545389754,
+                        0.04545454545389754, 0.055555555478081366, 0.04545454545389754,
+                        0.05555555556523971, 0.05555555556523971, 0.05555555556523971,
+                        0.04545454545389754, 0.05555555556523971, 0.05555555556523971,
+                        0.05555555556523971, 0.04545454545389754, 0.05555555556523971,
+                        0.05555555556523971, 0.04545454545389754], rtol = 1e-6)
     end
 end

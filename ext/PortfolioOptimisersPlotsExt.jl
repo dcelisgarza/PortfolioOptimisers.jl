@@ -1,6 +1,6 @@
 module PortfolioOptimisersPlotsExt
 
-using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
+using PortfolioOptimisers, StatsPlots, GraphRecipes, LinearAlgebra, Statistics, StatsBase,
       Clustering, Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Slv_VecSlv,
@@ -324,12 +324,12 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum,
                                            pr::PortfolioOptimisers.AbstractPriorResult,
                                            fees::Option{<:Fees} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
-                                           y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
+                                           y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
                                            z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
-                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskRatioRiskMeasure(;
-                                                                                                                       rk = x,
-                                                                                                                       rt = ArithmeticReturn(),
-                                                                                                                       rf = 0),
+                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(;
+                                                                                                                    rk = x,
+                                                                                                                    rt = ArithmeticReturn(),
+                                                                                                                    rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            flag::Bool = true,
                                            kwargs::NamedTuple = (title = "Pareto Frontier",

@@ -155,6 +155,7 @@ Abstract supertype for all prior result types.
 """
 abstract type AbstractPriorResult <: AbstractResult end
 const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 
@@ -236,7 +237,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - [`AbstractPriorResult`](@ref)
   - [`clusterise`](@ref)
 """
-function clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
+function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
 """
@@ -397,7 +398,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - `pl`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
   - `w`: Portfolio weights vector.
   - `pr`: Prior result object containing asset returns.
-  - `dims`: Dimension along which to compute the phylogeny matrix.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
 
 # Returns

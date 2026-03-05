@@ -11,7 +11,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
                                                scai::Scalariser, scao::Scalariser,
                                                ex::FLoops.Transducers.Executor,
-                                               fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                                               fb::Option{<:OptE_Opt})
         if isa(ri, AbstractVector)
             @argcheck(!isempty(ri))
         end
@@ -29,11 +29,25 @@ function HierarchicalEqualRiskContribution(;
                                            scai::Scalariser = SumScalariser(),
                                            scao::Scalariser = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                           fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                                           fb::Option{<:OptE_Opt} = nothing)
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
+function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
+    return (needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.ri) ||
+            needs_previous_weights(opt.ro) ||
+            needs_previous_weights(opt.fb))
+end
+function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
+    opt = factory(hec.opt, w)
+    ri = factory(hec.ri, w)
+    ro = factory(hec.ro, w)
+    fb = factory(hec.fb, w)
+    return HierarchicalEqualRiskContribution(; opt = opt, ri = ri, ro = ro, scai = hec.scai,
+                                             scao = hec.scao, ex = hec.ex, fb = fb)
+end
 function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
-    X = isa(hec.opt.pr, AbstractPriorResult) ? hec.opt.pr.X : X
+    X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro
     if ri === ro
@@ -471,8 +485,8 @@ end
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
-    pr = prior(hec.opt.pr, rd; dims = dims)
-    clr = clusterise(hec.opt.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    pr = prior(hec.opt.pe, rd; dims = dims)
+    clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     idx = get_clustering_indices(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

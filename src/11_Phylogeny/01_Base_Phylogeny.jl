@@ -38,9 +38,9 @@ All concrete and/or abstract types representing the result of a phylogeny estima
 """
 abstract type AbstractPhylogenyResult <: AbstractResult end
 const PlE_Pl = Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult}
-function factory(pl::PlE_Pl, args...)
+function factory(pl::PlE_Pl, args...; kwargs...)
     return pl
 end
-function factory(alg::AbstractPhylogenyAlgorithm, args...)
+function factory(alg::AbstractPhylogenyAlgorithm, args...; kwargs...)
     return alg
 end

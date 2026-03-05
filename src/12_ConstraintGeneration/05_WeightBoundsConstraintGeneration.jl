@@ -169,6 +169,12 @@ struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
         if isa(ub, Dict_Vec)
             @argcheck(!isempty(ub), IsEmptyError)
         end
+        if isa(lb, VecNum) && isa(ub, VecNum)
+            @argcheck(length(lb) == length(ub))
+            validate_bounds(lb, ub)
+        elseif isa(lb, Num_VecNum) && isa(ub, Num_VecNum)
+            validate_bounds(lb, ub)
+        end
         if !isnothing(dlb) && !isnothing(dub)
             @argcheck(dlb <= dub)
         end

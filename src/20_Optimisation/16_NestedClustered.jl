@@ -12,12 +12,12 @@ struct NestedClusteredResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     w::T10
     fb::T11
 end
-function factory(res::NestedClusteredResult, fb)
+function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
     return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
                                  res.reso, res.cv, res.retcode, res.w, fb)
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
-    @argcheck(!isa(opt.opt.clr, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
 function assert_rc_variance(::Any)
@@ -34,21 +34,31 @@ function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)
     end
     return nothing
 end
+function assert_rc_pl(::Any)
+    return nothing
+end
+function assert_rc_pl(opt::FactorRiskContribution)
+    @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) ||
+              isa(opt.frc_ple, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple))
+    return nothing
+end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_rc_variance(opt)
-    @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
-                isa(opt.opt.lcs, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
-    @argcheck(!(isa(opt.opt.ct, LinearConstraint) ||
-                isa(opt.opt.ct, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.ct)))
-    @argcheck(!isa(opt.opt.gcard, LinearConstraint))
-    @argcheck(!(isa(opt.opt.sgcard, LinearConstraint) ||
-                isa(opt.opt.sgcard, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.sgcard)))
-    @argcheck(!isa(opt.opt.pl, AbstractPhylogenyConstraintResult) ||
-              isa(opt.opt.pl, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.pl))
+    assert_rc_pl(opt)
+    @argcheck(!(isa(opt.opt.lcse, LinearConstraint) ||
+                isa(opt.opt.lcse, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.lcse)))
+    @argcheck(!(isa(opt.opt.cte, LinearConstraint) ||
+                isa(opt.opt.cte, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.cte)))
+    @argcheck(!isa(opt.opt.gcarde, LinearConstraint))
+    @argcheck(!(isa(opt.opt.sgcarde, LinearConstraint) ||
+                isa(opt.opt.sgcarde, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.sgcarde)))
+    @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) ||
+              isa(opt.opt.ple, AbstractVector) &&
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple))
     return nothing
 end
 function assert_internal_optimiser(opt::VecOptE_Opt)
@@ -57,20 +67,30 @@ function assert_internal_optimiser(opt::VecOptE_Opt)
 end
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pr, AbstractPriorResult))
-    @argcheck(!isa(opt.opt.clr, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pr, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    assert_internal_optimiser(opt)
+    return nothing
+end
+const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
+function assert_external_optimiser(opt::RiskBudgetingOptimiser)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    if isa(opt.rba, FactorRiskBudgeting)
+        @argcheck(!isa(opt.rba.re, AbstractRegressionResult))
+    end
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::FactorRiskContribution)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pr, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
     @argcheck(!isa(opt.re, AbstractRegressionResult))
     assert_internal_optimiser(opt)
     return nothing
@@ -81,8 +101,8 @@ function assert_external_optimiser(opt::VecOptE_Opt)
 end
 struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
        ClusteringOptimisationEstimator
-    pr::T1
-    clr::T2
+    pe::T1
+    cle::T2
     wb::T3
     fees::T4
     sets::T5
@@ -93,16 +113,21 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     strict::T10
     ex::T11
     fb::T12
-    function NestedClustered(pr::PrE_Pr, clr::ClE_Cl, wb::Option{<:WbE_Wb},
+    function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
                              opti::NonFiniteAllocationOptimisationEstimator,
                              opto::NonFiniteAllocationOptimisationEstimator,
-                             cv::Option{<:CrossValidationEstimator}, wf::WeightFinaliser,
+                             cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
                              strict::Bool, ex::FLoops.Transducers.Executor,
-                             fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                             fb::Option{<:OptE_Opt})
         assert_external_optimiser(opto)
+        assert_special_nco_requirements(opto)
         if !(opti === opto)
             assert_internal_optimiser(opti)
+            assert_special_nco_requirements(opti)
+        end
+        if !isnothing(cv)
+            assert_external_optimiser(opti)
         end
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -110,27 +135,27 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(sets),
+        return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(strict),
-                   typeof(ex), typeof(fb)}(pr, clr, wb, fees, sets, opti, opto, cv, wf,
+                   typeof(ex), typeof(fb)}(pe, cle, wb, fees, sets, opti, opto, cv, wf,
                                            strict, ex, fb)
     end
 end
-function NestedClustered(; pr::PrE_Pr = EmpiricalPrior(), clr::ClE_Cl = ClustersEstimator(),
+function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = ClustersEstimator(),
                          wb::Option{<:WbE_Wb} = nothing,
                          fees::Option{<:FeesE_Fees} = nothing,
                          sets::Option{<:AssetSets} = nothing,
                          opti::NonFiniteAllocationOptimisationEstimator,
                          opto::NonFiniteAllocationOptimisationEstimator,
-                         cv::Option{<:CrossValidationEstimator} = nothing,
+                         cv::Option{<:OptimisationCrossValidation} = nothing,
                          wf::WeightFinaliser = IterativeWeightFinaliser(),
                          strict::Bool = false,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
-    return NestedClustered(pr, clr, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
+                         fb::Option{<:OptE_Opt} = nothing)
+    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
 end
 function assert_internal_optimiser(opt::NestedClustered)
-    @argcheck(!isa(opt.clr, AbstractClusteringResult))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_internal_optimiser(opt.opti)
@@ -139,23 +164,41 @@ function assert_internal_optimiser(opt::NestedClustered)
 end
 function assert_external_optimiser(opt::NestedClustered)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pr, AbstractPriorResult))
-    @argcheck(!isa(opt.clr, AbstractClusteringResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
+    if !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
     end
     return nothing
 end
+function needs_previous_weights(opt::NestedClustered)
+    return (needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.opti) ||
+            needs_previous_weights(opt.opto) ||
+            needs_previous_weights(opt.fb))
+end
+function factory(nco::NestedClustered, w::AbstractVector)
+    fees = factory(nco.fees, w)
+    opti = factory(nco.opti, w)
+    opto = factory(nco.opto, w)
+    fb = factory(nco.fb, w)
+    return NestedClustered(; pe = nco.pe, cle = nco.cle, wb = nco.wb, fees = fees,
+                           sets = nco.sets, opti = opti, opto = opto, cv = nco.cv,
+                           wf = nco.wf, strict = nco.strict, ex = nco.ex, fb = fb)
+end
 function opt_view(nco::NestedClustered, i, X::MatNum)
-    X = isa(nco.pr, AbstractPriorResult) ? nco.pr.X : X
-    pr = prior_view(nco.pr, i)
+    X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
+    pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
     fees = fees_view(nco.fees, i)
     sets = nothing_asset_sets_view(nco.sets, i)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
-    return NestedClustered(; pr = pr, clr = nco.clr, wb = wb, fees = fees, sets = sets,
+    return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf,
                            strict = nco.strict, ex = nco.ex, fb = nco.fb)
 end
@@ -190,9 +233,20 @@ Overload this using nco.cv for custom cross-validation prediction
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
-    iv = isnothing(rd.iv) ? rd.iv : rd.iv * wi
-    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Number)) ? rd.ivpa : transpose(wi) * rd.ivpa
-    X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
+    iv = rd.iv
+    ivpa = rd.ivpa
+    iv_flag = !isnothing(iv)
+    ivpa_flag = isa(ivpa, AbstractVector)
+    if iv_flag || ivpa_flag
+        wi = abs.(wi)
+        if iv_flag
+            iv = iv * wi
+        end
+        if ivpa_flag
+            ivpa = transpose(wi) * ivpa
+        end
+    end
+    X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)
         feesi = fees_view(fees, cl)
@@ -201,11 +255,75 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          ts = rd.ts, iv = iv, ivpa = ivpa)
 end
+function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::Integer)
+    iv_flag = !isnothing(rd.iv)
+    ivpa_flag = !isnothing(rd.ivpa)
+    rd1 = predictions[1].mrd
+    X = rd1.X
+    iv = rd1.iv
+    ivpa = ivpa_flag ? [rd1.ivpa] : nothing
+    @inbounds for i in 2:length(predictions)
+        rdi = predictions[i].mrd
+        append!(X, rdi.X)
+        if iv_flag
+            append!(iv, rdi.iv)
+        end
+        if ivpa_flag
+            push!(ivpa, rdi.ivpa)
+        end
+    end
+    X = reshape(X, :, N)
+    iv = iv_flag ? reshape(iv, :, N) : nothing
+    return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
+                         ts = rd1.ts, iv = iv, ivpa = ivpa)
+end
+function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
+                                                                  <:Any, <:Any, <:Any,
+                                                                  <:Any,
+                                                                  <:OptimisationCrossValidation{<:NonCombOptCV}},
+                                             rd::ReturnsResult, pr::AbstractPriorResult,
+                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
+                                             cls::VecVecInt)
+    (; opti, cv, ex) = nco
+    cv = cv.cv
+    N = length(cls)
+    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    let cv = cv
+        FLoops.@floop ex for (i, cl) in enumerate(cls)
+            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
+        end
+    end
+    return rebuild_returns_result(rd, predictions, N)
+end
+function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
+                                                                  <:Any, <:Any, <:Any,
+                                                                  <:Any,
+                                                                  <:OptimisationCrossValidation{<:CombinatorialCrossValidation}},
+                                             rd::ReturnsResult, pr::AbstractPriorResult,
+                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
+                                             cls::VecVecInt)
+    (; opti, cv, ex) = nco
+    (; cv, score) = cv
+    N = length(cls)
+    predictions = Vector{PopulationPredictionResult}(undef, N)
+    let cv = cv
+        FLoops.@floop ex for (i, cl) in enumerate(cls)
+            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
+        end
+    end
+    if isnothing(score)
+        score = NearestQuantilePrediction()
+    end
+    best_predictions = [score(prediction) for prediction in predictions]
+    return rebuild_returns_result(rd, best_predictions, N)
+end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
-    pr = prior(nco.pr, rd; dims = dims)
-    clr = clusterise(nco.clr, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    pr = prior(nco.pe, rd; dims = dims)
+    clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(pr.X),
                             strict = nco.strict)

@@ -1,6 +1,14 @@
 function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :GV)
-        G = LinearAlgebra.cholesky(pr.V).U
+        G = try
+            LinearAlgebra.cholesky(pr.V).U
+        catch err
+            if isa(err, LinearAlgebra.PosDefException)
+                sqrt(pr.V)
+            else
+                rethrow(err)
+            end
+        end
         JuMP.@expression(model, GV, G)
     end
     return model[:GV]

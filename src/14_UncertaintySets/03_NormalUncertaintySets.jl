@@ -1,11 +1,12 @@
 """
-    struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6} <: AbstractUncertaintySetEstimator
+    struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: AbstractUncertaintySetEstimator
         pe::T1
         alg::T2
         n_sim::T3
         q::T4
         rng::T5
         seed::T6
+        ens::T7
     end
 
 Estimator for box or ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
@@ -18,14 +19,15 @@ Estimator for box or ellipsoidal uncertainty sets under the assumption of normal
   - `q`: Quantile or confidence level for uncertainty set bounds.
   - `rng`: Random number generator for simulation.
   - `seed`: Optional random seed for reproducibility.
+  - `ens`: Optional effective number of scenarios used for scaling the uncertainty sets.
 
 # Constructors
 
-    NormalUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+    NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                          alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                          n_sim::Integer = 3_000, q::Number = 0.05,
                          rng::Random.AbstractRNG = Random.default_rng(),
-                         seed::Option{<:Integer} = nothing)
+                         seed::Option{<:Integer} = nothing, ens::Option{<:Number} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -43,27 +45,31 @@ NormalUncertaintySet
         │        ce ┼ PortfolioOptimisersCovariance
         │           │   ce ┼ Covariance
         │           │      │    me ┼ SimpleExpectedReturns
-        │           │      │       │   w ┴ nothing
+        │           │      │       │     w ┼ nothing
+        │           │      │       │   idx ┴ nothing
         │           │      │    ce ┼ GeneralCovariance
-        │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │           │      │       │    w ┴ nothing
+        │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │           │      │       │     w ┼ nothing
+        │           │      │       │   idx ┴ nothing
         │           │      │   alg ┴ Full()
         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
         │           │      │     pdm ┼ Posdef
-        │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton  
+        │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
         │           │      │      dn ┼ nothing
         │           │      │      dt ┼ nothing
         │           │      │     alg ┼ nothing
         │           │      │   order ┴ DenoiseDetoneAlg()
         │        me ┼ SimpleExpectedReturns
-        │           │   w ┴ nothing
+        │           │     w ┼ nothing
+        │           │   idx ┴ nothing
         │   horizon ┴ nothing
     alg ┼ BoxUncertaintySetAlgorithm()
   n_sim ┼ Int64: 3000
       q ┼ Float64: 0.05
     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-   seed ┴ nothing
+   seed ┼ nothing
+    ens ┴ nothing
 ```
 
 # Related
@@ -74,29 +80,31 @@ NormalUncertaintySet
   - [`BoxUncertaintySetAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 """
-struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6} <: AbstractUncertaintySetEstimator
+struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: AbstractUncertaintySetEstimator
     pe::T1
     alg::T2
     n_sim::T3
     q::T4
     rng::T5
     seed::T6
-    function NormalUncertaintySet(pe::AbstractPriorEstimator,
+    ens::T7
+    function NormalUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                   q::Number, rng::Random.AbstractRNG,
-                                  seed::Option{<:Integer})
+                                  seed::Option{<:Integer}, ens::Option{<:Number})
         @argcheck(zero(n_sim) < n_sim)
         @argcheck(zero(q) < q < one(q))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
-                   typeof(seed)}(pe, alg, n_sim, q, rng, seed)
+                   typeof(seed), typeof(ens)}(pe, alg, n_sim, q, rng, seed, ens)
     end
 end
-function NormalUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                               alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                               n_sim::Integer = 3_000, q::Number = 0.05,
                               rng::Random.AbstractRNG = Random.default_rng(),
-                              seed::Option{<:Integer} = nothing)
-    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed)
+                              seed::Option{<:Integer} = nothing,
+                              ens::Option{<:Number} = nothing)
+    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens)
 end
 """
     commutation_matrix(X::MatNum)
@@ -154,6 +162,15 @@ function commutation_matrix(X::MatNum)
     data = range(1, 1; length = mn)
     return SparseArrays.sparse(row, col, data, mn, mn)
 end
+function choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
+    return if !isnothing(ue.ens)
+        ue.ens
+    elseif !isnothing(pr.ens)
+        pr.ens
+    else
+        size(pr.X, 1)
+    end
+end
 """
     ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
         X::MatNum,
@@ -166,7 +183,7 @@ Constructs box uncertainty sets for mean and covariance statistics under the ass
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -194,7 +211,8 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
                                       <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    T, N = size(pr.X)
+    N = size(pr.X, 2)
+    T = choose_scaling_parameter(ue, pr)
     sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
@@ -233,7 +251,7 @@ Constructs a box uncertainty set for expected returns under the assumption of no
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -259,10 +277,11 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
                                          <:Any}, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
+    T = choose_scaling_parameter(ue, pr)
     sigma = pr.sigma
     q = ue.q * 0.5
     mu_u = Distributions.cquantile(Distributions.Normal(), q) *
-           sqrt.(LinearAlgebra.diag(sigma / size(pr.X, 1))) *
+           sqrt.(LinearAlgebra.diag(sigma / T)) *
            2
     mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = size(pr.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
@@ -279,7 +298,7 @@ Constructs a box uncertainty set for covariance under the assumption of normally
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -306,7 +325,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
                                             <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    T, N = size(pr.X)
+    N = size(pr.X, 2)
+    T = choose_scaling_parameter(ue, pr)
     sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
@@ -342,7 +362,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -373,8 +393,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                                       <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, mu, sigma) = pr
-    T, N = size(X)
+    (; mu, sigma) = pr
+    N = size(pr.X, 2)
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if !isnothing(ue.seed)
@@ -415,7 +436,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -447,8 +468,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                                       <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T = size(X, 1)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
@@ -477,7 +498,7 @@ Constructs ellipsoidal uncertainty sets for expected returns and covariance stat
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -507,8 +528,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                                       <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T = size(X, 1)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
@@ -539,7 +560,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -568,8 +589,8 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
                                          <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, mu, sigma) = pr
-    T = size(X, 1)
+    (; mu, sigma) = pr
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if !isnothing(ue.seed)
@@ -597,7 +618,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -627,8 +648,8 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
                                          <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T = size(X, 1)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if ue.alg.diagonal
@@ -652,7 +673,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -681,8 +702,8 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
                                          <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T = size(X, 1)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if ue.alg.diagonal
@@ -706,7 +727,7 @@ Constructs an ellipsoidal uncertainty set for covariance under the assumption of
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -736,8 +757,9 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T, N = size(X)
+    sigma = pr.sigma
+    N = size(pr.X, 2)
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     if !isnothing(ue.seed)
@@ -773,7 +795,7 @@ Constructs an ellipsoidal uncertainty set for covariance under the assumption of
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -804,8 +826,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T = size(X, 1)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
@@ -831,7 +853,7 @@ Constructs an ellipsoidal uncertainty set for covariance under the assumption of
   - `ue`: Normal uncertainty set estimator.
   - `X`: Data matrix.
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -861,8 +883,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    (; X, sigma) = pr
-    T = size(X, 1)
+    sigma = pr.sigma
+    T = choose_scaling_parameter(ue, pr)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)

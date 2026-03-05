@@ -211,17 +211,17 @@ slv = [Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false, "max_step_fraction" => 0.7))]
 
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[2], slv = slv,
+        JuMPOptimiser(; pe = prs[2], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[3], slv = slv,
+        JuMPOptimiser(; pe = prs[3], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[4], slv = slv,
+        JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[5], slv = slv,
+        JuMPOptimiser(; pe = prs[5], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[6], slv = slv,
+        JuMPOptimiser(; pe = prs[6], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 ## Mean-Risk estimators using the variance.
@@ -233,7 +233,7 @@ ress = optimise.(mrs)
 #=
 Let's plot the efficient frontiers.
 =#
-using GraphRecipes, StatsPlots
+using StatsPlots, GraphRecipes
 
 r = Variance()
 # Vanilla sigma and mu.
@@ -242,9 +242,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
                                         title = "Vanilla sigma and mu",
                                         legend = :outerright))
 # Vanilla sigma and mu.
-plot_measures(ress[1].w, prs[1]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[1]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Vanilla sigma and mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -255,9 +254,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                                         title = "Fixed denoise sigma and BS(VW) mu",
                                         legend = :outerright))
 # Fixed denoise covariance.
-plot_measures(ress[2].w, prs[2]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[2]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed denoise sigma and BS(VW) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -268,9 +266,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                                         title = "LoGo(MaxDist) sigma and BS(MSE) mu",
                                         legend = :outerright))
 # LoGo(MaxDist) covariance.
-plot_measures(ress[3].w, prs[3]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[3]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "LoGo(MaxDist) sigma and BS(MSE) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -281,9 +278,8 @@ plot_stacked_area_composition(ress[4].w, rd.nx;
                                         title = "Shrunk denoise (0.5) sigma and BOP(GM) mu",
                                         legend = :outerright))
 # Shrunk denoise (0.5) covariance.
-plot_measures(ress[4].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[4].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[4].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[4].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[4].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[4].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Shrunk denoise (0.5) sigma and BOP(GM) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -295,9 +291,8 @@ plot_stacked_area_composition(ress[5].w, rd.nx;
                                         legend = :outerright))
 
 # Fixed denoise + LoGo(MaxDist) sigma and BOP(VW) mu.
-plot_measures(ress[5].w, prs[5]; x = r, y = ReturnRiskMeasure(; rt = ress[5].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[5].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[5].w, prs[5]; x = r, y = ExpectedReturn(; rt = ress[5].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[5].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed denoise + LoGo(MaxDist) sigma and BOP(VW) mu",
               xlabel = "Variance", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
@@ -308,9 +303,8 @@ plot_stacked_area_composition(ress[6].w, rd.nx;
                                         title = "LoGo(ExpDist) sigma and BOP(MSE) mu",
                                         legend = :outerright))
 # LoGo(ExpDist) sigma and BOP(MSE) mu.
-plot_measures(ress[6].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[6].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[6].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[6].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[6].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[6].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "LoGo(ExpDist) sigma and BOP(MSE) mu", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -318,9 +312,9 @@ plot_measures(ress[6].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[6].ret
 #=
 This example is a nice way to show how sensitive moment-based optimisations are to the moment estimation. For now, let's examine how the maximum risk return ratio portfolios differ. An actual analysis would isolate the effect of the covariance and expected returns separately, the point of this example is to show how different ways to improve their estimation and how much the results can be affected by them.
 =#
-opts = [JuMPOptimiser(; pr = prs[1], slv = slv), JuMPOptimiser(; pr = prs[2], slv = slv),
-        JuMPOptimiser(; pr = prs[3], slv = slv), JuMPOptimiser(; pr = prs[4], slv = slv),
-        JuMPOptimiser(; pr = prs[5], slv = slv), JuMPOptimiser(; pr = prs[6], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[1], slv = slv), JuMPOptimiser(; pe = prs[2], slv = slv),
+        JuMPOptimiser(; pe = prs[3], slv = slv), JuMPOptimiser(; pe = prs[4], slv = slv),
+        JuMPOptimiser(; pe = prs[5], slv = slv), JuMPOptimiser(; pe = prs[6], slv = slv)]
 
 ## Mean-Risk estimators using the variance.
 mrs = [MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt) for opt in opts]
@@ -341,11 +335,11 @@ Portfolios that emphasise expected returns are more sensitive to the expected re
 =#
 
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[5], slv = slv,
+        JuMPOptimiser(; pe = prs[5], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[6], slv = slv,
+        JuMPOptimiser(; pe = prs[6], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 r = NegativeSkewness()
@@ -365,9 +359,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
                                         title = "Vanilla V and BOP(GM) mu",
                                         legend = :outerright))
 # Vanilla V and BOP(GM) mu.
-plot_measures(ress[1].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Vanilla V and BOP(GM) mu", xlabel = "Negative Skewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -378,9 +371,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                                         title = "Fixed Denoise V and BOP(VW) mu",
                                         legend = :outerright))
 # Fixed Denoise V and BOP(VW) mu.
-plot_measures(ress[2].w, prs[5]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[5]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed Denoise V and BOP(VW) mu", xlabel = "Negative Skewness",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -391,9 +383,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                                         title = "Shrunk(0) Denoise + LoGo(MaxDist) V and BOP(MSE) mu",
                                         legend = :outerright))
 # Shrunk(0) Denoise + LoGo(MaxDist) V and BOP(MSE) mu.
-plot_measures(ress[3].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Shrunk(0) Denoise + LoGo(MaxDist) V and BOP(MSE) mu",
               xlabel = "Negative Skewness", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
@@ -402,8 +393,8 @@ In this case we can se that in this case, these techniques denoising and sparsif
 
 Now let's examine how the maximum risk return ratio portfolios differ.
 =#
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[5], slv = slv),
-        JuMPOptimiser(; pr = prs[6], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[5], slv = slv),
+        JuMPOptimiser(; pe = prs[6], slv = slv)]
 
 ## Mean-Risk estimators using the Negative Skewness.
 mrs = [MeanRisk(; r = r, obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt)
@@ -424,11 +415,11 @@ Finally, we will see how the cokurtosis estimation improvements affect the mean-
 =#
 
 ## JuMP Optimsiers, we will compute the efficient frontier with 50 points for all of them.
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv,
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[5], slv = slv,
+        JuMPOptimiser(; pe = prs[5], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50))),
-        JuMPOptimiser(; pr = prs[6], slv = slv,
+        JuMPOptimiser(; pe = prs[6], slv = slv,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)))]
 
 r = Kurtosis()
@@ -448,9 +439,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
                                         title = "Vanilla kt and BOP(GM) mu",
                                         legend = :outerright))
 # Vanilla kt and BOP(GM) mu.
-plot_measures(ress[1].w, prs[4]; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, prs[4]; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Vanilla kt and BOP(GM) mu", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -461,9 +451,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                                         title = "Fixed Denoise kt and BOP(VW) mu",
                                         legend = :outerright))
 # Fixed Denoise kt and BOP(VW) mu.
-plot_measures(ress[2].w, prs[5]; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[2].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, prs[5]; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[2].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Fixed Denoise kt and BOP(VW) mu", xlabel = "Kurtosis",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -474,9 +463,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                                         title = "Shrunk(0) Denoise + LoGo(MaxDist) kt and BOP(MSE) mu",
                                         legend = :outerright))
 # Shrunk(0) Denoise + LoGo(MaxDist) kt and BOP(MSE) mu.
-plot_measures(ress[3].w, prs[6]; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[3].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, prs[6]; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[3].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Shrunk(0) Denoise + LoGo(MaxDist) kt and BOP(MSE) mu",
               xlabel = "Kurtosis", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
@@ -485,8 +473,8 @@ Again, the efficient frontier is smoother, but the kurtosis is inherently less s
 
 Finally let's see what the maximum risk return ratio portfolios look like.
 =#
-opts = [JuMPOptimiser(; pr = prs[4], slv = slv), JuMPOptimiser(; pr = prs[5], slv = slv),
-        JuMPOptimiser(; pr = prs[6], slv = slv)]
+opts = [JuMPOptimiser(; pe = prs[4], slv = slv), JuMPOptimiser(; pe = prs[5], slv = slv),
+        JuMPOptimiser(; pe = prs[6], slv = slv)]
 
 ## Mean-Risk estimators using the Kurtosis.
 mrs = [MeanRisk(; r = r, obj = MaximumRatio(; rf = 4.2 / 100 / 252), opt = opt)
@@ -500,7 +488,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla kt + BOP(GM) mu" => ress[1].w
              formatters = [resfmt])
 
 #=
-Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with cross validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures), or to impose constraints on the maximum risk without adding them to the objective function. There are also other ways of directly mitigating these instabilities, such as making use of:
+Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with grid search cross-validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures), or to impose constraints on the maximum risk without adding them to the objective function. There are also other ways of directly mitigating these instabilities, such as making use of:
 
 1. Estimators like [`Stacking`]-(@ref), [`NearOptimalCentering`]-(@ref), and [`NestedClusters`]-(@ref).
 2. Uncertainty sets for the expected returns and covariance matrices.

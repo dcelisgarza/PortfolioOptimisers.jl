@@ -73,10 +73,12 @@ FactorBlackLittermanPrior
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │   w ┴ nothing
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │    w ┴ nothing
+             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │     w ┼ nothing
+             │           │      │       │   idx ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -87,7 +89,8 @@ FactorBlackLittermanPrior
              │           │      │     alg ┼ nothing
              │           │      │   order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
-             │           │   w ┴ nothing
+             │           │     w ┼ nothing
+             │           │   idx ┴ nothing
              │   horizon ┴ nothing
         f_mp ┼ DenoiseDetoneAlgMatrixProcessing
              │     pdm ┼ Posdef
@@ -113,7 +116,8 @@ FactorBlackLittermanPrior
              │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
           ve ┼ SimpleVariance
              │          me ┼ SimpleExpectedReturns
-             │             │   w ┴ nothing
+             │             │     w ┼ nothing
+             │             │   idx ┴ nothing
              │           w ┼ nothing
              │   corrected ┴ Bool: true
        views ┼ LinearConstraintEstimator
@@ -220,7 +224,7 @@ Compute factor Black-Litterman prior moments for asset returns.
   - `pe`: Factor Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
-  - `dims`: Dimension along which to compute moments (`1` = columns/assets, `2` = rows). Default is `1`.
+  - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 

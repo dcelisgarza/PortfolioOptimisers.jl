@@ -72,7 +72,7 @@
                       DataFrame)
         r = factory(StandardDeviation(), pr, slv)
         for (i, alg) in enumerate(algs)
-            opt = JuMPOptimiser(; pr = pr, slv = slv)
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
             res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
@@ -109,7 +109,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedAssetRiskBudgeting2.csv.gz"),
                       DataFrame)
         for (i, alg) in enumerate(algs)
-            opt = JuMPOptimiser(; pr = pr, slv = slv)
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt,
                                       rba = AssetRiskBudgeting(;
                                                                rkb = RiskBudget(;
@@ -136,19 +136,19 @@
         end
 
         res = optimise(RelaxedRiskBudgeting(; wi = w0,
-                                            opt = JuMPOptimiser(; pr = pr,
+                                            opt = JuMPOptimiser(; pe = pr,
                                                                 slv = Solver(;
                                                                              solver = Clarabel.Optimizer,
                                                                              settings = ["verbose" => false,
                                                                                          "max_iter" => 1])),
-                                            fb = InverseVolatility(; pr = pr)))
-        @test isapprox(res.w, optimise(InverseVolatility(; pr = pr)).w)
+                                            fb = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         r = factory(StandardDeviation(), pr, slv)
         df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedFactorRiskBudgeting1.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pr = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
                             sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
                             wb = WeightBounds(; lb = nothing, ub = nothing))
         rr = regression(StepwiseRegression(), rd)

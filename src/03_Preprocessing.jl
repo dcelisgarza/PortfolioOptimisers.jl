@@ -229,6 +229,47 @@ function returns_result_view(rd::ReturnsResult, i)
                          ivpa = ivpa)
 end
 """
+    returns_result_view(rd::ReturnsResult, i, j)
+
+Return a view of the `ReturnsResult` object for the asset or factor at index `j` and observation(s) at index `i`.
+
+# Arguments
+
+  - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
+  - `i`: Index or indices of the observation(s) to view.
+  - `j`: Index or indices of the assets to view.
+
+# Returns
+
+  - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified indices.
+
+# Details
+
+  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for index `j` and observation(s) `i`.
+  - Preserves factor names and returns for the selected observation(s).
+  - Preserves timestamps for the selected observation(s).
+  - Returns `nothing` for fields that are not present in the original object.
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`returns_result_view`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+  - [`MatNum`](@ref)
+"""
+function returns_result_view(rd::ReturnsResult, i, j, k = :)
+    nx = nothing_scalar_array_view(rd.nx, j)
+    X = isnothing(rd.X) ? rd.X : view(rd.X, i, j)
+    F = isnothing(rd.F) ? rd.F : view(rd.F, i, k)
+    nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)
+    ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
+    iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
+    ivpa = nothing_scalar_array_view(rd.ivpa, j)
+    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv, ivpa = ivpa)
+end
+"""
     prices_to_returns(X::TimeSeries.TimeArray; F::Option{TimeSeries.TimeArray} = nothing;
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
@@ -275,10 +316,13 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
   - Joins asset, factor, and benchmark data as specified.
 
   - Optionally applies a mapping function and/or collapses the time series.
+
   - Handles missing values by filtering, imputation, and dropping as configured.
+
   - Computes returns using the specified method.
 
       + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
+
   - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples
@@ -391,14 +435,15 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     oc = setdiff(col_names, union(nx, nf, nb))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @argcheck(issubset(ts, TimeSeries.timestamp(iv)), ValueError)
+        @argcheck(issubset(ts, TimeSeries.timestamp(iv)))
         iv = iv[ts]
     end
     if !isnothing(iv)
         iv = values(iv)
         assert_nonempty_nonneg_finite_val(iv, :iv)
         assert_nonempty_gt0_finite_val(ivpa, :ivpa)
-        @argcheck(size(iv) == length(nx), DimensionMismatch)
+        @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), DataFrames.DataAPI.ncol(X) - 1),
+                  DimensionMismatch)
         if isa(ivpa, VecNum)
             @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
         end
@@ -432,8 +477,8 @@ This function scans the specified dimension of the input matrix and returns the 
 
 # Arguments
 
-  - `X`: Input matrix of numeric values (observations × assets).
-  - `dims`: Dimension along which to check for completeness (`1` for columns, `2` for rows). Default is `1`.
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
 
 # Returns
 

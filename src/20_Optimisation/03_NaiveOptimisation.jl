@@ -1,4 +1,7 @@
 abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+function needs_previous_weights(opt::NaiveOptimisationEstimator)
+    return needs_previous_weights(opt.fb)
+end
 function assert_internal_optimiser(::NaiveOptimisationEstimator)
     return nothing
 end
@@ -14,51 +17,53 @@ struct NaiveOptimisationResult{T1, T2, T3, T4, T5, T6} <:
     w::T3
     fb::T6
 end
-function factory(res::NaiveOptimisationResult, fb)
+function factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 struct InverseVolatility{T1, T2, T3, T4, T5, T6} <: NaiveOptimisationEstimator
-    pr::T1
+    pe::T1
     wb::T2
     sets::T3
     wf::T4
     strict::T5
     fb::T6
-    function InverseVolatility(pr::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                               wf::WeightFinaliser, strict::Bool,
-                               fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+    function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+                               wf::WeightFinaliser, strict::Bool, fb::Option{<:OptE_Opt})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pr), typeof(wb), typeof(sets), typeof(wf), typeof(strict),
-                   typeof(fb)}(pr, wb, sets, wf, strict, fb)
+        return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(strict),
+                   typeof(fb)}(pe, wb, sets, wf, strict, fb)
     end
 end
-function InverseVolatility(; pr::PrE_Pr = EmpiricalPrior(),
+function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            wb::Option{<:WbE_Wb} = WeightBounds(),
                            sets::Option{<:AssetSets} = nothing,
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
-                           strict::Bool = false,
-                           fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
-    return InverseVolatility(pr, wb, sets, wf, strict, fb)
+                           strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
+    return InverseVolatility(pe, wb, sets, wf, strict, fb)
+end
+function factory(opt::InverseVolatility, w::AbstractVector)
+    return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
+                             strict = opt.strict, fb = factory(opt.fb, w))
 end
 function opt_view(opt::InverseVolatility, i, args...)
-    pr = prior_view(opt.pr, i)
+    pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     sets = nothing_asset_sets_view(opt.sets, i)
-    return InverseVolatility(; pr = pr, wb = wb, sets = sets, wf = opt.wf,
+    return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf,
                              strict = opt.strict, fb = opt.fb)
 end
 function assert_external_optimiser(opt::InverseVolatility)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pr, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
-    pr = prior(iv.pr, rd; dims = dims)
+    pr = prior(iv.pe, rd; dims = dims)
     w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     w /= sum(w)
     wb = weight_bounds_constraints(iv.wb, iv.sets;
@@ -78,8 +83,7 @@ struct EqualWeighted{T1, T2, T3, T4, T5} <: NaiveOptimisationEstimator
     strict::T4
     fb::T5
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                           wf::WeightFinaliser, strict::Bool,
-                           fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                           wf::WeightFinaliser, strict::Bool, fb::Option{<:OptE_Opt})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -93,9 +97,12 @@ end
 function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        sets::Option{<:AssetSets} = nothing,
                        wf::WeightFinaliser = IterativeWeightFinaliser(),
-                       strict::Bool = false,
-                       fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                       strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return EqualWeighted(wb, sets, wf, strict, fb)
+end
+function factory(opt::EqualWeighted, w::AbstractVector)
+    return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf, strict = opt.strict,
+                         fb = factory(opt.fb, w))
 end
 function opt_view(opt::EqualWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)
@@ -128,8 +135,7 @@ struct RandomWeighted{T1, T2, T3, T4, T5, T6, T7} <: NaiveOptimisationEstimator
     fb::T7
     function RandomWeighted(rng::Random.AbstractRNG, seed::Option{<:Integer},
                             wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                            wf::WeightFinaliser, strict::Bool,
-                            fb::Option{<:NonFiniteAllocationOptimisationEstimator})
+                            wf::WeightFinaliser, strict::Bool, fb::Option{<:OptE_Opt})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -141,9 +147,12 @@ function RandomWeighted(; rng::Random.AbstractRNG = Random.default_rng(),
                         seed::Option{<:Integer} = nothing, wb::Option{<:WbE_Wb} = nothing,
                         sets::Option{<:AssetSets} = nothing,
                         wf::WeightFinaliser = IterativeWeightFinaliser(),
-                        strict::Bool = false,
-                        fb::Option{<:NonFiniteAllocationOptimisationEstimator} = nothing)
+                        strict::Bool = false, fb::Option{<:OptE_Opt} = nothing)
     return RandomWeighted(rng, seed, wb, sets, wf, strict, fb)
+end
+function factory(opt::RandomWeighted, w::AbstractVector)
+    return RandomWeighted(; rng = opt.rng, seed = opt.seed, wb = opt.wb, sets = opt.sets,
+                          wf = opt.wf, strict = opt.strict, fb = factory(opt.fb, w))
 end
 function opt_view(opt::RandomWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)

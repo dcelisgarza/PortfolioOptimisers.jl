@@ -509,12 +509,16 @@ Where:
   - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
 
   - ``\\mathbf{A}_u``, ``\\mathbf{A}_l``, ``\\mathbf{W}``: `N × N` auxiliary symmetric matrices.
+
   - ``\\mathbf{\\Sigma}_l``: `N × N` lower bound of the covariance matrix.
+
   - ``\\mathbf{\\Sigma}_u``: `N × N` upper bound of the covariance matrix.
+
   - ``k``: Scalar variable/constant.
 
       + If the objective risk-adjusted return, it is a non-negative variable.
       + Else it is equal to 1.
+
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
 
 ## Ellipsoidal uncertainty set
@@ -536,16 +540,24 @@ Where:
   - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
 
   - ``\\mathbf{\\Sigma}``: `N × N` covariance matrix.
+
   - ``\\mathbf{W}``, ``\\mathbf{E}``: `N × N` auxiliary symmetric matrices.
+
   - ``k_{\\mathbf{\\Sigma}}``: Scalar constant defining the size of the uncertainty set.
+
   - ``\\sigma``: Variable representing the portfolio's variance of the variance.
+
   - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
+
   - ``k``: Scalar variable/constant.
 
       + If the objective risk-adjusted return, it is a non-negative variable.
       + Else it is equal to 1.
+
   - ``\\mathrm{Tr}(\\cdot)``: Trace operator.
+
   - ``\\mathrm{vec}(\\cdot)``: Vectorisation operator, which unrolls a matrix as a column vector in column-major order.
+
   - ``\\lVert \\cdot \\rVert_{2}``: L2 norm, which is modelled as a [JuMP.SecondOrderCone](https://jump.dev/JuMP.jl/stable/tutorials/conic/tips_and_tricks/#Second-Order-Cone).
 
 # Functor
@@ -588,10 +600,12 @@ UncertaintySetVariance
            │         │        ce ┼ PortfolioOptimisersCovariance
            │         │           │   ce ┼ Covariance
            │         │           │      │    me ┼ SimpleExpectedReturns
-           │         │           │      │       │   w ┴ nothing
+           │         │           │      │       │     w ┼ nothing
+           │         │           │      │       │   idx ┴ nothing
            │         │           │      │    ce ┼ GeneralCovariance
-           │         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │         │           │      │       │    w ┴ nothing
+           │         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │         │           │      │       │     w ┼ nothing
+           │         │           │      │       │   idx ┴ nothing
            │         │           │      │   alg ┴ Full()
            │         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
            │         │           │      │     pdm ┼ Posdef
@@ -602,13 +616,15 @@ UncertaintySetVariance
            │         │           │      │     alg ┼ nothing
            │         │           │      │   order ┴ DenoiseDetoneAlg()
            │         │        me ┼ SimpleExpectedReturns
-           │         │           │   w ┴ nothing
+           │         │           │     w ┼ nothing
+           │         │           │   idx ┴ nothing
            │         │   horizon ┴ nothing
            │     alg ┼ BoxUncertaintySetAlgorithm()
            │   n_sim ┼ Int64: 3000
            │       q ┼ Float64: 0.05
            │     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-           │    seed ┴ nothing
+           │    seed ┼ nothing
+           │     ens ┴ nothing
      sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
@@ -722,9 +738,15 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function factory(r::UncertaintySetVariance, ucs::UcSE_UcS; kwargs...)
+function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
+                 pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = r.sigma)
+    sigma = if isnothing(pr)
+        r.sigma
+    else
+        nothing_scalar_array_selector(r.sigma, pr.sigma)
+    end
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 function risk_measure_view(r::UncertaintySetVariance, i, args...)
     ucs = ucs_view(r.ucs, i)

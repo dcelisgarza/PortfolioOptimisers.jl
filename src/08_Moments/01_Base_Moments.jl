@@ -1,12 +1,13 @@
 """
-    factory(ce::StatsBase.CovarianceEstimator, args...)
+    factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
 
 Fallback for covariance estimator factory methods.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `args...`: Optional arguments (ignored for base covariance estimators).
+  - `args...`: Optional arguments (ignored).
+  - `kwargs...`: Optional keyword arguments (ignored).
 
 # Returns
 
@@ -18,7 +19,7 @@ Fallback for covariance estimator factory methods.
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function factory(ce::StatsBase.CovarianceEstimator, args...)
+function factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
     return ce
 end
 """
@@ -161,6 +162,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
       + $(arg_dict[:X])
       + $(arg_dict[:Xv])
+
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 ### Returns
@@ -424,7 +426,7 @@ Compute the covariance matrix robustly using the specified covariance estimator 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
@@ -484,7 +486,7 @@ Compute the correlation matrix robustly using the specified covariance estimator
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
-  - `dims`: Dimension along which to compute the correlation.
+  - $(arg_dict[:dims])
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 

@@ -52,14 +52,15 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1)),
+julia> FeesEstimator(; tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1)),
                      l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                      fl = Dict("A" => 5.0), fs = ["B" => 10.0])
 FeesEstimator
       tn ┼ TurnoverEstimator
-         │      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │    val ┼ Dict{String, Float64}: Dict("A" => 0.1)
-         │   dval ┴ nothing
+         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │     val ┼ Dict{String, Float64}: Dict("A" => 0.1)
+         │    dval ┼ nothing
+         │   fixed ┴ Bool: false
        l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
        s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
       fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
@@ -148,16 +149,41 @@ Returns a new `FeesEstimator` with all fee fields restricted to the indices or a
 # Examples
 
 ```jldoctest
-julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1)),
+julia> fees = FeesEstimator(;
+                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1)),
                             l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                             fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
 
 julia> PortfolioOptimisers.fees_view(fees, 1:2)
 FeesEstimator
       tn ┼ TurnoverEstimator
-         │      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │    val ┼ Dict{String, Float64}: Dict("A" => 0.1)
-         │   dval ┴ nothing
+         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+         │     val ┼ Dict{String, Float64}: Dict("A" => 0.1)
+         │    dval ┼ nothing
+         │   fixed ┴ Bool: false
+       l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
+       s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
+      fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
+      fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
+      dl ┼ nothing
+      ds ┼ nothing
+     dfl ┼ nothing
+     dfs ┼ nothing
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+
+julia> fees = FeesEstimator(;
+                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1),
+                                                   fixed = true),
+                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
+                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+
+julia> PortfolioOptimisers.fees_view(fees, 1:2)
+FeesEstimator
+      tn ┼ TurnoverEstimator
+         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+         │     val ┼ Dict{String, Float64}: Dict("A" => 0.1)
+         │    dval ┼ nothing
+         │   fixed ┴ Bool: true
        l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
        s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
       fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
@@ -290,12 +316,13 @@ Where:
 # Examples
 
 ```jldoctest
-julia> Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
+julia> Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
             s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0])
 Fees
       tn ┼ Turnover
-         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
+         │   fixed ┴ Bool: false
        l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
        s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
       fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
@@ -350,6 +377,9 @@ Union type for fee constraint objects and estimators.
   - [`FeesEstimator`](@ref)
 """
 const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
+function needs_previous_weights(fe::FeesE_Fees)
+    return needs_previous_weights(fe.tn)
+end
 """
     fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
                      strict::Bool = false)
@@ -380,15 +410,36 @@ Generate portfolio transaction fee constraints from a `FeesEstimator` and asset 
 ```jldoctest
 julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
 
-julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
+julia> fees = FeesEstimator(;
+                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1),
+                                                   dval = 0.0),
                             l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                             fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
 
 julia> fees_constraints(fees, sets)
 Fees
       tn ┼ Turnover
-         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
+         │   fixed ┴ Bool: false
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
+      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+
+julia> fees = FeesEstimator(;
+                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1),
+                                                   dval = 0.0, fixed = true),
+                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
+                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+
+julia> fees_constraints(fees, sets)
+Fees
+      tn ┼ Turnover
+         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
+         │   fixed ┴ Bool: true
        l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
        s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
       fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
@@ -438,13 +489,15 @@ Propagate or pass through portfolio transaction fee constraints.
 # Examples
 
 ```jldoctest
-julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0]);
+julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
+                   l = [0.001, 0.002, 0.0]);
 
 julia> fees_constraints(fees)
 Fees
       tn ┼ Turnover
-         │     w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
+         │   fixed ┴ Bool: false
        l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
        s ┼ nothing
       fl ┼ nothing
@@ -515,14 +568,32 @@ Returns a new `Fees` object with all fee fields restricted to the indices or ass
 # Examples
 
 ```jldoctest
-julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
-                   s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0]);
+julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
+                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
+                   fs = [0.0, 10.0, 0.0]);
 
 julia> PortfolioOptimisers.fees_view(fees, 1:2)
 Fees
       tn ┼ Turnover
-         │     w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │   val ┴ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
+         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+         │     val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
+         │   fixed ┴ Bool: false
+       l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
+       s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
+      fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
+      fs ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.0, 10.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+
+julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0], fixed = true),
+                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
+                   fs = [0.0, 10.0, 0.0]);
+
+julia> PortfolioOptimisers.fees_view(fees, 1:2)
+Fees
+      tn ┼ Turnover
+         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
+         │     val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
+         │   fixed ┴ Bool: true
        l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
        s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
       fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
@@ -570,14 +641,32 @@ Create a new `Fees` constraint with updated portfolio weights.
 # Examples
 
 ```jldoctest
-julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
-                   s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0]);
+julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
+                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
+                   fs = [0.0, 10.0, 0.0]);
 
 julia> factory(fees, [0.4, 0.4, 0.2])
 Fees
       tn ┼ Turnover
-         │     w ┼ Vector{Float64}: [0.4, 0.4, 0.2]
-         │   val ┴ Vector{Float64}: [0.1, 0.0, 0.0]
+         │       w ┼ Vector{Float64}: [0.4, 0.4, 0.2]
+         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
+         │   fixed ┴ Bool: false
+       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
+      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
+      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+
+julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0], fixed = true),
+                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
+                   fs = [0.0, 10.0, 0.0]);
+
+julia> factory(fees, [0.4, 0.4, 0.4])
+Fees
+      tn ┼ Turnover
+         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
+         │   fixed ┴ Bool: true
        l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
        s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
       fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
@@ -609,11 +698,13 @@ Compute the actual proportional fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `fees`: Scalar fee value.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -658,6 +749,7 @@ Compute the actual turnover fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
@@ -671,7 +763,7 @@ Compute the actual turnover fees for portfolio weights and prices.
 # Examples
 
 ```jldoctest
-julia> calc_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
+julia> calc_fees([0.1, 0.2], [100, 200], Turnover(; w = [0.0, 0.0], val = 0.01))
 0.5
 ```
 
@@ -754,6 +846,7 @@ Compute the proportional fees for portfolio weights and prices.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -810,7 +903,7 @@ Compute the turnover fees for portfolio weights and prices.
 # Examples
 
 ```jldoctest
-julia> calc_fees([0.8, 0.2], Turnover([0.0, 0.0], 0.02))
+julia> calc_fees([0.8, 0.2], Turnover(; w = [0.0, 0.0], val = 0.02))
 0.02
 ```
 
@@ -849,7 +942,9 @@ Compute the fixed portfolio fees for assets that have been allocated.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -939,11 +1034,13 @@ Compute the actual proportional per asset fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `fees`: Scalar fee value.
 
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -994,6 +1091,7 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
   - `w`: Portfolio weights.
 
   - `p`: Asset prices.
+
   - `tn`: Turnover structure.
 
       + `nothing`: No turnover fee, returns zero.
@@ -1007,7 +1105,7 @@ Compute the actual per asset turnover fees for portfolio weights and prices.
 # Examples
 
 ```jldoctest
-julia> calc_asset_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
+julia> calc_asset_fees([0.1, 0.2], [100, 200], Turnover(; w = [0.0, 0.0], val = 0.01))
 2-element Vector{Float64}:
  0.1
  0.4
@@ -1091,6 +1189,7 @@ Compute the proportional per asset fees for portfolio weights and prices.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns
@@ -1153,7 +1252,7 @@ Compute the per asset turnover fees for portfolio weights and prices.
 # Examples
 
 ```jldoctest
-julia> calc_asset_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
+julia> calc_asset_fees([0.1, 0.2], Turnover(; w = [0.0, 0.0], val = 0.01))
 2-element Vector{Float64}:
  0.001
  0.002
@@ -1193,7 +1292,9 @@ Compute the per asset fixed portfolio fees for assets that have been allocated.
       + `nothing`: No proportional fee, returns zero.
       + `Number`: Single fee applied to all relevant assets.
       + `VecNum`: Vector of fee values per asset.
+
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
+
   - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
 
 # Returns

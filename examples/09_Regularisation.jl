@@ -1,7 +1,7 @@
 #=
 # Example 9: Regularisation
 
-This example shows one of the simplest ways to imporve the robustness of portfolios, regularisation penalties.
+This example shows one of the simplest ways to improve the robustness of portfolios, regularisation penalties.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -74,7 +74,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 ## 2. Regularised portfolios
 
-The optimal regularisation penalty value depends on the data, the investor preferences, and type of regularisation. The specific choice of penalty value is so volatile that it can only be estimated via cross-validation or similar techniques, but the "optimal" (to some definition of optimal) value will also change over time as the market conditions change. Therefore, we will simply show how to set up and solve a regularised portfolio optimisation problem, without attempting to find the optimal penalty value.
+The optimal regularisation penalty value depends on the data, the investor preferences, and type of regularisation. The specific choice of penalty value is so volatile that it can only be estimated via grid search cross-validation or similar techniques, but the "optimal" (to some definition of optimal) value will also change over time as the market conditions change. Therefore, we will simply show how to set up and solve a regularised portfolio optimisation problem, without attempting to find the optimal penalty value.
 
 We will use the same small penalty for all regularisations to illustrate how they differ.
 
@@ -86,18 +86,18 @@ We will use the same small penalty for all regularisations to illustrate how the
 ### 2.1 Efficient frontier
 =#
 
-opts = [JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, ret = ArithmeticReturn(; lb = Frontier(; N = 50))),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       l1 = 4e-4),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       l2 = 4e-4),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       lp = LpRegularisation(; p = 5, val = 4e-4)),#
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       linf = 4e-4)]
 nocs = [MeanRisk(; opt = opt) for opt in opts]
@@ -106,7 +106,7 @@ ress = optimise.(nocs)
 #=
 Let's plot the efficient frontiers.
 =#
-using GraphRecipes, StatsPlots
+using StatsPlots, GraphRecipes
 
 r = Variance()
 # No regularisation portfolio weights.
@@ -114,9 +114,8 @@ plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "No regularisation", legend = :outerright))
 # No regularisation frontier.
-plot_measures(ress[1].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[1].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[1].w, pr; x = r, y = ExpectedReturn(; rt = ress[1].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "No regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -126,9 +125,8 @@ plot_stacked_area_composition(ress[2].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "L1 regularisation", legend = :outerright))
 # L1 regularisation frontier. The sparsification makes the pareto front non-smooth.
-plot_measures(ress[2].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[2].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[2].w, pr; x = r, y = ExpectedReturn(; rt = ress[2].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L1 regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -138,9 +136,8 @@ plot_stacked_area_composition(ress[3].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",
                                         title = "L2 regularisation", legend = :outerright))
 # L2 regularisation frontier.
-plot_measures(ress[3].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[3].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[3].w, pr; x = r, y = ExpectedReturn(; rt = ress[3].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L2 regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -151,9 +148,8 @@ plot_stacked_area_composition(ress[4].w, rd.nx;
                                         title = "Lp (p = 5) regularisation",
                                         legend = :outerright))
 # Lp regularisation frontier.
-plot_measures(ress[4].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[4].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[4].w, pr; x = r, y = ExpectedReturn(; rt = ress[4].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Lp (p = 5) regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -164,9 +160,8 @@ plot_stacked_area_composition(ress[5].w, rd.nx;
                                         title = "L-Inf regularisation",
                                         legend = :outerright))
 # L-Inf regularisation frontier.
-plot_measures(ress[5].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[5].ret),
-              c = ReturnRiskRatioRiskMeasure(; rt = ress[1].ret, rk = r,
-                                             rf = 4.2 / 100 / 252),
+plot_measures(ress[5].w, pr; x = r, y = ExpectedReturn(; rt = ress[5].ret),
+              c = ExpectedReturnRiskRatio(; rt = ress[1].ret, rk = r, rf = 4.2 / 100 / 252),
               title = "L-Inf regularisation", xlabel = "Variance",
               ylabel = "Arithmetic Return", colorbar_title = "\nRisk/Return Ratio",
               right_margin = 6Plots.mm)
@@ -177,15 +172,15 @@ plot_measures(ress[5].w, pr; x = r, y = ReturnRiskMeasure(; rt = ress[5].ret),
 Lets view only the minimum risk portfolios for each regularisation to get more insight into what regularisation does.
 =#
 
-opts = [JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1),# no regularisation
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, l1 = 4e-4),# L1 regularisation
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, l2 = 4e-4),# L2 regularisation
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),# Lp regularisation with p = 5
-        JuMPOptimiser(; pr = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
+        JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, linf = 4e-4)]# L-Inf regularisation
 nocs = [MeanRisk(; opt = opt) for opt in opts]
 

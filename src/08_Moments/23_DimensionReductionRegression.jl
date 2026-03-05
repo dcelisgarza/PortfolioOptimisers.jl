@@ -15,7 +15,7 @@ These types are used to specify the dimension reduction method when constructing
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
-function factory(drtgt::DimensionReductionTarget, args...)
+function factory(drtgt::DimensionReductionTarget, args...; kwargs...)
     return drtgt
 end
 """
@@ -187,10 +187,12 @@ Keyword arguments correspond to the fields above.
 julia> DimensionReductionRegression()
 DimensionReductionRegression
      me ┼ SimpleExpectedReturns
-        │   w ┴ nothing
+        │     w ┼ nothing
+        │   idx ┴ nothing
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
-        │             │   w ┴ nothing
+        │             │     w ┼ nothing
+        │             │   idx ┴ nothing
         │           w ┼ nothing
         │   corrected ┴ Bool: true
   drtgt ┼ PCA

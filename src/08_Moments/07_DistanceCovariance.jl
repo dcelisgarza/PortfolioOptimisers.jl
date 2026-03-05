@@ -172,7 +172,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
   - `ce`: Distance covariance estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute correlations.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
@@ -314,7 +314,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
   - `ce`: Distance covariance estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute covariances.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns

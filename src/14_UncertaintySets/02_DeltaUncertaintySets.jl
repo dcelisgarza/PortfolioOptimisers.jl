@@ -15,7 +15,7 @@ Estimator for box uncertainty sets using delta bounds on mean and covariance sta
 
 # Constructor
 
-    DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
+    DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
                         dsigma::Number = 0.1)
 
 Keyword arguments correspond to the fields above.
@@ -34,21 +34,24 @@ DeltaUncertaintySet
          │        ce ┼ PortfolioOptimisersCovariance
          │           │   ce ┼ Covariance
          │           │      │    me ┼ SimpleExpectedReturns
-         │           │      │       │   w ┴ nothing
+         │           │      │       │     w ┼ nothing
+         │           │      │       │   idx ┴ nothing
          │           │      │    ce ┼ GeneralCovariance
-         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │           │      │       │    w ┴ nothing
+         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │     w ┼ nothing
+         │           │      │       │   idx ┴ nothing
          │           │      │   alg ┴ Full()
          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
          │           │      │     pdm ┼ Posdef
-         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton 
+         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
          │           │      │      dn ┼ nothing
          │           │      │      dt ┼ nothing
          │           │      │     alg ┼ nothing
          │           │      │   order ┴ DenoiseDetoneAlg()
          │        me ┼ SimpleExpectedReturns
-         │           │   w ┴ nothing
+         │           │     w ┼ nothing
+         │           │   idx ┴ nothing
          │   horizon ┴ nothing
      dmu ┼ Float64: 0.1
   dsigma ┴ Float64: 0.1
@@ -64,13 +67,14 @@ struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
     pe::T1
     dmu::T2
     dsigma::T3
-    function DeltaUncertaintySet(pe::AbstractPriorEstimator, dmu::Number, dsigma::Number)
+    function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
+                                 dsigma::Number)
         @argcheck(dmu >= 0.0)
         @argcheck(dsigma >= 0.0)
         return new{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu, dsigma)
     end
 end
-function DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+function DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                              dmu::Number = 0.1, dsigma::Number = 0.1)
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
@@ -85,7 +89,7 @@ Constructs box uncertainty sets for mean and covariance statistics using delta b
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator.
-  - `dims`: Dimension along which to compute statistics (default: 1).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -128,7 +132,7 @@ Constructs a box uncertainty set for expected returns (mean) using delta bounds 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator (default: `nothing`).
-  - `dims`: Dimension along which to compute statistics (default: `1`).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns
@@ -167,7 +171,7 @@ Constructs a box uncertainty set for covariance using delta bounds from a prior 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
   - `X`: Data matrix (e.g., returns).
   - `F`: Optional factor matrix. Used by the prior estimator (default: `nothing`).
-  - `dims`: Dimension along which to compute statistics (default: `1`).
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the prior estimator.
 
 # Returns

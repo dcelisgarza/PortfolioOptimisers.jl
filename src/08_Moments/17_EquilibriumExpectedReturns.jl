@@ -35,10 +35,12 @@ EquilibriumExpectedReturns
   ce ┼ PortfolioOptimisersCovariance
      │   ce ┼ Covariance
      │      │    me ┼ SimpleExpectedReturns
-     │      │       │   w ┴ nothing
+     │      │       │     w ┼ nothing
+     │      │       │   idx ┴ nothing
      │      │    ce ┼ GeneralCovariance
-     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │      │       │    w ┴ nothing
+     │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │      │       │     w ┼ nothing
+     │      │       │   idx ┴ nothing
      │      │   alg ┴ Full()
      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
      │      │     pdm ┼ Posdef
@@ -87,7 +89,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
   - `me`: Equilibrium expected returns estimator.
   - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
+  - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
 # Returns
