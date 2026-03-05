@@ -1,5 +1,6 @@
 module PortfolioOptimisers
 
+using Accessors: Accessors
 using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering

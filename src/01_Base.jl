@@ -377,6 +377,7 @@ Alias for a pair consisting of an abstract string and a numeric type.
   - [`MultiEstValType`](@ref)
 """
 const PairStrNum = Pair{<:AbstractString, <:Number}
+const PairStrVecNum = Pair{<:AbstractString, <:VecNum}
 """
     const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 
@@ -388,6 +389,7 @@ Alias for an abstract dictionary with string keys and numeric values.
   - [`MultiEstValType`](@ref)
 """
 const DictStrNum = AbstractDict{<:AbstractString, <:Number}
+const DictStrVecNum = AbstractDict{<:AbstractString, <:VecNum}
 """
     const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 
@@ -400,6 +402,7 @@ Alias for a union of a dictionary with string keys and numeric values, or a vect
   - [`EstValType`](@ref)
 """
 const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+const MultiSCVValType = Union{<:DictStrVecNum, <:AbstractVector{<:PairStrVecNum}}
 """
     abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
 

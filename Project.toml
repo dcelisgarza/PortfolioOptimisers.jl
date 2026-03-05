@@ -4,6 +4,7 @@ version = "0.16.0"
 authors = ["Daniel Celis Garza <daniel.celis.garza@gmail.com>"]
 
 [deps]
+Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 ArgCheck = "dce04be8-c92d-5529-be00-80e4d2c0e197"
 AverageShiftedHistograms = "77b51b56-6f8f-5c3a-9cb4-d71f9594ea6e"
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
@@ -42,6 +43,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 PortfolioOptimisersPlotsExt = ["GraphRecipes", "StatsPlots"]
 
 [compat]
+Accessors = "0.1.43"
 ArgCheck = "2.5"
 AverageShiftedHistograms = "0.8"
 Clustering = "0.15"
