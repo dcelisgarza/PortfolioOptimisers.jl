@@ -1,6 +1,10 @@
 abstract type CrossValidationEstimator <: AbstractEstimator end
 abstract type CrossValidationResult <: AbstractResult end
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
+function Base.split(res::CrossValidationResult, args...)
+    return res
+end
+const CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
 
 abstract type OptimisationCrossValidationEstimator <: CrossValidationEstimator end
 abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
@@ -9,6 +13,11 @@ abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidati
 abstract type OptimisationCrossValidationResult <: CrossValidationResult end
 abstract type SequentialCrossValidationResult <: OptimisationCrossValidationResult end
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
+
+const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
+                         <:NonSequentialCrossValidationResult}
+const SeqCVER = Union{<:SequentialCrossValidationEstimator,
+                      <:SequentialCrossValidationResult}
 
 abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
 abstract type NonOptimisationSequentialCrossValidationEstimator <:
@@ -306,8 +315,7 @@ end
 function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
     return sort_predictions!(res.test_idx, predictions)
 end
-function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult,
-                         cv::NonSequentialCrossValidationEstimator; cols = :,
+function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     @argcheck(!(hasproperty(cv, :shuffle) && cv.shuffle),

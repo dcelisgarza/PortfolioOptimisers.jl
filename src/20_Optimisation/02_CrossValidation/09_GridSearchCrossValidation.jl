@@ -2,18 +2,23 @@ abstract type SearchCrossValidationEstimator <: AbstractEstimator end
 abstract type SearchCrossValidationResult <: AbstractResult end
 abstract type SearchCrossValidationAlgorithm <: AbstractAlgorithm end
 
-struct GridSearchCrossValidation{T1} <: SearchCrossValidationEstimator
+struct GridSearchCrossValidation{T1, T2, T3} <: SearchCrossValidationEstimator
     p::T1
-    function GridSearchCrossValidation(p::MultiSCVValType)
+    cv::T2
+    ex::T3
+    function GridSearchCrossValidation(p::MultiSCVValType, cv::CrossValidationEstimator,
+                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
         @argcheck(!isempty(p), IsEmptyError)
-        return new{typeof(p)}(p)
+        return new{typeof(p), typeof(cv), typeof(ex)}(p, cv, ex)
     end
 end
-function GridSearchCrossValidation(; p::MultiSCVValType)
-    return GridSearchCrossValidation(p)
+function GridSearchCrossValidation(; p::MultiSCVValType,
+                                   cv::CrossValidationEstimator = KFold(),
+                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    return GridSearchCrossValidation(p, cv, ex)
 end
 struct GridSearchCrossValidationResult <: SearchCrossValidationResult end
-function nested_lens(props::Vector{Symbol})
+function nested_lens(props::AbstractVector{Symbol})
     lens = Accessors.PropertyLens(props[1])
     for p in view(props, 2:length(props))
         lens = Accessors.PropertyLens(p) ∘ lens
@@ -25,24 +30,31 @@ function build_nested_lens(ks::VecStr)
     ks = [Symbol.(k) for k in ks]
     return [nested_lens(k) for k in ks]
 end
-function key_vals(estval::AbstractVector{<:PairStrVecNum})
-    return getindex.(estval, 1), getindex.(estval, 2)
+function key_vals(estval::AbstractVector{<:PairSCV})
+    return map(x -> x[1], estval), map(x -> x[2], estval)
 end
-function key_vals(estval::DictStrVecNum)
+function key_vals(estval::DictSCV)
     return keys(estval), values(estval)
 end
-function grid_search_cross_validation(obj, gscv::GridSearchCrossValidation)
-    obj_new = obj
+function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
+                                      rd::ReturnsResult)
     p = gscv.p
     ks, vals = key_vals(p)
     lenses = build_nested_lens(ks)
     val_grid = Iterators.product(vals...)
-    for v_grid in val_grid
+    res = Vector{AbstractPredictionResult}(undef, length(val_grid))
+    cv = split(gscv.cv, rd)
+    # folds = Iterators.product(zip(1:length(val_grid), val_grid),
+    #                           zip(1:length(cv.train_idx), cv.train_idx, cv.test_idx))
+    FLoops.@floop gscv.ex for (i, v_grid) in enumerate(val_grid)
+        local opti = opt
         for (lens, val) in zip(lenses, v_grid)
-            obj_new = Accessors.set(obj_new, lens, val)
+            opti = Accessors.set(opti, lens, val)
         end
+        res[i] = cross_val_predict(opti, rd, cv; ex = gscv.ex)
+        #! Use fit predict on each test and train split and score them
     end
-    return obj_new
+    return res
 end
 export grid_search_cross_validation, GridSearchCrossValidation
 #=

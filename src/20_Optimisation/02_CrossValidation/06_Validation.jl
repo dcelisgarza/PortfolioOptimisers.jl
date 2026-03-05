@@ -1,5 +1,5 @@
 function cross_val_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                           cv::CrossValidationEstimator = KFold(); cols = :,
+                           cv::CVER = KFold(); cols = :,
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     assert_internal_optimiser(opt)
     assert_external_optimiser(opt)
@@ -10,7 +10,7 @@ function cross_val_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Re
     return fit_and_predict(opt, rd, cv; ex = ex)
 end
 function cross_val_predict(opt::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                           cv::CrossValidationEstimator = KFold();
+                           cv::CVER = KFold();
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return fit_and_predict(opt, rd, cv; ex = ex)
 end

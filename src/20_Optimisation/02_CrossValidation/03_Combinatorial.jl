@@ -96,6 +96,7 @@ function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::Ve
                                             path_ids::AbstractMatrix{<:Integer})
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
+const CombCVER = Union{<:CombinatorialCrossValidation, <:CombinatorialCrossValidationResult}
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
 end
@@ -248,7 +249,7 @@ function sort_predictions!(res::CombinatorialCrossValidationResult,
             for (i, pred) in enumerate(sorted_preds)]
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::CombinatorialCrossValidation; cols = :,
+                         cv::CombCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
@@ -260,7 +261,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                         cv::CombinatorialCrossValidation;
+                         cv::CombCVER;
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx

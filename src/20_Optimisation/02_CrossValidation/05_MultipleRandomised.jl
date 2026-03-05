@@ -54,6 +54,7 @@ function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
                                   asset_idx::VecVecInt, path_ids::VecInt)
     return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
 end
+const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
     @argcheck(0 < idx <= n_comb)
@@ -176,8 +177,8 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                                        id = id)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::MultipleRandomised;
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
+                         cv::MRCVR; ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         kwargs...)
     cv_res = split(cv, rd)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     unique_ids = unique(path_ids)
