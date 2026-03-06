@@ -75,13 +75,13 @@ function parse_lens(key::AbstractString)
     return _expr_to_lens_chain(Meta.parse(key))
 end
 function key_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
-    vals = Iterators.product(map(x -> x[2], estval)...)
-    ks = Iterators.repeated(map(x -> x[1], estval), length(vals))
+    vals = collect(Iterators.product(map(x -> x[2], estval)...))
+    ks = fill(map(x -> x[1], estval), length(vals))
     return ks, vals
 end
 function key_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
-    vals = Iterators.product(values(estval)...)
-    ks = Iterators.repeated(keys(estval), length(vals))
+    vals = collect(Iterators.product(values(estval)...))
+    ks = fill(keys(estval), length(vals))
     return ks, vals
 end
 function key_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
@@ -89,7 +89,7 @@ function key_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:
                                                       <:AbstractDict{<:String,
                                                                      <:AbstractVector}}})
     ks_vals = [key_val_grid(estval) for estval in estvals]
-    ks = reduce(vcat, [collect(ks_val[1]) for ks_val in ks_vals])
+    ks = reduce(vcat, [ks_val[1] for ks_val in ks_vals])
     vals = collect(Iterators.flatten(ks_val[2] for ks_val in ks_vals))
     return ks, vals
 end
@@ -128,7 +128,8 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
         split_test_scores = split_test_scores,
         split_train_scores = split_train_scores
 
-        FLoops.@floop gscv.ex for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
+        # FLoops.@floop gscv.ex
+        for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
             local opti = opt
             for (lens, val) in zip(lenses, vals)
                 opti = Accessors.set(opti, lens, val)

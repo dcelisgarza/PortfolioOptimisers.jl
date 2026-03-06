@@ -688,20 +688,31 @@
     opt = JuMPOptimiser(; slv = slv)
     mr = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
                   opto = MeanRisk(; opt = opt))
-    p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
-                                                         length = 3),
-                               "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                         length = 3)],
-                              ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                         length = 3)],
-                              ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
-                                                         length = 3)],
-                              ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                             MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+    p1 = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
+                                                          length = 3),
+                                "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                          length = 3)],
+                               ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                          length = 3)],
+                               ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
+                                                          length = 3)],
+                               ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                              MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 
-    gs_cv = GridSearchCrossValidation(p,
-                                      r = MeanReturnRiskRatio(;
-                                                              rk = LowOrderMoment(;
-                                                                                  alg = SecondMoment())))
-    gs_res = grid_search_cross_validation(mr, gs_cv, rd)
+    gs_cv1 = GridSearchCrossValidation(p1,
+                                       r = MeanReturnRiskRatio(;
+                                                               rk = LowOrderMoment(;
+                                                                                   alg = SecondMoment())))
+    gs_res1 = grid_search_cross_validation(mr, gs_cv1, rd)
+
+    p2 = concrete_typed_array(["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                             MeanRisk(; opt = opt, obj = MaximumRatio())],
+                               "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002,
+                                                         length = 3)])
+
+    gs_cv2 = GridSearchCrossValidation(p2;
+                                       r = MeanReturnRiskRatio(;
+                                                               rk = LowOrderMoment(;
+                                                                                   alg = SecondMoment())))
+    gs_res2 = grid_search_cross_validation(mr, gs_cv2, rd)
 end
