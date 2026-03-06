@@ -685,30 +685,23 @@
                        rtol = 5e-5)
         @test isa(eff_front_combinatorial_pred.pred[1].res, AbstractVector)
     end
+    opt = JuMPOptimiser(; slv = slv)
+    mr = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
+                  opto = MeanRisk(; opt = opt))
+    p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
+                                                         length = 3),
+                               "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                         length = 3)],
+                              ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                         length = 3)],
+                              ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
+                                                         length = 3)],
+                              ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                             MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 
-    # mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-    # gscv = GridSearchCrossValidation(;
-    #                                  p = [["opt.l2" => range(; start = 0.0001, stop = 0.0003,
-    #                                                          length = 3),
-    #                                        "opt.l1" => range(; start = 0.005, stop = 0.008,
-    #                                                          length = 3),
-    #                                        "obj" => [MaximumRatio(), MinimumRisk()]],
-    #                                       ["opt.l2" => range(; start = 0.004, stop = 0.007,
-    #                                                          length = 3),
-    #                                        "opt.l1" => range(; start = 0.009, stop = 0.012,
-    #                                                          length = 3)]],
-    #                                  r = LowOrderMoment(; alg = SecondMoment()))
-
-    # gsscore = grid_search_cross_validation(mr, gscv, rd)
-
-    # score_mtx2 = grid_search_cross_validation(mr, gscv, rd)
-
-    # gscv = GridSearchCrossValidation(;
-    #                                  p = ["opt.l2" => range(; start = 0.004, stop = 0.007,
-    #                                                         length = 3),
-    #                                       "opt.l1" => range(; start = 0.009, stop = 0.0012,
-    #                                                         length = 3)])
-
-    # res = grid_search_cross_validation(mr, gscv, rd)
-
+    gs_cv = GridSearchCrossValidation(p,
+                                      r = MeanReturnRiskRatio(;
+                                                              rk = LowOrderMoment(;
+                                                                                  alg = SecondMoment())))
+    gs_res = grid_search_cross_validation(mr, gs_cv, rd)
 end

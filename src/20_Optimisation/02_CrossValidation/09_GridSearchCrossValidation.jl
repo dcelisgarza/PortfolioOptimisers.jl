@@ -7,7 +7,7 @@ abstract type CrossValidationSearchScorer <: AbstractEstimator end
 const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
 struct HighestMeanScore <: CrossValidationSearchScorer end
 function (s::HighestMeanScore)(X::MatNum)
-    return argmax(mean(X; dims = 1))
+    return argmax(dropdims(mean(X; dims = 1); dims = 1))
 end
 struct SearchCrossValidationResult{T1, T2, T3, T4, T5} <:
        AbstractSearchCrossValidationResult
@@ -40,7 +40,7 @@ struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
                                                         kwargs)
     end
 end
-function GridSearchCrossValidation(; p::MultiSCVValType_VecMultiSCVValType,
+function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType;
                                    cv::SearchCV = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    score::CrossValSearchScorer = HighestMeanScore(),
@@ -48,27 +48,48 @@ function GridSearchCrossValidation(; p::MultiSCVValType_VecMultiSCVValType,
                                    train_score::Bool = false, kwargs::NamedTuple = (;))
     return GridSearchCrossValidation(p, cv, r, score, ex, train_score, kwargs)
 end
-function nested_lens(props::AbstractVector{Symbol})
-    lens = Accessors.PropertyLens(props[1])
-    for p in view(props, 2:length(props))
-        lens = Accessors.PropertyLens(p) ∘ lens
+# Base case: bare symbol → PropertyLens
+_expr_to_lens(ex::Symbol) = Accessors.PropertyLens(ex)
+# Evaluate literal index nodes in the AST (no runtime eval needed)
+_eval_index(x::Integer) = x
+_eval_index(x::Symbol)  = x
+_eval_index(ex::Expr)   = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+function _expr_to_lens_chain(ex)
+    optics = Union{Accessors.PropertyLens, Accessors.IndexLens}[]
+    while ex isa Expr
+        if ex.head === :.
+            push!(optics, Accessors.PropertyLens((ex.args[2]::QuoteNode).value))
+            ex = ex.args[1]
+        elseif ex.head === :ref
+            indices = ntuple(i -> _eval_index(ex.args[i + 1]), length(ex.args) - 1)
+            push!(optics, Accessors.IndexLens(indices))
+            ex = ex.args[1]
+        else
+            error("Unsupported expression: $ex")
+        end
     end
-    return lens
+    push!(optics, Accessors.PropertyLens(ex))  # base case: Symbol
+    return foldl(∘, optics)
 end
-function build_nested_lens(ks::VecStr)
-    ks = split.(ks, ".")
-    ks = [Symbol.(k) for k in ks]
-    return [nested_lens(k) for k in ks]
+function parse_lens(key::AbstractString)
+    return _expr_to_lens_chain(Meta.parse(key))
 end
-function key_val_grid(estval::AbstractVector{<:PairSCV})
-    return map(x -> x[1], estval), Iterators.product(map(x -> x[2], estval)...)
+function key_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
+    vals = Iterators.product(map(x -> x[2], estval)...)
+    ks = Iterators.repeated(map(x -> x[1], estval), length(vals))
+    return ks, vals
 end
-function key_val_grid(estval::DictSCV)
-    return keys(estval), Iterators.product(values(estval)...)
+function key_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
+    vals = Iterators.product(values(estval)...)
+    ks = Iterators.repeated(keys(estval), length(vals))
+    return ks, vals
 end
-function key_val_grid(estvals::VecMultiSCVValType)
+function key_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
+                                                                              <:AbstractVector}},
+                                                      <:AbstractDict{<:String,
+                                                                     <:AbstractVector}}})
     ks_vals = [key_val_grid(estval) for estval in estvals]
-    ks = reduce(vcat, ks_val[1] for ks_val in ks_vals)
+    ks = reduce(vcat, [collect(ks_val[1]) for ks_val in ks_vals])
     vals = collect(Iterators.flatten(ks_val[2] for ks_val in ks_vals))
     return ks, vals
 end
@@ -92,7 +113,7 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
                                       rd::ReturnsResult; kwargs...)
     p = gscv.p
     ks, val_grid = key_val_grid(p)
-    lenses = build_nested_lens(ks)
+    lens_grid = [parse_lens.(k) for k in ks]
     cv = split(gscv.cv, rd)
     @argcheck(isa(cv.test_idx[1], VecInt))
     N = length(val_grid)
@@ -103,10 +124,13 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
     else
         nothing
     end
-    let split_test_scores = split_test_scores, split_train_scores = split_train_scores
-        FLoops.@floop gscv.ex for (i, v_grid) in enumerate(val_grid)
+    let opt = opt,
+        split_test_scores = split_test_scores,
+        split_train_scores = split_train_scores
+
+        FLoops.@floop gscv.ex for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
             local opti = opt
-            for (lens, val) in zip(lenses, v_grid)
+            for (lens, val) in zip(lenses, vals)
                 opti = Accessors.set(opti, lens, val)
             end
             for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
@@ -119,15 +143,13 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
         end
     end
 
-    split_test_scores
-    split_train_scores
-    opt_idx = gscv.score(split_test_scores)[2]
-    opt_grid = val_grid[opt_idx]
-    opti = opt
-    for (lens, val) in zip(lenses, opt_grid)
-        opti = Accessors.set(opti, lens, val)
+    opt_idx = gscv.score(split_test_scores)
+    opt_lens = lens_grid[opt_idx]
+    opt_vals = val_grid[opt_idx]
+    for (lens, val) in zip(opt_lens, opt_vals)
+        opt = Accessors.set(opt, lens, val)
     end
-    return SearchCrossValidationResult(opti, split_test_scores, split_train_scores,
-                                       val_grid, opt_idx)
+    return SearchCrossValidationResult(opt, split_test_scores, split_train_scores, val_grid,
+                                       opt_idx)
 end
 export grid_search_cross_validation, GridSearchCrossValidation, SearchCrossValidationResult
