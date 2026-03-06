@@ -688,22 +688,20 @@
 
     # mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
     # gscv = GridSearchCrossValidation(;
-    #                                  p = [["opt.l2" => range(;
-    #                                                                               start = 0.001,
-    #                                                                               stop = 0.003,
-    #                                                                               length = 3),
-    #                                                             "opt.l1" => range(;
-    #                                                                               start = 0.005,
-    #                                                                               stop = 0.008,
-    #                                                                               length = 3),
-    #                                                             "obj" => [MinimumRisk(),
-    #                                                                       MaximumRatio()]],
+    #                                  p = [["opt.l2" => range(; start = 0.0001, stop = 0.0003,
+    #                                                          length = 3),
+    #                                        "opt.l1" => range(; start = 0.005, stop = 0.008,
+    #                                                          length = 3),
+    #                                        "obj" => [MaximumRatio(), MinimumRisk()]],
     #                                       ["opt.l2" => range(; start = 0.004, stop = 0.007,
     #                                                          length = 3),
     #                                        "opt.l1" => range(; start = 0.009, stop = 0.012,
-    #                                                          length = 3)]])
+    #                                                          length = 3)]],
+    #                                  r = LowOrderMoment(; alg = SecondMoment()))
 
-    # grid_search_cross_validation(mr, gscv, rd)
+    # gsscore = grid_search_cross_validation(mr, gscv, rd)
+
+    # score_mtx2 = grid_search_cross_validation(mr, gscv, rd)
 
     # gscv = GridSearchCrossValidation(;
     #                                  p = ["opt.l2" => range(; start = 0.004, stop = 0.007,

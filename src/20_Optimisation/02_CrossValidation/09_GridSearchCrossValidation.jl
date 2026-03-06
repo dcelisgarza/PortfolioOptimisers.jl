@@ -1,27 +1,53 @@
-abstract type SearchCrossValidationEstimator <: AbstractEstimator end
-abstract type SearchCrossValidationResult <: AbstractResult end
-abstract type SearchCrossValidationAlgorithm <: AbstractAlgorithm end
-
-struct GridSearchCrossValidation{T1, T2, T3} <: SearchCrossValidationEstimator
+# randomised search cv can generate the grid after sampling
+const SearchCV = Union{<:KFold, <:KFoldResult, <:WalkForwardEstimator, <:WalkForwardResult}
+abstract type AbstractSearchCrossValidationEstimator <: AbstractEstimator end
+abstract type AbstractSearchCrossValidationResult <: AbstractResult end
+abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
+abstract type CrossValidationSearchScorer <: AbstractEstimator end
+const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+struct HighestMeanScore <: CrossValidationSearchScorer end
+function (s::HighestMeanScore)(X::MatNum)
+    return argmax(mean(X; dims = 1))
+end
+struct SearchCrossValidationResult{T1, T2, T3, T4, T5} <:
+       AbstractSearchCrossValidationResult
+    opti::T1
+    split_test_scores::T2
+    split_train_scores::T3
+    grid::T4
+    idx::T5
+end
+struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
+       AbstractSearchCrossValidationEstimator
     p::T1
     cv::T2
-    ex::T3
-    function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType,
-                                       cv::CrossValidationEstimator,
-                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    r::T3
+    score::T4
+    ex::T5
+    train_score::T6
+    kwargs::T7
+    function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType, cv::SearchCV,
+                                       r::AbstractBaseRiskMeasure,
+                                       score::CrossValSearchScorer,
+                                       ex::FLoops.Transducers.Executor, train_score::Bool,
+                                       kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
         if isa(p, VecMultiSCVValType)
             @argcheck(all(!isempty, p), IsEmptyError)
         end
-        return new{typeof(p), typeof(cv), typeof(ex)}(p, cv, ex)
+        return new{typeof(p), typeof(cv), typeof(r), typeof(score), typeof(ex),
+                   typeof(train_score), typeof(kwargs)}(p, cv, r, score, ex, train_score,
+                                                        kwargs)
     end
 end
 function GridSearchCrossValidation(; p::MultiSCVValType_VecMultiSCVValType,
-                                   cv::CrossValidationEstimator = KFold(),
-                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    return GridSearchCrossValidation(p, cv, ex)
+                                   cv::SearchCV = KFold(),
+                                   r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+                                   score::CrossValSearchScorer = HighestMeanScore(),
+                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                                   train_score::Bool = false, kwargs::NamedTuple = (;))
+    return GridSearchCrossValidation(p, cv, r, score, ex, train_score, kwargs)
 end
-struct GridSearchCrossValidationResult <: SearchCrossValidationResult end
 function nested_lens(props::AbstractVector{Symbol})
     lens = Accessors.PropertyLens(props[1])
     for p in view(props, 2:length(props))
@@ -46,150 +72,62 @@ function key_val_grid(estvals::VecMultiSCVValType)
     vals = collect(Iterators.flatten(ks_val[2] for ks_val in ks_vals))
     return ks, vals
 end
+function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
+                       gscv::GridSearchCrossValidation, rd::ReturnsResult,
+                       train_idx::VecInt, test_idx::VecInt_VecVecInt)
+    rd_train = returns_result_view(rd, train_idx, :)
+    res = optimise(opt, rd_train)
+    test_pred = predict(res, rd, test_idx)
+    r = gscv.r
+    sign = ifelse(bigger_is_better(r), 1, -1)
+    test_score = sign * expected_risk(gscv.r, test_pred; gscv.kwargs...)
+    train_score = if gscv.train_score
+        sign * expected_risk(gscv.r, res; gscv.kwargs...)
+    else
+        nothing
+    end
+    return test_score, train_score
+end
 function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
-                                      rd::ReturnsResult)
+                                      rd::ReturnsResult; kwargs...)
     p = gscv.p
     ks, val_grid = key_val_grid(p)
     lenses = build_nested_lens(ks)
     cv = split(gscv.cv, rd)
+    @argcheck(isa(cv.test_idx[1], VecInt))
     N = length(val_grid)
     M = length(cv.train_idx)
-    allprod = Iterators.product(zip(1:N, val_grid), zip(1:M, cv.train_idx, cv.test_idx))
-    FLoops.@floop gscv.ex for ((i, v_grid), (j, train_idx, test_idx)) in allprod
-        idx = (j - 1) * N + (i - 1) + 1
-        local opti = opt
-        for (lens, val) in zip(lenses, v_grid)
-            opti = Accessors.set(opti, lens, val)
+    split_test_scores = Matrix{eltype(rd.X)}(undef, M, N)
+    split_train_scores = if gscv.train_score
+        Matrix{eltype(rd.X)}(undef, M, N)
+    else
+        nothing
+    end
+    let split_test_scores = split_test_scores, split_train_scores = split_train_scores
+        FLoops.@floop gscv.ex for (i, v_grid) in enumerate(val_grid)
+            local opti = opt
+            for (lens, val) in zip(lenses, v_grid)
+                opti = Accessors.set(opti, lens, val)
+            end
+            for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
+                test_score, train_score = fit_and_score(opti, gscv, rd, train_idx, test_idx)
+                split_test_scores[j, i] = test_score
+                if gscv.train_score
+                    split_train_scores[j, i] = train_score
+                end
+            end
         end
-        # Return a dict like this one.
-        # split_test_score  = [score_{1,1}, score_{1,2}, ... score_{1,M}]
-        #                     |score_{2,1}, score_{2,2}, ... score_{2,M}|
-        #                     |           .                             |
-        #                     |                        .                |
-        #                     |           .            .               .|
-        #                     [score_{N,1}, score_{N,2}, ... score_{N,M}]
-        # mean_split_score = mean(split_test_score, dims = 1)
-        # rank_test_score = sortperm(mean_split_score, rev = bigger_is_better(<risk_measure_used_for_scoring>))
-        #
-        # split_j_train_score = [score_1, score_2, ... score_i]
-        # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
-        #! Use fit_and_predict on each test and train split and then score them
-        #  cross_val_predict(opti, rd, cv; ex = gscv.ex)
     end
-    return nothing
-    # res = Vector{AbstractPredictionResult}(undef, N)
-    # FLoops.@floop gscv.ex for (i, v_grid) in enumerate(val_grid)
-    #     local opti = opt
-    #     for (lens, val) in zip(lenses, v_grid)
-    #         opti = Accessors.set(opti, lens, val)
-    #     end
-    #     res[i] = cross_val_predict(opti, rd, cv; ex = gscv.ex)
-    #     #! Use fit_and_predict on each test and train split and then score them
-    # end
-    # return res
+
+    split_test_scores
+    split_train_scores
+    opt_idx = gscv.score(split_test_scores)[2]
+    opt_grid = val_grid[opt_idx]
+    opti = opt
+    for (lens, val) in zip(lenses, opt_grid)
+        opti = Accessors.set(opti, lens, val)
+    end
+    return SearchCrossValidationResult(opti, split_test_scores, split_train_scores,
+                                       val_grid, opt_idx)
 end
-export grid_search_cross_validation, GridSearchCrossValidation
-#=
-#! Asked mr Gippitty to write this, it would not work but it gives ideas.
-"""
-    GridSearchCVResult
-
-Result type for grid search cross-validation. Stores parameter grid, scores, and best parameters.
-
-# Fields
-
-  - `param_grid::Vector{NamedTuple}`: List of parameter combinations.
-  - `mean_scores::Vector{Float64}`: Mean score for each parameter set.
-  - `std_scores::Vector{Float64}`: Std deviation of scores for each parameter set.
-  - `all_scores::Vector{Vector{Float64}}`: All fold scores for each parameter set.
-  - `best_index::Int`: Index of best parameter set.
-  - `best_params::NamedTuple`: Best parameter set.
-  - `best_score::Float64`: Best mean score.
-
-# Example
-
-```julia
-result = grid_search_cv(estimator_constructor, param_grid, X, y; n_folds = 5,
-                        scorer = my_metric)
-println(result.best_params)
-println(result.best_score)
-```
-"""
-Base.@kwdef struct GridSearchCVResult
-    param_grid::Vector{NamedTuple}
-    mean_scores::Vector{Float64}
-    std_scores::Vector{Float64}
-    all_scores::Vector{Vector{Float64}}
-    best_index::Int
-    best_params::NamedTuple
-    best_score::Float64
-end
-
-"""
-    grid_search_cv(estimator_constructor, param_grid, X, y; n_folds=5, scorer, rng=Random.GLOBAL_RNG)
-
-Perform grid search cross-validation over a parameter grid for an estimator.
-
-# Arguments
-
-  - `estimator_constructor`: Function or type that constructs an estimator given keyword arguments.
-  - `param_grid`: Vector of NamedTuples, each specifying a parameter combination.
-  - `X`: Feature matrix or data input.
-  - `y`: Target vector or data output.
-  - `n_folds`: Number of CV folds (default: 5).
-  - `scorer`: Function `(y_true, y_pred) -> score` to evaluate performance (higher is better).
-  - `rng`: Random number generator (default: Random.GLOBAL_RNG).
-
-# Returns
-
-  - `GridSearchCVResult` summarizing grid search outcomes.
-
-# Example
-
-```julia
-param_grid = [(alpha = a, beta = b) for a in 0.1:0.1:0.5, b in 1:2]
-result = grid_search_cv(MyEstimator, param_grid, X, y; n_folds = 3, scorer = my_metric)
-```
-"""
-function grid_search_cv(estimator_constructor, param_grid, X, y; n_folds = 5, scorer,
-                        rng = Random.GLOBAL_RNG)
-    @argcheck !isempty(param_grid) "Parameter grid must not be empty."
-    n = size(X, 1)
-    idx = collect(1:n)
-    Random.shuffle!(rng, idx)
-    fold_sizes = fill(div(n, n_folds), n_folds)
-    for i in 1:rem(n, n_folds)
-        fold_sizes[i] += 1
-    end
-    folds = []
-    start = 1
-    for sz in fold_sizes
-        push!(folds, idx[start:(start + sz - 1)])
-        start += sz
-    end
-    mean_scores = Float64[]
-    std_scores = Float64[]
-    all_scores = Vector{Vector{Float64}}()
-    for params in param_grid
-        scores = Float64[]
-        for i in 1:n_folds
-            val_idx = folds[i]
-            train_idx = vcat(folds[1:(i - 1)]..., folds[(i + 1):end]...)
-            X_train, y_train = X[train_idx, :], y[train_idx]
-            X_val, y_val = X[val_idx, :], y[val_idx]
-            est = estimator_constructor(; params...)
-            fit!(est, X_train, y_train)
-            y_pred = predict(est, X_val)
-            push!(scores, scorer(y_val, y_pred))
-        end
-        push!(mean_scores, mean(scores))
-        push!(std_scores, std(scores))
-        push!(all_scores, scores)
-    end
-    best_index = argmax(mean_scores)
-    return GridSearchCVResult(; param_grid = param_grid, mean_scores = mean_scores,
-                              std_scores = std_scores, all_scores = all_scores,
-                              best_index = best_index, best_params = param_grid[best_index],
-                              best_score = mean_scores[best_index])
-end
-=#
+export grid_search_cross_validation, GridSearchCrossValidation, SearchCrossValidationResult

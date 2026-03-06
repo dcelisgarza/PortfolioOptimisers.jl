@@ -13,6 +13,8 @@ abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidati
 abstract type OptimisationCrossValidationResult <: CrossValidationResult end
 abstract type SequentialCrossValidationResult <: OptimisationCrossValidationResult end
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
+const OptCVER = Union{<:OptimisationCrossValidationEstimator,
+                      <:OptimisationCrossValidationResult}
 
 const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
                          <:NonSequentialCrossValidationResult}

@@ -341,10 +341,10 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum,
                                                                  xrotation = 0,
                                                                  yrotation = 0), ekwargs...)
     if flag
-        x = factory(x, pr)
-        y = factory(y, pr)
+        x = factory(x, pr, slv)
+        y = factory(y, pr, slv)
         z = isnothing(z) ? nothing : factory(z, pr, slv)
-        c = factory(c, pr)
+        c = factory(c, pr, slv)
     end
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
