@@ -6,13 +6,17 @@ struct GridSearchCrossValidation{T1, T2, T3} <: SearchCrossValidationEstimator
     p::T1
     cv::T2
     ex::T3
-    function GridSearchCrossValidation(p::MultiSCVValType, cv::CrossValidationEstimator,
+    function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType,
+                                       cv::CrossValidationEstimator,
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
         @argcheck(!isempty(p), IsEmptyError)
+        if isa(p, VecMultiSCVValType)
+            @argcheck(all(!isempty, p), IsEmptyError)
+        end
         return new{typeof(p), typeof(cv), typeof(ex)}(p, cv, ex)
     end
 end
-function GridSearchCrossValidation(; p::MultiSCVValType,
+function GridSearchCrossValidation(; p::MultiSCVValType_VecMultiSCVValType,
                                    cv::CrossValidationEstimator = KFold(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return GridSearchCrossValidation(p, cv, ex)
@@ -30,31 +34,59 @@ function build_nested_lens(ks::VecStr)
     ks = [Symbol.(k) for k in ks]
     return [nested_lens(k) for k in ks]
 end
-function key_vals(estval::AbstractVector{<:PairSCV})
-    return map(x -> x[1], estval), map(x -> x[2], estval)
+function key_val_grid(estval::AbstractVector{<:PairSCV})
+    return map(x -> x[1], estval), Iterators.product(map(x -> x[2], estval)...)
 end
-function key_vals(estval::DictSCV)
-    return keys(estval), values(estval)
+function key_val_grid(estval::DictSCV)
+    return keys(estval), Iterators.product(values(estval)...)
+end
+function key_val_grid(estvals::VecMultiSCVValType)
+    ks_vals = [key_val_grid(estval) for estval in estvals]
+    ks = reduce(vcat, ks_val[1] for ks_val in ks_vals)
+    vals = collect(Iterators.flatten(ks_val[2] for ks_val in ks_vals))
+    return ks, vals
 end
 function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
                                       rd::ReturnsResult)
     p = gscv.p
-    ks, vals = key_vals(p)
+    ks, val_grid = key_val_grid(p)
     lenses = build_nested_lens(ks)
-    val_grid = Iterators.product(vals...)
-    res = Vector{AbstractPredictionResult}(undef, length(val_grid))
     cv = split(gscv.cv, rd)
-    # folds = Iterators.product(zip(1:length(val_grid), val_grid),
-    #                           zip(1:length(cv.train_idx), cv.train_idx, cv.test_idx))
-    FLoops.@floop gscv.ex for (i, v_grid) in enumerate(val_grid)
+    N = length(val_grid)
+    M = length(cv.train_idx)
+    allprod = Iterators.product(zip(1:N, val_grid), zip(1:M, cv.train_idx, cv.test_idx))
+    FLoops.@floop gscv.ex for ((i, v_grid), (j, train_idx, test_idx)) in allprod
+        idx = (j - 1) * N + (i - 1) + 1
         local opti = opt
         for (lens, val) in zip(lenses, v_grid)
             opti = Accessors.set(opti, lens, val)
         end
-        res[i] = cross_val_predict(opti, rd, cv; ex = gscv.ex)
-        #! Use fit predict on each test and train split and score them
+        # Return a dict like this one.
+        # split_test_score  = [score_{1,1}, score_{1,2}, ... score_{1,M}]
+        #                     |score_{2,1}, score_{2,2}, ... score_{2,M}|
+        #                     |           .                             |
+        #                     |                        .                |
+        #                     |           .            .               .|
+        #                     [score_{N,1}, score_{N,2}, ... score_{N,M}]
+        # mean_split_score = mean(split_test_score, dims = 1)
+        # rank_test_score = sortperm(mean_split_score, rev = bigger_is_better(<risk_measure_used_for_scoring>))
+        #
+        # split_j_train_score = [score_1, score_2, ... score_i]
+        # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
+        #! Use fit_and_predict on each test and train split and then score them
+        #  cross_val_predict(opti, rd, cv; ex = gscv.ex)
     end
-    return res
+    return nothing
+    # res = Vector{AbstractPredictionResult}(undef, N)
+    # FLoops.@floop gscv.ex for (i, v_grid) in enumerate(val_grid)
+    #     local opti = opt
+    #     for (lens, val) in zip(lenses, v_grid)
+    #         opti = Accessors.set(opti, lens, val)
+    #     end
+    #     res[i] = cross_val_predict(opti, rd, cv; ex = gscv.ex)
+    #     #! Use fit_and_predict on each test and train split and then score them
+    # end
+    # return res
 end
 export grid_search_cross_validation, GridSearchCrossValidation
 #=
