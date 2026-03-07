@@ -74,24 +74,24 @@ end
 function parse_lens(key::AbstractString)
     return _expr_to_lens_chain(Meta.parse(key))
 end
-function key_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
-    vals = collect(Iterators.product(map(x -> x[2], estval)...))
-    ks = fill(map(x -> x[1], estval), length(vals))
-    return ks, vals
+function lens_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
+    vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
+    lenses = fill(parse_lens.(map(x -> x[1], estval)), length(vals))
+    return lenses, vals
 end
-function key_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
-    vals = collect(Iterators.product(values(estval)...))
-    ks = fill(keys(estval), length(vals))
-    return ks, vals
+function lens_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
+    vals = vec(collect(Iterators.product(values(estval)...)))
+    lenses = fill(parse_lens.(keys(estval)), length(vals))
+    return lenses, vals
 end
-function key_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
-                                                                              <:AbstractVector}},
-                                                      <:AbstractDict{<:String,
-                                                                     <:AbstractVector}}})
-    ks_vals = [key_val_grid(estval) for estval in estvals]
-    ks = reduce(vcat, [ks_val[1] for ks_val in ks_vals])
-    vals = collect(Iterators.flatten(ks_val[2] for ks_val in ks_vals))
-    return ks, vals
+function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
+                                                                               <:AbstractVector}},
+                                                       <:AbstractDict{<:String,
+                                                                      <:AbstractVector}}})
+    lenses_vals = [lens_val_grid(estval) for estval in estvals]
+    lenses = mapreduce(x->x[1], vcat, lenses_vals)
+    vals = mapreduce(x -> x[2], vcat, lenses_vals)
+    return lenses, vals
 end
 function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                        gscv::GridSearchCrossValidation, rd::ReturnsResult,
@@ -112,8 +112,7 @@ end
 function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
                                       rd::ReturnsResult; kwargs...)
     p = gscv.p
-    ks, val_grid = key_val_grid(p)
-    lens_grid = [parse_lens.(k) for k in ks]
+    lens_grid, val_grid = lens_val_grid(p)
     cv = split(gscv.cv, rd)
     @argcheck(isa(cv.test_idx[1], VecInt))
     N = length(val_grid)
@@ -124,9 +123,7 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
     else
         nothing
     end
-    let opt = opt,
-        test_scores = test_scores,
-        train_scores = train_scores
+    let opt = opt, test_scores = test_scores, train_scores = train_scores
         FLoops.@floop gscv.ex for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
             local opti = opt
             for (lens, val) in zip(lenses, vals)
@@ -148,7 +145,6 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
     for (lens, val) in zip(opt_lens, opt_vals)
         opt = Accessors.set(opt, lens, val)
     end
-    return SearchCrossValidationResult(opt, test_scores, train_scores, val_grid,
-                                       opt_idx)
+    return SearchCrossValidationResult(opt, test_scores, train_scores, val_grid, opt_idx)
 end
 export grid_search_cross_validation, GridSearchCrossValidation, SearchCrossValidationResult

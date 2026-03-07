@@ -699,7 +699,7 @@
                                ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                               MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 
-    gs_cv1 = GridSearchCrossValidation(p1,
+    gs_cv1 = GridSearchCrossValidation(p1;
                                        r = MeanReturnRiskRatio(;
                                                                rk = LowOrderMoment(;
                                                                                    alg = SecondMoment())))
