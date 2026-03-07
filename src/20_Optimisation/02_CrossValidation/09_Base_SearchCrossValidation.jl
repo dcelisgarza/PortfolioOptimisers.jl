@@ -9,13 +9,14 @@ struct HighestMeanScore <: CrossValidationSearchScorer end
 function (s::HighestMeanScore)(X::MatNum)
     return argmax(dropdims(mean(X; dims = 1); dims = 1))
 end
-struct SearchCrossValidationResult{T1, T2, T3, T4, T5} <:
+struct SearchCrossValidationResult{T1, T2, T3, T4, T5, T6} <:
        AbstractSearchCrossValidationResult
     opt::T1
     test_scores::T2
     train_scores::T3
-    grid::T4
-    idx::T5
+    lens_grid::T4
+    val_grid::T5
+    idx::T6
 end
 function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                        scv::AbstractSearchCrossValidationEstimator, rd::ReturnsResult,

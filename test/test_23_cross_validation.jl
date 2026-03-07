@@ -1,6 +1,6 @@
 @safetestset "Cross Validation" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, Clarabel, Dates,
-          StableRNGs
+          StableRNGs, Distributions
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252 * 4):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
@@ -25,6 +25,38 @@
             end
         end
     end
+    slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = "verbose" => false),
+           Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = ["verbose" => false, "max_step_fraction" => 0.95]),
+           Solver(; name = :clarabel3, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.9)),
+           Solver(; name = :clarabel4, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.85)),
+           Solver(; name = :clarabel5, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.80)),
+           Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
+           Solver(; name = :clarabel7, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.7)),
+           Solver(; name = :clarabel8, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.6,
+                                  "max_iter" => 1500, "tol_gap_abs" => 1e-4,
+                                  "tol_gap_rel" => 1e-4, "tol_ktratio" => 1e-3,
+                                  "tol_feas" => 1e-4, "tol_infeas_abs" => 1e-4,
+                                  "tol_infeas_rel" => 1e-4, "reduced_tol_gap_abs" => 1e-4,
+                                  "reduced_tol_gap_rel" => 1e-4,
+                                  "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
+                                  "reduced_tol_infeas_abs" => 1e-4,
+                                  "reduced_tol_infeas_rel" => 1e-4))]
     @testset "KFold" begin
         T = size(rd.X, 1)
         n = 5
@@ -515,38 +547,6 @@
         @test unique(asset_idx) != asset_idx
         @test unique.(asset_idx) == asset_idx
     end
-    slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = "verbose" => false),
-           Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = ["verbose" => false, "max_step_fraction" => 0.95]),
-           Solver(; name = :clarabel3, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.9)),
-           Solver(; name = :clarabel4, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.85)),
-           Solver(; name = :clarabel5, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.80)),
-           Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
-           Solver(; name = :clarabel7, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.7)),
-           Solver(; name = :clarabel8, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.6,
-                                  "max_iter" => 1500, "tol_gap_abs" => 1e-4,
-                                  "tol_gap_rel" => 1e-4, "tol_ktratio" => 1e-3,
-                                  "tol_feas" => 1e-4, "tol_infeas_abs" => 1e-4,
-                                  "tol_infeas_rel" => 1e-4, "reduced_tol_gap_abs" => 1e-4,
-                                  "reduced_tol_gap_rel" => 1e-4,
-                                  "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
-                                  "reduced_tol_infeas_abs" => 1e-4,
-                                  "reduced_tol_infeas_rel" => 1e-4))]
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
         function test_pred(predictions, name; rtol = 1e-6)
@@ -688,31 +688,81 @@
     opt = JuMPOptimiser(; slv = slv)
     mr = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
                   opto = MeanRisk(; opt = opt))
-    p1 = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
-                                                          length = 3),
-                                "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                          length = 3)],
-                               ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                          length = 3)],
-                               ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
-                                                          length = 3)],
-                               ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                              MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+    r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
+    p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
+                                                         length = 3),
+                               "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                         length = 3)],
+                              ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                         length = 3)],
+                              ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
+                                                         length = 3)],
+                              ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                             MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+    gs_cv = GridSearchCrossValidation(p; r = r)
+    gs_res1 = search_cross_validation(mr, gs_cv, rd)
+    rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+    rs_res1 = search_cross_validation(mr, rs_cv1, rd)
+    @test gs_res1.val_grid[gs_res1.idx] == rs_res1.val_grid[rs_res1.idx]
+    @test gs_res1.lens_grid[gs_res1.idx] == rs_res1.lens_grid[rs_res1.idx]
+    p = concrete_typed_array([Dict("opti[2].opt.l1" => range(; start = 0.0005,
+                                                             stop = 0.0008, length = 3),
+                                   "opti[1].opt.l2" => range(; start = 0.0004,
+                                                             stop = 0.0007, length = 3)),
+                              Dict("opti[1].opt.l2" => range(; start = 0.0004,
+                                                             stop = 0.0007, length = 3)),
+                              Dict("opti[2].opt.l1" => range(; start = 0.0009,
+                                                             stop = 0.0012, length = 3)),
+                              Dict("opti[2]" => [MeanRisk(; opt = opt,
+                                                          obj = MaximumUtility()),
+                                                 MeanRisk(; opt = opt,
+                                                          obj = MaximumRatio())])])
+    rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+    rs_res2 = search_cross_validation(mr, rs_cv2, rd)
+    rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
+    if rev
+        @test reverse(rs_res2.val_grid[rs_res2.idx]) == rs_res1.val_grid[rs_res1.idx]
+        @test reverse(rs_res2.lens_grid[rs_res2.idx]) == rs_res1.lens_grid[rs_res1.idx]
+    else
+        @test rs_res2.val_grid[rs_res2.idx] == rs_res1.val_grid[rs_res1.idx]
+        @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
+    end
 
-    gs_cv1 = GridSearchCrossValidation(p1;
-                                       r = MeanReturnRiskRatio(;
-                                                               rk = LowOrderMoment(;
-                                                                                   alg = SecondMoment())))
-    gs_res1 = grid_search_cross_validation(mr, gs_cv1, rd)
+    p = concrete_typed_array(["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                            MeanRisk(; opt = opt, obj = MaximumRatio())],
+                              "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002,
+                                                        length = 3)])
+    gs_cv = GridSearchCrossValidation(p; r = r)
+    gs_res = search_cross_validation(mr, gs_cv, rd)
 
-    p2 = concrete_typed_array(["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                             MeanRisk(; opt = opt, obj = MaximumRatio())],
-                               "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002,
-                                                         length = 3)])
+    rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+    rs_res1 = search_cross_validation(mr, rs_cv1, rd)
+    @test gs_res.val_grid[gs_res.idx] == rs_res1.val_grid[rs_res1.idx]
+    @test gs_res.lens_grid[gs_res.idx] == rs_res1.lens_grid[rs_res1.idx]
 
-    gs_cv2 = GridSearchCrossValidation(p2;
-                                       r = MeanReturnRiskRatio(;
-                                                               rk = LowOrderMoment(;
-                                                                                   alg = SecondMoment())))
-    gs_res2 = grid_search_cross_validation(mr, gs_cv2, rd)
+    p = Dict("opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                           MeanRisk(; opt = opt, obj = MaximumRatio())],
+             "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002, length = 3))
+    rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+    rs_res2 = search_cross_validation(mr, rs_cv2, rd)
+    rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
+    if rev
+        @test reverse(rs_res2.val_grid[rs_res2.idx]) == rs_res1.val_grid[rs_res1.idx]
+        @test reverse(rs_res2.lens_grid[rs_res2.idx]) == rs_res1.lens_grid[rs_res1.idx]
+    else
+        @test rs_res2.val_grid[rs_res2.idx] == rs_res1.val_grid[rs_res1.idx]
+        @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
+    end
+
+    p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
+                                                         length = 3),
+                               "opti[1].opt.l2" => Uniform(0, 0.0015)],
+                              ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
+                                                         length = 3)],
+                              ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
+                                                         length = 3)],
+                              ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                             MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+    rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+    rs_res1 = search_cross_validation(mr, rs_cv1, rd)
 end

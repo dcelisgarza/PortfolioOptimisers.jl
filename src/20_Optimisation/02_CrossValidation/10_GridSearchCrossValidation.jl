@@ -7,13 +7,13 @@ struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
     ex::T5
     train_score::T6
     kwargs::T7
-    function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType, cv::SearchCV,
-                                       r::AbstractBaseRiskMeasure,
+    function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType,
+                                       cv::SearchCV, r::AbstractBaseRiskMeasure,
                                        score::CrossValSearchScorer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
                                        kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
-        if isa(p, VecMultiSCVValType)
+        if isa(p, VecMultiGSCVValType)
             @argcheck(all(!isempty, p), IsEmptyError)
         end
         return new{typeof(p), typeof(cv), typeof(r), typeof(score), typeof(ex),
@@ -21,7 +21,7 @@ struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
                                                         kwargs)
     end
 end
-function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType;
+function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType;
                                    cv::SearchCV = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    score::CrossValSearchScorer = HighestMeanScore(),
@@ -31,12 +31,12 @@ function GridSearchCrossValidation(p::MultiSCVValType_VecMultiSCVValType;
 end
 function lens_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
     vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
-    lenses = fill(parse_lens.(map(x -> x[1], estval)), length(vals))
+    lenses = fill(map(x -> parse_lens(x[1]), estval), length(vals))
     return lenses, vals
 end
 function lens_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
     vals = vec(collect(Iterators.product(values(estval)...)))
-    lenses = fill(parse_lens.(keys(estval)), length(vals))
+    lenses = fill(map(x -> parse_lens(x), keys(estval)), length(vals))
     return lenses, vals
 end
 function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
@@ -83,6 +83,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     for (lens, val) in zip(opt_lens, opt_vals)
         opt = Accessors.set(opt, lens, val)
     end
-    return SearchCrossValidationResult(opt, test_scores, train_scores, val_grid, opt_idx)
+    return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
+                                       opt_idx)
 end
 export search_cross_validation, GridSearchCrossValidation
