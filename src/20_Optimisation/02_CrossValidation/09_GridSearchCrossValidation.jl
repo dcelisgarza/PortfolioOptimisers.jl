@@ -12,8 +12,8 @@ end
 struct SearchCrossValidationResult{T1, T2, T3, T4, T5} <:
        AbstractSearchCrossValidationResult
     opti::T1
-    split_test_scores::T2
-    split_train_scores::T3
+    test_scores::T2
+    train_scores::T3
     grid::T4
     idx::T5
 end
@@ -118,39 +118,37 @@ function grid_search_cross_validation(opt, gscv::GridSearchCrossValidation,
     @argcheck(isa(cv.test_idx[1], VecInt))
     N = length(val_grid)
     M = length(cv.train_idx)
-    split_test_scores = Matrix{eltype(rd.X)}(undef, M, N)
-    split_train_scores = if gscv.train_score
+    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
+    train_scores = if gscv.train_score
         Matrix{eltype(rd.X)}(undef, M, N)
     else
         nothing
     end
     let opt = opt,
-        split_test_scores = split_test_scores,
-        split_train_scores = split_train_scores
-
-        # FLoops.@floop gscv.ex
-        for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
+        test_scores = test_scores,
+        train_scores = train_scores
+        FLoops.@floop gscv.ex for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
             local opti = opt
             for (lens, val) in zip(lenses, vals)
                 opti = Accessors.set(opti, lens, val)
             end
             for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
                 test_score, train_score = fit_and_score(opti, gscv, rd, train_idx, test_idx)
-                split_test_scores[j, i] = test_score
+                test_scores[j, i] = test_score
                 if gscv.train_score
-                    split_train_scores[j, i] = train_score
+                    train_scores[j, i] = train_score
                 end
             end
         end
     end
 
-    opt_idx = gscv.score(split_test_scores)
+    opt_idx = gscv.score(test_scores)
     opt_lens = lens_grid[opt_idx]
     opt_vals = val_grid[opt_idx]
     for (lens, val) in zip(opt_lens, opt_vals)
         opt = Accessors.set(opt, lens, val)
     end
-    return SearchCrossValidationResult(opt, split_test_scores, split_train_scores, val_grid,
+    return SearchCrossValidationResult(opt, test_scores, train_scores, val_grid,
                                        opt_idx)
 end
 export grid_search_cross_validation, GridSearchCrossValidation, SearchCrossValidationResult
