@@ -1,33 +1,106 @@
+"""
+    struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
+           AbstractSearchCrossValidationEstimator
+        p::T1
+        cv::T2
+        r::T3
+        scorer::T4
+        ex::T5
+        train_score::T6
+        kwargs::T7
+    end
+
+Performs grid search cross-validation for portfolio optimisation estimators. Iterates over parameter grids, applies cross-validation splits, and scores each configuration to select the optimal parameters.
+
+# Fields
+
+  - `p`: Parameter grid for optimisation.
+  - `cv`: Cross-validation splitter (e.g., KFold).
+  - `r`: Risk measure used for scoring (e.g., ConditionalValueatRisk).
+  - `scorer`: Scoring function to select optimal parameter set.
+  - `ex`: Parallel execution strategy (e.g., FLoops.ThreadedEx).
+  - `train_score`: Whether to record training scores.
+  - `kwargs`: Additional keyword arguments for customisation.
+
+# Constructors
+
+```julia
+GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType; cv::SearchCV = KFold(),
+                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+                          scorer::CrossValSearchScorer = HighestMeanScore(),
+                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                          train_score::Bool = false, kwargs::NamedTuple = (;))
+```
+
+  - Arguments correspond to fields above.
+
+## Validation
+
+  - `@argcheck(!isempty(p), IsEmptyError)`: Parameter grid must not be empty.
+  - If `p` is a vector of parameter sets, each must not be empty.
+  - All validations use custom error types.
+
+# Examples
+
+```jldoctest
+julia> GridSearchCrossValidation(Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0]))
+GridSearchCrossValidation
+            p ┼ Dict{String, Vector{Float64}}: Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0])
+           cv ┼ KFold
+              │              n ┼ Int64: 5
+              │    purged_size ┼ Int64: 0
+              │   embargo_size ┴ Int64: 0
+            r ┼ ConditionalValueatRisk
+              │   settings ┼ RiskMeasureSettings
+              │            │   scale ┼ Float64: 1.0
+              │            │      ub ┼ nothing
+              │            │     rke ┴ Bool: true
+              │      alpha ┼ Float64: 0.05
+              │          w ┴ nothing
+        scorer ┼ HighestMeanScore()
+           ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+  train_score ┼ Bool: false
+       kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`MultiGSCVValType_VecMultiGSCVValType`](@ref)
+  - [`SearchCV`](@ref)
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+  - [`search_cross_validation`](@ref)
+"""
 struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractSearchCrossValidationEstimator
     p::T1
     cv::T2
     r::T3
-    score::T4
+    scorer::T4
     ex::T5
     train_score::T6
     kwargs::T7
     function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType,
                                        cv::SearchCV, r::AbstractBaseRiskMeasure,
-                                       score::CrossValSearchScorer,
+                                       scorer::CrossValSearchScorer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
                                        kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
         if isa(p, VecMultiGSCVValType)
             @argcheck(all(!isempty, p), IsEmptyError)
         end
-        return new{typeof(p), typeof(cv), typeof(r), typeof(score), typeof(ex),
-                   typeof(train_score), typeof(kwargs)}(p, cv, r, score, ex, train_score,
+        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
+                   typeof(train_score), typeof(kwargs)}(p, cv, r, scorer, ex, train_score,
                                                         kwargs)
     end
 end
 function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType;
                                    cv::SearchCV = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                                   score::CrossValSearchScorer = HighestMeanScore(),
+                                   scorer::CrossValSearchScorer = HighestMeanScore(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    train_score::Bool = false, kwargs::NamedTuple = (;))
-    return GridSearchCrossValidation(p, cv, r, score, ex, train_score, kwargs)
+    return GridSearchCrossValidation(p, cv, r, scorer, ex, train_score, kwargs)
 end
 function lens_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
     vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
@@ -48,6 +121,46 @@ function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<
     vals = mapreduce(x -> x[2], vcat, lenses_vals)
     return lenses, vals
 end
+"""
+    search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
+                           gscv::GridSearchCrossValidation,
+                           rd::ReturnsResult)
+
+Performs grid search cross-validation for portfolio optimisation estimators. Iterates over parameter grids, applies cross-validation splits, fits and scores each configuration, and selects the optimal parameters using the provided scoring strategy.
+
+# Arguments
+
+  - `opt`: Portfolio optimisation estimator to be tuned.
+  - `gscv`: Grid search cross-validation estimator specifying parameter grid, CV splitter, risk measure, scorer, execution strategy, and options.
+  - `rd`: Returns result containing asset returns data.
+
+# Returns
+
+  - `SearchCrossValidationResult`: Result type containing the optimal estimator, test and train scores, parameter grid, and selected index.
+
+# Validation
+
+  - Ensures parameter grid is not empty.
+  - Validates cross-validation splits and indices.
+
+# Details
+
+  - Iterates over all parameter combinations in the grid.
+  - Applies cross-validation splits to the returns data.
+  - Fits the estimator for each parameter set and split.
+  - Scores each configuration using the specified risk measure and scoring function.
+  - Selects the optimal parameter set based on cross-validation scores.
+  - Returns a result object encapsulating the optimal estimator and score matrices.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationEstimator`]-(@ref)
+  - [`RandomisedSearchCrossValidation`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+
+# Examples
+"""
 function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  gscv::GridSearchCrossValidation, rd::ReturnsResult)
     p = gscv.p
@@ -77,7 +190,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    opt_idx = gscv.score(test_scores)
+    opt_idx = gscv.scorer(test_scores)
     opt_lens = lens_grid[opt_idx]
     opt_vals = val_grid[opt_idx]
     for (lens, val) in zip(opt_lens, opt_vals)

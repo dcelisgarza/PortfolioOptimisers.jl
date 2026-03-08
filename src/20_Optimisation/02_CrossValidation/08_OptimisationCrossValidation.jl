@@ -1,14 +1,14 @@
 struct OptimisationCrossValidation{T1, T2} <: AbstractEstimator
     cv::T1
-    score::T2
+    scorer::T2
     function OptimisationCrossValidation(cv::OptCVER,
-                                         score::Option{<:PredictionCrossValScorer})
-        return new{typeof(cv), typeof(score)}(cv, score)
+                                         scorer::Option{<:PredictionCrossValScorer})
+        return new{typeof(cv), typeof(scorer)}(cv, scorer)
     end
 end
 function OptimisationCrossValidation(; cv::OptCVER = KFold(),
-                                     score::Option{<:PredictionCrossValScorer} = nothing)
-    return OptimisationCrossValidation(cv, score)
+                                     scorer::Option{<:PredictionCrossValScorer} = nothing)
+    return OptimisationCrossValidation(cv, scorer)
 end
 const NonCombOptCV = Union{<:KFold, <:WalkForwardEstimator}
 

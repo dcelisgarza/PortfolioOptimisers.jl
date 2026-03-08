@@ -304,7 +304,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
                                              fees::Option{<:Fees}, wi::MatNum, resi::VecOpt,
                                              cls::VecVecInt)
     (; opti, cv, ex) = nco
-    (; cv, score) = cv
+    (; cv, scorer) = cv
     N = length(cls)
     predictions = Vector{PopulationPredictionResult}(undef, N)
     let cv = cv
@@ -313,10 +313,10 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
-    if isnothing(score)
-        score = NearestQuantilePrediction()
+    if isnothing(scorer)
+        scorer = NearestQuantilePrediction()
     end
-    best_predictions = [score(prediction) for prediction in predictions]
+    best_predictions = [scorer(prediction) for prediction in predictions]
     return rebuild_returns_result(rd, best_predictions, N)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
