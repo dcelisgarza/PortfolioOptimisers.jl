@@ -57,7 +57,7 @@ GridSearchCrossValidation
               │            │     rke ┴ Bool: true
               │      alpha ┼ Float64: 0.05
               │          w ┴ nothing
-        scorer ┼ HighestMeanScore()
+       scorer ┼ HighestMeanScore()
            ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   train_score ┼ Bool: false
        kwargs ┴ @NamedTuple{}: NamedTuple()

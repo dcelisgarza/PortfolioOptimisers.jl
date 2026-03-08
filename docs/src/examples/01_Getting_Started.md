@@ -1,4 +1,5 @@
-The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/01_Getting_Started.jl"
 ```
@@ -154,4 +155,3 @@ println("cost of shares ≈ cost of portfolio: $(all(isapprox.(mip_res.shares .*
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

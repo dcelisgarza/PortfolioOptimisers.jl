@@ -60,9 +60,9 @@ Keyword arguments correspond to the fields above.
 
 ```jldoctest
 julia> RandomisedSearchCrossValidation(Dict("alpha" => [0.1, 0.2, 0.3],
-                                            "beta" => Distributions.Normal(1.0, 0.5)))
+                                            "beta" => Normal(1.0, 0.5)))
 RandomisedSearchCrossValidation
-            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Normal{Float64}(μ=1.0, σ=0.5))
+            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Distributions.Normal{Float64}(μ=1.0, σ=0.5))
            cv ┼ KFold
               │              n ┼ Int64: 5
               │    purged_size ┼ Int64: 0
@@ -74,7 +74,7 @@ RandomisedSearchCrossValidation
               │            │     rke ┴ Bool: true
               │      alpha ┼ Float64: 0.05
               │          w ┴ nothing
-        score ┼ PortfolioOptimisers.HighestMeanScore()
+       scorer ┼ HighestMeanScore()
            ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
        n_iter ┼ Int64: 10
           rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
