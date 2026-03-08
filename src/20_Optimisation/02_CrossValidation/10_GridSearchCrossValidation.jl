@@ -36,7 +36,7 @@ function lens_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}
 end
 function lens_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
     vals = vec(collect(Iterators.product(values(estval)...)))
-    lenses = fill(map(x -> parse_lens(x), keys(estval)), length(vals))
+    lenses = fill(parse_lens.(keys(estval)), length(vals))
     return lenses, vals
 end
 function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
