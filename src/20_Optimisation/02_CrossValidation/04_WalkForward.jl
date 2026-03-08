@@ -12,6 +12,7 @@ end
 function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return WalkForwardResult(train_idx, test_idx)
 end
+const WFCVER = Union{<:WalkForwardEstimator, <:WalkForwardResult}
 """
     struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
         train_size
@@ -430,7 +431,7 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     return special_div(last_allowed_start - M, test_size) + 1
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::WalkForwardEstimator; cols = :,
+                         cv::WFCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     cv_res = split(cv, rd)
@@ -463,8 +464,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                         cv::WalkForwardEstimator;
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         cv::WFCVER; ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx

@@ -245,11 +245,11 @@ function LInfTracking(; ddof::Integer = 0, pos::Bool = true)
     return LInfTracking(ddof, pos)
 end
 """
-    norm_tracking(f::L2Tracking, a, b; N::Option{<:Number} = nothing)
-    norm_tracking(f::SquaredL2Tracking, a, b; N::Option{<:Number} = nothing)
-    norm_tracking(::L1Tracking, a, b; N::Option{<:Number} = nothing)
-    norm_tracking(f::LpTracking, a, b; N::Option{<:Number} = nothing)
-    norm_tracking(f::LInfTracking, a, b; N::Option{<:Number} = nothing)
+    norm_tracking(f::L2Tracking, a, b, T::Option{<:Number} = nothing)
+    norm_tracking(f::SquaredL2Tracking, a, b, T::Option{<:Number} = nothing)
+    norm_tracking(::L1Tracking, a, b, T::Option{<:Number} = nothing)
+    norm_tracking(f::LpTracking, a, b, T::Option{<:Number} = nothing)
+    norm_tracking(f::LInfTracking, a, b, T::Option{<:Number} = nothing)
 
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
@@ -260,7 +260,7 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
   - `f`: Tracking formulation algorithm.
   - `a`: Portfolio weights.
   - `b`: Benchmark weights.
-  - `N`: Optional number of assets.
+  - `T`: Optional number of observations.
 
 # Returns
 
@@ -268,9 +268,9 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 # Details
 
-  - For `L2Tracking`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(N - f.ddof)` if `N` is not `nothing`, else unscaled.
-  - For `SquaredL2Tracking`, computes `LinearAlgebra.norm(a - b, 2)^2 / (N - f.ddof)` if `N` is not `nothing`, else unscaled.
-  - For `L1Tracking`, computes `LinearAlgebra.norm(a - b, 1) / N` if `N` is not `nothing`, else unscaled.
+  - For `L2Tracking`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(T - f.ddof)` if `T` is not `nothing`, else unscaled.
+  - For `SquaredL2Tracking`, computes `LinearAlgebra.norm(a - b, 2)^2 / (T - f.ddof)` if `T` is not `nothing`, else unscaled.
+  - For `L1Tracking`, computes `LinearAlgebra.norm(a - b, 1) / T` if `T` is not `nothing`, else unscaled.
 
 # Examples
 
@@ -289,21 +289,21 @@ julia> PortfolioOptimisers.norm_tracking(L1Tracking(), [0.5, 0.5], [0.6, 0.4], 2
   - [`NormTracking`](@ref)
   - [`Option`](@ref)
 """
-function norm_tracking(f::L2Tracking, a, b, N::Option{<:Number} = nothing)
-    factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
+function norm_tracking(f::L2Tracking, a, b, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
     return LinearAlgebra.norm(a - b, 2) / factor
 end
-function norm_tracking(f::SquaredL2Tracking, a, b, N::Option{<:Number} = nothing)
-    factor = isnothing(N) ? 1 : (N - f.ddof)
+function norm_tracking(f::SquaredL2Tracking, a, b, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : (T - f.ddof)
     val = LinearAlgebra.norm(a - b, 2)
     return val^2 / factor
 end
-function norm_tracking(::L1Tracking, a, b, N::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(N), 1, N)
+function norm_tracking(::L1Tracking, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T)
     return LinearAlgebra.norm(a - b, 1) / factor
 end
-function norm_tracking(f::LpTracking, a, b, N::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(N), 1, N - f.ddof)
+function norm_tracking(f::LpTracking, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
     factor = if f.p == 3
         cbrt(factor)
     else
@@ -311,8 +311,8 @@ function norm_tracking(f::LpTracking, a, b, N::Option{<:Number} = nothing)
     end
     return LinearAlgebra.norm(a - b, f.p) / factor
 end
-function norm_tracking(f::LInfTracking, a, b, N::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(N), 1, N - f.ddof)
+function norm_tracking(f::LInfTracking, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
     ty = promote_type(eltype(a), eltype(b))
     p = ifelse(f.pos, typemax(ty), typemin(ty))
     return LinearAlgebra.norm(a - b, p) / factor

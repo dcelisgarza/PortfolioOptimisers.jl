@@ -378,6 +378,17 @@ Alias for a pair consisting of an abstract string and a numeric type.
 """
 const PairStrNum = Pair{<:AbstractString, <:Number}
 """
+    const PairGSCV = Pair{<:AbstractString, <:AbstractVector}
+
+Alias for a pair consisting of an abstract string and an abstract vector.
+
+# Related
+
+  - [`DictGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+"""
+const PairGSCV = Pair{<:AbstractString, <:AbstractVector}
+"""
     const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 
 Alias for an abstract dictionary with string keys and numeric values.
@@ -388,6 +399,17 @@ Alias for an abstract dictionary with string keys and numeric values.
   - [`MultiEstValType`](@ref)
 """
 const DictStrNum = AbstractDict{<:AbstractString, <:Number}
+"""
+    const DictGSCV = AbstractDict{<:AbstractString, <:AbstractVector}
+
+Alias for an abstract dictionary with string keys and abstract vector values.
+
+# Related
+
+  - [`PairGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+"""
+const DictGSCV = AbstractDict{<:AbstractString, <:AbstractVector}
 """
     const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 
@@ -400,6 +422,47 @@ Alias for a union of a dictionary with string keys and numeric values, or a vect
   - [`EstValType`](@ref)
 """
 const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
+"""
+    const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
+
+Alias for a union of an abstract dictionary with string keys and abstract vector values, or a vector of string-vector pairs.
+
+# Related
+
+  - [`DictGSCV`](@ref)
+  - [`PairGSCV`](@ref)
+  - [`VecMultiGSCVValType`](@ref)
+  - [`MultiGSCVValType_VecMultiGSCVValType`](@ref)
+"""
+const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
+"""
+    const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
+
+Alias for an abstract vector of `MultiGSCVValType` elements.
+
+# Related
+
+  - [`DictGSCV`](@ref)
+  - [`PairGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+  - [`MultiGSCVValType_VecMultiGSCVValType`](@ref)
+"""
+const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
+"""
+    const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
+                                                   <:VecMultiGSCVValType}
+
+Alias for a union of `MultiGSCVValType` and `VecMultiGSCVValType` elements.
+
+# Related
+
+  - [`DictGSCV`](@ref)
+  - [`PairGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+  - [`VecMultiGSCVValType`](@ref)
+"""
+const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
+                                                   <:VecMultiGSCVValType}
 """
     abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
 

@@ -280,8 +280,8 @@ end
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
-function dup_elim_sum_view(::MatNum, N)
-    return dup_elim_sum_matrices(N)
+function dup_elim_sum_view(::MatNum, n)
+    return dup_elim_sum_matrices(n)
 end
 function prior_view(pr::HighOrderPrior, i)
     idx = fourth_moment_index_generator(length(pr.mu), i)

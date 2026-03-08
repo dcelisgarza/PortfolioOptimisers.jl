@@ -159,7 +159,7 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
     # if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
     #     return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
     # end
-    (; cv, score) = cv
+    (; cv, scorer) = cv
     N = length(opti)
     predictions = Vector{PopulationPredictionResult}(undef, N)
     let cv = cv
@@ -168,10 +168,10 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
-    if isnothing(score)
-        score = NearestQuantilePrediction()
+    if isnothing(scorer)
+        scorer = NearestQuantilePrediction()
     end
-    best_predictions = [score(prediction) for prediction in predictions]
+    best_predictions = [scorer(prediction) for prediction in predictions]
     return rebuild_returns_result(rd, best_predictions, N)
 end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,

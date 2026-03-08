@@ -1,4 +1,4 @@
-The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
 
 ```@meta
 EditURL = "../../../examples/02_Mean_Risk_Objectives.jl"

@@ -59,6 +59,11 @@ PairStrNum
 DictStrNum
 MultiEstValType
 EstValType
+PairGSCV
+DictGSCV
+MultiGSCVValType
+VecMultiGSCVValType
+MultiGSCVValType_VecMultiGSCVValType
 Str_Expr
 VecStr_Expr
 EqnType
