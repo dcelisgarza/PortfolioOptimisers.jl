@@ -207,9 +207,11 @@ function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:Asset
                                       rcos::AbstractVector{<:OptimisationReturnCode},
                                       ws::VecVecNum, wi::MatNum;
                                       datatype::DataType = Float64)
-    res = [outer_optimisation_finaliser(wb, sets, wf, strict, resi, rco, w, wi;
-                                        datatype = datatype) for (rco, w) in zip(rcos, ws)]
-    return map(x -> x[1], res), map(x -> x[2], res), map(x -> x[3], res)
+    wb_retcode_w = [outer_optimisation_finaliser(wb, sets, wf, strict, resi, rco, w, wi;
+                                                 datatype = datatype)
+                    for (rco, w) in zip(rcos, ws)]
+    return map(x -> x[1], wb_retcode_w), map(x -> x[2], wb_retcode_w),
+           map(x -> x[3], wb_retcode_w)
 end
 function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                       wf::WeightFinaliser, strict::Bool, resi::VecOpt,
