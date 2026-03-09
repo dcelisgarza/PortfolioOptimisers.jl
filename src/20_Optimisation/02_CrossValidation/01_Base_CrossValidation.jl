@@ -310,7 +310,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     return predict(res, rd, test_idx, cols)
 end
 function sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
-    @argcheck(all(allunique, test_idx), "Test indices must be unique.")
+    @argcheck(all(map(x -> allunique(x), test_idx)), "Test indices must be unique.")
     idx = sortperm(test_idx; by = x -> x[1])
     return predictions[idx]
 end
