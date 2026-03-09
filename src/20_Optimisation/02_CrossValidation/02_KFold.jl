@@ -100,7 +100,7 @@ function Base.split(kf::KFold, rd::ReturnsResult)
                 push!(tmp_test_idx, test_idx[j])
             end
         end
-        push!(train_idx, vcat(tmp_test_idx...))
+        push!(train_idx, reduce(vcat, tmp_test_idx))
     end
     return KFoldResult(; train_idx = train_idx, test_idx = test_idx)
 end
