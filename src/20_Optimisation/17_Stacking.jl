@@ -194,8 +194,9 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, wi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
-                                                 reso, wi * reso.w; datatype = eltype(pr.X))
+    wb, retcode, w = outer_optimisation_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
+                                                  reso.retcode, reso.w, wi;
+                                                  datatype = eltype(pr.X))
     return StackingResult(typeof(st), pr, wb, fees, resi, reso, st.cv, retcode, w, nothing)
 end
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

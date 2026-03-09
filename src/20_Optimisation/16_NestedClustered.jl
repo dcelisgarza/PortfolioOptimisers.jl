@@ -202,15 +202,25 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf,
                            strict = nco.strict, ex = nco.ex, fb = nco.fb)
 end
-function nested_clustering_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                                     wf::WeightFinaliser, strict::Bool, resi::VecOpt,
-                                     res::NonFiniteAllocationOptimisationResult, w::VecNum;
-                                     datatype::DataType = Float64)
+function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+                                      wf::WeightFinaliser, strict::Bool, resi::VecOpt,
+                                      rcos::AbstractVector{<:OptimisationReturnCode},
+                                      ws::VecVecNum, wi::MatNum;
+                                      datatype::DataType = Float64)
+    res = [outer_optimisation_finaliser(wb, sets, wf, strict, resi, rco, w, wi;
+                                        datatype = datatype) for (rco, w) in zip(rcos, ws)]
+    return map(x -> x[1], res), map(x -> x[2], res), map(x -> x[3], res)
+end
+function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+                                      wf::WeightFinaliser, strict::Bool, resi::VecOpt,
+                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum;
+                                      datatype::DataType = Float64)
+    w = wi * w
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
                                    datatype = datatype)
     retcode, w = finalise_weight_bounds(wf, wb, w)
     wb_flag = isa(retcode, OptimisationFailure)
-    opto_flag = isa(res.retcode, OptimisationFailure)
+    opto_flag = isa(rco, OptimisationFailure)
     resi_flag = any(x -> isa(x, OptimisationFailure), getproperty.(resi, :retcode))
     if resi_flag || opto_flag || wb_flag
         msg = ""
@@ -345,8 +355,9 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     rdo = predict_outer_nco_estimator_returns(nco, rd, pr, fees, wi, resi, cls)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.wf, nco.strict, resi,
-                                                 reso, wi * reso.w; datatype = eltype(pr.X))
+    wb, retcode, w = outer_optimisation_finaliser(nco.wb, nco.sets, nco.wf, nco.strict,
+                                                  resi, reso.retcode, reso.w, wi;
+                                                  datatype = eltype(pr.X))
     return NestedClusteredResult(typeof(nco), pr, clr, wb, fees, resi, reso, nco.cv,
                                  retcode, w, nothing)
 end

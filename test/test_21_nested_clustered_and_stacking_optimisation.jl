@@ -747,4 +747,24 @@
                         0.05555555556523971, 0.04545454545389754, 0.05555555556523971,
                         0.05555555556523971, 0.04545454545389754], rtol = 1e-6)
     end
+    @testset "Efficient frontier" begin
+        mr1 = MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv))
+        mr2 = MeanRisk(; obj = MaximumRatio(), opt = JuMPOptimiser(; pe = pr, slv = slv))
+        mr3 = MeanRisk(;
+                       opt = JuMPOptimiser(;
+                                           ret = ArithmeticReturn(;
+                                                                  lb = Frontier(; N = 10)),
+                                           slv = slv))
+        nco = NestedClustered(; opti = mr1, opto = mr3)
+        res = optimise(nco, rd)
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/NestedClusteredEfficientFrontier.csv.gz"),
+                      DataFrame)
+        @test isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-6)
+        st = Stacking(; opti = [mr1, mr2], opto = mr3)
+        res = optimise(st, rd)
+        df = CSV.read(joinpath(@__DIR__, "./assets/StackingEfficientFrontier.csv.gz"),
+                      DataFrame)
+        @test isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-6)
+    end
 end
