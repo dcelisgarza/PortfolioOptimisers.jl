@@ -141,7 +141,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
                 sigma = pr.sigma
             else
                 err_sigma = vec(Statistics.var(pe.pe.ve, err; dims = 1))
-                sigma = if any(x -> x[1] > x[2], (err_sigma, LinearAlgebra.diag(pr.sigma)))
+                sigma = if any(map((x, y) -> x > y, err_sigma,
+                                   LinearAlgebra.diag(pr.sigma)))
                     @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
                     pr.sigma
                 else

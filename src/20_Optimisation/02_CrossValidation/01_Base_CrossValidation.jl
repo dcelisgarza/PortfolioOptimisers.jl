@@ -324,7 +324,7 @@ function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols 
               "Cross validation estimator must not be shuffled.")
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    @argcheck(all(x -> x > zero(x), map(x -> diff(x), train_idx)),
+    @argcheck(all(map(x -> x > zero(x), map(x -> diff(x), train_idx))),
               "Cross validation estimator must not be shuffled.")
     predictions = Vector{PredictionResult}(undef, length(train_idx))
     FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))

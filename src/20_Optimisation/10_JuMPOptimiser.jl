@@ -221,20 +221,23 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
            isa(sgmtx, AssetSetsMatrixEstimator) ||
            isa(fees, FeesEstimator) ||
            isa(tn, TurnoverEstimator) ||
-           isa(slt, AbstractVector) && any(x -> isa(x, ThresholdEstimator), slt) ||
-           isa(sst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sst) ||
-           isa(sglt, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sglt) ||
-           isa(sgst, AbstractVector) && any(x -> isa(x, ThresholdEstimator), sgst) ||
-           isa(lcse, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), lcse) ||
-           isa(cte, AbstractVector) && any(x -> isa(x, LinearConstraintEstimator), cte) ||
+           isa(slt, AbstractVector) && any(map(x -> isa(x, ThresholdEstimator), slt)) ||
+           isa(sst, AbstractVector) && any(map(x -> isa(x, ThresholdEstimator), sst)) ||
+           isa(sglt, AbstractVector) && any(map(x -> isa(x, ThresholdEstimator), sglt)) ||
+           isa(sgst, AbstractVector) && any(map(x -> isa(x, ThresholdEstimator), sgst)) ||
+           isa(lcse, AbstractVector) &&
+           any(map(x -> isa(x, LinearConstraintEstimator), lcse)) ||
+           isa(cte, AbstractVector) &&
+           any(map(x -> isa(x, LinearConstraintEstimator), cte)) ||
            isa(gcarde, AbstractVector) &&
-           any(x -> isa(x, LinearConstraintEstimator), gcarde) ||
+           any(map(x -> isa(x, LinearConstraintEstimator), gcarde)) ||
            isa(sgcarde, AbstractVector) &&
-           any(x -> isa(x, LinearConstraintEstimator), sgcarde) ||
-           isa(smtx, AbstractVector) && any(x -> isa(x, AssetSetsMatrixEstimator), smtx) ||
+           any(map(x -> isa(x, LinearConstraintEstimator), sgcarde)) ||
+           isa(smtx, AbstractVector) &&
+           any(map(x -> isa(x, AssetSetsMatrixEstimator), smtx)) ||
            isa(sgmtx, AbstractVector) &&
-           any(x -> isa(x, AssetSetsMatrixEstimator), sgmtx) ||
-           isa(tn, AbstractVector) && any(x -> isa(x, TurnoverEstimator), tn)
+           any(map(x -> isa(x, AssetSetsMatrixEstimator), sgmtx)) ||
+           isa(tn, AbstractVector) && any(map(x -> isa(x, TurnoverEstimator), tn))
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),

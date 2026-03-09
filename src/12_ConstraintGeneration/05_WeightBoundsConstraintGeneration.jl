@@ -16,7 +16,7 @@ function validate_bounds(lb::VecNum, ub::VecNum)
     @argcheck(!isempty(lb))
     @argcheck(!isempty(ub))
     @argcheck(length(lb) == length(ub))
-    @argcheck(all(x -> x[1] <= x[2], (lb, ub)))
+    @argcheck(all(map((x, y) -> x <= y, lb, ub)))
     return nothing
 end
 function validate_bounds(lb::VecNum, ::Any)
