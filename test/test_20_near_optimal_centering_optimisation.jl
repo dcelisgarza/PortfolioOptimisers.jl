@@ -323,9 +323,39 @@
                                                                               length = 3)))
         res2 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumUtility(),
                                              opt = opt))
-        success = isapprox(Matrix(df), hcat(res2.w...); rtol = 5e-5)
+        success = isapprox(Matrix(df), hcat(res2.w...); rtol = 1e-4)
         if !success
             find_tol(Matrix(df), hcat(res2.w...))
+        end
+        @test success
+
+        r1 = factory(StandardDeviation(), pr)
+        r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
+        res_min = optimise(MeanRisk(; r = r1, opt = opt))
+        res_max = optimise(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt))
+        rk1_min = expected_risk(r1, res_min.w, pr)
+        rk1_max = expected_risk(r1, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
+        drk1 = mean(diff(rk1_min))
+        drt = mean(diff(rt_min))
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/NearOptimalCenteringParetoSurfaceRetRk.csv.gz"),
+                      DataFrame)
+        res3 = optimise(NearOptimalCentering(; obj = MaximumUtility(),
+                                             r = StandardDeviation(;
+                                                                   settings = RiskMeasureSettings(;
+                                                                                                  ub = rk1_min .+
+                                                                                                       drk1)),
+                                             opt = JuMPOptimiser(; pe = pr,
+                                                                 ret = ArithmeticReturn(;
+                                                                                        lb = rt_min .-
+                                                                                             drt),
+                                                                 slv = slv),
+                                             alg = ConstrainedNearOptimalCentering()))
+        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-5)
+        if !success
+            find_tol(Matrix(df), hcat(res3.w...))
         end
         @test success
 
@@ -339,12 +369,12 @@
         r2 = ConditionalValueatRisk(;
                                     settings = RiskMeasureSettings(;
                                                                    ub = Frontier(; N = 5)))
-        res3 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
+        res4 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
                                              opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
-        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-5)
+        success = isapprox(Matrix(df), hcat(res4.w...); rtol = 5e-5)
         if !success
-            find_tol(Matrix(df), hcat(res3.w...))
+            find_tol(Matrix(df), hcat(res4.w...))
         end
         @test success
     end

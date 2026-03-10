@@ -400,11 +400,11 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     ::Any, ::Any, ::Val{true}, ::Val{false})
     lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max)
     sc = model[:sc]
-    ret_expr = model[:ret]
     retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
     sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
+    ret = model[:ret]
     JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
-    JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var) >= 0)
+    JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
     set_near_optimal_objective_function!(noc.alg, model, opt)
@@ -515,8 +515,9 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(rt_opts) * length(rk_opts))
     sols = sizehint!(JuMPOptimisationSolution[], length(rt_opts) * length(rk_opts))
+    ret = model[:ret]
     JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
-    JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var) >= 0)
+    JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
     set_near_optimal_objective_function!(noc.alg, model, opt)
