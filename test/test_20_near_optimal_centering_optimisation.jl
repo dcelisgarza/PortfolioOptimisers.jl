@@ -206,7 +206,7 @@
         pr = prior(HighOrderPriorEstimator(), rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = reverse(slv))
         r = factory(StandardDeviation(), pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
@@ -242,11 +242,11 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier4.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
