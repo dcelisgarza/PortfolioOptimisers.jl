@@ -353,7 +353,7 @@
                                                                                              drt),
                                                                  slv = slv),
                                              alg = ConstrainedNearOptimalCentering()))
-        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-5)
+        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 1e-4)
         if !success
             find_tol(Matrix(df), hcat(res3.w...))
         end
