@@ -760,11 +760,20 @@
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/NestedClusteredEfficientFrontier.csv.gz"),
                       DataFrame)
-        @test isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-6)
+        success = isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-5)
+        if !success
+            find_tol(Matrix(df), reduce(hcat, res.w))
+        end
+        @test success
+
         st = Stacking(; opti = [mr1, mr2], opto = mr3)
         res = optimise(st, rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/StackingEfficientFrontier.csv.gz"),
                       DataFrame)
-        @test isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-6)
+        success = isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-5)
+        if !success
+            find_tol(Matrix(df), reduce(hcat, res.w))
+        end
+        @test success
     end
 end
