@@ -109,6 +109,8 @@ ReturnsResult
      X ┼ 2×2 Matrix{Float64}
     nf ┼ nothing
      F ┼ nothing
+    nb ┼ nothing
+     B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┴ nothing
@@ -216,6 +218,8 @@ ReturnsResult
      X ┼ 2×2 Matrix{Float64}
     nf ┼ nothing
      F ┼ nothing
+    nb ┼ nothing
+     B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┴ nothing
@@ -226,6 +230,8 @@ ReturnsResult
      X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, UnitRange{Int64}}, true}
     nf ┼ nothing
      F ┼ nothing
+    nb ┼ nothing
+     B ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┴ nothing
@@ -366,8 +372,6 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 # Examples
 
 ```jldoctest
-julia> using TimeSeries
-
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103; 104 105],
                      ["A", "B"])
 3×2 TimeSeries.TimeArray{Int64, 2, Dates.Date, Matrix{Int64}} 2020-01-01 to 2020-01-03
@@ -385,7 +389,9 @@ ReturnsResult
      X ┼ 2×2 Matrix{Float64}
     nf ┼ nothing
      F ┼ nothing
-    ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
+    nb ┼ nothing
+     B ┼ nothing
+    ts ┼ Vector{Date}: [Date("2020-01-02"), Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┴ nothing
 ```

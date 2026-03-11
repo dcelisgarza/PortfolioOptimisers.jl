@@ -248,6 +248,11 @@ Overload this using nco.cv for custom cross-validation prediction
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
+    nb, B = if !isa(rd.B, MatNum)
+        rd.nb, rd.B
+    else
+        ["_b$(i)" for i in 1:size(wi, 2)], rd.B * wi
+    end
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -268,13 +273,16 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
         X[:, i] = calc_net_returns(res, pri, feesi)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         ts = rd.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::Integer)
+    nb = rd.nb
+    B_flag = !isnothing(rd.B)
     iv_flag = !isnothing(rd.iv)
     ivpa_flag = !isnothing(rd.ivpa)
     rd1 = predictions[1].mrd
     X = rd1.X
+    B = B_flag ? rd1.B : nothing
     iv = rd1.iv
     ivpa = ivpa_flag ? [rd1.ivpa] : nothing
     @inbounds for i in 2:length(predictions)
@@ -286,11 +294,18 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::
         if ivpa_flag
             push!(ivpa, rdi.ivpa)
         end
+        if B_flag
+            append!(B, rdi.B)
+        end
     end
     X = reshape(X, :, N)
+    if B_flag
+        B = reshape(B, :, N)
+        nb = ["_b$(i)" for i in 1:N]
+    end
     iv = iv_flag ? reshape(iv, :, N) : nothing
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
-                         ts = rd1.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa)
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,
@@ -305,7 +320,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     predictions = Vector{MultiPeriodPredictionResult}(undef, N)
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
@@ -324,7 +339,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     predictions = Vector{PopulationPredictionResult}(undef, N)
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end

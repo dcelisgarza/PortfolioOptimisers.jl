@@ -114,6 +114,11 @@ Overload this using st.cv for custom cross-validation prediction
 function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsResult,
                                             pr::AbstractPriorResult, fees::Option{<:Fees},
                                             wi::MatNum, resi::VecOpt)
+    nb, B = if !isa(rd.B, MatNum)
+        rd.nb, rd.B
+    else
+        ["_b$(i)" for i in 1:size(wi, 2)], rd.B * wi
+    end
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -127,12 +132,12 @@ function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsR
             ivpa = transpose(wi) * ivpa
         end
     end
-    X = zeros(eltype(pr.X), size(pr.X, 1), size(wi, 2))
+    X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, pr, fees)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         ts = rd.ts, iv = iv, ivpa = ivpa)
+                         nb = rd.nb, B = rd.B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any,
@@ -140,15 +145,12 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
                                             rd::ReturnsResult, pr::AbstractPriorResult,
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
-    # if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
-    #     return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
-    # end
     cv = cv.cv
     N = length(opti)
     predictions = Vector{MultiPeriodPredictionResult}(undef, N)
     let cv = cv
         FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
@@ -160,15 +162,12 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
                                             rd::ReturnsResult, pr::AbstractPriorResult,
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
-    # if any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)
-    #     return predict_outer_st_estimator_returns(nothing, rd, pr, fees, wi, resi)
-    # end
     (; cv, scorer) = cv
     N = length(opti)
     predictions = Vector{PopulationPredictionResult}(undef, N)
     let cv = cv
         FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
