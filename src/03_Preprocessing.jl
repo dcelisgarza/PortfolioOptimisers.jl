@@ -124,21 +124,36 @@ ReturnsResult
   - [`VecDate`](@ref)
   - [`Num_VecNum`](@ref)
 """
-struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
+struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
     F::T4
-    ts::T5
-    iv::T6
-    ivpa::T7
+    nb::T5
+    B::T6
+    ts::T7
+    iv::T8
+    ivpa::T9
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
-                           F::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
-                           ivpa::Option{<:Num_VecNum})
+                           F::Option{<:MatNum}, nb::Option{<:VecStr},
+                           B::Option{<:VecMatNum}, ts::Option{<:VecDate},
+                           iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
+        if isa(B, VecNum)
+            @argcheck(length(nb) == 1, DimensionMismatch)
+        elseif isa(B, MatNum)
+            _check_names_and_returns_matrix(nb, B, :nb, :B)
+        end
         if !isnothing(X) && !isnothing(F)
             @argcheck(size(X, 1) == size(F, 1), DimensionMismatch)
+        end
+        if !isnothing(X) && !isnothing(B)
+            if isa(B, VecNum)
+                @argcheck(size(X, 1) == size(B, 1), DimensionMismatch)
+            else
+                @argcheck(size(X) == size(B), DimensionMismatch)
+            end
         end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
@@ -149,6 +164,9 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
             if !isnothing(F)
                 @argcheck(length(ts) == size(F, 1), DimensionMismatch)
             end
+            if !isnothing(B)
+                @argcheck(length(ts) == size(B, 1), DimensionMismatch)
+            end
         end
         if !isnothing(iv)
             assert_nonempty_nonneg_finite_val(iv, :iv)
@@ -158,15 +176,16 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
                 @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
             end
         end
-        return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts), typeof(iv),
-                   typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
+        return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
+                   typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf, F, nb, B, ts, iv, ivpa)
     end
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
+                       nb::Option{<:VecStr} = nothing, B::Option{<:VecMatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing)
-    return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
+    return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
 """
     returns_result_view(rd::ReturnsResult, i)
@@ -223,10 +242,12 @@ ReturnsResult
 function returns_result_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
+    nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, i)
+    B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
-    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv,
-                         ivpa = ivpa)
+    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
+                         iv = iv, ivpa = ivpa)
 end
 """
     returns_result_view(rd::ReturnsResult, i, j)
@@ -262,12 +283,29 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `j`
 function returns_result_view(rd::ReturnsResult, i, j, k = :)
     nx = nothing_scalar_array_view(rd.nx, j)
     X = isnothing(rd.X) ? rd.X : view(rd.X, i, j)
-    F = isnothing(rd.F) ? rd.F : view(rd.F, i, k)
     nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)
+    F = isnothing(rd.F) ? rd.F : view(rd.F, i, k)
+    nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, j)
+    B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, i, j)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
-    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv, ivpa = ivpa)
+    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
+                         ivpa = ivpa)
+end
+function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                 Nothing}, ::Any)
+    return rd
+end
+function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
+                                                 <:VecMatNum}, rtr::Bool)
+    return if !rtr
+        rd
+    else
+        X = isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
+        ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = rd.iv,
+                      ivpa = rd.ivpa)
+    end
 end
 """
     prices_to_returns(X::TimeSeries.TimeArray; F::Option{TimeSeries.TimeArray} = nothing;
@@ -458,15 +496,16 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         nx = nothing
         X = nothing
     else
-        X = if isempty(nb)
-            Matrix(X[!, nx])
-        elseif length(nb) == 1
-            Matrix(X[!, nx]) .- Matrix(X[!, nb])
-        else
-            Matrix(X[!, nx]) - Matrix(X[!, nb])
-        end
+        X = Matrix(X[!, nx])
     end
-    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = iv, ivpa = ivpa)
+    if isempty(nb)
+        nb = nothing
+        B = nothing
+    else
+        B = Matrix(X[!, nb])
+    end
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, iv = iv,
+                         ivpa = ivpa)
 end
 """
     find_complete_indices(X::AbstractMatrix; dims::Int = 1)

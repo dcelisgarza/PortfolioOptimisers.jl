@@ -16,7 +16,7 @@ function factory(res::StackingResult, fb::Option{<:OptE_Opt})
     return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
                           res.retcode, res.w, fb)
 end
-struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
+struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
        BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
@@ -26,14 +26,16 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
     opto::T6
     cv::T7
     wf::T8
-    strict::T9
-    ex::T10
-    fb::T11
+    ex::T9
+    fb::T10
+    rtr::T11
+    strict::T12
     function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                       sets::Option{<:AssetSets}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,
                       cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
-                      strict::Bool, ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt})
+                      ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt}, rtr::Bool,
+                      strict::Bool)
         assert_external_optimiser(opto)
         if !isnothing(cv)
             assert_external_optimiser(opti)
@@ -45,18 +47,19 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opti),
-                   typeof(opto), typeof(cv), typeof(wf), typeof(strict), typeof(ex),
-                   typeof(fb)}(pe, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
+                   typeof(opto), typeof(cv), typeof(wf), typeof(ex), typeof(fb),
+                   typeof(rtr), typeof(strict)}(pe, wb, fees, sets, opti, opto, cv, wf, ex,
+                                                fb, rtr, strict)
     end
 end
 function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   fees::Option{<:FeesE_Fees} = nothing, sets::Option{<:AssetSets} = nothing,
                   opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
-                  wf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
+                  wf::WeightFinaliser = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                  fb::Option{<:OptE_Opt} = nothing)
-    return Stacking(pe, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
+                  fb::Option{<:OptE_Opt} = nothing, rtr::Bool = false, strict::Bool = false)
+    return Stacking(pe, wb, fees, sets, opti, opto, cv, wf, ex, fb, rtr, strict)
 end
 function assert_special_nco_requirements(opt::Stacking)
     @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti))
@@ -89,8 +92,8 @@ function factory(st::Stacking, w::AbstractVector)
     opto = factory(st.opto, w)
     fb = factory(st.fb, w)
     return Stacking(; pe = st.pe, wb = st.wb, fees = fees, sets = st.sets, opti = opti,
-                    opto = opto, cv = st.cv, wf = st.wf, strict = st.strict, ex = st.ex,
-                    fb = fb)
+                    opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb, rtr = st.rtr,
+                    strict = st.strict)
 end
 function opt_view(st::Stacking, i, X::MatNum)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
@@ -101,7 +104,8 @@ function opt_view(st::Stacking, i, X::MatNum)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
     return Stacking(; pe = pe, wb = wb, fees = fees, opti = opti, opto = opto, cv = st.cv,
-                    wf = st.wf, sets = sets, strict = st.strict, ex = st.ex, fb = st.fb)
+                    wf = st.wf, sets = sets, ex = st.ex, fb = st.fb, rtr = st.rtr,
+                    strict = st.strict)
 end
 
 """
@@ -177,6 +181,7 @@ end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
+    rd = returns_result_picker(rd, st.rtr)
     pr = prior(st.pe, rd; dims = dims)
     fees = fees_constraints(st.fees, st.sets; datatype = eltype(pr.X), strict = st.strict)
     opti = st.opti
@@ -200,7 +205,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     return StackingResult(typeof(st), pr, wb, fees, resi, reso, st.cv, retcode, w, nothing)
 end
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                               <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
+                               Nothing}, rd::ReturnsResult; dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(st, rd; dims = dims, branchorder = branchorder, str_names = str_names,

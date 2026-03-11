@@ -32,7 +32,8 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)
 end
 struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16,
                      T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30,
-                     T31, T32, T33, T34, T35, T36, T37} <: BaseJuMPOptimisationEstimator
+                     T31, T32, T33, T34, T35, T36, T37, T38} <:
+       BaseJuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     slv::T2
     wb::T3 # WeightBounds
@@ -69,7 +70,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l2::T34
     linf::T35
     lp::T36
-    strict::T37
+    rtr::T37
+    strict::T38
     function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
                            lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
@@ -90,7 +92,8 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number},
-                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, strict::Bool)
+                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, rtr::Bool,
+                           strict::Bool)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -244,11 +247,13 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte,
-                                               gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt,
-                                               sgst, tn, fees, sets, tr, ple, ret, sca,
-                                               ccnt, cobj, sc, so, ss, card, scard, nea, l1,
-                                               l2, linf, lp, strict)
+                   typeof(lp), typeof(rtr), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st,
+                                                            lcse, cte, gcarde, sgcarde,
+                                                            smtx, sgmtx, slt, sst, sglt,
+                                                            sgst, tn, fees, sets, tr, ple,
+                                                            ret, sca, ccnt, cobj, sc, so,
+                                                            ss, card, scard, nea, l1, l2,
+                                                            linf, lp, rtr, strict)
     end
 end
 function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -279,10 +284,12 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
-                       lp::Option{<:LpReg_VecLpReg} = nothing, strict::Bool = false)
+                       lp::Option{<:LpReg_VecLpReg} = nothing, rtr::Bool = false,
+                       strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, rtr,
+                         strict)
 end
 function needs_previous_weights(opt::JuMPOptimiser)
     return (needs_previous_weights(opt.tn) ||
@@ -306,7 +313,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)
                          sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         strict = opt.strict)
+                         rtr = opt.rtr, strict = opt.strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
@@ -348,10 +355,11 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, ss = opt.ss, card = opt.card, scard = opt.scard,
                          nea = opt.nea, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, strict = opt.strict)
+                         lp = opt.lp, rtr = opt.rtr, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
+    rd = returns_result_picker(rd, opt.rtr)
     pr = prior(opt.pe, rd; dims = dims)
     datatype = eltype(pr.X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
@@ -410,7 +418,8 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          sets = opt.sets, tr = opt.tr, ple = plr, ret = ret, sca = opt.sca,
                          ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, strict = opt.strict)
+                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, rtr = opt.rtr,
+                         strict = opt.strict)
 end
 
 export ProcessedJuMPOptimiserAttributes, JuMPOptimiser

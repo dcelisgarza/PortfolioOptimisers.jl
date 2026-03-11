@@ -485,6 +485,7 @@ end
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
+    rd = returns_result_picker(rd, hec.opt.rtr)
     pr = prior(hec.opt.pe, rd; dims = dims)
     clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
