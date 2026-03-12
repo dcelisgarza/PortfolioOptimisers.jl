@@ -7,7 +7,7 @@ This is a collection of quickfire tutorials to help you get started with `Portfo
 #=
 ## 1. Downloading data
 
-There are both open and close source providers, in Julia we have [`YFinance.jl`](https://github.com/eohne/YFinance.jl) and [`MarketData.jl`](https://github.com/JuliaFinance/MarketData.jl).
+There are both open and close source providers, in Julia we have [`YFinance.jl`](https://github.com/eohne/YFinance.jl) and [`MarketData.jl`](https://github.com/JuliaQuant/MarketData.jl).
 
 ## 2. Computing returns
 
