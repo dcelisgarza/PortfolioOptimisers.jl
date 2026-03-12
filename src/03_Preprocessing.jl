@@ -338,7 +338,7 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
   - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing values per row (timestamp).
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
-  - `join_method`: How to join asset and factor data (`:outer`, `:inner`, etc.).
+  - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
   - `impute_method`: Optional imputation method for missing data.
 
 # Returns
@@ -360,13 +360,10 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
   - Joins asset, factor, and benchmark data as specified.
 
   - Optionally applies a mapping function and/or collapses the time series.
-
   - Handles missing values by filtering, imputation, and dropping as configured.
-
   - Computes returns using the specified method.
 
       + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
-
   - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples

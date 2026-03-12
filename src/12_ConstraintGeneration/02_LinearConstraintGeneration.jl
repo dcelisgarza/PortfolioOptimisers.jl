@@ -200,8 +200,8 @@ If a key in `dict` starts with the same value as `key`, it means that the corres
 
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` must have the same length as `dict[key]` as their lengths are preserved across views.
-  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalent group prefixed by `key` with the same length as `dict[key]` as that group will be used to find the unique entries for the view.
+  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`]-(@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the each entry corresponds to the industry of the asset in the same position in `dict[key]`.
+  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]. This uniqueness will be propagated accross views, which lets us define constraints on the unique entries even in [`NestedClustered`]-(@ref) optimisations.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
 # Constructor
@@ -604,7 +604,6 @@ Recursively collect and expand terms from a Julia expression for linear constrai
       + `Number`: Appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
 
       + `Symbol`: Appends `(coeff, string(expr))` to `terms`.
-
       + `Expr`:
 
           * For multiplication (`*`), distributes the coefficient to the numeric part.
@@ -828,13 +827,11 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
       + `eqn::AbstractString`: Must contain exactly one comparison operator from `ops1`.
 
           * `ops1`: Tuple of valid comparison operators as strings.
-
       + `eqn::Expr`: Must contain exactly one comparison operator from `ops1`.
 
           * `ops2`: Tuple of valid comparison operator expressions.
 
   - `datatype`: The numeric type to use for coefficients and right-hand side.
-
   - `kwargs...`: Additional keyword arguments, ignored.
 
 # Validation
@@ -847,25 +844,17 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
   - If `eqn::AbstractVector`, the function is applied element-wise.
 
   - The function first checks for invalid operator patterns (e.g., `"++"`).
-
   - It searches for the first occurrence of a valid comparison operator from `ops1` in the equation string. Errors if there are more than one or none.
-
   - The equation is split into left- and right-hand sides using the detected operator.
-
   - If `eqn::AbstractString`:
 
       + Both sides are parsed into Julia expressions using `Meta.parse`.
-
   - If `eqn::Expr`:
 
       + Expression is ready as is.
-
   - Numeric functions and constants (e.g., `Inf`) are recursively evaluated.
-
   - All terms are moved to the left-hand side and collected, separating coefficients and variables.
-
   - The constant term is moved to the right-hand side, and the equation is formatted for display.
-
   - The result is returned as a [`ParsingResult`](@ref) containing the collected information.
 
 # Returns

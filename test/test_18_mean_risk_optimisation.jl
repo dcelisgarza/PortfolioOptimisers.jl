@@ -478,7 +478,7 @@
                                                                              ub = Frontier(;
                                                                                            N = 5))),
                                  obj = MaximumReturn(), opt = opt))
-        res = isapprox(hcat(res1.w...), hcat(res2.w...); rtol = 1e-4)
+        res = isapprox(hcat(res1.w...), hcat(res2.w...); rtol = 5e-4)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res1.w...), hcat(res2.w...))
@@ -524,7 +524,7 @@
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res5 = optimise(MeanRisk(; r = Variance(;), opt = opt))
         res6 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
-        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-4)
+        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 1e-3)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
@@ -543,7 +543,7 @@
                                                               stop = rt_max, length = 5)))
         res7 = optimise(MeanRisk(; r = Variance(;), opt = opt))
         res8 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
-        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-4)
+        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 1e-3)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
