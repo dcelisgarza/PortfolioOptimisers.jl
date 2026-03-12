@@ -75,8 +75,10 @@
     iv = TimeArray(ts, rand(StableRNG(123), 252, 20))
     ivpa = rand(StableRNG(123), 20)
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end]; iv = iv,
-                           ivpa = ivpa)
+                                     timestamp = :Date)[(end - 252):end];
+                           B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                           "./assets/SP500_idx.csv.gz"));
+                                         timestamp = :Date), iv = iv, ivpa = ivpa)
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = "verbose" => false),
@@ -2003,5 +2005,26 @@
             end
             @test res
         end
+    end
+    @testset "Benchmark tracking" begin
+        opt = JuMPOptimiser(; slv = slv, brt = true)
+        mr = MeanRisk(; opt = opt)
+        res1 = optimise(mr, rd)
+
+        rdb = returns_result_picker(rd, true)
+        prb = prior(EmpiricalPrior(), rdb)
+        opt = JuMPOptimiser(; pe = prb, slv = slv, brt = true)
+        mr = MeanRisk(; opt = opt)
+        res2 = optimise(mr, rd)
+
+        @test res1.w == res2.w
+        @test isapprox(res1.w,
+                       [0.13594491020480565, 0.06664942220565599, 0.03347388625739562,
+                        0.018519121388742617, 0.037028053491839685, 0.07413397219776975,
+                        0.08586567489340931, 3.171794447542938e-6, 0.08014095369469784,
+                        0.03728279594798708, 0.030039697931611924, 0.03946098091476264,
+                        0.1844158171814443, 0.052745229082914055, 0.023728773389230906,
+                        0.005354628032118466, 0.010563552176813158, 0.04042806167670747,
+                        0.02919805117977965, 0.015023246357866301], rtol = 1e-6)
     end
 end

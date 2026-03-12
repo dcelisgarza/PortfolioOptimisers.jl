@@ -70,7 +70,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l2::T34
     linf::T35
     lp::T36
-    rtr::T37
+    brt::T37
     strict::T38
     function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
@@ -92,7 +92,7 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number},
-                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, rtr::Bool,
+                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, brt::Bool,
                            strict::Bool)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
@@ -247,13 +247,13 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
                    typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(rtr), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st,
+                   typeof(lp), typeof(brt), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st,
                                                             lcse, cte, gcarde, sgcarde,
                                                             smtx, sgmtx, slt, sst, sglt,
                                                             sgst, tn, fees, sets, tr, ple,
                                                             ret, sca, ccnt, cobj, sc, so,
                                                             ss, card, scard, nea, l1, l2,
-                                                            linf, lp, rtr, strict)
+                                                            linf, lp, brt, strict)
     end
 end
 function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -284,11 +284,11 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
-                       lp::Option{<:LpReg_VecLpReg} = nothing, rtr::Bool = false,
+                       lp::Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
                        strict::Bool = false)
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, rtr,
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
                          strict)
 end
 function needs_previous_weights(opt::JuMPOptimiser)
@@ -313,7 +313,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)
                          sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         rtr = opt.rtr, strict = opt.strict)
+                         brt = opt.brt, strict = opt.strict)
 end
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
@@ -355,11 +355,11 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, ss = opt.ss, card = opt.card, scard = opt.scard,
                          nea = opt.nea, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, rtr = opt.rtr, strict = opt.strict)
+                         lp = opt.lp, brt = opt.brt, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
-    rd = returns_result_picker(rd, opt.rtr)
+    rd = returns_result_picker(rd, opt.brt)
     pr = prior(opt.pe, rd; dims = dims)
     datatype = eltype(pr.X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
@@ -418,7 +418,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          sets = opt.sets, tr = opt.tr, ple = plr, ret = ret, sca = opt.sca,
                          ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, rtr = opt.rtr,
+                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, brt = opt.brt,
                          strict = opt.strict)
 end
 

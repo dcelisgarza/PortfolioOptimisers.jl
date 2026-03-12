@@ -344,7 +344,7 @@ Alias for an abstract array of numeric types or JuMP scalar types.
   - [`MatNum`](@ref)
 """
 const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
-const VecMatNum = Union{<:VecNum, <:MatNum}
+const VecNumMatNum = Union{<:VecNum, <:MatNum}
 """
     const Num_VecNum = Union{<:Number, <:VecNum}
 

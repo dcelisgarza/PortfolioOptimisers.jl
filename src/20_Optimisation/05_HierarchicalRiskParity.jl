@@ -52,7 +52,7 @@ function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::Vec
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    rd = returns_result_picker(rd, hrp.opt.rtr)
+    rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -174,7 +174,7 @@ function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, r
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    rd = returns_result_picker(rd, hrp.opt.rtr)
+    rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)

@@ -138,7 +138,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResul
     ivpa::T9
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
-                           B::Option{<:VecMatNum}, ts::Option{<:VecDate},
+                           B::Option{<:VecNumMatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
@@ -184,7 +184,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResul
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
-                       nb::Option{<:VecStr} = nothing, B::Option{<:VecMatNum} = nothing,
+                       nb::Option{<:VecStr} = nothing, B::Option{<:VecNumMatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing)
     return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
@@ -304,8 +304,8 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:A
     return rd
 end
 function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
-                                                 <:VecMatNum}, rtr::Bool)
-    return if !rtr
+                                                 <:VecNumMatNum}, brt::Bool)
+    return if !brt
         rd
     else
         X = isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
@@ -391,7 +391,7 @@ ReturnsResult
      F ┼ nothing
     nb ┼ nothing
      B ┼ nothing
-    ts ┼ Vector{Date}: [Date("2020-01-02"), Date("2020-01-03")]
+    ts ┼ Vector{Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┴ nothing
 ```
@@ -477,6 +477,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     nf = intersect(col_names, factor_names)
     nb = intersect(col_names, benchmark_names)
     oc = setdiff(col_names, union(nx, nf, nb))
+    N = length(nx)
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
         @argcheck(issubset(ts, TimeSeries.timestamp(iv)))
@@ -486,8 +487,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
         iv = values(iv)
         assert_nonempty_nonneg_finite_val(iv, :iv)
         assert_nonempty_gt0_finite_val(ivpa, :ivpa)
-        @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), DataFrames.DataAPI.ncol(X) - 1),
-                  DimensionMismatch)
+        @argcheck(size(iv) == (DataFrames.DataAPI.nrow(X), N), DimensionMismatch)
         if isa(ivpa, VecNum)
             @argcheck(length(ivpa) == size(iv, 2), DimensionMismatch)
         end
@@ -498,17 +498,17 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     else
         F = Matrix(X[!, nf])
     end
+    if isempty(nb)
+        nb = nothing
+        B = nothing
+    else
+        B = length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
+    end
     if isempty(nx)
         nx = nothing
         X = nothing
     else
         X = Matrix(X[!, nx])
-    end
-    if isempty(nb)
-        nb = nothing
-        B = nothing
-    else
-        B = Matrix(X[!, nb])
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, iv = iv,
                          ivpa = ivpa)
@@ -578,4 +578,4 @@ end
 """
 function select_k_extremes(X::MatNum) end
 
-export ReturnsResult, prices_to_returns, find_complete_indices
+export ReturnsResult, prices_to_returns, find_complete_indices, returns_result_picker

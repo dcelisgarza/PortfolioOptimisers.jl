@@ -24,19 +24,19 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     fees::T5
     sets::T6
     wf::T7
-    rtr::T8
+    brt::T8
     strict::T9
     function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,
-                                   rtr::Bool, strict::Bool)
+                                   brt::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(rtr), typeof(strict)}(pe, cle, slv, wb,
+                   typeof(sets), typeof(wf), typeof(brt), typeof(strict)}(pe, cle, slv, wb,
                                                                           fees, sets, wf,
-                                                                          rtr, strict)
+                                                                          brt, strict)
     end
 end
 function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
@@ -46,8 +46,8 @@ function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
                                fees::Option{<:FeesE_Fees} = nothing,
                                sets::Option{<:AssetSets} = nothing,
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
-                               rtr::Bool = false, strict::Bool = false)
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, rtr, strict)
+                               brt::Bool = false, strict::Bool = false)
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, strict)
 end
 function needs_previous_weights(opt::HierarchicalOptimiser)
     return needs_previous_weights(opt.fees)
@@ -55,7 +55,7 @@ end
 function factory(opt::HierarchicalOptimiser, w::AbstractVector)
     return HierarchicalOptimiser(; pe = opt.pe, cle = opt.cle, slv = opt.slv, wb = opt.wb,
                                  fees = factory(opt.fees, w), sets = opt.sets, wf = opt.wf,
-                                 rtr = opt.rtr, strict = opt.strict)
+                                 brt = opt.brt, strict = opt.strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i)
     pe = prior_view(hco.pe, i)
@@ -63,7 +63,7 @@ function opt_view(hco::HierarchicalOptimiser, i)
     fees = fees_view(hco.fees, i)
     sets = nothing_asset_sets_view(hco.sets, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, slv = hco.slv, wb = wb,
-                                 fees = fees, wf = hco.wf, sets = sets, rtr = hco.rtr,
+                                 fees = fees, wf = hco.wf, sets = sets, brt = hco.brt,
                                  strict = hco.strict)
 end
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,

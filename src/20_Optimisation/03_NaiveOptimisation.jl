@@ -26,36 +26,36 @@ struct InverseVolatility{T1, T2, T3, T4, T5, T6, T7} <: NaiveOptimisationEstimat
     sets::T3
     wf::T4
     fb::T5
-    rtr::T6
+    brt::T6
     strict::T7
     function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                               wf::WeightFinaliser, fb::Option{<:OptE_Opt}, rtr::Bool,
+                               wf::WeightFinaliser, fb::Option{<:OptE_Opt}, brt::Bool,
                                strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(fb),
-                   typeof(rtr), typeof(strict)}(pe, wb, sets, wf, fb, rtr, strict)
+                   typeof(brt), typeof(strict)}(pe, wb, sets, wf, fb, brt, strict)
     end
 end
 function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            wb::Option{<:WbE_Wb} = WeightBounds(),
                            sets::Option{<:AssetSets} = nothing,
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
-                           fb::Option{<:OptE_Opt} = nothing, rtr::Bool = false,
+                           fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
                            strict::Bool = false)
-    return InverseVolatility(pe, wb, sets, wf, fb, rtr, strict)
+    return InverseVolatility(pe, wb, sets, wf, fb, brt, strict)
 end
 function factory(opt::InverseVolatility, w::AbstractVector)
     return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
-                             fb = factory(opt.fb, w), rtr = opt.rtr, strict = opt.strict)
+                             fb = factory(opt.fb, w), brt = opt.brt, strict = opt.strict)
 end
 function opt_view(opt::InverseVolatility, i, args...)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     sets = nothing_asset_sets_view(opt.sets, i)
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
-                             rtr = opt.rtr, strict = opt.strict)
+                             brt = opt.brt, strict = opt.strict)
 end
 function assert_external_optimiser(opt::InverseVolatility)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -66,7 +66,7 @@ end
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
-    rd = returns_result_picker(rd, iv.rtr)
+    rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
     w = inv.(sqrt.(LinearAlgebra.diag(pr.sigma)))
     w /= sum(w)
