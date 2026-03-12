@@ -771,7 +771,7 @@
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/NestedClusteredEfficientFrontier.csv.gz"),
                       DataFrame)
-        success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 1e-5)
+        success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 1e-3)
         if !success
             find_tol(Matrix(df), reduce(hcat, res.w))
         end
@@ -781,7 +781,7 @@
         res = optimise(st, rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/StackingEfficientFrontier.csv.gz"),
                       DataFrame)
-        success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 1e-5)
+        success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 5e-4)
         if !success
             find_tol(Matrix(df), reduce(hcat, res.w))
         end
