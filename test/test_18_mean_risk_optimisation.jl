@@ -1400,8 +1400,10 @@
         ivpa = rand(StableRNG(123))
         rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
                                                            "./assets/SP500.csv.gz"));
-                                         timestamp = :Date)[(end - 252):end]; iv = iv,
-                               ivpa = ivpa)
+                                         timestamp = :Date)[(end - 252):end];
+                               B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                               "./assets/SP500_idx.csv.gz"));
+                                             timestamp = :Date), iv = iv, ivpa = ivpa)
         pr = prior(HighOrderPriorEstimator(), rd)
 
         sets.dict["group4"] = ["AMD", "BAC"]
