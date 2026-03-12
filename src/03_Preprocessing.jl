@@ -292,7 +292,13 @@ function returns_result_view(rd::ReturnsResult, i, j, k = :)
     nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)
     F = isnothing(rd.F) ? rd.F : view(rd.F, i, k)
     nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, j)
-    B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, i, j)
+    B = if isnothing(rd.B)
+            nothing
+        elseif isa(VecNum)
+            view(rd.B, i)
+        else
+            view(rd.B, i, j)
+        end
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
