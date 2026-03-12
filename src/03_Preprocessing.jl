@@ -391,7 +391,7 @@ ReturnsResult
      F ┼ nothing
     nb ┼ nothing
      B ┼ nothing
-    ts ┼ Vector{Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
+    ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┴ nothing
 ```
