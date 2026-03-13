@@ -268,8 +268,9 @@
                                                                                                                     opt = jopto))],
                                                                 opto = HierarchicalRiskParity(;
                                                                                               opt = hopto)))),
-                NestedClustered(; cle = clr, opti = FactorRiskContribution(; opt = jopti),
-                                opto = FactorRiskContribution(; opt = jopto)),
+                NestedClustered(; cle = clr,
+                                opti = FactorRiskContribution(; flag = true, opt = jopti),
+                                opto = FactorRiskContribution(; flag = true, opt = jopto)),
                 NestedClustered(; cle = clr,
                                 opti = HierarchicalRiskParity(;
                                                               r = MedianAbsoluteDeviation(),
@@ -278,8 +279,9 @@
                                                               r = MedianAbsoluteDeviation(),
                                                               opt = hopto)),
                 NestedClustered(; cle = clr,
-                                opti = FactorRiskContribution(; re = rr, opt = jopti),
-                                opto = FactorRiskContribution(; opt = jopto)),
+                                opti = FactorRiskContribution(; flag = true, re = rr,
+                                                              opt = jopti),
+                                opto = FactorRiskContribution(; flag = true, opt = jopto)),
                 NestedClustered(;
                                 cle = ClustersEstimator(;
                                                         ce = PortfolioOptimisersCovariance(),

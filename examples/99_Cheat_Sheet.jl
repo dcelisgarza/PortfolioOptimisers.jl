@@ -87,7 +87,7 @@ ress = optimise.([mr1, mr2, mr3, mr4], rd);
 #=
 `PortfolioOptimisers.jl` provides users with the ability to use multiple risk measures per optimisation, which means that some risk measure have to keep certain internal statistics to be able to compute the risk. We provide factory functions that create the risk measures with the appropraite internal statistics.
 
-The [`MeanRisk`]-(@ref) optimiser defaults to the variance so we will use that to compute the risk statistics. All optimisations use the same prior estimator, as well as portfolio return estimator so we will use only the first 
+The [`MeanRisk`]-(@ref) optimiser defaults to the variance so we will use that to compute the risk statistics. All optimisations use the same prior estimator, as well as portfolio return estimator so we will use only the first
 =#
 pr = ress[1].pr
 r = factory(Variance(), pr)
@@ -109,7 +109,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
 #=
 #### 3.1.2 Factor risk contribution
 
-This is a more advanced estimator, it requires some more set up. It allows users to provide objective functions, but also define risk contributions per factor to the variance risk measure. the minimum risk optimisaion will follow the risk contribution constraints the closest, and with enough data and assets can be quite exact up to the user provided convergence settings for the provided solvers.
+This is a more advanced estimator, it requires some more set up. It allows users to provide objective functions, but also define risk contributions per factor to the variance risk measure. The minimum risk optimisaion will follow the risk contribution constraints the closest, and with enough data and assets can be quite exact up to the user provided convergence settings for the provided solvers.
 
 It is compatible with other risk measures, but only the variance can take risk contribution constraints, without them or when using other risk measures it is largely the same as the [`MeanRisk`]-(@ref) estimator.
 
@@ -117,10 +117,12 @@ First we need to provide a instance of [`AssetSets`](@ref) which defines sets of
 
 The [`AssetSets`](@ref) has a `key` property which defines the default search key in `dict`, `dict` must contain a key matching `key` whose value is taken to tbe the names of the assets/factors around which the sets are defined.
 
-In this case we use this to define the set of factors with key "nf" (default "nx"). We use these to define the factor risk contribution constraints, and we have to assign the linear constraint estimator for the risk contribution to the [`Variance`](@ref).
+In this case we use this to define the set of factors with key "nf" (default "nx"). We use these to define the factor risk contribution constraints, and we have to assign the linear constraint estimator for the risk contribution to the [`Variance`](@ref). We'll define the constraints such that each factor contributes between 30% and 12% of the total variance risk.
 =#
 sets = AssetSets(; key = "nf", dict = Dict("nf" => rd.nf))
-lcs = LinearConstraintEstimator(; val = ["VLUE >= 0.25", "QUAL <= -0.07", "MTUM == 0.19"])
+lcs = LinearConstraintEstimator(;
+                                val = [["$f <= 0.3" for f in rd.nf];
+                                       ["$f >= 0.12" for f in rd.nf]])
 r = Variance(; rc = lcs)
 
 #=
@@ -128,23 +130,22 @@ We can optimise for the different objective functions.
 =#
 
 ## Minimum risk (default)
-frc1 = FactorRiskContribution(; r = r, flag = false, obj = MinimumRisk(), sets = sets,
+frc1 = FactorRiskContribution(; r = r, obj = MinimumRisk(), sets = sets,
                               opt = JuMPOptimiser(; slv = slv))
 ## Maximum utility, `l` controls the risk aversion.
-frc2 = FactorRiskContribution(; r = r, flag = false, obj = MaximumUtility(; l = 3),
-                              sets = sets, opt = JuMPOptimiser(; slv = slv))
-## Maximum risk adjusted return ratio, rf is the risk free rate.
-frc3 = FactorRiskContribution(; r = r, flag = false,
-                              obj = MaximumRatio(; rf = 4.2 / 252 / 100), sets = sets,
+frc2 = FactorRiskContribution(; r = r, obj = MaximumUtility(; l = 8), sets = sets,
                               opt = JuMPOptimiser(; slv = slv))
+## Maximum risk adjusted return ratio, rf is the risk free rate.
+frc3 = FactorRiskContribution(; r = r, obj = MaximumRatio(; rf = 4.2 / 252 / 100),
+                              sets = sets, opt = JuMPOptimiser(; slv = slv))
 ## Maximum return
-frc4 = FactorRiskContribution(; r = r, flag = false, obj = MaximumReturn(), sets = sets,
+frc4 = FactorRiskContribution(; r = r, obj = MaximumReturn(), sets = sets,
                               opt = JuMPOptimiser(; slv = slv))
 ## Optimise all objective functions at once
 ress = optimise.([frc1, frc2, frc3, frc4], rd);
 
 #=
-We can display the results and factor risk contributions [`factor_risk_contribution`]-(@ref), but we have to normalise them using their sum. Again we use the factory function to set the appropriate internal parameters.
+We can display the results and factor risk contributions [`factor_risk_contribution`]-(@ref), but we have to normalise them using their sum. Again we use the factory function to set the appropriate internal parameters. The last entry in the risk contribution is the regression intercept.
 =#
 r = factory(r, pr)
 rkcs = [factor_risk_contribution(r, res.w, pr.X; rd = rd) for res in ress]
@@ -154,10 +155,7 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
                   DataFrame(reduce(hcat, [res.w for res in ress]),
                             [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn]));
              formatters = [resfmt])
-#=
-### 3.2 Clustering optimisers
-=#
-
-#=
-### 3.3 Stacking optimiser
-=#
+pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
+                  DataFrame(reduce(hcat, rkcs),
+                            ["RC MinRisk", "RC Max Util", "RC Max Ratio", "RC Max Ret"]));
+             formatters = [resfmt])

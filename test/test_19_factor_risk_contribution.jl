@@ -62,7 +62,7 @@
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     r = Variance(; rc = lcs)
     obj = MaximumRatio()
-    frc = FactorRiskContribution(; r = r, obj = obj, opt = opt, flag = false, sets = sets)
+    frc = FactorRiskContribution(; r = r, obj = obj, opt = opt, sets = sets)
     res = optimise(frc, rd)
     rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X; rd = rd)
     rkc = rkc / sum(rkc)

@@ -604,6 +604,7 @@ Recursively collect and expand terms from a Julia expression for linear constrai
       + `Number`: Appends `(coeff * oftype(coeff, expr), nothing)` to `terms`.
 
       + `Symbol`: Appends `(coeff, string(expr))` to `terms`.
+
       + `Expr`:
 
           * For multiplication (`*`), distributes the coefficient to the numeric part.
@@ -827,11 +828,13 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
       + `eqn::AbstractString`: Must contain exactly one comparison operator from `ops1`.
 
           * `ops1`: Tuple of valid comparison operators as strings.
+
       + `eqn::Expr`: Must contain exactly one comparison operator from `ops1`.
 
           * `ops2`: Tuple of valid comparison operator expressions.
 
   - `datatype`: The numeric type to use for coefficients and right-hand side.
+
   - `kwargs...`: Additional keyword arguments, ignored.
 
 # Validation
@@ -844,17 +847,25 @@ Parse a linear constraint equation from a string into a structured [`ParsingResu
   - If `eqn::AbstractVector`, the function is applied element-wise.
 
   - The function first checks for invalid operator patterns (e.g., `"++"`).
+
   - It searches for the first occurrence of a valid comparison operator from `ops1` in the equation string. Errors if there are more than one or none.
+
   - The equation is split into left- and right-hand sides using the detected operator.
+
   - If `eqn::AbstractString`:
 
       + Both sides are parsed into Julia expressions using `Meta.parse`.
+
   - If `eqn::Expr`:
 
       + Expression is ready as is.
+
   - Numeric functions and constants (e.g., `Inf`) are recursively evaluated.
+
   - All terms are moved to the left-hand side and collected, separating coefficients and variables.
+
   - The constant term is moved to the right-hand side, and the equation is formatted for display.
+
   - The result is returned as a [`ParsingResult`](@ref) containing the collected information.
 
 # Returns
@@ -877,11 +888,12 @@ ParsingResult
     op ┼ String: "<="
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
-```
+```    # 1. Identify the comparison operator
 
 # Related
 
   - [`ParsingResult`](@ref)
+```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)

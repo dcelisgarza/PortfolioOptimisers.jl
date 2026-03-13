@@ -293,12 +293,12 @@ function returns_result_view(rd::ReturnsResult, i, j, k = :)
     F = isnothing(rd.F) ? rd.F : view(rd.F, i, k)
     nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, j)
     B = if isnothing(rd.B)
-            nothing
-        elseif isa(VecNum)
-            view(rd.B, i)
-        else
-            view(rd.B, i, j)
-        end
+        nothing
+    elseif isa(rd.B, VecNum)
+        view(rd.B, i)
+    else
+        view(rd.B, i, j)
+    end
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
@@ -366,10 +366,13 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
   - Joins asset, factor, and benchmark data as specified.
 
   - Optionally applies a mapping function and/or collapses the time series.
+
   - Handles missing values by filtering, imputation, and dropping as configured.
+
   - Computes returns using the specified method.
 
       + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
+
   - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples
