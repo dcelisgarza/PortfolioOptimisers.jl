@@ -455,7 +455,7 @@ pr = res.pr
 r = factory(Variance(), pr)
 rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
 ## Display results
-pretty_table(DataFrame(:assets => rd.nx, :cluster => get_clustering_indices(res.clr),
+pretty_table(DataFrame(:assets => rd.nx, :cluster => assignments(res.clr),
                        :Weights => res.w); formatters = [resfmt])
 pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt])
@@ -500,8 +500,7 @@ rk = map(rr -> rr[1], rk_rt_ratio)
 rt = map(rr -> rr[2], rk_rt_ratio)
 ratio = map(rr -> rr[3], rk_rt_ratio)
 ## Display results
-pretty_table(hcat(DataFrame(:assets => rd.nx,
-                            :clusters => get_clustering_indices(ress[1].clr)),
+pretty_table(hcat(DataFrame(:assets => rd.nx, :clusters => assignments(ress[1].clr)),
                   DataFrame(reduce(hcat, [res.w for res in ress]),
                             ["EW-RB", "MR-MR", "NC-HERC-RB_NC-RB-MR"]));
              formatters = [resfmt])

@@ -275,7 +275,8 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
-function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::Integer)
+function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
+    N = length(predictions)
     nb = rd.nb
     B_flag = !isnothing(rd.B)
     iv_flag = !isnothing(rd.iv)
@@ -285,7 +286,7 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::
     B = B_flag ? rd1.B : nothing
     iv = rd1.iv
     ivpa = ivpa_flag ? [rd1.ivpa] : nothing
-    @inbounds for i in 2:length(predictions)
+    @inbounds for i in 2:N
         rdi = predictions[i].mrd
         append!(X, rdi.X)
         if iv_flag
@@ -316,15 +317,14 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
                                              cls::VecVecInt)
     (; opti, cv, ex) = nco
     cv = cv.cv
-    N = length(cls)
-    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    predictions = Vector{MultiPeriodPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
             cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
-    return rebuild_returns_result(rd, predictions, N)
+    return rebuild_returns_result(rd, predictions)
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,
@@ -335,8 +335,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
                                              cls::VecVecInt)
     (; opti, cv, ex) = nco
     (; cv, scorer) = cv
-    N = length(cls)
-    predictions = Vector{PopulationPredictionResult}(undef, N)
+    predictions = Vector{PopulationPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
             cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
@@ -347,7 +346,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
         scorer = NearestQuantilePrediction()
     end
     best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions, N)
+    return rebuild_returns_result(rd, best_predictions)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
@@ -358,7 +357,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                      branchorder = branchorder)
     fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(pr.X),
                             strict = nco.strict)
-    idx = get_clustering_indices(clr)
+    idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti

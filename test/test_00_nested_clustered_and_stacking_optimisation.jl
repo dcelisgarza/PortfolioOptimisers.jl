@@ -478,7 +478,7 @@
                                                        opt = opti),
                                        opto = MeanRisk(; opt = opto)), rd)
 
-        clusters = get_clustering_indices(clr)
+        clusters = assignments(clr)
         idx = findfirst(x -> x == "PG", rd.nx)
         idxc = clusters[idx]
         idx = findall(x -> x == idxc, clusters)
@@ -528,7 +528,7 @@
                                                                   sets = sets)),
                               opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
         res = optimise(opt, rd)
-        clusters = get_clustering_indices(clr)
+        clusters = assignments(clr)
 
         group2 = sets.dict["group2"]
         for i in 1:(clr.k)

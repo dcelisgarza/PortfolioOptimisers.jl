@@ -143,7 +143,7 @@ function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsR
         X[:, i] = calc_net_returns(res, pr, fees)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = rd.nb, B = rd.B, ts = rd.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any,
@@ -152,15 +152,14 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
     cv = cv.cv
-    N = length(opti)
-    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    predictions = Vector{MultiPeriodPredictionResult}(length(opti))
     let cv = cv
         FLoops.@floop ex for (i, opt) in enumerate(opti)
             cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
-    return rebuild_returns_result(rd, predictions, N)
+    return rebuild_returns_result(rd, predictions)
 end
 function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any,
@@ -169,8 +168,7 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
                                             fees::Option{<:Fees}, wi::MatNum, resi::VecOpt)
     (; opti, cv, ex) = st
     (; cv, scorer) = cv
-    N = length(opti)
-    predictions = Vector{PopulationPredictionResult}(undef, N)
+    predictions = Vector{PopulationPredictionResult}(undef, length(opti))
     let cv = cv
         FLoops.@floop ex for (i, opt) in enumerate(opti)
             cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
@@ -181,7 +179,7 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
         scorer = NearestQuantilePrediction()
     end
     best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions, N)
+    return rebuild_returns_result(rd, best_predictions)
 end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
