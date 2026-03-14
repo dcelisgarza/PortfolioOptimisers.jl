@@ -22,10 +22,10 @@ Here we show a quick example of a heterogenous dataset which will only return th
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra,
       StableRNGs
 resfmt = (v, i, j) -> begin
-    if j == 1
-        return v
+    return if j == 1
+        v
     else
-        return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
+        isa(v, AbstractFloat) ? "$(round(v*100, digits=3)) %" : v
     end
 end;
 
@@ -415,7 +415,58 @@ pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt])
 ````
 
-#### 3.3.1 Hierachical equal risk contribution
+#### 3.3.2 Schur complement hierarchical risk parity
+
+The [`SchurComplementHierarchicalRiskParity`]-(@ref) estimator works similarly to [`HierarchicalRiskParity`]-(@ref), but uses the Schur complement to compute decide whether to include more information into the risk calculation. It is only available for the variance and standard deviation because it relies on the Schur complement. It serves almost as an interpolation between the classic mean variance optimisation and hierarchical risk parity. It has a `params` keyword which allows users to specify an instance or vector of instances of [`SchurComplementParams`]-(@ref) which specify the risk measure, the "interpolation" parameter `gamma ∈ [0, 1]`, and whether the algorithm should be kept monotonic in risk as `gamma` increases (default).
+
+When `gamma` is zero, it reduces to the [`HierarchicalRiskParity`]-(@ref) estimator, the closer it is to one the closer it is to the classic mean variance optimisation. There is no need to specify all these parameters, as they all have default values, this is for demonstration purposes. It's worth noting that there are values of `gamma` for which the Schur augmented matrix is not positive definite as it cannot add any more risk information beyond a certain point, so when wanting `gamma` to be large, one should use [`NonMonotonicSchurComplement`]-(@ref) and make sure to disable the positive definite projection in the `pdm` keyword of [`SchurComplementParams`]-(@ref.
+
+````@example 99_Cheat_Sheet
+r = Variance()
+# Hierachical risk parity
+hrp = HierarchicalRiskParity()
+# Schur complement hierarchical risk parity converging to the hierarchical risk parity
+sch1 = SchurComplementHierarchicalRiskParity(;
+                                             params = SchurComplementParams(; gamma = 0,
+                                                                            r = r,
+                                                                            alg = MonotonicSchurComplement()))
+# Mean variance optimisation
+mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+# Schur complement hierarchical risk parity nearing the mean variance optimisation, no positive definite projection, non-monotonic
+sch2 = SchurComplementHierarchicalRiskParity(;
+                                             params = SchurComplementParams(; gamma = 1,
+                                                                            r = r,
+                                                                            pdm = nothing,
+                                                                            alg = NonMonotonicSchurComplement()))
+# Schur complement hierarchical risk parity nearing the mean variance optimisation
+sch3 = SchurComplementHierarchicalRiskParity(;
+                                             params = SchurComplementParams(; gamma = 1,
+                                                                            r = r,
+                                                                            alg = MonotonicSchurComplement()))
+ress = optimise.([hrp, sch1, mr, sch2, sch3], rd)
+````
+
+We can compute the statistics and visualise the results of each estimator.
+
+````@example 99_Cheat_Sheet
+pr = ress[1].pr
+r = factory(Variance(), pr)
+rk_rt_ratio = [expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr) for res in ress]
+rk = map(rr -> rr[1], rk_rt_ratio)
+rt = map(rr -> rr[2], rk_rt_ratio)
+ratio = map(rr -> rr[3], rk_rt_ratio)
+# Display results
+pretty_table(hcat(DataFrame(:assets => rd.nx),
+                  DataFrame(reduce(hcat, [res.w for res in ress]),
+                            ["HRP", "gamma = 0", "MVO", "gamma = 1", "gamma = :max"]));
+             formatters = [resfmt])
+pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+                  DataFrame(vcat(rk', rt', ratio'),
+                            ["HRP", "gamma = 0", "MVO", "gamma = 1", "gamma = :max"]));
+             formatters = [resfmt])
+````
+
+#### 3.3.3 Hierachical equal risk contribution
 
 The [`HierarchicalEqualRiskContribution`]-(@ref) estimator uses the hierarchical structure of the assets as well as a clustering quality score to iteratively break up the asset universe into left and right clusters up until the optimal number of clusters according to the score. Each cluster is treated as a synthetic asset for which their risk is computed. The weight of each cluster is computed based on the risk it represents with respect to the cluster on the other side, and this weight is then multiplied by the weights represented by its member assets which were computed based on the risk they represented in porportion to the other assets in the cluster.
 
@@ -423,13 +474,6 @@ The [`HierarchicalOptimiser`]-(@ref) is specified via the `opt` keyword. Since t
 
 ````@example 99_Cheat_Sheet
 using Clustering
-clrfmt = (v, i, j) -> begin
-    if j in (1, 2)
-        return v
-    else
-        return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
-    end
-end;
 # Hierarchical equal risk contribution, equal weights risk inner risk measure, variance outer risk measure
 herc = HierarchicalEqualRiskContribution(; ri = EqualRiskMeasure(), ro = Variance())
 res = optimise(herc, rd)
@@ -443,7 +487,89 @@ r = factory(Variance(), pr)
 rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
 # Display results
 pretty_table(DataFrame(:assets => rd.nx, :cluster => get_clustering_indices(res.clr),
-                       :Weights => res.w); formatters = [clrfmt])
+                       :Weights => res.w); formatters = [resfmt])
+pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
+                       :Measure => [rk, rt, ratio]); formatters = [resfmt])
+````
+
+#### 3.3.4 Nested clustered optimisation
+
+The [`NestedClustered`]-(@ref) optimiser uses the same idea as the [`HierarchicalEqualRiskContribution`]-(@ref), where the optimisation process is split into inner and outer optimisations using the same scoring system for finding the optimal number of clusters. However, unlike [`HierarchicalEqualRiskContribution`]-(@ref), the intra- and inter-cluster optimisations are completely independent. It is possible to provide any non finite allocation optimisation estimator for the inner and outer estimators independently via the keywods `opti` and `opto` respectively. This means it inherits the requirements for the inner and outer estimators respectively.
+
+It is also possible to optimise the outer estimator by using cross validation via the `cv` keyword. A cross validation prediction is applied to the inner estimators, yielding a predicted returns series for each cluster. The returns vector for each cluster is then taken as the returns vector for a synthetic asset, and the resulting returns matrix is used to optimise the outer estimator. Otherwise the returns are computed directly by multiplying the inner weights by the original returns matrix. The final weights are computed in a similar way to the [`HierarchicalEqualRiskContribution`]-(@ref), multiplying weights of each cluster by their corresponding inner weights.
+
+````@example 99_Cheat_Sheet
+# Emulating the original `HierarchicalEqualRiskContribution`
+nco1 = NestedClustered(; opti = EqualWeighted(),
+                       opto = RiskBudgeting(; opt = JuMPOptimiser(; slv = slv)))
+# Mean risk for both optimisations
+nco2 = NestedClustered(; opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                       opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
+# It's even possible to nest them
+nco3 = NestedClustered(;
+                       opti = NestedClustered(; opti = HierarchicalEqualRiskContribution(;),
+                                              opto = RiskBudgeting(;
+                                                                   opt = JuMPOptimiser(;
+                                                                                       slv = slv))),
+                       opto = NestedClustered(;
+                                              opti = RiskBudgeting(;
+                                                                   opt = JuMPOptimiser(;
+                                                                                       slv = slv)),
+                                              opto = MeanRisk(;
+                                                              opt = JuMPOptimiser(;
+                                                                                  slv = slv))))
+# Optimise them all in one go
+ress = optimise.([nco1, nco2, nco3], rd)
+````
+
+We can compute some risk characteristics and visualise the results. We can see how the analogous optimisation to the original version of [`HierarchicalEqualRiskContribution`]-(@ref) has a similar behaviour, where all assets within a cluster have the same weight as each other.
+
+````@example 99_Cheat_Sheet
+pr = ress[1].pr
+r = factory(Variance(), pr)
+rk_rt_ratio = [expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr) for res in ress]
+rk = map(rr -> rr[1], rk_rt_ratio)
+rt = map(rr -> rr[2], rk_rt_ratio)
+ratio = map(rr -> rr[3], rk_rt_ratio)
+# Display results
+pretty_table(hcat(DataFrame(:assets => rd.nx,
+                            :clusters => get_clustering_indices(ress[1].clr)),
+                  DataFrame(reduce(hcat, [res.w for res in ress]),
+                            ["EW-RB", "MR-MR", "NC-HERC-RB_NC-RB-MR"]));
+             formatters = [resfmt])
+pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+                  DataFrame(vcat(rk', rt', ratio'),
+                            ["EW-RB", "MR-MR", "NC-HERC-RB_NC-RB-MR"]));
+             formatters = [resfmt])
+````
+
+#### 3.3.5 Stacking optimisation
+
+The [`Stacking`]-(@ref) optimiser uses a similar approach to [`NestedClustered`]-(@ref), but instead of using a single inner estimator, it uses a vector of estimators, inhering the requirements of each estimator being used. The inner weights are optimised by each estimator, and outer estimator uses each inner optimisation as a synthetic asset. The returns series used in the outer optimisation can be computed in the same way as [`NestedClustered`]-(@ref), either directly or by using cross validation predictions. The final weights are computed the same way as well.
+
+[`Stacking`]-(@ref) can be used in [`NestedClustered`]-(@ref) and vice-versa.
+
+The keywords for the inner and outer optimisers are the same as [`NestedClustered`]-(@ref).
+
+````@example 99_Cheat_Sheet
+# Use a few different optimisers
+st = Stacking(;
+              opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                      RiskBudgeting(; opt = JuMPOptimiser(; slv = slv)),
+                      InverseVolatility(), HierarchicalEqualRiskContribution()],
+              opto = NearOptimalCentering(; opt = JuMPOptimiser(; slv = slv)))
+# Optimise
+res = optimise(st, rd)
+````
+
+Compute and view the results.
+
+````@example 99_Cheat_Sheet
+pr = res.pr
+r = factory(Variance(), pr)
+rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
+# Display results
+pretty_table(DataFrame(:assets => rd.nx, :Weights => res.w); formatters = [resfmt])
 pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt])
 ````
