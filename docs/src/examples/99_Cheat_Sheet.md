@@ -19,7 +19,8 @@ Usually data is obtained from a provider and the returns have to be computed. `P
 Here we show a quick example of a heterogenous dataset which will only return the data with matching timestamps.
 
 ````@example 99_Cheat_Sheet
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra,
+      StableRNGs
 resfmt = (v, i, j) -> begin
     if j == 1
         return v
@@ -38,9 +39,49 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz"));
 
 ## 3. Basic Optimisations
 
-There are many optimisers available in `PortfolioOptimisers.jl`. Here we will showcase their basic usage. There are three types of non finite allocation optimisers.
+There are many optimisers available in `PortfolioOptimisers.jl`. Here we will showcase their basic usage.
 
-### 3.1 JuMP optimisers
+### 3.1 Naive Optimisers
+
+Naive optimisers do not use sophisticated optimisation algorithms, but rather very basic ones that offer robustness and diversificaiton by virtue of being unsophisticated.
+
+#### 3.1.1 Inverse volatility
+
+This uses the diagonal of the covariance to set the weights, if the flag `sq` is true, the weights are just the inverse of each entry in the diagonal, else it is the inverse of the square root of each entry in the diagonal.
+
+````@example 99_Cheat_Sheet
+variance = diag(prior(EmpiricalPrior(), rd).sigma)
+
+res1 = optimise(InverseVolatility(), rd)
+res2 = optimise(InverseVolatility(; sq = true), rd)
+inv_vol = 1 ./ sqrt.(variance)
+inv_vol /= sum(inv_vol)
+inv_var = 1 ./ variance
+inv_var /= sum(inv_var)
+pretty_table(DataFrame([rd.nx res1.w inv_vol res2.w inv_var],
+                       ["assets", "Opt Vol", "Inv Vol", "Opt Var", "Inv Var"]);
+             formatters = [resfmt])
+````
+
+#### 3.1.2 Equal weighted
+
+This assigns equal weights to all assets.
+
+````@example 99_Cheat_Sheet
+res = optimise(EqualWeighted(), rd)
+pretty_table(DataFrame([rd.nx res.w], ["assets", "Weights"]); formatters = [resfmt])
+````
+
+#### 3.1.3 Random weighted
+
+This randomly assigns weights according to a [`Dirichlet`](https://juliastats.org/Distributions.jl/latest/multivariate/#Distributions.Dirichlet) distribution. It's possible to provide a custom alpha parameter as a vector or number, random number generator, and seed.
+
+````@example 99_Cheat_Sheet
+res = optimise(RandomWeighted(; alpha = 1, rng = StableRNG(696), seed = 66420), rd)
+pretty_table(DataFrame([rd.nx res.w], ["assets", "Weights"]); formatters = [resfmt])
+````
+
+### 3.2 JuMP optimisers
 
 The JuMP-based optimisers use traditional mathematical optimisation. As such, they are the most flexible when it comes to constraints, and for those which accept them, objective functions. Most risk measures are also compatible with these, aside from a few exclusively compatible with clustering optimisations, as well as other risk measures which are incompatible with any optimisation. All JuMP-based optimisers require the user to provide a JuMP-compatible solver, which supports the type of constraints being used.
 
@@ -75,9 +116,9 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 nothing #hide
 ````
 
-#### 3.1.1 Mean Risk
+#### 3.2.1 Mean Risk
 
-[`MeanRisk`]-(@ref) is the traditional portfolio optimisation problem. It seeks to minimise the risk with respect to a target return, or maximise the return with respect to a target risk. It supports four objective functions which use the relationship between risk and returns in different ways.
+[`MeanRisk`]-(@ref) is the traditional portfolio optimisation problem. It seeks to minimise the risk with respect to a target return, or maximise the return with respect to a target risk. It supports four objective functions via the `obj` keyword which defaults to [`MinimumRisk`]-(@ref) which use the relationship between risk and returns in different ways, and the risk measure(s) are specified with the `r` keyword which defaults to [`Variance`](@ref).
 
 ````@example 99_Cheat_Sheet
 # Minimum risk (default)
@@ -117,7 +158,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
              formatters = [resfmt])
 ````
 
-#### 3.1.2 Factor risk contribution
+#### 3.2.2 Factor Risk Contribution
 
 This is a more advanced estimator, it requires some more set up. It allows users to provide objective functions, but also define risk contributions per factor to the variance risk measure. The minimum risk optimisaion will follow the risk contribution constraints the closest, and with enough data and assets can be quite exact up to the user provided convergence settings for the provided solvers.
 
@@ -172,6 +213,239 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
                   DataFrame(reduce(hcat, rkcs),
                             ["RC MinRisk", "RC Max Util", "RC Max Ratio", "RC Max Ret"]));
              formatters = [resfmt])
+````
+
+#### 3.2.3 Near Optimal Centering
+
+[`NearOptimalCentering`]-(@ref) is a way to smear an optimal portfolio accross a region around the point of optimality. The size of this region can be tuend by the user via the `bins` keyword, or automatically decided based on the number of observations and assets (default). This makes the portfolio more robust to estimation error and more diversified. It is not compatible with risk measures which produce quadratic risk expressions, so the risk measure keyword `r` defaults to [`StandardDeviation`](@ref).
+
+There are two variants, defined by the `alg` keyword, one which applies all constraints to the inner [`MeanRisk`]-(@ref) optimisation and leave the near optimal portfolio to fall where it may [`UnconstrainedNearOptimalCentering`]-(@ref), meaning the constraints will not be satisfied by the near optimal portfolio. And another which does apply the constraints to the near optimal portfolio [`ConstrainedNearOptimalCentering`]-(@ref).
+
+````@example 99_Cheat_Sheet
+# Minimum risk (default)
+noc1 = NearOptimalCentering(; obj = MinimumRisk(), opt = JuMPOptimiser(; slv = slv))
+# Maximum utility
+noc2 = NearOptimalCentering(; obj = MaximumUtility(; l = 0.5),
+                            opt = JuMPOptimiser(; slv = slv))
+# Maximum risk adjusted return ratio
+noc3 = NearOptimalCentering(; obj = MaximumRatio(), opt = JuMPOptimiser(; slv = slv))
+# Maximum return
+noc4 = NearOptimalCentering(; obj = MaximumReturn(), opt = JuMPOptimiser(; slv = slv))
+# Optimise all objective functions at once
+ress = optimise.([noc1, noc2, noc3, noc4], rd);
+nothing #hide
+````
+
+View and compute the results.
+
+````@example 99_Cheat_Sheet
+pr = ress[1].pr
+r = factory(StandardDeviation(), pr)
+ret = mr1.opt.ret
+rk_rt_ratio = [expected_risk_ret_ratio(r, ret, res.w, pr) for res in ress]
+rk = map(rr -> rr[1], rk_rt_ratio)
+rt = map(rr -> rr[2], rk_rt_ratio)
+ratio = map(rr -> rr[3], rk_rt_ratio)
+# Display results
+pretty_table(hcat(DataFrame(:assets => rd.nx),
+                  DataFrame(reduce(hcat, [res.w for res in ress]),
+                            [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn]));
+             formatters = [resfmt])
+pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+                  DataFrame(vcat(rk', rt', ratio'),
+                            [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn]));
+             formatters = [resfmt])
+````
+
+#### 3.2.4 Risk Budgeting
+
+[`RiskBudgeting`]-(@ref) provides a way to allocate risk accross assets or factors via the `rba` keyword according to a user-defined risk budgeting vector provided via the `rkb` keyword of [`AssetRiskBudgeting`]-(@ref) and [`FactorRiskBudgeting`]-(@ref) risk budgeting algorithms. The risk budget vectors do not have to be normalised. The risk being budgeted depends on the risk measures used. This does not support objective functions, the optimisation is solely focused on achieving the risk budgeting as closely as possible. It is compatible with the same risk measures as [`MeanRisk`]-(@ref).
+
+##### 3.2.4.1 Asset Risk Budgeting
+
+This version allocated risk accross assets.
+
+````@example 99_Cheat_Sheet
+r = Variance()
+# Equal risk contribution per asset (default)
+rba1 = RiskBudgeting(; r = r,
+                     rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nx))),
+                     opt = JuMPOptimiser(; slv = slv))
+# Increasing risk contribution per asset
+rba2 = RiskBudgeting(; r = r,
+                     rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nx))),
+                     opt = JuMPOptimiser(; slv = slv))
+# Optimise all risk budgeting estimators at once
+ress = optimise.([rba1, rba2], rd);
+nothing #hide
+````
+
+View and compute the results.
+
+````@example 99_Cheat_Sheet
+r = factory(r, pr)
+rkcs = [risk_contribution(r, res.w, pr.X) for res in ress]
+rkcs = rkcs ./ sum.(rkcs)
+pretty_table(hcat(DataFrame(:assets => rd.nx),
+                  DataFrame(reduce(hcat, [[res.w rkc] for (res, rkc) in zip(ress, rkcs)]),
+                            ["Eq Risk Weights", "Eq Risk Budget", "Incr Risk Weights",
+                             "Incr Risk Budget"])); formatters = [resfmt])
+````
+
+##### 3.2.4.1 Factor Risk Budgeting
+
+This version allocated risk accross factors.
+
+````@example 99_Cheat_Sheet
+r = Variance()
+# Equal risk contribution per factor (default)
+rba1 = RiskBudgeting(; r = r,
+                     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nf))),
+                     opt = JuMPOptimiser(; slv = slv))
+# Increasing risk contribution per factor
+rba2 = RiskBudgeting(; r = r,
+                     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nf))),
+                     opt = JuMPOptimiser(; slv = slv))
+# Optimise all risk budgeting estimators at once
+ress = optimise.([rba1, rba2], rd);
+nothing #hide
+````
+
+View and compute the results.
+
+````@example 99_Cheat_Sheet
+r = factory(r, pr)
+rkcas = [risk_contribution(r, res.w, pr.X) for res in ress]
+rkcas = rkcas ./ sum.(rkcas)
+rkcfs = [factor_risk_contribution(r, res.w, pr.X; rd = rd) for res in ress]
+rkcfs = rkcfs ./ sum.(rkcfs)
+pretty_table(hcat(DataFrame(:assets => rd.nx),
+                  DataFrame(reduce(hcat, [[res.w rkc] for (res, rkc) in zip(ress, rkcas)]),
+                            ["Eq Risk Weights", "Eq Risk Budget", "Incr Risk Weights",
+                             "Incr Risk Budget"])); formatters = [resfmt],
+             title = "Asset risk contribution")
+pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
+                  DataFrame(reduce(hcat,
+                                   [[[(res.prb.b1 \ res.w); NaN] rkc]
+                                    for (res, rkc) in zip(ress, rkcfs)]),
+                            ["Eq Risk Weights", "Eq Risk Budget", "Incr Risk Weights",
+                             "Incr Risk Budget"])); formatters = [resfmt],
+             title = "Factor risk contribution")
+````
+
+#### 3.2.5 Relaxed Risk Budgeting
+
+[`RelaxedRiskBudgeting`]-(@ref) provides a way to allocate risk accross assets or factors according to a user-defined risk budgeting vector, which does not have to be normalised. They are provided in the same way as for [`RiskBudgeting`]-(@ref), it does not accept risk measures as it's only available for the variance, and it will not follow the risk budget as closely.
+
+There are three variants, basic, regularised, and regularised and penalised. Since the asset and factor versions are the same as before we will only show the different relaxed risk budgeting algorithms.
+
+````@example 99_Cheat_Sheet
+# Basic
+rrb1 = RelaxedRiskBudgeting(;
+                            rba = AssetRiskBudgeting(;
+                                                     rkb = RiskBudget(;
+                                                                      val = range(;
+                                                                                  start = 1,
+                                                                                  stop = 1,
+                                                                                  length = length(rd.nx)))),
+                            alg = BasicRelaxedRiskBudgeting(),
+                            opt = JuMPOptimiser(; slv = slv))
+# Regularised
+rrb2 = RelaxedRiskBudgeting(;
+                            rba = AssetRiskBudgeting(;
+                                                     rkb = RiskBudget(;
+                                                                      val = range(;
+                                                                                  start = 1,
+                                                                                  stop = 1,
+                                                                                  length = length(rd.nx)))),
+                            alg = RegularisedRelaxedRiskBudgeting(),
+                            opt = JuMPOptimiser(; slv = slv))
+# Regularised and penalised, `p` is the penalty factor (default 1)
+rrrb3 = RelaxedRiskBudgeting(;
+                             rba = AssetRiskBudgeting(;
+                                                      rkb = RiskBudget(;
+                                                                       val = range(;
+                                                                                   start = 1,
+                                                                                   stop = 1,
+                                                                                   length = length(rd.nx)))),
+                             alg = RegularisedPenalisedRelaxedRiskBudgeting(; p = 1),
+                             opt = JuMPOptimiser(; slv = slv))
+ress = optimise.([rrb1, rrb2, rrrb3], rd);
+nothing #hide
+````
+
+View and compute the results.
+
+````@example 99_Cheat_Sheet
+r = Variance()
+r = factory(r, pr)
+rkcs = [risk_contribution(r, res.w, pr.X) for res in ress]
+rkcs = rkcs ./ sum.(rkcs)
+pretty_table(hcat(DataFrame(:assets => rd.nx),
+                  DataFrame(reduce(hcat, [[res.w rkc] for (res, rkc) in zip(ress, rkcs)]),
+                            ["B Weights", "B Budget", "Reg Weights", "Reg Budget",
+                             "RegPen Weights", "RegPen Budget"])); formatters = [resfmt])
+````
+
+### 3.3 Clustering optimisers
+
+Clustering based optimisers use the relatedness of the assets and the risks associated with these structures to assign weights based on those risks. Aside from the [`NestedClusters`]-(@ref) estimator, they all use a [`HierarchicalOptimiser`]-(@ref) in much the same way that JuMP-based optimisers use [`JuMPOptimiser`]-(@ref). In this case, the [`HierarchicalOptimiser`]-(@ref) does not require a solver to be specified via the `slv` keyword unless it uses a risk measure that requires one.
+
+#### 3.3.1 Hierachical risk parity
+
+The [`HierarchicalRiskParity`]-(@ref) estimator uses the hierarchical structure of the assets to iteratively partition the assets into smaller and smaller clusters computing the weights as a function of the risk between left and right cluster at each partition level. This accepts the same risk measures as JuMP based optimisers as well as some extra ones for which there are no traditional optimisation formulations.
+
+The [`HierarchicalOptimiser`]-(@ref) is specified via the `opt` keyword and the risk measure can be specified via the `r` keyword which defaults to the [`Variance`](@ref).
+
+````@example 99_Cheat_Sheet
+# Hierarchical risk parity
+hrp = HierarchicalRiskParity()
+res = optimise(hrp, rd)
+````
+
+View and compute the results.
+
+````@example 99_Cheat_Sheet
+pr = res.pr
+r = factory(Variance(), pr)
+rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
+# Display results
+pretty_table(DataFrame(:assets => rd.nx, :Weights => res.w); formatters = [resfmt])
+pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
+                       :Measure => [rk, rt, ratio]); formatters = [resfmt])
+````
+
+#### 3.3.1 Hierachical equal risk contribution
+
+The [`HierarchicalEqualRiskContribution`]-(@ref) estimator uses the hierarchical structure of the assets as well as a clustering quality score to iteratively break up the asset universe into left and right clusters up until the optimal number of clusters according to the score. Each cluster is treated as a synthetic asset for which their risk is computed. The weight of each cluster is computed based on the risk it represents with respect to the cluster on the other side, and this weight is then multiplied by the weights represented by its member assets which were computed based on the risk they represented in porportion to the other assets in the cluster.
+
+The [`HierarchicalOptimiser`]-(@ref) is specified via the `opt` keyword. Since this optimiser breaks up the assets into intra- and inter-cluster optimisations, it's possible to provide inner and outer risk measures via the `ri` and `ro` keywords, which both default to the [`Variance`](@ref). The original formulation used equal weights for the inner risk measure.
+
+````@example 99_Cheat_Sheet
+using Clustering
+clrfmt = (v, i, j) -> begin
+    if j in (1, 2)
+        return v
+    else
+        return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
+    end
+end;
+# Hierarchical equal risk contribution, equal weights risk inner risk measure, variance outer risk measure
+herc = HierarchicalEqualRiskContribution(; ri = EqualRiskMeasure(), ro = Variance())
+res = optimise(herc, rd)
+````
+
+We can view the results and verify that indeed all assets within a single cluster have the same weight.
+
+````@example 99_Cheat_Sheet
+pr = res.pr
+r = factory(Variance(), pr)
+rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
+# Display results
+pretty_table(DataFrame(:assets => rd.nx, :cluster => get_clustering_indices(res.clr),
+                       :Weights => res.w); formatters = [clrfmt])
+pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
+                       :Measure => [rk, rt, ratio]); formatters = [resfmt])
 ````
 
 ---
