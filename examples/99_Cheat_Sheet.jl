@@ -513,7 +513,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
 #=
 #### 3.3.5 Stacking optimisation
 
-The [`Stacking`]-(@ref) optimiser uses a similar approach to [`NestedClustered`]-(@ref), but instead of using a single inner estimator, it uses a vector of estimators, inhering the requirements of each estimator being used. The inner weights are optimised by each estimator, and outer estimator uses each inner optimisation as a synthetic asset. The returns series used in the outer optimisation can be computed in the same way as [`NestedClustered`]-(@ref), either directly or by using cross validation predictions. The final weights are computed the same way as well.
+The [`Stacking`]-(@ref) optimiser uses a similar approach to [`NestedClustered`]-(@ref), but instead of using a single inner estimator, it uses a vector of estimators, inhering the requirements of each estimator being used. The inner weights are optimised by each estimator, and outer estimator uses each inner optimisation as a synthetic asset. The returns series used in the outer optimisation can be computed in the same way as [`NestedClustered`]-(@ref), either directly or by using cross validation predictions. The final weights are computed the same way as well. It is possible to provide a vector of weights for the inner estimators via the `scale` keyword.
 
 [`Stacking`]-(@ref) can be used in [`NestedClustered`]-(@ref) and vice-versa.
 

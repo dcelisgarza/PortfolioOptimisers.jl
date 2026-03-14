@@ -16,26 +16,31 @@ function factory(res::StackingResult, fb::Option{<:OptE_Opt})
     return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
                           res.retcode, res.w, fb)
 end
-struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
+struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
        BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
     fees::T3
     sets::T4
-    opti::T5
-    opto::T6
-    cv::T7
-    wf::T8
-    ex::T9
-    fb::T10
-    brt::T11
-    strict::T12
+    scale::T5
+    opti::T6
+    opto::T7
+    cv::T8
+    wf::T9
+    ex::T10
+    fb::T11
+    brt::T12
+    strict::T13
     function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
-                      sets::Option{<:AssetSets}, opti::VecOptE_Opt,
+                      sets::Option{<:AssetSets}, scale::Option{<:VecNum}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,
                       cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
                       ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt}, brt::Bool,
                       strict::Bool)
+        if !isnothing(scale)
+            @argcheck(length(opti) == length(scale))
+            @argcheck(all(isfinite, scale))
+        end
         assert_external_optimiser(opto)
         if !isnothing(cv)
             assert_external_optimiser(opti)
@@ -46,20 +51,22 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets))
         end
-        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opti),
-                   typeof(opto), typeof(cv), typeof(wf), typeof(ex), typeof(fb),
-                   typeof(brt), typeof(strict)}(pe, wb, fees, sets, opti, opto, cv, wf, ex,
-                                                fb, brt, strict)
+        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
+                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
+                   typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opti,
+                                                            opto, cv, wf, ex, fb, brt,
+                                                            strict)
     end
 end
 function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                   fees::Option{<:FeesE_Fees} = nothing, sets::Option{<:AssetSets} = nothing,
-                  opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
+                  scale::Option{<:VecNum} = nothing, opti::VecOptE_Opt,
+                  opto::NonFiniteAllocationOptimisationEstimator,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::Option{<:OptE_Opt} = nothing, brt::Bool = false, strict::Bool = false)
-    return Stacking(pe, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, strict)
+    return Stacking(pe, wb, fees, sets, scale, opti, opto, cv, wf, ex, fb, brt, strict)
 end
 function assert_special_nco_requirements(opt::Stacking)
     @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti))
@@ -91,9 +98,9 @@ function factory(st::Stacking, w::AbstractVector)
     opti = factory(st.opti, w)
     opto = factory(st.opto, w)
     fb = factory(st.fb, w)
-    return Stacking(; pe = st.pe, wb = st.wb, fees = fees, sets = st.sets, opti = opti,
-                    opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb, brt = st.brt,
-                    strict = st.strict)
+    return Stacking(; pe = st.pe, wb = st.wb, fees = fees, sets = st.sets, scale = st.scale,
+                    opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb,
+                    brt = st.brt, strict = st.strict)
 end
 function opt_view(st::Stacking, i, X::MatNum)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
@@ -103,11 +110,10 @@ function opt_view(st::Stacking, i, X::MatNum)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
     sets = nothing_asset_sets_view(st.sets, i)
-    return Stacking(; pe = pe, wb = wb, fees = fees, opti = opti, opto = opto, cv = st.cv,
-                    wf = st.wf, sets = sets, ex = st.ex, fb = st.fb, brt = st.brt,
-                    strict = st.strict)
+    return Stacking(; pe = pe, wb = wb, fees = fees, scale = st.scale, opti = opti,
+                    opto = opto, cv = st.cv, wf = st.wf, sets = sets, ex = st.ex,
+                    fb = st.fb, brt = st.brt, strict = st.strict)
 end
-
 """
 Overload this using st.cv for custom cross-validation prediction
 """
@@ -195,7 +201,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, wi, resi)
+    swi = isnothing(st.scale) ? wi : wi .* transpose(st.scale)
+    rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, swi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = outer_optimisation_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
