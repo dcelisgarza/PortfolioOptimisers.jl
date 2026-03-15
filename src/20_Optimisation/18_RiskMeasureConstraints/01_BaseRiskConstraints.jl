@@ -72,15 +72,16 @@ end
 function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Front_NumVec, key)
     bound_key = Symbol(key, :_ub)
+    bound_var_key = Symbol(key, :_ub_var)
     if !haskey(model, :risk_frontier)
         risk_frontier = JuMP.@expression(model, risk_frontier,
-                                         Pair{Symbol,
+                                         Pair{Tuple{Symbol, Symbol},
                                               Tuple{<:JuMP.AbstractJuMPScalar,
-                                                    <:Front_NumVec}}[bound_key => (r_expr,
-                                                                                   ub)])
+                                                    <:Front_NumVec}}[(bound_var_key, bound_key) => (r_expr,
+                                                                                                    ub)])
     else
         risk_frontier = model[:risk_frontier]
-        push!(risk_frontier, bound_key => (r_expr, ub))
+        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub))
     end
     return nothing
 end

@@ -482,25 +482,23 @@ const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
 function bigger_is_better(::PerfRM)
     return true
 end
-function expected_risk(pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecNum}},
-                       r::PrRM; kwargs...)
-    throw(MethodError(expected_risk,
-                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+function expected_risk(r::PrRM,
+                       pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecNum}};
+                       kwargs...)
+    throw(ArgumentError("risk measure $r is incompatible for computing the `expected_risk` of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
 end
-function expected_risk(pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecVecNum}},
-                       r::PrRM; kwargs...)
-    throw(MethodError(expected_risk,
-                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+function expected_risk(r::PrRM,
+                       pred::PredictionResult{<:Any,
+                                              <:PredictionReturnsResult{<:Any, <:VecVecNum}};
+                       kwargs...)
+    throw(ArgumentError("risk measure $r is incompatible for computing the `expected_risk` of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
 end
-function expected_risk(pred::MultiPeriodPredictionResult, r::PrRM; kwargs...)
-    throw(MethodError(expected_risk,
-                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+function expected_risk(r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
+    throw(ArgumentError("risk measure $r is incompatible for computing the `expected_risk` of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
 end
-function expected_risk(pred::PopulationPredictionResult, r::PrRM; kwargs...)
-    throw(MethodError(expected_risk,
-                      "risk measure $r is incompatible for computing the expected risk of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
+function expected_risk(r::PrRM, pred::PopulationPredictionResult; kwargs...)
+    throw(ArgumentError("risk measure $r is incompatible for computing the `expected_risk` of a $(Base.typename(typeof(pred)).wrapper), please use $(isa(r, ExpectedReturn) ? MeanReturn : MeanReturnRiskRatio) instead"))
 end
 """
     brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,

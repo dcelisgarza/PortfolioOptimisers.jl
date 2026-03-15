@@ -268,6 +268,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.res.order]
@@ -280,6 +281,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.res.order]

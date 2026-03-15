@@ -75,8 +75,10 @@
     iv = TimeArray(ts, rand(StableRNG(123), 252, 20))
     ivpa = rand(StableRNG(123), 20)
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end]; iv = iv,
-                           ivpa = ivpa)
+                                     timestamp = :Date)[(end - 252):end];
+                           B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                           "./assets/SP500_idx.csv.gz"));
+                                         timestamp = :Date), iv = iv, ivpa = ivpa)
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = "verbose" => false),
@@ -481,6 +483,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res1.w...), hcat(res2.w...))
         end
+        @test res
         rks = expected_risk.(r, res1.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -509,6 +512,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
+        @test res
         rks = expected_risk.(r, res3.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -520,11 +524,12 @@
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res5 = optimise(MeanRisk(; r = Variance(;), opt = opt))
         res6 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
-        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-4)
+        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 1e-3)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
         end
+        @test res
         rks = expected_risk.(r, res5.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -538,11 +543,12 @@
                                                               stop = rt_max, length = 5)))
         res7 = optimise(MeanRisk(; r = Variance(;), opt = opt))
         res8 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
-        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-4)
+        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 1e-3)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
         end
+        @test res
         rks = expected_risk.(r, res7.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -579,6 +585,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res1.w...), hcat(res2.w...))
         end
+        @test res
         rks = expected_risk.(r, res1.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -611,6 +618,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
+        @test res
         rks = expected_risk.(r, res3.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -635,6 +643,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
         end
+        @test res
         rks = expected_risk.(r, res5.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -661,6 +670,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
         end
+        @test res
         rks = expected_risk.(r, res7.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -718,6 +728,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res1.w...), hcat(res2.w...))
         end
+        @test res
         rks = expected_risk.(r, res1.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -747,6 +758,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
+        @test res
         rks = expected_risk.(r, res3.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -764,6 +776,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
         end
+        @test res
         rks = expected_risk.(r, res5.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -783,6 +796,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
         end
+        @test res
         rks = expected_risk.(r, res7.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -838,6 +852,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res12.w...), hcat(res13.w...))
         end
+        @test res
         rks = expected_risk.(r, res12.w, pr)
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
@@ -1398,8 +1413,10 @@
         ivpa = rand(StableRNG(123))
         rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
                                                            "./assets/SP500.csv.gz"));
-                                         timestamp = :Date)[(end - 252):end]; iv = iv,
-                               ivpa = ivpa)
+                                         timestamp = :Date)[(end - 252):end];
+                               B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                               "./assets/SP500_idx.csv.gz"));
+                                             timestamp = :Date), iv = iv, ivpa = ivpa)
         pr = prior(HighOrderPriorEstimator(), rd)
 
         sets.dict["group4"] = ["AMD", "BAC"]
@@ -2003,5 +2020,26 @@
             end
             @test res
         end
+    end
+    @testset "Benchmark tracking" begin
+        opt = JuMPOptimiser(; slv = slv, brt = true)
+        mr = MeanRisk(; opt = opt)
+        res1 = optimise(mr, rd)
+
+        rdb = returns_result_picker(rd, true)
+        prb = prior(EmpiricalPrior(), rdb)
+        opt = JuMPOptimiser(; pe = prb, slv = slv, brt = true)
+        mr = MeanRisk(; opt = opt)
+        res2 = optimise(mr, rd)
+
+        @test res1.w == res2.w
+        @test isapprox(res1.w,
+                       [0.13594491020480565, 0.06664942220565599, 0.03347388625739562,
+                        0.018519121388742617, 0.037028053491839685, 0.07413397219776975,
+                        0.08586567489340931, 3.171794447542938e-6, 0.08014095369469784,
+                        0.03728279594798708, 0.030039697931611924, 0.03946098091476264,
+                        0.1844158171814443, 0.052745229082914055, 0.023728773389230906,
+                        0.005354628032118466, 0.010563552176813158, 0.04042806167670747,
+                        0.02919805117977965, 0.015023246357866301], rtol = 1e-6)
     end
 end

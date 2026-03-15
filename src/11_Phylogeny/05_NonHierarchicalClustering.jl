@@ -86,7 +86,7 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any,
     res, k = optimal_number_clusters(cle.onc, cle.alg, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
-function get_clustering_indices(clr::Clusters{<:Clustering.ClusteringResult, <:Any, <:Any,
+function Clustering.assignments(clr::Clusters{<:Clustering.ClusteringResult, <:Any, <:Any,
                                               <:Any})
     return clr.res.assignments
 end

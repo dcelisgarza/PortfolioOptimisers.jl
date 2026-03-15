@@ -33,16 +33,19 @@ abstract type NonOptimisationSequentialCrossValidationResult <:
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
 
-struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
+struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
     F::T4
-    ts::T5
-    iv::T6
-    ivpa::T7
+    nb::T5
+    B::T6
+    ts::T7
+    iv::T8
+    ivpa::T9
     function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
+                                     nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
                                      ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
                                      ivpa::Option{<:Num_VecNum})
         _check_names_and_returns_matrix(nf, F, :nf, :F)
@@ -53,16 +56,32 @@ struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsRes
                 @argcheck(all(x -> length(x) == size(F, 1), X))
             end
         end
+        if !isnothing(B) && !isnothing(X)
+            @argcheck(typeof(B) == typeof(X))
+            if isa(B, VecNum)
+                @argcheck(length(B) == length(X), DimensionMismatch)
+            elseif isa(B, VecVecNum)
+                @argcheck(length(B) == length(X), DimensionMismatch)
+                for (x, b) in zip(X, B)
+                    @argcheck(length(x) == length(b), DimensionMismatch)
+                end
+            end
+        end
         if !isnothing(ts)
             @argcheck(!isempty(ts), IsEmptyError)
             @argcheck(!(isnothing(X) && isnothing(F)), IsNothingError)
-            if isa(X, VecBaseRM)
+            if isa(X, VecNum)
                 @argcheck(length(ts) == length(X), DimensionMismatch)
             elseif isa(X, VecVecNum)
                 @argcheck(all(x -> length(x) == length(ts), X))
             end
             if !isnothing(F)
                 @argcheck(length(ts) == size(F, 1), DimensionMismatch)
+            end
+            if isa(B, VecNum)
+                @argcheck(length(ts) == length(B), DimensionMismatch)
+            elseif isa(B, VecVecNum)
+                @argcheck(all(x -> length(x) == length(ts), B))
             end
         end
         if isa(iv, VecNum)
@@ -80,18 +99,20 @@ struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsRes
                 @argcheck(length(ivi) == length(Xi), DimensionMismatch)
             end
         end
-        return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts), typeof(iv),
-                   typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
+        return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
+                   typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf, F, nb, B, ts, iv, ivpa)
     end
 end
 function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  X::Option{<:VecNum_VecVecNum} = nothing,
                                  nf::Option{<:VecStr} = nothing,
                                  F::Option{<:MatNum} = nothing,
+                                 nb::Option{<:VecStr} = nothing,
+                                 B::Option{<:VecNum_VecVecNum} = nothing,
                                  ts::Option{<:VecDate} = nothing,
                                  iv::Option{<:VecNum_VecVecNum} = nothing,
                                  ivpa::Option{<:Num_VecNum} = nothing)
-    return PredictionReturnsResult(nx, X, nf, F, ts, iv, ivpa)
+    return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
 abstract type AbstractPredictionResult <: AbstractResult end
 struct PredictionResult{T1, T2} <: AbstractPredictionResult
@@ -128,6 +149,19 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
     return _prediction_expected_risk(r, pred.rd.X, kwargs...)
 end
+function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}},
+                          sym = :X)
+    return mapreduce(x -> getproperty(x, sym), vcat, rd)
+end
+function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecVecNum}},
+                          sym = :X)
+    N = length(getproperty(rd[1], sym))
+    X = [eltype(getproperty(rd[1], sym)[1])[] for _ in 1:N]
+    for i in 1:N
+        X[i] = mapreduce(x -> getproperty(x, sym)[i], vcat, rd)
+    end
+    return X
+end
 struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
     pred::T1
     mrd::T2
@@ -135,14 +169,16 @@ struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
-        X = mapreduce_X(rd)
+        X = mapreduce_RetMtx(rd)
         nf = rd[1].nf
         F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
+        nb = rd[1].nb
+        B = isnothing(rd[1].B) ? nothing : mapreduce_RetMtx(rd, :B)
         ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
         iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
         ivpa = rd[1].ivpa
-        mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
-                                      ivpa = ivpa)
+        mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
+                                      ts = ts, iv = iv, ivpa = ivpa)
         return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id)
     end
 end
@@ -152,36 +188,11 @@ function MultiPeriodPredictionResult(;
     return MultiPeriodPredictionResult(pred, id)
 end
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
-function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}})
-    return mapreduce(x -> getproperty(x, :X), vcat, rd)
-end
-function mapreduce_X(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecVecNum}})
-    N = length(rd[1].X)
-    X = [eltype(rd[1].X[1])[] for _ in 1:N]
-    for i in 1:N
-        X[i] = mapreduce(x -> getproperty(x, :X)[i], vcat, rd)
-    end
-    return X
-end
-# function get_multiperiod_returns_result(mpred::MultiPeriodPredictionResult)
-#     rd = mpred.rd
-#     nx = rd[1].nx
-#     X = mapreduce_X(rd)
-#     nf = rd[1].nf
-#     F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
-#     ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
-#     iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
-#     ivpa = rd[1].ivpa
-#     return PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, ts = ts, iv = iv,
-#                                    ivpa = ivpa)
-# end
 function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
     return if sym == :res
         getfield.(getfield(mpred, :pred), :res)
     elseif sym === :rd
         getfield.(getfield(mpred, :pred), :rd)
-        # elseif sym == :mrd
-        #     get_multiperiod_returns_result(mpred)
     else
         getfield(mpred, sym)
     end
@@ -239,6 +250,8 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseR
 end
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum)
+    nb = rd.nb
+    B = !isa(rd.B, MatNum) ? rd.B : rd.B * res.w
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -252,11 +265,19 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
             ivpa = LinearAlgebra.dot(rd.ivpa, w)
         end
     end
-    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                                   iv = iv, ivpa = ivpa)
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
+                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecVecNum)
+    nb = rd.nb
+    B = if isnothing(rd.B)
+        nothing
+    elseif isa(rd.B, VecNum)
+        fill(rd.B, length(res.w))
+    else
+        [rd.B * w for w in res.w]
+    end
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -266,15 +287,15 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         if iv_flag
             iv = [iv * w for w in w]
         end
-    end
-    if ivpa_flag
-        ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in w]
+        if ivpa_flag
+            ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in w]
+        end
     end
     if isa(ivpa, Number)
         ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
     end
-    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts,
-                                   iv = iv, ivpa = ivpa)
+    return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
+                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     X = calc_net_returns(res, rd.X)

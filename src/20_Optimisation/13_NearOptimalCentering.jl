@@ -314,13 +314,14 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
                             w_min_retcode, w_opt_retcode, w_max_retcode)
 end
-function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Number, rt::Number,
-                                                 wb::WeightBounds)
+function set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBounds)
     w = model[:w]
     sc = model[:sc]
     w_ub = wb.ub
     risk = model[:risk]
     ret = model[:ret]
+    rk = model[:noc_rk]
+    rt = model[:noc_rt]
     N = length(w)
     JuMP.@variables(model, begin
                         log_ret
@@ -345,49 +346,28 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Number, 
     return obj_expr
 end
 function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
-                                              model::JuMP.Model, rk::Number, rt::Number,
+                                              model::JuMP.Model,
                                               opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
-    obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
+    obj_expr = set_near_optimal_centering_constraints!(model, opt.wb)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
 function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
-                                              model::JuMP.Model, rk::Number, rt::Number,
+                                              model::JuMP.Model,
                                               opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
-    obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
+    obj_expr = set_near_optimal_centering_constraints!(model, opt.wb)
     add_penalty_to_objective!(model, 1, obj_expr)
     add_custom_objective_term!(model, opt.ret, opt.cobj, obj_expr, opt, opt.pe)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
-function unregister_noc_variables!(model::JuMP.Model)
-    if !haskey(model, :log_ret)
-        return nothing
-    end
-    JuMP.delete(model, model[:log_ret])
-    JuMP.unregister(model, :log_ret)
-    JuMP.delete(model, model[:log_risk])
-    JuMP.unregister(model, :log_risk)
-    JuMP.delete(model, model[:log_w])
-    JuMP.unregister(model, :log_w)
-    JuMP.delete(model, model[:log_delta_w])
-    JuMP.unregister(model, :log_delta_w)
-    JuMP.delete(model, model[:clog_risk])
-    JuMP.unregister(model, :clog_risk)
-    JuMP.delete(model, model[:clog_ret])
-    JuMP.unregister(model, :clog_ret)
-    JuMP.delete(model, model[:clog_w])
-    JuMP.unregister(model, :clog_w)
-    JuMP.delete(model, model[:clog_delta_w])
-    JuMP.unregister(model, :clog_delta_w)
-    JuMP.unregister(model, :obj_expr)
-    return nothing
-end
 function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number,
                     rt_opt::Number, opt::BaseJuMPOptimisationEstimator, args...)
-    set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+    JuMP.@expression(model, noc_rk, rk_opt)
+    JuMP.@expression(model, noc_rt, rt_opt)
+    set_near_optimal_objective_function!(noc.alg, model, opt)
     return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -397,9 +377,12 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     opt::BaseJuMPOptimisationEstimator)
     retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
     sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
+    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
+    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
+    set_near_optimal_objective_function!(noc.alg, model, opt)
     for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
-        unregister_noc_variables!(model)
-        set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+        JuMP.set_parameter_value(noc_rk, rk_opt)
+        JuMP.set_parameter_value(noc_rt, rt_opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
         push!(retcodes, retcode)
         push!(sols, sol)
@@ -417,18 +400,18 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     ::Any, ::Any, ::Val{true}, ::Val{false})
     lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max)
     sc = model[:sc]
-    ret_expr = model[:ret]
     retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
     sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
+    ret = model[:ret]
+    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
+    JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
+    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
+    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
+    set_near_optimal_objective_function!(noc.alg, model, opt)
     for (i, (rk_opt, rt_opt, lb)) in enumerate(zip(rk_opts, rt_opts, lbs))
-        if i != 1
-            JuMP.delete(model, model[:ret_lb])
-            JuMP.unregister(model, :ret_lb)
-            JuMP.unregister(model, :obj_expr)
-        end
-        JuMP.@constraint(model, ret_lb, sc * (ret_expr - lb) >= 0)
-        unregister_noc_variables!(model)
-        set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+        JuMP.set_parameter_value(ret_lb_var, lb)
+        JuMP.set_parameter_value(noc_rk, rk_opt)
+        JuMP.set_parameter_value(noc_rt, rt_opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
         retcodes[i] = retcode
         sols[i] = sol
@@ -487,27 +470,69 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     opt::BaseJuMPOptimisationEstimator, ::Any, ::Any, w_min::VecNum,
                     w_max::VecNum, ::Val{false}, ::Val{true})
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max)
-    itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
-             Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
+    sc = model[:sc]
+    for (keys, vals) in risk_frontier
+        ub = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub) <= 0)
+    end
+    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
     sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
-    sc = model[:sc]
-    for (keys, r_exprs, ubs, rk_opt, rt_opt) in
-        zip(pitrs[1], pitrs[2], pitrs[3], rk_opts, rt_opts)
-        unregister_noc_variables!(model)
-        for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
-            if haskey(model, key)
-                JuMP.delete(model, model[key])
-                JuMP.unregister(model, key)
-            end
-            model[key] = JuMP.@constraint(model, sc * (r_expr - ub) <= 0)
+    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
+    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
+    set_near_optimal_objective_function!(noc.alg, model, opt)
+    for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
+        for (key, ub) in zip(keys, ubs)
+            JuMP.set_parameter_value(model[key], ub)
         end
-        set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+        JuMP.set_parameter_value(noc_rk, rk_opt)
+        JuMP.set_parameter_value(noc_rt, rt_opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
         push!(retcodes, retcode)
         push!(sols, sol)
+    end
+    return retcodes, sols
+end
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:ConstrainedNearOptimalCentering},
+                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
+                    opt::BaseJuMPOptimisationEstimator, rt_min::Number, rt_max::Number,
+                    w_min::VecNum, w_max::VecNum, ::Val{true}, ::Val{true})
+    lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max)
+    risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max)
+    sc = model[:sc]
+    for (keys, vals) in risk_frontier
+        ub = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub) <= 0)
+    end
+    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
+            for rkf in risk_frontier]
+    pitrs = Iterators.product.(itrs...)
+    retcodes = sizehint!(OptimisationReturnCode[], length(rt_opts) * length(rk_opts))
+    sols = sizehint!(JuMPOptimisationSolution[], length(rt_opts) * length(rk_opts))
+    ret = model[:ret]
+    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
+    JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
+    JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
+    JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
+    set_near_optimal_objective_function!(noc.alg, model, opt)
+    for lb in lbs
+        JuMP.set_parameter_value(ret_lb_var, lb)
+        for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
+            for (key, ub) in zip(keys, ubs)
+                JuMP.set_parameter_value(model[key], ub)
+            end
+            JuMP.set_parameter_value(noc_rk, rk_opt)
+            JuMP.set_parameter_value(noc_rt, rt_opt)
+            retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+            push!(retcodes, retcode)
+            push!(sols, sol)
+        end
     end
     return retcodes, sols
 end

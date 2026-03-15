@@ -39,6 +39,10 @@
     res = optimise(RandomWeighted(; rng = StableRNG(123456789)), rd)
     @test isapprox(sum(res.w), 1)
 
+    @test optimise(RandomWeighted(; alpha = 5, rng = StableRNG(123456789), seed = 42),
+                   rd).w == optimise(RandomWeighted(; alpha = fill(5, size(rd.X, 2)),
+                                                    rng = StableRNG(123456789), seed = 42), rd).w
+
     res = optimise(RandomWeighted(), rd)
     @test isapprox(sum(res.w), 1)
 

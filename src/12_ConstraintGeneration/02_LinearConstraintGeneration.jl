@@ -200,8 +200,8 @@ If a key in `dict` starts with the same value as `key`, it means that the corres
 
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` must have the same length as `dict[key]` as their lengths are preserved across views.
-  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalent group prefixed by `key` with the same length as `dict[key]` as that group will be used to find the unique entries for the view.
+  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`]-(@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the each entry corresponds to the industry of the asset in the same position in `dict[key]`.
+  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`]-(@ref) optimisations.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
 # Constructor
@@ -893,6 +893,9 @@ ParsingResult
 # Related
 
   - [`ParsingResult`](@ref)
+
+```
+```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)
