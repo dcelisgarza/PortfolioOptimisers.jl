@@ -12,10 +12,14 @@
     @testset "ReturnsResult" begin
         X = rand(3, 4)
         F = rand(3, 2)
+        B1 = rand(3, 4)
+        B2 = rand(3)
         iv = rand(3, 4)
         ivpa = rand(4)
         nx = string.(1:4)
         nf = string.(1:2)
+        nb1 = string.(1:3)
+        nb2 = ["1"]
         ts = Date(2020, 1, 1) .+ Day.(0:2)
         @test_throws IsNothingError ReturnsResult(; nx = nothing, X = X)
         @test_throws IsNothingError ReturnsResult(; nx = nx)
@@ -57,17 +61,23 @@
         @test_throws DimensionMismatch ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf,
                                                      F = F, iv = iv, ivpa = [1])
 
-        rr = ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = iv, ivpa = ivpa)
+        rr = ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb1, B = B1,
+                           iv = iv, ivpa = ivpa)
         @test rr.ts === ts
         @test rr.nx === nx
         @test rr.X === X
         @test rr.nf === nf
         @test rr.F === F
+        @test rr.nb === nb1
+        @test rr.B === B1
         @test rr.iv === iv
         @test rr.ivpa === ivpa
 
-        rr = ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = iv, ivpa = 1)
+        rr = ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, nb = nb2, B = B2,
+                           iv = iv, ivpa = 1)
         @test rr.ivpa == 1
+        @test rr.nb === nb2
+        @test rr.B === B2
 
         rr = ReturnsResult()
         @test isnothing(rr.ts)

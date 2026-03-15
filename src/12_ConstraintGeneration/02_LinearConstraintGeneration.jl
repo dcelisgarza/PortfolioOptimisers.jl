@@ -893,9 +893,6 @@ ParsingResult
 # Related
 
   - [`ParsingResult`](@ref)
-
-```
-```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)
