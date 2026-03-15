@@ -199,7 +199,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(typeof(rw), nothing, wb, retcode, w, nothing)
 end
-function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(rw, rd; dims = dims, kwargs...)
 end

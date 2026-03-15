@@ -382,7 +382,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                                  retcode, w, nothing)
 end
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
+                                       Nothing}, rd::ReturnsResult; dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(nco, rd; dims = dims, branchorder = branchorder, str_names = str_names,
