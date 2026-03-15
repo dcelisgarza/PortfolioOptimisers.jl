@@ -55,6 +55,7 @@ function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:
         @argcheck(length(names) == size(mat, 2),
                   DimensionMismatch("length($names_sym) == size($mat_sym, 2) must hold. Got\nlength($names_sym) => $(length(names))\nsize($mat_sym, 2) => $(size(mat, 2))"))
     end
+    return nothing
 end
 """
     struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
@@ -142,7 +143,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResul
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
-        if isa(B, VecNum)
+        if isa(B, VecNum) && !isnothing(nb)
             @argcheck(length(nb) == 1, DimensionMismatch)
         elseif isa(B, MatNum)
             _check_names_and_returns_matrix(nb, B, :nb, :B)

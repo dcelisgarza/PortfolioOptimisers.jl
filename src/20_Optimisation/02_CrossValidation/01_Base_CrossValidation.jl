@@ -57,10 +57,14 @@ struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractRe
             end
         end
         if !isnothing(B) && !isnothing(X)
+            @argcheck(typeof(B) == typeof(X))
             if isa(B, VecNum)
-                @argcheck(length(B) == size(X, 1), DimensionMismatch)
-            else
-                @argcheck(all(x -> length(x) == size(X, 1), B))
+                @argcheck(length(B) == length(X), DimensionMismatch)
+            elseif isa(B, VecVecNum)
+                @argcheck(length(B) == length(X), DimensionMismatch)
+                for (x, b) in zip(X, B)
+                    @argcheck(length(x) == length(b), DimensionMismatch)
+                end
             end
         end
         if !isnothing(ts)
