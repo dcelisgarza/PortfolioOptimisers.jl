@@ -139,7 +139,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResul
     ivpa::T9
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
-                           B::Option{<:VecNumMatNum}, ts::Option{<:VecDate},
+                           B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
         _check_names_and_returns_matrix(nx, X, :nx, :X)
         _check_names_and_returns_matrix(nf, F, :nf, :F)
@@ -185,7 +185,7 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResul
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
-                       nb::Option{<:VecStr} = nothing, B::Option{<:VecNumMatNum} = nothing,
+                       nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing)
     return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
@@ -311,7 +311,7 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:A
     return rd
 end
 function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
-                                                 <:VecNumMatNum}, brt::Bool)
+                                                 <:VecNum_MatNum}, brt::Bool)
     return if !brt
         rd
     else
