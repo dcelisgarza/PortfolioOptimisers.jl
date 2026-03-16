@@ -258,9 +258,19 @@ function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::M
     end
     return expected_risk(r, res.w, X, fees; kwargs...)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, pr::Pr_RR,
-                       fees::Option{<:Fees} = nothing; kwargs...)
-    return expected_risk(r, res.w, pr.X, fees; kwargs...)
+function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
+                       pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
+                       kwargs...)
+    pr = if !isnothing(pr)
+        pr
+    elseif isnothing(pr) && hasproperty(res, :pr)
+        res.pr
+    elseif isnothing(pr) && hasproperty(res, :opt) && hasproperty(res.opt, :pr)
+        res.opt.pr
+    else
+        throw(ArgumentError("`res` is a $(Base.typename(typeof(res)).wrapper), which does not have a valid `res.pr` or `res.opt.pr` field, please provide `pr` or a data matrix as an argument"))
+    end
+    return expected_risk(r, res, pr.X, fees; kwargs...)
 end
 function needs_previous_weights(::Nothing)
     return false
