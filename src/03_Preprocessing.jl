@@ -306,6 +306,90 @@ function returns_result_view(rd::ReturnsResult, i, j, k = :)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
                          ivpa = ivpa)
 end
+"""
+returns_result_picker(rd::ReturnsResult, brt::Bool)
+
+Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
+
+This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean flag `brt` (benchmark-tracking). If `brt` is `true` and a benchmark `B` is present it returns a new `ReturnsResult` in which asset returns `X` have the benchmark removed (i.e. `X - B` or broadcast `X .- B` for vector benchmarks). If `brt` is `false` or no benchmark is present, the original `ReturnsResult` is returned unchanged.
+
+# Arguments
+
+  - `rd`: A `ReturnsResult` object containing asset, factor and/or benchmark returns.
+  - `brt`: Boolean flag indicating whether benchmark-tracking behaviour should be applied. When `true`, asset returns are adjusted by subtracting the benchmark `B` (if present).
+
+# Returns
+
+  - `rd::ReturnsResult`:
+
+      + If `isnothing(B)` or `brt` is `false` returns the input `rd`.
+
+      + If `!isnothing(B)` and `brt` is `true`:
+
+          * When `B` is a vector (`VecNum`), returns a new `ReturnsResult` with `X = rd.X .- rd.B`.
+          * When `B` is a matrix (`MatNum`), returns a new `ReturnsResult` with `X = rd.X - rd.B`.
+
+# Details
+
+  - Subtraction is not done in-place: when an adjustment is required a new `ReturnsResult`
+    is returned leaving the original `rd` unmodified.
+  - For vector benchmarks (`VecNum`) subtraction uses broadcasting (`X .- B`) to subtract the
+    per-observation benchmark from each asset column (common for single benchmark tracking).
+  - For matrix benchmarks (`MatNum`) subtraction uses matrix subtraction (`X - B`).
+  - Other fields (`nx`, `nf`, `F`, `ts`, `iv`, `ivpa`) are preserved in the returned object.
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.10 0.20; 0.30 0.40], nb = ["BM"],
+                          B = [0.01; 0.02])
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    nb ┼ Vector{String}: ["BM"]
+     B ┼ Vector{Float64}: [0.01, 0.02]
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> rd2 = returns_result_picker(rd, false)  # no change when brt is false
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    nb ┼ Vector{String}: ["BM"]
+     B ┼ Vector{Float64}: [0.01, 0.02]
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> rd === rd2
+true
+
+julia> rd3 = returns_result_picker(rd, true)
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 2×2 Matrix{Float64}
+    nf ┼ nothing
+     F ┼ nothing
+    nb ┼ nothing
+     B ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> rd.X .- rd.B == rd3.X
+true
+```
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`returns_result_view`](@ref)
+"""
 function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                  Nothing}, ::Any)
     return rd
