@@ -18,7 +18,7 @@
         ivpa = rand(4)
         nx = string.(1:4)
         nf = string.(1:2)
-        nb1 = string.(1:3)
+        nb1 = string.(1:4)
         nb2 = ["1"]
         ts = Date(2020, 1, 1) .+ Day.(0:2)
         @test_throws IsNothingError ReturnsResult(; nx = nothing, X = X)
