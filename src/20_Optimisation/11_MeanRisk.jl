@@ -93,14 +93,11 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     k = model[:k]
     sc = model[:sc]
     ret_expr = model[:ret]
+    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
+    JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
+    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     for lb in lbs
-        if haskey(model, :ret_lb)
-            JuMP.delete(model, model[:ret_lb])
-            JuMP.unregister(model, :ret_lb)
-            JuMP.unregister(model, :obj_expr)
-        end
-        JuMP.@constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
-        set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
+        JuMP.set_parameter_value(ret_lb_var, lb)
         retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
         push!(retcodes, retcode)
         push!(sols, sol)
@@ -173,26 +170,23 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
                           pr::AbstractPriorResult, ::Val{false}, ::Val{true},
                           fees::Option{<:Fees})
     risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees)
-    itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
-             Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
+    k = model[:k]
+    sc = model[:sc]
+    for (keys, vals) in risk_frontier
+        ub = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub * k) <= 0)
+    end
+    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(pitrs))
     sols = sizehint!(JuMPOptimisationSolution[], length(pitrs))
-    k = model[:k]
-    sc = model[:sc]
-    for (keys, r_exprs, ubs) in zip(pitrs[1], pitrs[2], pitrs[3])
-        if haskey(model, :obj_expr)
-            JuMP.unregister(model, :obj_expr)
+    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
+    for (keys, ubs) in zip(pitrs[1], pitrs[2])
+        for (key, ub) in zip(keys, ubs)
+            JuMP.set_parameter_value(model[key], ub)
         end
-        for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
-            if haskey(model, key)
-                JuMP.delete(model, model[key])
-                JuMP.unregister(model, key)
-            end
-            model[key] = JuMP.@constraint(model, sc * (r_expr - ub * k) <= 0)
-        end
-        set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
         retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
         push!(retcodes, retcode)
         push!(sols, sol)
@@ -204,34 +198,28 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
                           fees::Option{<:Fees})
     lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr, fees)
     risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees)
-    itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
-             Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
+    sc = model[:sc]
+    k = model[:k]
+    for (keys, vals) in risk_frontier
+        ub = model[keys[1]] = JuMP.@variable(model,
+                                             set = JuMP.Parameter(zero(eltype(vals[2]))))
+        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub * k) <= 0)
+    end
+    itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(lbs) * length(pitrs))
     sols = sizehint!(JuMPOptimisationSolution[], length(lbs) * length(pitrs))
-    k = model[:k]
-    sc = model[:sc]
     ret_expr = model[:ret]
+    JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
+    JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
+    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     for lb in lbs
-        if haskey(model, :ret_lb)
-            JuMP.delete(model, model[:ret_lb])
-            JuMP.unregister(model, :ret_lb)
-            JuMP.unregister(model, :obj_expr)
-        end
-        JuMP.@constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
-        for (keys, r_exprs, ubs) in zip(pitrs[1], pitrs[2], pitrs[3])
-            if haskey(model, :obj_expr)
-                JuMP.unregister(model, :obj_expr)
+        JuMP.set_parameter_value(ret_lb_var, lb)
+        for (keys, ubs) in zip(pitrs[1], pitrs[2])
+            for (key, ub) in zip(keys, ubs)
+                JuMP.set_parameter_value(model[key], ub)
             end
-            for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
-                if haskey(model, key)
-                    JuMP.delete(model, model[key])
-                    JuMP.unregister(model, key)
-                end
-                model[key] = JuMP.@constraint(model, sc * (r_expr - ub * k) <= 0)
-            end
-            set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
             retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
             push!(retcodes, retcode)
             push!(sols, sol)

@@ -971,6 +971,9 @@ Unlike all other estimators, finite allocation does not yield an "optimal" value
   - ::: details Walk forward [`WalkForward`]-(@ref) return a [`WalkForwardResult`]-(@ref)
     - Index-based [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref)
   - Multiple randomised [`MultipleRandomised`]-(@ref) returns a [`MultipleRandomisedResult`]-(@ref)
+- ::: details Hyperparameter tuning via [`search_cross_validation`](@ref).
+  - Grid search cross validation [`GridSearchCrossValidation`](@ref)
+  - Randomised search cross validation [`RandomisedSearchCrossValidation`](@ref)
 
 ### Plotting
 

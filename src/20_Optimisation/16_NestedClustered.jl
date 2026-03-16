@@ -99,7 +99,7 @@ function assert_external_optimiser(opt::VecOptE_Opt)
     assert_external_optimiser.(opt)
     return nothing
 end
-struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
+struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
        ClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -110,16 +110,17 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     opto::T7
     cv::T8
     wf::T9
-    strict::T10
-    ex::T11
-    fb::T12
+    ex::T10
+    fb::T11
+    brt::T12
+    strict::T13
     function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
                              opti::NonFiniteAllocationOptimisationEstimator,
                              opto::NonFiniteAllocationOptimisationEstimator,
                              cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
-                             strict::Bool, ex::FLoops.Transducers.Executor,
-                             fb::Option{<:OptE_Opt})
+                             ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt},
+                             brt::Bool, strict::Bool)
         assert_external_optimiser(opto)
         assert_special_nco_requirements(opto)
         if !(opti === opto)
@@ -136,9 +137,10 @@ struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
             @argcheck(!isnothing(sets))
         end
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
-                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(strict),
-                   typeof(ex), typeof(fb)}(pe, cle, wb, fees, sets, opti, opto, cv, wf,
-                                           strict, ex, fb)
+                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
+                   typeof(fb), typeof(brt), typeof(strict)}(pe, cle, wb, fees, sets, opti,
+                                                            opto, cv, wf, ex, fb, brt,
+                                                            strict)
     end
 end
 function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = ClustersEstimator(),
@@ -149,10 +151,10 @@ function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = Clusters
                          opto::NonFiniteAllocationOptimisationEstimator,
                          cv::Option{<:OptimisationCrossValidation} = nothing,
                          wf::WeightFinaliser = IterativeWeightFinaliser(),
-                         strict::Bool = false,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         fb::Option{<:OptE_Opt} = nothing)
-    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, strict, ex, fb)
+                         fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                         strict::Bool = false)
+    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, strict)
 end
 function assert_internal_optimiser(opt::NestedClustered)
     @argcheck(!isa(opt.cle, AbstractClusteringResult))
@@ -188,7 +190,8 @@ function factory(nco::NestedClustered, w::AbstractVector)
     fb = factory(nco.fb, w)
     return NestedClustered(; pe = nco.pe, cle = nco.cle, wb = nco.wb, fees = fees,
                            sets = nco.sets, opti = opti, opto = opto, cv = nco.cv,
-                           wf = nco.wf, strict = nco.strict, ex = nco.ex, fb = fb)
+                           wf = nco.wf, ex = nco.ex, fb = fb, brt = nco.brt,
+                           strict = nco.strict)
 end
 function opt_view(nco::NestedClustered, i, X::MatNum)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
@@ -199,8 +202,8 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
-                           opti = opti, opto = opto, cv = nco.cv, wf = nco.wf,
-                           strict = nco.strict, ex = nco.ex, fb = nco.fb)
+                           opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
+                           fb = nco.fb, brt = nco.brt, strict = nco.strict)
 end
 function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                       wf::WeightFinaliser, strict::Bool, resi::VecOpt,
@@ -245,6 +248,11 @@ Overload this using nco.cv for custom cross-validation prediction
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
+    nb, B = if !isa(rd.B, MatNum)
+        rd.nb, rd.B
+    else
+        ["_b$(i)" for i in 1:size(wi, 2)], rd.B * wi
+    end
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -265,16 +273,20 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
         X[:, i] = calc_net_returns(res, pri, feesi)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         ts = rd.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
-function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::Integer)
+function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
+    N = length(predictions)
+    nb = rd.nb
+    B_flag = !isnothing(rd.B)
     iv_flag = !isnothing(rd.iv)
     ivpa_flag = !isnothing(rd.ivpa)
     rd1 = predictions[1].mrd
     X = rd1.X
+    B = B_flag ? rd1.B : nothing
     iv = rd1.iv
     ivpa = ivpa_flag ? [rd1.ivpa] : nothing
-    @inbounds for i in 2:length(predictions)
+    @inbounds for i in 2:N
         rdi = predictions[i].mrd
         append!(X, rdi.X)
         if iv_flag
@@ -283,11 +295,18 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes, N::
         if ivpa_flag
             push!(ivpa, rdi.ivpa)
         end
+        if B_flag
+            append!(B, rdi.B)
+        end
     end
     X = reshape(X, :, N)
+    if B_flag
+        B = reshape(B, :, N)
+        nb = ["_b$(i)" for i in 1:N]
+    end
     iv = iv_flag ? reshape(iv, :, N) : nothing
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
-                         ts = rd1.ts, iv = iv, ivpa = ivpa)
+                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa)
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,
@@ -298,15 +317,14 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
                                              cls::VecVecInt)
     (; opti, cv, ex) = nco
     cv = cv.cv
-    N = length(cls)
-    predictions = Vector{MultiPeriodPredictionResult}(undef, N)
+    predictions = Vector{MultiPeriodPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
-    return rebuild_returns_result(rd, predictions, N)
+    return rebuild_returns_result(rd, predictions)
 end
 function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, <:Any,
                                                                   <:Any, <:Any, <:Any,
@@ -317,11 +335,10 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
                                              cls::VecVecInt)
     (; opti, cv, ex) = nco
     (; cv, scorer) = cv
-    N = length(cls)
-    predictions = Vector{PopulationPredictionResult}(undef, N)
+    predictions = Vector{PopulationPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = hasproperty(cv, :rng) ? copy(cv) : cv
+            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
@@ -329,17 +346,18 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
         scorer = NearestQuantilePrediction()
     end
     best_predictions = [scorer(prediction) for prediction in predictions]
-    return rebuild_returns_result(rd, best_predictions, N)
+    return rebuild_returns_result(rd, best_predictions)
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
+    rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd; dims = dims)
     clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(pr.X),
                             strict = nco.strict)
-    idx = get_clustering_indices(clr)
+    idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
@@ -364,8 +382,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                                  retcode, w, nothing)
 end
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                                       Nothing}, rd::ReturnsResult; dims::Int = 1,
+                  branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     return _optimise(nco, rd; dims = dims, branchorder = branchorder, str_names = str_names,
                      save = save, kwargs...)

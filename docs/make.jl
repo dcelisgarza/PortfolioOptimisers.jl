@@ -14,7 +14,7 @@ end
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
-                            Dates, Distributions, StableRNGs); recursive = true)
+                            Dates, Distributions, StableRNGs, TimeSeries); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)

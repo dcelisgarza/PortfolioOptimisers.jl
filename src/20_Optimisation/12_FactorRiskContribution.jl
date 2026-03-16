@@ -60,7 +60,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                                 sets::Option{<:AssetSets} = nothing,
-                                wi::Option{<:VecNum} = nothing, flag::Bool = true,
+                                wi::Option{<:VecNum} = nothing, flag::Bool = false,
                                 fb::Option{<:OptE_Opt} = nothing)
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
 end

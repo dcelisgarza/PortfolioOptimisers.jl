@@ -83,7 +83,7 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 
 The simplest form of cross validation is KFold. This method splits the data into K folds, and then iteratively trains on K-1 folds and tests on the remaining fold. This process is repeated K times, with each fold being used as the test set once.
 
-The [`KFold``](@ref) indices can be generated independently of the optimisation. Let's say we want to perform 5-fold cross validation, this works out to be roughly one per year.
+The [`KFold`](@ref) indices can be generated independently of the optimisation. Let's say we want to perform 5-fold cross validation, this works out to be roughly one per year.
 
 ````@example 10_CrossValidation
 kfold = KFold(; n = 5)

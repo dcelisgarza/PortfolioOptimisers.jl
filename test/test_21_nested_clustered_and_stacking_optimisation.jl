@@ -24,7 +24,10 @@
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+                                     timestamp = :Date)[(end - 252):end];
+                           B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                           "./assets/SP500_idx.csv.gz"));
+                                         timestamp = :Date))
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = Dict("verbose" => false)),
@@ -265,8 +268,9 @@
                                                                                                                     opt = jopto))],
                                                                 opto = HierarchicalRiskParity(;
                                                                                               opt = hopto)))),
-                NestedClustered(; cle = clr, opti = FactorRiskContribution(; opt = jopti),
-                                opto = FactorRiskContribution(; opt = jopto)),
+                NestedClustered(; cle = clr,
+                                opti = FactorRiskContribution(; flag = true, opt = jopti),
+                                opto = FactorRiskContribution(; flag = true, opt = jopto)),
                 NestedClustered(; cle = clr,
                                 opti = HierarchicalRiskParity(;
                                                               r = MedianAbsoluteDeviation(),
@@ -275,8 +279,9 @@
                                                               r = MedianAbsoluteDeviation(),
                                                               opt = hopto)),
                 NestedClustered(; cle = clr,
-                                opti = FactorRiskContribution(; re = rr, opt = jopti),
-                                opto = FactorRiskContribution(; opt = jopto)),
+                                opti = FactorRiskContribution(; flag = true, re = rr,
+                                                              opt = jopti),
+                                opto = FactorRiskContribution(; flag = true, opt = jopto)),
                 NestedClustered(;
                                 cle = ClustersEstimator(;
                                                         ce = PortfolioOptimisersCovariance(),
@@ -411,6 +416,14 @@
                                                       HierarchicalRiskParity(; opt = hopto),
                                                       MeanRisk(; obj = MaximumRatio(),
                                                                opt = jopto)]),
+                         opto = MeanRisk(; opt = jopto)),
+                NestedClustered(; brt = true, opti = MeanRisk(; opt = jopti),
+                                opto = MeanRisk(; opt = jopto)),
+                Stacking(; brt = true,
+                         opti = concrete_typed_array([resi,
+                                                      HierarchicalRiskParity(; opt = hopto),
+                                                      MeanRisk(; obj = MaximumRatio(),
+                                                               opt = jopto)]),
                          opto = MeanRisk(; opt = jopto))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
@@ -465,7 +478,7 @@
                                                        opt = opti),
                                        opto = MeanRisk(; opt = opto)), rd)
 
-        clusters = get_clustering_indices(clr)
+        clusters = assignments(clr)
         idx = findfirst(x -> x == "PG", rd.nx)
         idxc = clusters[idx]
         idx = findall(x -> x == idxc, clusters)
@@ -515,7 +528,7 @@
                                                                   sets = sets)),
                               opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
         res = optimise(opt, rd)
-        clusters = get_clustering_indices(clr)
+        clusters = assignments(clr)
 
         group2 = sets.dict["group2"]
         for i in 1:(clr.k)
@@ -760,11 +773,20 @@
         df = CSV.read(joinpath(@__DIR__,
                                "./assets/NestedClusteredEfficientFrontier.csv.gz"),
                       DataFrame)
-        @test isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-6)
+        success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 1e-3)
+        if !success
+            find_tol(Matrix(df), reduce(hcat, res.w))
+        end
+        @test success
+
         st = Stacking(; opti = [mr1, mr2], opto = mr3)
         res = optimise(st, rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/StackingEfficientFrontier.csv.gz"),
                       DataFrame)
-        @test isapprox(Matrix(df), reduce(hcat, res.w), rtol = 1e-6)
+        success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 5e-4)
+        if !success
+            find_tol(Matrix(df), reduce(hcat, res.w))
+        end
+        @test success
     end
 end

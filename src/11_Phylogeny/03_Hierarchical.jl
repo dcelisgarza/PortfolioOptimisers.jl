@@ -498,9 +498,9 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     end
     return valid_k_clusters(res, W_list)
 end
-function get_clustering_indices(clr::Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any})
+function Clustering.assignments(clr::Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any})
     return Clustering.cutree(clr.res; k = clr.k)
 end
 
 export ClusterNode, is_leaf, PreorderTreeByID, pre_order, to_tree, optimal_number_clusters,
-       get_clustering_indices
+       assignments
