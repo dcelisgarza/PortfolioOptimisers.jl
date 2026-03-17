@@ -280,6 +280,11 @@ function phylogeny_constraints(plc::PlCE_PlC, pr::Pr_RR;
     X = isnothing(rd) || cle_pr ? pr.X : pr.rd.X
     return phylogeny_constraints(plc, X; kwargs...)
 end
+#! Start: Only exists to avoid ambiguities.
+function phylogeny_constraints(plc::AbstractPhylogenyConstraintResult, ::Pr_RR; kwargs...)
+    return plc
+end
+#! End: Only exists to avoid ambiguities.
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
 
