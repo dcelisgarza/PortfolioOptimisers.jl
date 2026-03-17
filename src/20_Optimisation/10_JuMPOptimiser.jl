@@ -361,13 +361,14 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                              dims::Int = 1)
     rd = returns_result_picker(rd, opt.brt)
     pr = prior(opt.pe, rd; dims = dims)
-    datatype = eltype(pr.X)
-    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
+    X = pr.X
+    datatype = eltype(X)
+    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(X, 2), strict = opt.strict,
                                    datatype = datatype)
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict)
-    ctr = centrality_constraints(opt.cte, pr.X; iv = rd.iv, ivpa = rd.ivpa)
+    ctr = centrality_constraints(opt.cte, X; iv = rd.iv, ivpa = rd.ivpa)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     if opt.smtx === opt.sgmtx
@@ -396,7 +397,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
-    plr = phylogeny_constraints(opt.ple, pr.X; iv = rd.iv, ivpa = rd.ivpa)
+    plr = phylogeny_constraints(opt.ple, X; iv = rd.iv, ivpa = rd.ivpa)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,

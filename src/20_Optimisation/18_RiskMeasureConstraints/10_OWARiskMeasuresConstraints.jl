@@ -16,9 +16,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     key = Symbol(:owa_risk_, i)
     sc = model[:sc]
-    T = size(pr.X, 1)
-    owa = set_owa_constraints!(model, pr.X)
-    ovec = range(one(eltype(pr.X)), one(eltype(pr.X)); length = T)
+    X = pr.X
+    T = size(X, 1)
+    owa = set_owa_constraints!(model, X)
+    ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     owa_a, owa_b = model[Symbol(:owa_a_, i)], model[Symbol(:owa_b_, i)] = JuMP.@variables(model,
                                                                                           begin
                                                                                               [1:T]
@@ -41,9 +42,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     key = Symbol(:owa_range_risk_, i)
     sc = model[:sc]
-    T = size(pr.X, 1)
-    owa = set_owa_constraints!(model, pr.X)
-    ovec = range(one(eltype(pr.X)), one(eltype(pr.X)); length = T)
+    X = pr.X
+    T = size(X, 1)
+    owa = set_owa_constraints!(model, X)
+    ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     owa_a, owa_b = model[Symbol(:owa_range_a_, i)], model[Symbol(:owa_range_b_, i)] = JuMP.@variables(model,
                                                                                                       begin
                                                                                                           [1:T]
@@ -68,8 +70,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     key = Symbol(:aowa_risk_, i)
     sc = model[:sc]
-    T = size(pr.X, 1)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    T = size(X, 1)
+    net_X = set_net_portfolio_returns!(model, X)
     owa_p = r.alg.p
     M = length(owa_p)
     owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = model[Symbol(:owa_t_, i)], model[Symbol(:owa_nu_, i)], model[Symbol(:owa_eta_, i)], model[Symbol(:owa_epsilon_, i)], model[Symbol(:owa_psi_, i)], model[Symbol(:owa_z_, i)], model[Symbol(:owa_y_, i)] = JuMP.@variables(model,
@@ -147,8 +150,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     key = Symbol(:aowa_range_risk_, i)
     sc = model[:sc]
-    T = size(pr.X, 1)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    T = size(X, 1)
+    net_X = set_net_portfolio_returns!(model, X)
     owa_p = r.alg.p
     M = length(owa_p)
     owa_l_t, owa_l_nu, owa_l_eta, owa_l_epsilon, owa_l_psi, owa_l_z, owa_l_y, owa_h_t, owa_h_nu, owa_h_eta, owa_h_epsilon, owa_h_psi, owa_h_z, owa_h_y = model[Symbol(:owa_l_t_, i)], model[Symbol(:owa_l_nu_, i)], model[Symbol(:owa_l_eta_, i)], model[Symbol(:owa_l_epsilon_, i)], model[Symbol(:owa_l_psi_, i)], model[Symbol(:owa_l_z_, i)], model[Symbol(:owa_l_y_, i)], model[Symbol(:owa_h_t_, i)], model[Symbol(:owa_h_nu_, i)], model[Symbol(:owa_h_eta_, i)], model[Symbol(:owa_h_epsilon_, i)], model[Symbol(:owa_h_psi_, i)], model[Symbol(:owa_h_z_, i)], model[Symbol(:owa_h_y_, i)] = JuMP.@variables(model,

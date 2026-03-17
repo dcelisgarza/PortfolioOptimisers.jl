@@ -70,12 +70,12 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     @argcheck(dims in (1, 2))
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
+    X = pr.X
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
     w /= sum(w)
-    wb = weight_bounds_constraints(iv.wb, iv.sets;
-                                   N = size(pr.X, ifelse(isone(dims), 2, 1)),
-                                   strict = iv.strict, datatype = eltype(pr.X))
+    wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, ifelse(isone(dims), 2, 1)),
+                                   strict = iv.strict, datatype = eltype(X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(typeof(iv), pr, wb, retcode, w, nothing)
 end

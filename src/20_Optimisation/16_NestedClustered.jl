@@ -266,7 +266,8 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
             ivpa = transpose(wi) * ivpa
         end
     end
-    X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
+    X = pr.X
+    X = Matrix{eltype(X)}(undef, size(X, 1), size(wi, 2))
     for (i, (res, cl)) in enumerate(zip(resi, cls))
         pri = prior_view(pr, cl)
         feesi = fees_view(fees, cl)
@@ -353,17 +354,17 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    save::Bool = true, kwargs...)
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd; dims = dims)
-    clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    X = pr.X
+    clr = clusterise(nco.cle, X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
-    fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(pr.X),
-                            strict = nco.strict)
+    fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(X), strict = nco.strict)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
-    wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
+    wi = zeros(eltype(X), size(X, 2), clr.k)
     opti = nco.opti
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
-        optic = opt_view(opti, cl, pr.X)
+        optic = opt_view(opti, cl, X)
         rdc = returns_result_view(rd, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
@@ -377,7 +378,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = outer_optimisation_finaliser(nco.wb, nco.sets, nco.wf, nco.strict,
                                                   resi, reso.retcode, reso.w, wi;
-                                                  datatype = eltype(pr.X))
+                                                  datatype = eltype(X))
     return NestedClusteredResult(typeof(nco), pr, clr, wb, fees, resi, reso, nco.cv,
                                  retcode, w, nothing)
 end

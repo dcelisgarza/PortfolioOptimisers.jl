@@ -140,7 +140,8 @@ function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsR
             ivpa = transpose(wi) * ivpa
         end
     end
-    X = Matrix{eltype(pr.X)}(undef, size(pr.X, 1), size(wi, 2))
+    X = pr.X
+    X = Matrix{eltype(X)}(undef, size(X, 1), size(wi, 2))
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, pr, fees)
     end
@@ -188,10 +189,11 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    save::Bool = true, kwargs...)
     rd = returns_result_picker(rd, st.brt)
     pr = prior(st.pe, rd; dims = dims)
-    fees = fees_constraints(st.fees, st.sets; datatype = eltype(pr.X), strict = st.strict)
+    X = pr.X
+    fees = fees_constraints(st.fees, st.sets; datatype = eltype(X), strict = st.strict)
     opti = st.opti
     Ni = length(opti)
-    wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
+    wi = zeros(eltype(X), size(X, 2), Ni)
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
         res = optimise(opt, rd; dims = dims, branchorder = branchorder,
@@ -207,7 +209,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = outer_optimisation_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
                                                   reso.retcode, reso.w, wi;
-                                                  datatype = eltype(pr.X))
+                                                  datatype = eltype(X))
     return StackingResult(typeof(st), pr, wb, fees, resi, reso, st.cv, retcode, w, nothing)
 end
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

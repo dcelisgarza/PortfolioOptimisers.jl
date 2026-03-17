@@ -130,16 +130,6 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
 end
 const VecPredRes = AbstractVector{<:PredictionResult}
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-struct SingletonVector{T} <: AbstractVector{T} end
-function SingletonVector()
-    return SingletonVector{Int}()
-end
-Base.length(::SingletonVector) = 1
-function Base.getindex(A::SingletonVector, i::Int)
-    return isone(i) ? 1 : throw(BoundsError(A, i))
-end
-Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
-Base.size(::SingletonVector) = (1,)
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
     return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
 end
