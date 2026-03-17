@@ -495,8 +495,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(hec.opt.cle, X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
-                     branchorder = branchorder)
+    clr = clusterise(hec.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     branchorder = branchorder, cle_pr = hec.opt.cle_pr)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl, fees = herc_risk(hec, pr, cls)

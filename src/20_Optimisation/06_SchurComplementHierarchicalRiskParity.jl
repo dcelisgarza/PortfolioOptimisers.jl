@@ -273,7 +273,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(sh.opt.cle, X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    clr = clusterise(sh.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     cle_pr = sh.opt.cle_pr)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
@@ -287,7 +288,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(sh.opt.cle, X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    clr = clusterise(sh.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     cle_pr = sh.opt.cle_pr)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
