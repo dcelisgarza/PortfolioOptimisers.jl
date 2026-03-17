@@ -1,8 +1,6 @@
 """
     abstract type AbstractPriorEstimator <: AbstractEstimator end
 
-using Base: AbstractArrayOrBroadcasted
-
 Abstract supertype for all prior estimators.
 
 `AbstractPriorEstimator` is the base type for all estimators that compute prior information from asset and/or factor returns. All concrete prior estimators should subtype this type to ensure a consistent interface for prior computation and integration with portfolio optimisation workflows.
@@ -277,7 +275,7 @@ end
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
                                kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : pr.rd.X
+    X = isnothing(rd) || cle_pr ? pr.X : pr.X
     return phylogeny_constraints(plc, X; kwargs...)
 end
 """
