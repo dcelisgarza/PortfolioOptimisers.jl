@@ -144,10 +144,8 @@ struct RandomWeighted{T1, T2, T3, T4, T5, T6, T7, T8} <: NaiveOptimisationEstima
                             seed::Option{<:Integer}, wb::Option{<:WbE_Wb},
                             sets::Option{<:AssetSets}, wf::WeightFinaliser,
                             fb::Option{<:OptE_Opt}, strict::Bool)
-        if isa(alpha, Number)
-            @argcheck(alpha > zero(alpha))
-        else
-            @argcheck(all(x -> x > zero(x), alpha))
+        if !isnothing(alpha)
+            assert_nonempty_gt0_finite_val(alpha, :alpha)
         end
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))

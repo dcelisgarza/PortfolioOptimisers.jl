@@ -40,11 +40,11 @@ end
 function expected_risk(r::ERkw, w::VecNum, args...; kwargs...)
     return r(w)
 end
-#! Start: Only exists to avoiid ambiguities.
+#! Start: Only exists to avoid ambiguities.
 function expected_risk(r::ERkw, w::VecNum, ::Pr_RR, args...; kwargs...)
     return r(w)
 end
-#! End: Only exists to avoiid ambiguities.
+#! End: Only exists to avoid ambiguities.
 function expected_risk(r::RkRatioRM, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return expected_risk(r.r1, w, X, fees; kwargs...) /
