@@ -10,6 +10,7 @@ ReturnsResult
 _check_names_and_returns_matrix
 prices_to_returns
 returns_result_view
+returns_result_picker
 ```
 
 ## Pre-filtering

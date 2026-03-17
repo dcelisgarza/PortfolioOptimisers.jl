@@ -345,6 +345,17 @@ Alias for an abstract array of numeric types or JuMP scalar types.
 """
 const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
 """
+    const VecNum_MatNum = Union{<:VecNum, <:MatNum}
+
+Alias for a union of a numeric type or an abstract matrix of numeric types.
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
+"""
+const VecNum_MatNum = Union{<:VecNum, <:MatNum}
+"""
     const Num_VecNum = Union{<:Number, <:VecNum}
 
 Alias for a union of a numeric type or an abstract vector of numeric types.
@@ -765,7 +776,16 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
   - [`VecScalar`](@ref)
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
-
+struct SingletonVector{T} <: AbstractVector{T} end
+function SingletonVector()
+    return SingletonVector{Int}()
+end
+Base.length(::SingletonVector) = 1
+function Base.getindex(A::SingletonVector, i::Int)
+    return isone(i) ? 1 : throw(BoundsError(A, i))
+end
+Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
+Base.size(::SingletonVector) = (1,)
 """
     arg_dict = Dict(
                  # Weight vectors.

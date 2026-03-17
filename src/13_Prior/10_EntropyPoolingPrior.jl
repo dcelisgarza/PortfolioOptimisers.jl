@@ -871,16 +871,17 @@ Parse and add mean (expected return) view constraints to the entropy pooling con
 """
 function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
-    mu_views = parse_equation(mu_views.val; datatype = eltype(pr.X))
+    X = pr.X
+    mu_views = parse_equation(mu_views.val; datatype = eltype(X))
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
     mu_views = replace_prior_views(mu_views, pr, sets, :mu; strict = strict)
-    lcs = get_linear_constraints(mu_views, sets; datatype = eltype(pr.X), strict = strict)
+    lcs = get_linear_constraints(mu_views, sets; datatype = eltype(X), strict = strict)
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
         end
-        add_ep_constraint!(epc, getproperty(lcs, p).A * transpose(pr.X),
-                           getproperty(lcs, p).B, p)
+        add_ep_constraint!(epc, getproperty(lcs, p).A * transpose(X), getproperty(lcs, p).B,
+                           p)
     end
     return nothing
 end
@@ -917,7 +918,7 @@ function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
                  pr::AbstractPriorResult)
     fix = to_fix .& .!fixed
     if any(fix)
-        add_ep_constraint!(epc, transpose(pr.X[:, fix]), pr.mu[fix], :feq)
+        add_ep_constraint!(epc, transpose(view(pr.X, :, fix)), pr.mu[fix], :feq)
         fixed .= fixed .| fix
     end
     return nothing
@@ -1014,11 +1015,12 @@ Parse and add variance (VaR) view constraints to the entropy pooling constraint 
 function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                        pr::AbstractPriorResult, sets::AssetSets, alpha::Number;
                        strict::Bool = false)
+    X = pr.X
     var_views = parse_equation(var_views.val; ops1 = ("==", ">="),
-                               ops2 = (:call, :(==), :(>=)), datatype = eltype(pr.X))
+                               ops2 = (:call, :(==), :(>=)), datatype = eltype(X))
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
-    lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
+    lcs = get_linear_constraints(var_views, sets; datatype = eltype(X), strict = strict)
     @argcheck(!(!isnothing(lcs.ineq) && !any(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
                 !isnothing(lcs.eq) && !any(x -> (iszero(x) || isone(x)), lcs.A_eq)),
               ArgumentError("`var_view` only supports coefficients of 1.\n$var_views"))
@@ -1039,12 +1041,12 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
         for i in eachindex(B)
             j = .!iszero.(A[i, :])
             #! Figure out a way to include pr.w, probably see how it's implemented in ValueatRisk.
-            idx = findall(x -> x <= -abs(B[i]), view(pr.X, :, j))
+            idx = findall(x -> x <= -abs(B[i]), view(X, :, j))
             @argcheck(!isempty(idx),
-                      ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(pr.X[:,j])). Please lower it or use a different prior with fatter tails."))
+                      ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(X[:,j])). Please lower it or use a different prior with fatter tails."))
             sign = ifelse(p == :eq || B[i] >= zero(eltype(B)), one(eltype(B)),
                           -one(eltype(B)))
-            Ai = zeros(eltype(pr.X), 1, size(pr.X, 1))
+            Ai = zeros(eltype(X), 1, size(X, 1))
             Ai[1, idx] .= sign
             add_ep_constraint!(epc, Ai, [sign * alpha], p)
         end
@@ -1456,11 +1458,12 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
                               opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Option{<:CVaREntropyPooling},
                               dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+    X = pr.X
     cvar_views = parse_equation(cvar_views.val; ops1 = ("==",), ops2 = (:call, :(==)),
-                                datatype = eltype(pr.X))
+                                datatype = eltype(X))
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
     cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
-    lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
+    lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(X), strict = strict)
     @argcheck(isnothing(lcs.ineq), "`cvar_view` can only have equality constraints.")
     @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
               ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
@@ -1469,7 +1472,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     idx = dropdims(.!iszero.(sum(lcs.A_eq; dims = 1)); dims = 1)
     idx2 = .!iszero.(lcs.A_eq)
     B = lcs.B_eq ./ view(lcs.A_eq, idx2)
-    X = view(pr.X, :, idx)
+    X = view(X, :, idx)
     min_X = dropdims(-minimum(X; dims = 1); dims = 1)
     invalid = B .>= min_X
     if any(invalid)
@@ -1587,13 +1590,13 @@ Parse and add variance (sigma) view constraints to the entropy pooling constrain
 """
 function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
                          pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
-    sigma_views = parse_equation(sigma_views.val; datatype = eltype(pr.X))
+    X = pr.X
+    sigma_views = parse_equation(sigma_views.val; datatype = eltype(X))
     sigma_views = replace_group_by_assets(sigma_views, sets, false, true, false)
     sigma_views = replace_prior_views(sigma_views, pr, sets, :sigma; strict = strict)
-    lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(pr.X),
-                                 strict = strict)
-    tmp = transpose((pr.X .- transpose(pr.mu)) .^ 2)
-    to_fix = falses(size(pr.X, 2))
+    lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(X), strict = strict)
+    tmp = transpose((X .- transpose(pr.mu)) .^ 2)
+    to_fix = falses(size(X, 2))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
@@ -1638,7 +1641,7 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
     sigma = LinearAlgebra.diag(pr.sigma)
     fix = to_fix .& .!fixed
     if any(fix)
-        add_ep_constraint!(epc, transpose(pr.X[:, fix] .- transpose(pr.mu[fix])) .^ 2,
+        add_ep_constraint!(epc, transpose(view(pr.X, :, fix) .- transpose(pr.mu[fix])) .^ 2,
                            sigma[fix], :feq)
         fixed .= fixed .| fix
     end
@@ -1830,15 +1833,16 @@ Parse and add correlation view constraints to the entropy pooling constraint dic
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
                        pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
-    rho_views = parse_equation(rho_views.val; datatype = eltype(pr.X))
+    X = pr.X
+    rho_views = parse_equation(rho_views.val; datatype = eltype(X))
     rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
     rho_views = replace_prior_views(rho_views, pr, sets; strict = strict)
-    to_fix = falses(size(pr.X, 2))
+    to_fix = falses(size(X, 2))
     sigma = LinearAlgebra.diag(pr.sigma)
     for rho_view in rho_views
         @argcheck(length(rho_view.vars) == 1,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
-        @argcheck(-one(eltype(pr.X)) <= rho_view.rhs <= one(eltype(pr.X)),
+        @argcheck(-one(eltype(X)) <= rho_view.rhs <= one(eltype(X)),
                   "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
         d = ifelse(rho_view.op == ">=", -1, 1)
         i, j = rho_view.ij[1]
@@ -1847,7 +1851,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
         else
             LinearAlgebra.norm(sigma[i] .* sigma[j])
         end
-        Ai = d * rho_view.coef[1] * view(pr.X, :, i) .* view(pr.X, :, j)
+        Ai = d * rho_view.coef[1] * view(X, :, i) .* view(X, :, j)
         Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ rho_view.rhs ⊙ sigma_ij
         if !isa(i, AbstractVector)
             Bi = [Bi]
@@ -1884,7 +1888,7 @@ Extract the skewness for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
     #! Think about how to include pr.w
-    return Skewness()([1], reshape(view(pr.X, :, i), :, 1))
+    return Skewness()(SingletonVector(), reshape(view(pr.X, :, i), :, 1))
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -1921,14 +1925,15 @@ Parse and add skewness view constraints to the entropy pooling constraint dictio
 """
 function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
-    skew_views = parse_equation(skew_views.val; datatype = eltype(pr.X))
+    X = pr.X
+    skew_views = parse_equation(skew_views.val; datatype = eltype(X))
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false)
     skew_views = replace_prior_views(skew_views, pr, sets, :skew; strict = strict)
-    lcs = get_linear_constraints(skew_views, sets; datatype = eltype(pr.X), strict = strict)
+    lcs = get_linear_constraints(skew_views, sets; datatype = eltype(X), strict = strict)
     sigma = LinearAlgebra.diag(pr.sigma)
-    tmp = transpose((pr.X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
+    tmp = transpose((X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
                     transpose(sigma .* sqrt.(sigma)))
-    to_fix = falses(size(pr.X, 2))
+    to_fix = falses(size(X, 2))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
@@ -1966,7 +1971,7 @@ Extract the kurtosis for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
     #! Think about how to include pr.w
-    return HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+    return HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(SingletonVector(),
                                                                                         reshape(view(pr.X,
                                                                                                      :,
                                                                                                      i),
@@ -2008,18 +2013,19 @@ Parse and add kurtosis view constraints to the entropy pooling constraint dictio
 """
 function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
-    kurtosis_views = parse_equation(kurtosis_views.val; datatype = eltype(pr.X))
+    X = pr.X
+    kurtosis_views = parse_equation(kurtosis_views.val; datatype = eltype(X))
     kurtosis_views = replace_group_by_assets(kurtosis_views, sets, false, true, false)
     kurtosis_views = replace_prior_views(kurtosis_views, pr, sets, :kurtosis;
                                          strict = strict)
-    lcs = get_linear_constraints(kurtosis_views, sets; datatype = eltype(pr.X),
+    lcs = get_linear_constraints(kurtosis_views, sets; datatype = eltype(X),
                                  strict = strict)
-    X_sq = pr.X .^ 2
+    X_sq = X .^ 2
     mu_sq = pr.mu .^ 2
-    tmp = transpose((X_sq .* X_sq .- 4 * transpose(pr.mu) .* X_sq .* pr.X .+
+    tmp = transpose((X_sq .* X_sq .- 4 * transpose(pr.mu) .* X_sq .* X .+
                      6 * transpose(mu_sq) .* X_sq .- 3 * transpose(mu_sq .* mu_sq)) ./
                     transpose(LinearAlgebra.diag(pr.sigma)) .^ 2)
-    to_fix = falses(size(pr.X, 2))
+    to_fix = falses(size(X, 2))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue

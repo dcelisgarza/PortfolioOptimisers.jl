@@ -5,12 +5,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / T)
     tr = r.tr
-    benchmark = tracking_benchmark(tr, pr.X)
+    benchmark = tracking_benchmark(tr, X)
     tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
                                                                    net_X - benchmark * k)
     model[Symbol(:ctracking_r_noc_, i)] = JuMP.@constraint(model,
@@ -46,13 +47,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     tracking_risk = model[key] = JuMP.@expression(model,
                                                   t_tracking_risk / sqrt(T - r.alg.ddof))
     tr = r.tr
-    benchmark = tracking_benchmark(tr, pr.X)
+    benchmark = tracking_benchmark(tr, X)
     tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
                                                                    net_X - benchmark * k)
     model[Symbol(:ctracking_r_soc_, i)] = JuMP.@constraint(model,
@@ -69,7 +71,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     t_tracking_risk, r_tr = model[Symbol(:t_tracking_risk_, i)], model[Symbol(:r_tracking_risk_, i)] = JuMP.@variables(model,
                                                                                                                        begin
@@ -80,7 +83,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     scale = T - r.alg.ddof
     scale = r.alg.p == 3 ? cbrt(scale) : scale^p_inv
     tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / scale)
-    benchmark = tracking_benchmark(r.tr, pr.X)
+    benchmark = tracking_benchmark(r.tr, X)
     tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
                                                                    net_X - benchmark * k)
     model[Symbol(:ctracking_r_pnorm_, i)], model[Symbol(:ctracking_r_pnorm_eq_, i)] = JuMP.@constraints(model,
@@ -108,12 +111,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     scale = T - r.alg.ddof
     tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / scale)
-    benchmark = tracking_benchmark(r.tr, pr.X)
+    benchmark = tracking_benchmark(r.tr, X)
     tracking_r = model[Symbol(:tracking_r_, i)] = JuMP.@expression(model,
                                                                    net_X - benchmark * k)
     model[Symbol(:ctracking_infnorm_, i)] = JuMP.@constraint(model,

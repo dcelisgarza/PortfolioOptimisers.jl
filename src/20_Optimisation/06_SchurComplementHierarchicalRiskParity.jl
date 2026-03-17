@@ -147,7 +147,8 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     r = factory(params.r, pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
-    w = ones(eltype(pr.X), size(pr.X, 2))
+    X = pr.X
+    w = ones(eltype(X), size(X, 2))
     pdm = params.pdm
     flag = params.flag
     while length(items) > 0
@@ -228,6 +229,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                                                 <:Any})
     max_gamma = params.gamma
     r = factory(params.r, pr)
+    X = pr.X
     if iszero(max_gamma)
         nm_params = SchurComplementParams(; r = r, gamma = max_gamma, pdm = params.pdm,
                                           alg = NonMonotonicSchurComplement(),
@@ -238,11 +240,11 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                       alg = NonMonotonicSchurComplement(), flag = false)
     function objective(x::Number)
         w = schur_complement_weights(pr, items, wb, nm_params, x)[1]
-        risk = isnothing(w) ? typemax(eltype(pr.X)) : LinearAlgebra.dot(w, r.sigma, w)
+        risk = isnothing(w) ? typemax(eltype(X)) : LinearAlgebra.dot(w, r.sigma, w)
         return w, risk
     end
     gammas = range(zero(max_gamma), max_gamma; length = params.alg.N)
-    risks = fill(typemax(eltype(pr.X)), size(gammas))
+    risks = fill(typemax(eltype(X)), size(gammas))
     w, risk = objective(gammas[1])
     risks[1] = risk
     # First binary search, finds the point at which the risk starts to increase with gamma, if it exists.
@@ -268,11 +270,14 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
-    clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    X = pr.X
+    clr = clusterise(sh.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     cle_pr = sh.opt.cle_pr)
     items = [clr.res.order]
-    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
-                                   strict = sh.opt.strict, datatype = eltype(pr.X))
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
+                                   strict = sh.opt.strict, datatype = eltype(X))
     w, gamma = schur_complement_weights(pr, items, wb, sh.params)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
     return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gamma,
@@ -280,14 +285,17 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
 end
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
-    clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    X = pr.X
+    clr = clusterise(sh.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     cle_pr = sh.opt.cle_pr)
     items = [clr.res.order]
-    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
-                                   strict = sh.opt.strict, datatype = eltype(pr.X))
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
+                                   strict = sh.opt.strict, datatype = eltype(X))
     params = sh.params
-    gammas = Vector{eltype(pr.X)}(undef, length(params))
-    w = zeros(eltype(pr.X), size(pr.X, 2))
+    gammas = Vector{eltype(X)}(undef, length(params))
+    w = zeros(eltype(X), size(X, 2))
     for (i, ps) in enumerate(params)
         wi, gamma = schur_complement_weights(pr, items, wb, ps)
         w .+= ps.r.settings.scale * wi

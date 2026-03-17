@@ -376,8 +376,7 @@ function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
     k = model[:k]
     sc = model[:sc]
     lb = pret.lb
-    X = pr.X
-    X = set_portfolio_returns!(model, X)
+    X = set_portfolio_returns!(model, pr.X)
     T = length(X)
     JuMP.@variable(model, t_elog_ret[1:T])
     wi = nothing_scalar_array_selector(pret.w, pr.w)

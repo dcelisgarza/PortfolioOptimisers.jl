@@ -237,8 +237,10 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - [`AbstractPriorResult`](@ref)
   - [`clusterise`](@ref)
 """
-function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR; kwargs...)
-    return clusterise(cle, pr.X; kwargs...)
+function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
+                    rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true, kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return clusterise(cle, X; kwargs...)
 end
 """
     phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
@@ -265,8 +267,16 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`PhylogenyResult`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult; kwargs...)
-    return phylogeny_matrix(pl, pr.X; kwargs...)
+function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
+                          cle_pr::Bool = true, kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return phylogeny_matrix(pl, X; kwargs...)
+end
+function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
+                               rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                               kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return phylogeny_constraints(plc, X; kwargs...)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -291,8 +301,11 @@ Compute the centrality vector for a centrality estimator and prior result.
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
-    return centrality_vector(cte, pr.X; kwargs...)
+function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
+                           rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                           kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return centrality_vector(cte, X; kwargs...)
 end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
@@ -320,9 +333,11 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`PhylogenyResult`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
-                           pr::AbstractPriorResult; kwargs...)
-    return centrality_vector(pl, ct, pr.X; kwargs...)
+function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
+                           rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                           kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return centrality_vector(pl, ct, X; kwargs...)
 end
 """
     average_centrality(pl::NwE_Pl_ClE_Cl,
@@ -353,8 +368,10 @@ Compute the weighted average centrality for a network or phylogeny result.
   - [`average_centrality`](@ref)
 """
 function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
-                            pr::AbstractPriorResult; kwargs...)
-    return LinearAlgebra.dot(centrality_vector(pl, ct, pr; kwargs...).X, w)
+                            pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
+                            cle_pr::Bool = true, kwargs...)
+    return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, cle_pr = cle_pr,
+                                               kwargs...).X, w)
 end
 """
     average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
@@ -381,9 +398,11 @@ Compute the weighted average centrality for a centrality estimator.
   - [`centrality_vector`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
+function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
+                            rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
                             kwargs...)
-    return average_centrality(cte, w, pr.X; kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return average_centrality(cte, w, X; kwargs...)
 end
 """
     asset_phylogeny(pl::NwE_ClE_Cl,
@@ -420,9 +439,17 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`AbstractPriorResult`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::AbstractPriorResult; dims::Int = 1,
+function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
+                         rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
                          kwargs...)
-    return asset_phylogeny(pl, w, pr.X; dims = dims, kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return asset_phylogeny(pl, w, X; kwargs...)
+end
+function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
+                                rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
+                                kwargs...)
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
+    return centrality_constraints(ccs, X; kwargs...)
 end
 """
     struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:

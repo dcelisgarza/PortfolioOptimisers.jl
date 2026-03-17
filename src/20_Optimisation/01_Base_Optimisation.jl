@@ -251,16 +251,26 @@ function calc_net_returns(res::NonFiniteAllocationOptimisationResult, pr::Pr_RR,
                           fees::Option{<:Fees} = nothing)
     return calc_net_returns(res, pr.X, fees)
 end
-function expected_risk(res::OptimisationResult, r::ERkNetRet, X::MatNum,
+function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     if isnothing(fees) && hasproperty(res, :fees)
         fees = res.fees
     end
-    return expected_risk(r, res.w, X; fees = fees, kwargs...)
+    return expected_risk(r, res.w, X, fees; kwargs...)
 end
-function expected_risk(res::OptimisationResult, r::ERkNetRet, pr::Pr_RR,
-                       fees::Option{<:Fees} = nothing; kwargs...)
-    return expected_risk(r, res.w, pr.X; fees = fees, kwargs...)
+function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
+                       pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
+                       kwargs...)
+    pr = if !isnothing(pr)
+        pr
+    elseif isnothing(pr) && hasproperty(res, :pr)
+        res.pr
+    elseif isnothing(pr) && hasproperty(res, :opt) && hasproperty(res.opt, :pr)
+        res.opt.pr
+    else
+        throw(ArgumentError("`res` is a $(Base.typename(typeof(res)).wrapper), which does not have a valid `res.pr` or `res.opt.pr` field, please provide `pr` or a data matrix as an argument"))
+    end
+    return expected_risk(r, res, pr.X, fees; kwargs...)
 end
 function needs_previous_weights(::Nothing)
     return false

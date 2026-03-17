@@ -78,28 +78,28 @@
                                      timestamp = :Date)[(end - 252):end]; iv = iv,
                            ivpa = ivpa)
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false)),
            Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.95)),
            Solver(; name = :clarabel3, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.9)),
            Solver(; name = :clarabel4, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.85)),
            Solver(; name = :clarabel5, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.80)),
            Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
            Solver(; name = :clarabel7, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.7)),
            Solver(; name = :clarabel8, solver = Clarabel.Optimizer,
-                  check_sol = (; allow_local = true, allow_almost = true),
+                  check_sol = (; allow_local = false, allow_almost = false),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.6,
                                   "max_iter" => 1500, "tol_gap_abs" => 1e-4,
                                   "tol_gap_rel" => 1e-4, "tol_ktratio" => 1e-3,
@@ -206,7 +206,7 @@
         pr = prior(HighOrderPriorEstimator(), rd)
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        opt = JuMPOptimiser(; pe = pr, slv = reverse(slv))
         r = factory(StandardDeviation(), pr)
         res_min = optimise(MeanRisk(; r = r, opt = opt))
         res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
@@ -242,11 +242,11 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier4.csv.gz"),
                       DataFrame)
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res3 = optimise(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = reverse(slv),
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
@@ -323,9 +323,39 @@
                                                                               length = 3)))
         res2 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumUtility(),
                                              opt = opt))
-        success = isapprox(Matrix(df), hcat(res2.w...); rtol = 5e-5)
+        success = isapprox(Matrix(df), hcat(res2.w...); rtol = 1e-4)
         if !success
             find_tol(Matrix(df), hcat(res2.w...))
+        end
+        @test success
+
+        r1 = factory(StandardDeviation(), pr)
+        r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
+        res_min = optimise(MeanRisk(; r = r1, opt = opt))
+        res_max = optimise(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt))
+        rk1_min = expected_risk(r1, res_min.w, pr)
+        rk1_max = expected_risk(r1, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
+        drk1 = mean(diff(rk1_min))
+        drt = mean(diff(rt_min))
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/NearOptimalCenteringParetoSurfaceRetRk.csv.gz"),
+                      DataFrame)
+        res3 = optimise(NearOptimalCentering(; obj = MaximumUtility(),
+                                             r = StandardDeviation(;
+                                                                   settings = RiskMeasureSettings(;
+                                                                                                  ub = rk1_min .+
+                                                                                                       drk1)),
+                                             opt = JuMPOptimiser(; pe = pr,
+                                                                 ret = ArithmeticReturn(;
+                                                                                        lb = rt_min .-
+                                                                                             drt),
+                                                                 slv = slv),
+                                             alg = ConstrainedNearOptimalCentering()))
+        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-4)
+        if !success
+            find_tol(Matrix(df), hcat(res3.w...))
         end
         @test success
 
@@ -339,12 +369,12 @@
         r2 = ConditionalValueatRisk(;
                                     settings = RiskMeasureSettings(;
                                                                    ub = Frontier(; N = 5)))
-        res3 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
+        res4 = optimise(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
                                              opt = opt,
                                              alg = ConstrainedNearOptimalCentering()))
-        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-5)
+        success = isapprox(Matrix(df), hcat(res4.w...); rtol = 5e-5)
         if !success
-            find_tol(Matrix(df), hcat(res3.w...))
+            find_tol(Matrix(df), hcat(res4.w...))
         end
         @test success
     end

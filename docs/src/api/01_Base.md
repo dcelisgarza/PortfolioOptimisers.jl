@@ -53,6 +53,7 @@ VecNum
 VecInt
 MatNum
 ArrNum
+VecNum_MatNum
 Num_VecNum
 Num_ArrNum
 PairStrNum

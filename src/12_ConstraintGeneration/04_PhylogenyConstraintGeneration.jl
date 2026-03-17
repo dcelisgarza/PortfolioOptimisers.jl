@@ -654,8 +654,8 @@ This method returns the input [`LinearConstraint`](@ref) object or `nothing` unc
   - [`LinearConstraint`](@ref)
   - [`centrality_constraints`](@ref)
 """
-function centrality_constraints(ccs::Option{<:LinearConstraint}, args...; kwargs...)
-    return ccs
+function centrality_constraints(lc::Option{<:LinearConstraint}, args...; kwargs...)
+    return lc
 end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,

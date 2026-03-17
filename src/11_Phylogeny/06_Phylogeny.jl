@@ -1006,7 +1006,7 @@ This function clusterises the data, cuts the tree into the optimal number of clu
 function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal,
                           dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
-    clusters = get_clustering_indices(res)
+    clusters = assignments(res)
     P = zeros(Int, size(X, 2), res.k)
     for i in axes(P, 2)
         idx = clusters .== i

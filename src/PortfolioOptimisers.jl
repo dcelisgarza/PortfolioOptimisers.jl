@@ -3,7 +3,7 @@ module PortfolioOptimisers
 using Accessors: Accessors
 using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
-using Clustering: Clustering
+using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
 using DataFrames: DataFrames
 using Dates: Dates

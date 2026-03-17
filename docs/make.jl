@@ -14,7 +14,7 @@ end
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
-                            Dates, Distributions, StableRNGs); recursive = true)
+                            Dates, Distributions, StableRNGs, TimeSeries); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)
@@ -107,14 +107,14 @@ makedocs(; #modules = [PortfolioOptimisers],
                                                             api_pages[7][3])
                             "Risk Measures" => joinpath.(api_pages[8][1][idx1:end],
                                                          api_pages[8][3])
-                            "Optimisation" => [joinpath.(api_pages[9][1][idx1:end],
-                                                         api_pages[9][3])
-                                               "Cross Validation" => joinpath.(api_pages[10][1][idx1:end],
-                                                                               api_pages[10][3])
-                                               "Constraints" => joinpath.(api_pages[11][1][idx1:end],
-                                                                          api_pages[11][3])
-                                               "Risk Constraints" => joinpath.(api_pages[12][1][idx1:end],
-                                                                               api_pages[12][3])]];
+                            "Optimisation" => joinpath.(api_pages[9][1][idx1:end],
+                                                        api_pages[9][3])
+                            "Cross Validation" => joinpath.(api_pages[10][1][idx1:end],
+                                                            api_pages[10][3])
+                            "Constraints" => joinpath.(api_pages[11][1][idx1:end],
+                                                       api_pages[11][3])
+                            "Risk Constraints" => joinpath.(api_pages[12][1][idx1:end],
+                                                            api_pages[12][3])];
                   "Contribute" => contribute;
                   "References" => root_pages[2]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");

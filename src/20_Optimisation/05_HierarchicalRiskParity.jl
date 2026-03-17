@@ -52,31 +52,34 @@ function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::Vec
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
-    clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    X = pr.X
+    clr = clusterise(hrp.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     cle_pr = hrp.opt.cle_pr)
     r = factory(hrp.r, pr, hrp.opt.slv)
-    wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
+    wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
-                            datatype = eltype(pr.X))
-    rku = unitary_expected_risks(r, pr.X, fees)
-    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(pr.X, 2),
-                                   strict = hrp.opt.strict, datatype = eltype(pr.X))
-    w = ones(eltype(pr.X), size(pr.X, 2))
+                            datatype = eltype(X))
+    rku = unitary_expected_risks(r, X, fees)
+    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
+                                   strict = hrp.opt.strict, datatype = eltype(X))
+    w = ones(eltype(X), size(X, 2))
     items = [clr.res.order]
     while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]
         for i in 1:2:length(items)
-            fill!(wu, zero(eltype(pr.X)))
+            fill!(wu, zero(eltype(X)))
             lc = items[i]
             rc = items[i + 1]
             wu[lc, 1] .= inv.(view(rku, lc))
             wu[lc, 1] ./= sum(view(wu, lc, 1))
             wu[rc, 2] .= inv.(view(rku, rc))
             wu[rc, 2] ./= sum(view(wu, rc, 2))
-            lrisk = expected_risk(r, view(wu, :, 1), pr.X, fees)
-            rrisk = expected_risk(r, view(wu, :, 2), pr.X, fees)
+            lrisk = expected_risk(r, view(wu, :, 1), X, fees)
+            rrisk = expected_risk(r, view(wu, :, 2), X, fees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
@@ -173,17 +176,20 @@ function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, r
 end
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
-    clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    X = pr.X
+    clr = clusterise(hrp.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     cle_pr = hrp.opt.cle_pr)
     r = factory(hrp.r, pr, hrp.opt.slv)
-    wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
-    wk = zeros(eltype(pr.X), size(pr.X, 2))
-    rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
+    wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
+    wk = zeros(eltype(X), size(X, 2))
+    rku = Vector{eltype(X)}(undef, size(X, 2))
     fees = fees_constraints(hrp.opt.fees, hrp.opt.sets; strict = hrp.opt.strict,
-                            datatype = eltype(pr.X))
-    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(pr.X, 2),
-                                   strict = hrp.opt.strict, datatype = eltype(pr.X))
-    w = ones(eltype(pr.X), size(pr.X, 2))
+                            datatype = eltype(X))
+    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
+                                   strict = hrp.opt.strict, datatype = eltype(X))
+    w = ones(eltype(X), size(X, 2))
     items = [clr.res.order]
     while length(items) > 0
         items = [i[j:k] for i in items
@@ -192,7 +198,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, pr.X, fees)
+            lrisk, rrisk = hrp_scalarised_risk(hrp.sca, wu, wk, rku, lc, rc, r, X, fees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)

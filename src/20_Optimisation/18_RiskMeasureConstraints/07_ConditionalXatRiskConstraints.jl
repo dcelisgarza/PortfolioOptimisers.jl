@@ -92,9 +92,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:drcvar_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    net_X = set_net_portfolio_returns!(model, pr.X)
-    Xap1 = set_portfolio_returns_plus_one!(model, pr.X)
-    T, N = size(pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
+    Xap1 = set_portfolio_returns_plus_one!(model, X)
+    T, N = size(X)
 
     alpha = r.alpha
     b1 = r.l
@@ -186,9 +187,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:drcvar_risk_range_, i)
     sc = model[:sc]
     w = model[:w]
-    net_X = set_net_portfolio_returns!(model, pr.X)
-    Xap1 = set_portfolio_returns_plus_one!(model, pr.X)
-    T, N = size(pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
+    Xap1 = set_portfolio_returns_plus_one!(model, X)
+    T, N = size(X)
 
     alpha = r.alpha
     b1_l = r.l_a
@@ -385,9 +387,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:drcvar_risk_, i)
     sc = model[:sc]
     w = model[:w]
-    dd = set_drawdown_constraints!(model, pr.X)
-    ddap1 = set_portfolio_drawdowns_plus_one!(model, pr.X)
-    T, N = size(pr.X)
+    X = pr.X
+    dd = set_drawdown_constraints!(model, X)
+    ddap1 = set_portfolio_drawdowns_plus_one!(model, X)
+    T, N = size(X)
 
     alpha = r.alpha
     b1 = r.l

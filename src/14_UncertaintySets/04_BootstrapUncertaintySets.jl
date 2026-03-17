@@ -365,13 +365,14 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
                                     <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
+    X = pr.X
+    N = size(X, 2)
+    mus, sigmas = bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(pr.X)}(undef, N)
-    mu_u = Vector{eltype(pr.X)}(undef, N)
-    sigma_l = Matrix{eltype(pr.X)}(undef, N, N)
-    sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
+    mu_l = Vector{eltype(X)}(undef, N)
+    mu_u = Vector{eltype(X)}(undef, N)
+    sigma_l = Matrix{eltype(X)}(undef, N, N)
+    sigma_u = Matrix{eltype(X)}(undef, N, N)
     for j in 1:N
         mu_j = mus[j, :]
         mu_l[j] = Statistics.quantile(mu_j, q)
@@ -423,11 +424,12 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
                                        <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
+    X = pr.X
+    N = size(X, 2)
+    mus = mu_bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(pr.X)}(undef, N)
-    mu_u = Vector{eltype(pr.X)}(undef, N)
+    mu_l = Vector{eltype(X)}(undef, N)
+    mu_u = Vector{eltype(X)}(undef, N)
     for j in 1:N
         mu_j = mus[j, :]
         mu_l[j] = Statistics.quantile(mu_j, q)
@@ -473,11 +475,12 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
                                           <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
+    X = pr.X
+    N = size(X, 2)
+    sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
     q = ue.q * 0.5
-    sigma_l = Matrix{eltype(pr.X)}(undef, N, N)
-    sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
+    sigma_l = Matrix{eltype(X)}(undef, N, N)
+    sigma_u = Matrix{eltype(X)}(undef, N, N)
     for j in 1:N
         for i in j:N
             sigma_ij = sigmas[i, j, :]
@@ -527,10 +530,11 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm,
                                     <:Any, <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
-    X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
-    X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)
+    X = pr.X
+    N = size(X, 2)
+    mus, sigmas = bootstrap_generator(ue, X; kwargs...)
+    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
+    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i in axes(X_mu, 2)
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
@@ -589,9 +593,10 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorit
                                        <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
-    X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
+    X = pr.X
+    N = size(X, 2)
+    mus = mu_bootstrap_generator(ue, X; kwargs...)
+    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
     for i in axes(X_mu, 2)
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
     end
@@ -643,9 +648,10 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgo
                                           <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    N = size(pr.X, 2)
-    sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
-    X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)
+    X = pr.X
+    N = size(X, 2)
+    sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
+    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i in axes(X_sigma, 2)
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end

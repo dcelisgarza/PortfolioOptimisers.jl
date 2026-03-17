@@ -40,10 +40,11 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
     if haskey(model, :bdvariance_risk)
         return model[:bdvariance_risk]
     end
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    X = pr.X
+    net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     iT2 = inv(T^2)
-    ovec = range(one(eltype(pr.X)), one(eltype(pr.X)); length = T)
+    ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     JuMP.@variable(model, Dt[1:T, 1:T], Symmetric)
     JuMP.@expression(model, Dx, net_X * transpose(ovec) - ovec * transpose(net_X))
     bdvariance_risk = set_brownian_distance_risk_constraint!(model, r.alg1, Dt, iT2)
