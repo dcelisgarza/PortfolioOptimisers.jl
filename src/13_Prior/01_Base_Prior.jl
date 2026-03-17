@@ -275,7 +275,7 @@ end
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
                                kwargs...)
-    X = isnothing(rd) || cle_pr ? pr.X : pr.X
+    X = isnothing(rd) || cle_pr ? pr.X : rd.X
     return phylogeny_constraints(plc, X; kwargs...)
 end
 """
