@@ -110,7 +110,7 @@ function opt_view(st::Stacking, i, X::MatNum)
     fees = fees_view(st.fees, i)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
-    sets = nothing_asset_sets_view(st.sets, i)
+    sets = asset_sets_view(st.sets, i)
     return Stacking(; pe = pe, wb = wb, fees = fees, scale = st.scale, opti = opti,
                     opto = opto, cv = st.cv, wf = st.wf, sets = sets, ex = st.ex,
                     fb = st.fb, brt = st.brt, strict = st.strict)

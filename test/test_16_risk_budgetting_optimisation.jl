@@ -199,8 +199,9 @@
                                                     rkb = RiskBudgetEstimator(;
                                                                               val = ["AAPL" => 0.5,
                                                                                      "MSFT" => 0.25,
-                                                                                     "LLY" => 0.125])),
-                           opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets))
+                                                                                     "LLY" => 0.125]),
+                                                    sets = sets),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv))
         res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = risk_contribution(r, res.w, pr.X)
@@ -209,10 +210,10 @@
         @test isapprox(rkc, rkb.val, rtol = 5e-5)
 
         res = optimise(RiskBudgeting(; wi = w0,
-                                     rba = AssetRiskBudgeting(;
+                                     rba = AssetRiskBudgeting(; sets = sets,
                                                               rkb = RiskBudgetEstimator(;
                                                                                         val = ["AAPL" => 0.5])),
-                                     opt = JuMPOptimiser(; pe = pr, sets = sets,
+                                     opt = JuMPOptimiser(; pe = pr,
                                                          slv = Solver(;
                                                                       solver = Clarabel.Optimizer,
                                                                       settings = ["verbose" => false,
@@ -353,13 +354,13 @@
         rb = RiskBudgeting(;
                            rba = FactorRiskBudgeting(; re = rr,
                                                      rkb = RiskBudgetEstimator(;
-                                                                               val = "MTUM" => 0.5)),
+                                                                               val = "MTUM" => 0.5),
+                                                     sets = fsets),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                sbgt = BudgetRange(; lb = 0, ub = nothing),
                                                bgt = 1,
                                                wb = WeightBounds(; lb = nothing,
-                                                                 ub = nothing),
-                                               sets = fsets))
+                                                                 ub = nothing)))
         res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = factor_risk_contribution(r, res.w, pr.X; re = res.prb.rr)

@@ -33,33 +33,46 @@ struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
     rkb::T1
 end
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
-struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
+struct AssetRiskBudgeting{T1, T2} <: RiskBudgetingAlgorithm
     rkb::T1
-    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb})
-        return new{typeof(rkb)}(rkb)
+    sets::T2
+    function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets})
+        if isa(rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        return new{typeof(rkb), typeof(sets)}(rkb, sets)
     end
 end
-function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing)
-    return AssetRiskBudgeting(rkb)
+function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
+                            sets::Option{<:AssetSets} = nothing)
+    return AssetRiskBudgeting(rkb, sets)
 end
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
-    return AssetRiskBudgeting(; rkb = risk_budget_view(r.rkb, i))
+    rkb = risk_budget_view(r.rkb, i)
+    sets = asset_sets_view(r.sets, i)
+    return AssetRiskBudgeting(; rkb = rkb, sets = sets)
 end
-struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
+struct FactorRiskBudgeting{T1, T2, T3, T4} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
-    flag::T3
-    function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb}, flag::Bool)
-        return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
+    sets::T3
+    flag::T4
+    function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
+                                 sets::Option{<:AssetSets}, flag::Bool)
+        if isa(rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
     end
 end
 function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
-                             rkb::Option{<:RkbE_Rkb} = nothing, flag::Bool = true)
-    return FactorRiskBudgeting(re, rkb, flag)
+                             rkb::Option{<:RkbE_Rkb} = nothing,
+                             sets::Option{<:AssetSets} = nothing, flag::Bool = true)
+    return FactorRiskBudgeting(re, rkb, sets, flag)
 end
 function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
-    return FactorRiskBudgeting(; re = re, rkb = r.rkb, flag = r.flag)
+    return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
 struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
     opt::T1
@@ -74,9 +87,6 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
         end
         if isa(wi, VecNum)
             @argcheck(!isempty(wi))
-        end
-        if isa(rba.rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(opt.sets))
         end
         return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
                                                                                 wi, fb)
@@ -109,7 +119,7 @@ end
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::VecJuMPScalar; strict::Bool = false)
     N = length(w)
-    rkb = risk_budget_constraints(rb.rba.rkb, rb.opt.sets; N = N, strict = strict)
+    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N)
     sc = model[:sc]

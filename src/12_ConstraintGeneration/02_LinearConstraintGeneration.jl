@@ -264,7 +264,7 @@ function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
                    dict::AbstractDict{<:AbstractString, <:Any})
     return AssetSets(key, ukey, dict)
 end
-function nothing_asset_sets_view(sets::AssetSets, i)
+function asset_sets_view(sets::AssetSets, i)
     key = sets.key
     ukey = sets.ukey
     dict = typeof(sets.dict)()
@@ -280,7 +280,7 @@ function nothing_asset_sets_view(sets::AssetSets, i)
     return AssetSets(; key = key, ukey = ukey, dict = dict)
 end
 """
-    nothing_asset_sets_view(::Nothing, ::Any)
+    asset_sets_view(::Nothing, ::Any)
 
 No-op fallback for indexing `nothing` asset sets.
 
@@ -288,7 +288,7 @@ No-op fallback for indexing `nothing` asset sets.
 
   - `nothing`.
 """
-function nothing_asset_sets_view(::Nothing, ::Any)
+function asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """

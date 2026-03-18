@@ -202,7 +202,7 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
     fees = fees_view(nco.fees, i)
-    sets = nothing_asset_sets_view(nco.sets, i)
+    sets = asset_sets_view(nco.sets, i)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,

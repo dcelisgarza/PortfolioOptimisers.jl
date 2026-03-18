@@ -55,7 +55,7 @@ end
 function opt_view(opt::InverseVolatility, i, args...)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                              sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
@@ -112,7 +112,7 @@ function factory(opt::EqualWeighted, w::AbstractVector)
 end
 function opt_view(opt::EqualWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                          strict = opt.strict)
 end
@@ -170,7 +170,7 @@ function factory(opt::RandomWeighted, w::AbstractVector)
 end
 function opt_view(opt::RandomWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     alpha = nothing_scalar_array_view(opt.alpha, i)
     return RandomWeighted(; alpha = alpha, rng = opt.rng, seed = opt.seed, wb = wb,
                           sets = sets, wf = opt.wf, fb = opt.fb, strict = opt.strict)

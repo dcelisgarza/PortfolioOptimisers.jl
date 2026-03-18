@@ -349,7 +349,7 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
         sgst = threshold_view(opt.sgst, i)
     end
     tn = turnover_view(opt.tn, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     fees = fees_view(opt.fees, i)
     tr = tracking_view(opt.tr, i, X)
     ret = jump_returns_view(opt.ret, i)

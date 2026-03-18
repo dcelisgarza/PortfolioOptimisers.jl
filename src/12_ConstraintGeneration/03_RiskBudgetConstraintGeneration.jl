@@ -82,11 +82,13 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> RiskBudgetEstimator(; val = Dict("A" => 0.2, "B" => 0.3, "C" => 0.5))
 RiskBudgetEstimator
-  val ┴ Dict{String, Float64}: Dict("B" => 0.3, "A" => 0.2, "C" => 0.5)
+   val ┼ Dict{String, Float64}: Dict("B" => 0.3, "A" => 0.2, "C" => 0.5)
+  dval ┴ nothing
 
 julia> RiskBudgetEstimator(; val = ["A" => 0.2, "B" => 0.3, "C" => 0.5])
 RiskBudgetEstimator
-  val ┴ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
+   val ┼ Vector{Pair{String, Float64}}: ["A" => 0.2, "B" => 0.3, "C" => 0.5]
+  dval ┴ nothing
 ```
 
 # Related
@@ -95,15 +97,17 @@ RiskBudgetEstimator
   - [`risk_budget_constraints`](@ref)
   - [`AssetSets`](@ref)
 """
-struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
+struct RiskBudgetEstimator{T1, T2} <: AbstractConstraintEstimator
     val::T1
-    function RiskBudgetEstimator(val::EstValType)
+    dval::T2
+    function RiskBudgetEstimator(val::EstValType, dval::Option{<:Number})
         assert_nonempty_nonneg_finite_val(val)
-        return new{typeof(val)}(val)
+        assert_nonempty_nonneg_finite_val(dval)
+        return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function RiskBudgetEstimator(; val::EstValType)
-    return RiskBudgetEstimator(val)
+function RiskBudgetEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
+    return RiskBudgetEstimator(val, dval)
 end
 const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
@@ -143,7 +147,7 @@ RiskBudget
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(::Nothing, args...; N::Number, kwargs...)
+function risk_budget_constraints(::Nothing, args...; N = N, kwargs...)
     iN = inv(N)
     return RiskBudget(; val = range(iN, iN; length = N))
 end
@@ -223,10 +227,13 @@ RiskBudget
   - [`estimator_to_val`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::EstValType, sets::AssetSets;
-                                 N::Number = length(sets.dict[sets.key]),
-                                 strict::Bool = false)
-    val = estimator_to_val(rb, sets, inv(N); strict = strict)
+function risk_budget_constraints(rb::EstValType, sets::AssetSets,
+                                 dval::Option{<:Number} = nothing; strict::Bool = false,
+                                 kwargs...)
+    if isnothing(dval)
+        dval = inv(length(sets.dict[sets.key]))
+    end
+    val = estimator_to_val(rb, sets, dval; strict = strict)
     return RiskBudget(; val = val / sum(val))
 end
 """
@@ -248,11 +255,11 @@ It is used for type stability and to provide a uniform interface for processing 
 """
 function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
-    return risk_budget_constraints(rb.val, sets; strict = strict)
+    return risk_budget_constraints(rb.val, sets, rb.dval; strict = strict, kwargs...)
 end
 function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
                                  kwargs...)
-    return [risk_budget_constraints(rbi, sets; strict = strict) for rbi in rb]
+    return [risk_budget_constraints(rbi, sets; strict = strict, kwargs...) for rbi in rb]
 end
 
 export RiskBudget, RiskBudgetEstimator, risk_budget_constraints

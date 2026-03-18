@@ -109,8 +109,9 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   w::VecJuMPScalar, sigma::MatNum,
                                                   chol::Option{<:MatNum} = nothing)
     N = length(w)
-    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
+    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
+    @argcheck(length(rb) == N)
     sc = model[:sc]
     JuMP.@variables(model, begin
                         psi >= 0

@@ -69,7 +69,7 @@ function opt_view(hco::HierarchicalOptimiser, i)
     pe = prior_view(hco.pe, i)
     wb = weight_bounds_view(hco.wb, i)
     fees = fees_view(hco.fees, i)
-    sets = nothing_asset_sets_view(hco.sets, i)
+    sets = asset_sets_view(hco.sets, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, slv = hco.slv, wb = wb,
                                  fees = fees, wf = hco.wf, sets = sets, brt = hco.brt,
                                  cle_pr = hco.cle_pr, strict = hco.strict)
