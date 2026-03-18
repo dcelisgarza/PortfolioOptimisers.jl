@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/99_Cheat_Sheet.jl"
 ```
@@ -10,11 +9,11 @@ This is a collection of quickfire tutorials to help you get started with `Portfo
 
 ## 1. Downloading data
 
-There are both open and close source providers, in Julia we have [`YFinance.jl`](https://github.com/eohne/YFinance.jl) and [`MarketData.jl`](https://github.com/JuliaQuant/MarketData.jl).
+There are both open and closed source financial data APIs, in Julia we have [`YFinance.jl`](https://github.com/eohne/YFinance.jl) and [`MarketData.jl`](https://github.com/JuliaQuant/MarketData.jl), both of which are quite good.
 
 ## 2. Computing returns
 
-Usually data is obtained from a provider and the returns have to be computed. `PortfolioOptimisers.jl` has a [`prices_to_returns`](@ref) to do so from price data. It can handle asset, factor, and benchmark returns, as well as implied volatilities, and volatility premiums. It performs appropriate data validation checks to ensure the timestamps match and the data is clean. It can also preprocess missing data and collapse to lower frequencies.
+Usually, price data is obtained using an API, and the returns have to be computed. In `PortfolioOptimisers.jl`, we have [`prices_to_returns`](@ref), which handles asset, factor, and benchmark price data, as well as implied volatilities, and volatility premiums. It performs appropriate data validation checks to ensure the timestamps match, and the data is clean. It can also preprocess missing data, fill gaps using [`Impute.jl`](https://github.com/invenia/Impute.jl), as well as collapse the data to lower frequencies using [`TimeSeries.jl`](https://github.com/JuliaStats/TimeSeries.jl).
 
 Here we show a quick example of a heterogenous dataset which will only return the data with matching timestamps.
 
@@ -269,7 +268,10 @@ This version allocated risk accross assets.
 r = Variance()
 # Equal risk contribution per asset (default)
 rba1 = RiskBudgeting(; r = r,
-                     rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nx))),
+                     rba = AssetRiskBudgeting(;
+                                              rkb = RiskBudget(;
+                                                               val = fill(1.0,
+                                                                          length(rd.nx)))),
                      opt = JuMPOptimiser(; slv = slv))
 # Increasing risk contribution per asset
 rba2 = RiskBudgeting(; r = r,
@@ -300,7 +302,11 @@ This version allocated risk accross factors.
 r = Variance()
 # Equal risk contribution per factor (default)
 rba1 = RiskBudgeting(; r = r,
-                     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nf))),
+                     rba = FactorRiskBudgeting(;
+                                               rkb = RiskBudget(;
+                                                                val = range(; start = 1,
+                                                                            stop = 1,
+                                                                            length = length(rd.nf)))),
                      opt = JuMPOptimiser(; slv = slv))
 # Increasing risk contribution per factor
 rba2 = RiskBudgeting(; r = r,
@@ -576,3 +582,4 @@ pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

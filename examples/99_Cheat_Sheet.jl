@@ -7,11 +7,11 @@ This is a collection of quickfire tutorials to help you get started with `Portfo
 #=
 ## 1. Downloading data
 
-There are both open and close source providers, in Julia we have [`YFinance.jl`](https://github.com/eohne/YFinance.jl) and [`MarketData.jl`](https://github.com/JuliaQuant/MarketData.jl).
+There are both open and closed source financial data APIs, in Julia we have [`YFinance.jl`](https://github.com/eohne/YFinance.jl) and [`MarketData.jl`](https://github.com/JuliaQuant/MarketData.jl), both of which are quite good.
 
 ## 2. Computing returns
 
-Usually data is obtained from a provider and the returns have to be computed. `PortfolioOptimisers.jl` has a [`prices_to_returns`](@ref) to do so from price data. It can handle asset, factor, and benchmark returns, as well as implied volatilities, and volatility premiums. It performs appropriate data validation checks to ensure the timestamps match and the data is clean. It can also preprocess missing data and collapse to lower frequencies.
+Usually, price data is obtained using an API, and the returns have to be computed. In `PortfolioOptimisers.jl`, we have [`prices_to_returns`](@ref), which handles asset, factor, and benchmark price data, as well as implied volatilities, and volatility premiums. It performs appropriate data validation checks to ensure the data is consistent. It can also preprocess missing price data, fill gaps using [`Impute.jl`](https://github.com/invenia/Impute.jl), as well as collapse it to lower frequencies using [`TimeSeries.jl`](https://github.com/JuliaStats/TimeSeries.jl).
 
 Here we show a quick example of a heterogenous dataset which will only return the data with matching timestamps.
 =#
@@ -39,11 +39,11 @@ There are many optimisers available in `PortfolioOptimisers.jl`. Here we will sh
 
 ### 3.1 Naive Optimisers
 
-Naive optimisers do not use sophisticated optimisation algorithms, but rather very basic ones that offer robustness and diversificaiton by virtue of being unsophisticated.
+Naive optimisers use very basic algorithms that offer robustness and diversification by virtue of being unsophisticated.
 
 #### 3.1.1 Inverse volatility
 
-This uses the diagonal of the covariance to set the weights, if the flag `sq` is true, the weights are just the inverse of each entry in the diagonal, else it is the inverse of the square root of each entry in the diagonal.
+[`InverseVolatility`]-(@ref) uses the diagonal of the prior covariance to set the asset weights. If the property `sq` is set to `true`, the weights are the inverse of each entry in the diagonal, else it is the inverse of the square root of each entry in the diagonal.
 =#
 variance = diag(prior(EmpiricalPrior(), rd).sigma)
 
@@ -59,7 +59,7 @@ pretty_table(DataFrame([rd.nx res1.w inv_vol res2.w inv_var],
 #=
 #### 3.1.2 Equal weighted
 
-This assigns equal weights to all assets.
+[`EqualWeighted`]-(@ref) assigns equal weights to all assets.
 =#
 
 res = optimise(EqualWeighted(), rd)
@@ -68,20 +68,19 @@ pretty_table(DataFrame([rd.nx res.w], ["assets", "Weights"]); formatters = [resf
 #=
 #### 3.1.3 Random weighted
 
-This randomly assigns weights according to a [`Dirichlet`](https://juliastats.org/Distributions.jl/latest/multivariate/#Distributions.Dirichlet) distribution. It's possible to provide a custom alpha parameter as a vector or number, random number generator, and seed.
+[`RandomWeighted`]-(@ref) assigns weights according to a [`Dirichlet`](https://juliastats.org/Distributions.jl/latest/multivariate/#Distributions.Dirichlet) distribution.
 =#
 
+## `alpha` gets forwarded to the Dirichlet distribution, the `rng` and `seed` are used to control the random number generator.
 res = optimise(RandomWeighted(; alpha = 1, rng = StableRNG(696), seed = 66420), rd)
 pretty_table(DataFrame([rd.nx res.w], ["assets", "Weights"]); formatters = [resfmt])
 
 #=
 ### 3.2 JuMP optimisers
 
-The JuMP-based optimisers use traditional mathematical optimisation. As such, they are the most flexible when it comes to constraints, and for those which accept them, objective functions. Most risk measures are also compatible with these, aside from a few exclusively compatible with clustering optimisations, as well as other risk measures which are incompatible with any optimisation. All JuMP-based optimisers require the user to provide a JuMP-compatible solver, which supports the type of constraints being used.
+JuMP-based optimisers implement traditional mathematical optimisation algorithms using `JuMP`. As such, they are the most flexible when it comes to constraints, and for those which accept them, objective functions. Most risk measures are also compatible with these, aside from a few exclusively compatible with clustering optimisations, as well as other risk measures which are incompatible with any optimisation. All JuMP-based optimisers require the user to provide an instance of [`JuMPOptimiser`]-(@ref) with a JuMP-compatible [`Solver`](@ref), or vector of solvers. Other than optimisation-specific constraints, general constraints are applied at the level of the [`JuMPOptimiser`]-(@ref). Problem feasibility depends on the specific constraints and the provided solver's support for constraint types and ability to solve the problem.
 
-If using open-source solvers we recommend [`Clarabel`](https://github.com/oxfordcontrol/Clarabel.jl) when not using MIP constraints. When using MIP constraints, [`Pajarito`](https://github.com/jump-dev/Pajarito.jl) with [`Clarabel`](https://github.com/oxfordcontrol/Clarabel.jl) as the continuous solver, and [`HiGHS`](https://github.com/jump-dev/HiGHS.jl) as the MIP solver.
-
-Users can provide a vector of solvers which will be iterated over until one solves the problem satisfactorily, or all fail. Other than optimisation-specific constraints, general constraints are applied at the level of the [`JuMPOptimiser`]-(@ref), whether the problem is feasable or not depends on the specific constraints and the provided solver's support for constraint types/ability to solve the problem.
+If using open-source solvers, we recommend [`Clarabel`](https://github.com/oxfordcontrol/Clarabel.jl) when not using MIP constraints. When using MIP constraints, [`Pajarito`](https://github.com/jump-dev/Pajarito.jl) with [`Clarabel`](https://github.com/oxfordcontrol/Clarabel.jl) as the continuous solver and [`HiGHS`](https://github.com/jump-dev/HiGHS.jl) as the MIP one works very well. This makes it possible to solve problems with exotic constraint combinations.
 =#
 using Clarabel
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -121,16 +120,29 @@ mr2 = MeanRisk(; obj = MaximumUtility(), opt = JuMPOptimiser(; slv = slv))
 mr3 = MeanRisk(; obj = MaximumRatio(), opt = JuMPOptimiser(; slv = slv))
 ## Maximum return
 mr4 = MeanRisk(; obj = MaximumReturn(), opt = JuMPOptimiser(; slv = slv))
-## Optimise all objective functions at once
+## Optimise all objective functions at once using broadcasting
 ress = optimise.([mr1, mr2, mr3, mr4], rd);
-#=
-`PortfolioOptimisers.jl` provides users with the ability to use multiple risk measures per optimisation, which means that some risk measure have to keep certain internal statistics to be able to compute the risk. We provide factory functions that create the risk measures with the appropraite internal statistics.
 
-The [`MeanRisk`]-(@ref) optimiser defaults to the variance so we will use that to compute the risk statistics. All optimisations use the same prior estimator, as well as portfolio return estimator so we will use only the first
+#=
+`PortfolioOptimisers.jl` provides users with the ability to use multiple risk measures per optimisation, which means that some risk measure have to keep certain internal statistics to be able to compute the risk.
+
+The [`MeanRisk`]-(@ref) optimiser defaults to the variance so we will use that to compute the risk statistics. We've used the same prior statistics [`EmpiricalPrior`](@ref) estimator, and portfolio returns [`ArithmeticReturn`]-(@ref) estimator for all objectives. So we only need to get the ones in the first result.
+
+Since the package's structs are all immutable, we provide factory functions that create risk measures with the appropriate internal statistics. This enables programatic construction of risk measures, manual construction is also possible by directly using the risk measure's constructor.
 =#
+
+## Prior statistics result, we will use the covariance matrix, `sigma`
 pr = ress[1].pr
+
+## This generates the variance risk measure with the right covariance matrix.
+## Alternatively, we could do `Variance(; sigma = pr.sigma)`, but factory
+## functions let you do this programatically.
 r = factory(Variance(), pr)
+
+## There are `ArithmeticReturns` and `LogarithmicReturns`.
 ret = mr1.opt.ret
+
+## Compute the risk, return and risk adjusted return for each result
 rk_rt_ratio = [expected_risk_ret_ratio(r, ret, res.w, pr) for res in ress]
 rk = map(rr -> rr[1], rk_rt_ratio)
 rt = map(rr -> rr[2], rk_rt_ratio)
@@ -148,11 +160,11 @@ pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
 #=
 #### 3.2.2 Factor Risk Contribution
 
-This is a more advanced estimator, it requires some more set up. It allows users to provide objective functions, but also define risk contributions per factor to the variance risk measure. The minimum risk optimisaion will follow the risk contribution constraints the closest, and with enough data and assets can be quite exact up to the user provided convergence settings for the provided solvers.
+The [`FactorRiskContribution`]-(@ref) is a more complex estimator that requires some more set up. It allows users to provide objective functions, but also define risk contributions per factor to the variance risk measure. The minimum risk optimisaion will follow the risk contribution constraints the closest, and with enough data and assets can be quite exact up to the user-provided convergence settings for the solvers used.
 
-It is compatible with other risk measures, but only the variance can take risk contribution constraints, without them or when using other risk measures it is largely the same as the [`MeanRisk`]-(@ref) estimator.
+It is compatible with other risk measures, but only the variance can take risk contribution constraints, without these constraints or when using other risk measures, it is largely the same as the [`MeanRisk`]-(@ref) estimator.
 
-First we need to provide a instance of [`AssetSets`](@ref) which defines sets of assets or factors and their relationships, which lets `PortfolioOptimisers.jl` create linear constraints according to how users define them via [`LinearConstraintEstimator`](@ref). This way it's possible to define groups of assets/factors and how they relate to each other. We will showcase them later. For now, we need these to define the relationship between factors for their risk contribution.
+In order to define the factor risk contributions, we need to provide an instance of [`AssetSets`](@ref) via the `sets` keyword. In this estimator, this must define sets of factors and their relationships. This information lets `PortfolioOptimisers.jl` map user-provided equations to the factor universe and create the corresponding linear constraints. This makes it possible to define groups of factors and how they relate to each other. [`AssetSets`](@ref) can be used throughout the package, mostly for defining sets of assets, but as shown here can also be used for factors (it's also how they can be used when combining [`FactorPrior`](@ref) and estimators like [`EntropyPooling`](@ref) and [`BlackLitterman`](@ref). We will showcase them later. For now, we need these to define the relationship between factors for their risk contribution.
 
 The [`AssetSets`](@ref) has a `key` property which defines the default search key in `dict`, `dict` must contain a key matching `key` whose value is taken to tbe the names of the assets/factors around which the sets are defined.
 
@@ -250,7 +262,10 @@ This version allocated risk accross assets.
 r = Variance()
 ## Equal risk contribution per asset (default)
 rba1 = RiskBudgeting(; r = r,
-                     rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nx))),
+                     rba = AssetRiskBudgeting(;
+                                              rkb = RiskBudget(;
+                                                               val = fill(1.0,
+                                                                          length(rd.nx)))),
                      opt = JuMPOptimiser(; slv = slv))
 ## Increasing risk contribution per asset
 rba2 = RiskBudgeting(; r = r,
@@ -278,7 +293,11 @@ This version allocated risk accross factors.
 r = Variance()
 ## Equal risk contribution per factor (default)
 rba1 = RiskBudgeting(; r = r,
-                     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = 1:length(rd.nf))),
+                     rba = FactorRiskBudgeting(;
+                                               rkb = RiskBudget(;
+                                                                val = range(; start = 1,
+                                                                            stop = 1,
+                                                                            length = length(rd.nf)))),
                      opt = JuMPOptimiser(; slv = slv))
 ## Increasing risk contribution per factor
 rba2 = RiskBudgeting(; r = r,
