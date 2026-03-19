@@ -191,7 +191,7 @@ It is compatible with other risk measures, but only the variance can take risk c
 
 We need to provide an instance of [`AssetSets`](@ref) via the `sets` keyword defining the sets of factors and their relationships. This way, the estimator can generate the linear constraints by parsing user-provided equations.
 
-[`AssetSets`](@ref) is be used throughout the package for similar purposes, though mostly in the context of defining sets of assets. Other factor-based uses include combining [`FactorPrior`](@ref) with [`EntropyPooling`](@ref) and/or [`BlackLitterman`](@ref) type prior estimators.
+[`AssetSets`](@ref) is be used throughout the package for similar purposes, though mostly in the context of defining sets of assets. Other factor-based uses include combining [`FactorPrior`](@ref) with [`EntropyPoolingPrior`](@ref) and/or [`BlackLittermanPrior`](@ref) type prior estimators.
 
 The [`AssetSets`](@ref) struct has a `key` property which defines the default search key in `dict`, `dict` must contain a key matching `key` whose value is taken to be the names of the assets/factors around which the sets are defined.
 
