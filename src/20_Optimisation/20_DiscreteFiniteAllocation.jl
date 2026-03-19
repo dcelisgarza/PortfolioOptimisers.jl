@@ -1,28 +1,27 @@
-struct DiscreteAllocationResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
-       FiniteAllocationOptimisationResult
-    oe::T1
-    retcode::T2
-    s_retcode::T3
-    l_retcode::T4
-    shares::T5
-    cost::T6
-    w::T7
-    cash::T8
-    s_model::T9
-    l_model::T10
-    fb::T11
+@concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
+    oe
+    retcode
+    s_retcode
+    l_retcode
+    shares
+    cost
+    w
+    cash
+    s_model
+    l_model
+    fb
 end
 function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
     return DiscreteAllocationResult(res.oe, res.retcode, res.s_retcode, res.l_retcode,
                                     res.shares, res.cost, res.w, res.cash, res.s_model,
                                     res.l_model, fb)
 end
-struct DiscreteAllocation{T1, T2, T3, T4, T5} <: FiniteAllocationOptimisationEstimator
-    slv::T1
-    sc::T2
-    so::T3
-    wf::T4
-    fb::T5
+@concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
+    slv
+    sc
+    so
+    wf
+    fb
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation,
                                 fb::Option{<:FOptE_FOpt})

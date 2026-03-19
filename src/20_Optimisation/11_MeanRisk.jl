@@ -1,10 +1,10 @@
-struct MeanRiskResult{T1, T2, T3, T4, T5, T6} <: NonFiniteAllocationOptimisationResult
-    oe::T1
-    pa::T2
-    retcode::T3
-    sol::T4
-    model::T5
-    fb::T6
+@concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pa
+    retcode
+    sol
+    model
+    fb
 end
 function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
     return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
@@ -20,12 +20,12 @@ function Base.getproperty(r::MeanRiskResult, sym::Symbol)
         getfield(r, sym)
     end
 end
-struct MeanRisk{T1, T2, T3, T4, T5} <: RiskJuMPOptimisationEstimator
-    opt::T1
-    r::T2
-    obj::T3
-    wi::T4
-    fb::T5
+@concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
+    opt
+    r
+    obj
+    wi
+    fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)

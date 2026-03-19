@@ -117,8 +117,8 @@ LinearModel
   - [`GeneralisedLinearModel`](@ref)
   - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
-struct LinearModel{T1} <: AbstractRegressionTarget
-    kwargs::T1
+@concrete struct LinearModel <: AbstractRegressionTarget
+    kwargs
     function LinearModel(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
     end
@@ -190,9 +190,9 @@ GeneralisedLinearModel
   - [`LinearModel`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
-struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
-    args::T1
-    kwargs::T2
+@concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
+    args
+    kwargs
     function GeneralisedLinearModel(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -437,10 +437,10 @@ Regression
 
   - [`AbstractRegressionResult`](@ref)
 """
-struct Regression{T1, T2, T3} <: AbstractRegressionResult
-    M::T1
-    L::T2
-    b::T3
+@concrete struct Regression <: AbstractRegressionResult
+    M
+    L
+    b
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, VecNum)

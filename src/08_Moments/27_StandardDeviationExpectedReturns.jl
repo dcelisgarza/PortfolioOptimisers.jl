@@ -1,5 +1,5 @@
-struct StandardDeviationExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
-    ce::T1
+@concrete struct StandardDeviationExpectedReturns <: AbstractExpectedReturnsEstimator
+    ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end

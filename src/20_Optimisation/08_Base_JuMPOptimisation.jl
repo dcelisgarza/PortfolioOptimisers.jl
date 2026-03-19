@@ -36,8 +36,8 @@ end
 function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
-struct JuMPOptimisationSolution{T1} <: OptimisationModelResult
-    w::T1
+@concrete struct JuMPOptimisationSolution <: OptimisationModelResult
+    w
     function JuMPOptimisationSolution(w::ArrNum)
         @argcheck(!isempty(w))
         return new{typeof(w)}(w)

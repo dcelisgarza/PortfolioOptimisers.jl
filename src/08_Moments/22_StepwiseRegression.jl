@@ -34,8 +34,8 @@ PValue
   - [`AbstractStepwiseRegressionCriterion`](@ref)
   - [`StepwiseRegression`](@ref)
 """
-struct PValue{T1} <: AbstractStepwiseRegressionCriterion
-    t::T1
+@concrete struct PValue <: AbstractStepwiseRegressionCriterion
+    t
     function PValue(t::Number)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
         return new{typeof(t)}(t)
@@ -115,10 +115,10 @@ StepwiseRegression
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
-struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
-    crit::T1
-    alg::T2
-    tgt::T3
+@concrete struct StepwiseRegression <: AbstractRegressionEstimator
+    crit
+    alg
+    tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)

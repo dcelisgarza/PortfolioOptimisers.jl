@@ -60,10 +60,10 @@ EquilibriumExpectedReturns
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
-struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-    ce::T1
-    w::T2
-    l::T3
+@concrete struct EquilibriumExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    ce
+    w
+    l
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
                                         w::Option{<:VecNum}, l::Number)
         assert_nonempty_finite_val(w, :w)

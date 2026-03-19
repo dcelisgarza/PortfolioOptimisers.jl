@@ -100,9 +100,9 @@ SemiDefinitePhylogenyEstimator
   - [`AbstractClusteringResult`](@ref)
   - [`phylogeny_constraints`](@ref)
 """
-struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-    pl::T1
-    p::T2
+@concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
+    pl
+    p
     function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl, p::Number)
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pl), typeof(p)}(pl, p)
@@ -153,9 +153,9 @@ SemiDefinitePhylogeny
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
 """
-struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
-    A::T1
-    p::T2
+@concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
+    A
+    p
     function SemiDefinitePhylogeny(A::MatNum, p::Number)
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
@@ -327,10 +327,10 @@ IntegerPhylogenyEstimator
   - [`AbstractClusteringResult`](@ref)
   - [`phylogeny_constraints`](@ref)
 """
-struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-    pl::T1
-    B::T2
-    scale::T3
+@concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
+    pl
+    B
+    scale
     function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt, scale::Number)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
@@ -391,10 +391,10 @@ IntegerPhylogeny
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
 """
-struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
-    A::T1
-    B::T2
-    scale::T3
+@concrete struct IntegerPhylogeny <: AbstractPhylogenyConstraintResult
+    A
+    B
+    scale
     function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
@@ -535,10 +535,10 @@ CentralityConstraint
   - [`ComparisonOperator`](@ref)
   - [`centrality_constraints`](@ref)
 """
-struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
-    A::T1
-    B::T2
-    comp::T3
+@concrete struct CentralityConstraint <: AbstractCentralityConstraint
+    A
+    B
+    comp
     function CentralityConstraint(A::CentralityEstimator, B::Num_VecToScaM,
                                   comp::ComparisonOperator)
         return new{typeof(A), typeof(B), typeof(comp)}(A, B, comp)

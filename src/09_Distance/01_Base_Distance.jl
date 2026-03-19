@@ -158,9 +158,9 @@ VariationInfoDistance
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
-    bins::T1
-    normalise::T2
+@concrete struct VariationInfoDistance <: AbstractDistanceAlgorithm
+    bins
+    normalise
     function VariationInfoDistance(bins::Int_Bin, normalise::Bool)
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins, DomainError)

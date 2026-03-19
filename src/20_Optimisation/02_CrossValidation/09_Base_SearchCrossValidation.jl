@@ -95,14 +95,13 @@ Result type for search-based cross-validation routines. Stores the optimal estim
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`fit_and_score`](@ref)
 """
-struct SearchCrossValidationResult{T1, T2, T3, T4, T5, T6} <:
-       AbstractSearchCrossValidationResult
-    opt::T1
-    test_scores::T2
-    train_scores::T3
-    lens_grid::T4
-    val_grid::T5
-    idx::T6
+@concrete struct SearchCrossValidationResult <: AbstractSearchCrossValidationResult
+    opt
+    test_scores
+    train_scores
+    lens_grid
+    val_grid
+    idx
 end
 """
     fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,

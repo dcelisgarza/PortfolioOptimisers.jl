@@ -65,10 +65,10 @@ EmpiricalPrior
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`prior`](@ref)
 """
-struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
-    ce::T1
-    me::T2
-    horizon::T3
+@concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
+    ce
+    me
+    horizon
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number})
         if !isnothing(horizon)

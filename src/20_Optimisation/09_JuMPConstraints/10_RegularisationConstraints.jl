@@ -30,9 +30,9 @@ function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
     return nothing
 end
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
-struct LpRegularisation{T1, T2} <: AbstractRegularisationEstimator
-    p::T1
-    val::T2
+@concrete struct LpRegularisation <: AbstractRegularisationEstimator
+    p
+    val
     function LpRegularisation(p::Number, val::Number)
         @argcheck(isfinite(p), IsNonFiniteError)
         @argcheck(p > one(p), DomainError)

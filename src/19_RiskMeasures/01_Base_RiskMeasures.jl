@@ -144,10 +144,10 @@ Frontier
 
   - [`RiskMeasureSettings`](@ref)
 """
-struct Frontier{T1, T2, T3} <: AbstractAlgorithm
-    N::T1
-    factor::T2
-    flag::T3
+@concrete struct Frontier <: AbstractAlgorithm
+    N
+    factor
+    flag
     function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)
         @argcheck(N > zero(N))
         @argcheck(isfinite(factor))
@@ -209,10 +209,10 @@ RiskMeasureSettings
   - [`Frontier`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
-    scale::T1
-    ub::T2
-    rke::T3
+@concrete struct RiskMeasureSettings <: AbstractRiskMeasureSettings
+    scale
+    ub
+    rke
     function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds}, rke::Bool)
         assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
@@ -260,8 +260,8 @@ HierarchicalRiskMeasureSettings
   - [`HierarchicalRiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
 """
-struct HierarchicalRiskMeasureSettings{T1} <: AbstractRiskMeasureSettings
-    scale::T1
+@concrete struct HierarchicalRiskMeasureSettings <: AbstractRiskMeasureSettings
+    scale
     function HierarchicalRiskMeasureSettings(scale::Number)
         @argcheck(isfinite(scale))
         return new{typeof(scale)}(scale)
@@ -471,8 +471,8 @@ LogSumExpScalariser
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-struct LogSumExpScalariser{T1} <: NonHierarchicalScalariser
-    gamma::T1
+@concrete struct LogSumExpScalariser <: NonHierarchicalScalariser
+    gamma
     function LogSumExpScalariser(gamma::Number)
         @argcheck(gamma > zero(gamma))
         return new{typeof(gamma)}(gamma)

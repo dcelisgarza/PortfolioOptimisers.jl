@@ -127,16 +127,16 @@ ReturnsResult
   - [`VecDate`](@ref)
   - [`Num_VecNum`](@ref)
 """
-struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResult
-    nx::T1
-    X::T2
-    nf::T3
-    F::T4
-    nb::T5
-    B::T6
-    ts::T7
-    iv::T8
-    ivpa::T9
+@concrete struct ReturnsResult <: AbstractReturnsResult
+    nx
+    X
+    nf
+    F
+    nb
+    B
+    ts
+    iv
+    ivpa
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},

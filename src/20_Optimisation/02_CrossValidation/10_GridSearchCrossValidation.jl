@@ -71,15 +71,14 @@ GridSearchCrossValidation
   - [`CrossValSearchScorer`](@ref)
   - [`search_cross_validation`](@ref)
 """
-struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractSearchCrossValidationEstimator
-    p::T1
-    cv::T2
-    r::T3
-    scorer::T4
-    ex::T5
-    train_score::T6
-    kwargs::T7
+@concrete struct GridSearchCrossValidation <: AbstractSearchCrossValidationEstimator
+    p
+    cv
+    r
+    scorer
+    ex
+    train_score
+    kwargs
     function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType,
                                        cv::SearchCV, r::AbstractBaseRiskMeasure,
                                        scorer::CrossValSearchScorer,

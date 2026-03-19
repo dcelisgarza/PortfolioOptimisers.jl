@@ -36,8 +36,8 @@ RiskBudget
   - [`risk_budget_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
 """
-struct RiskBudget{T1} <: AbstractConstraintResult
-    val::T1
+@concrete struct RiskBudget <: AbstractConstraintResult
+    val
     function RiskBudget(val::VecNum)
         @argcheck(!isempty(val))
         @argcheck(all(x -> zero(x) <= x, val))
@@ -97,9 +97,9 @@ RiskBudgetEstimator
   - [`risk_budget_constraints`](@ref)
   - [`AssetSets`](@ref)
 """
-struct RiskBudgetEstimator{T1, T2} <: AbstractConstraintEstimator
-    val::T1
-    dval::T2
+@concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
+    val
+    dval
     function RiskBudgetEstimator(val::EstValType, dval::Option{<:Number})
         assert_nonempty_nonneg_finite_val(val)
         assert_nonempty_nonneg_finite_val(dval)

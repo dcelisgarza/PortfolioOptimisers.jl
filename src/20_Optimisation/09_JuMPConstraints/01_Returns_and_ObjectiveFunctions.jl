@@ -1,7 +1,7 @@
-struct ArithmeticReturn{T1, T2, T3} <: JuMPReturnsEstimator
-    ucs::T1
-    lb::T2
-    mu::T3
+@concrete struct ArithmeticReturn <: JuMPReturnsEstimator
+    ucs
+    lb
+    mu
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
                               mu::Option{<:Num_VecNum})
         if isa(ucs, EllipsoidalUncertaintySet)
@@ -54,9 +54,9 @@ end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs, mu = r.mu) : ArithmeticReturn()
 end
-struct LogarithmicReturn{T1, T2} <: JuMPReturnsEstimator
-    w::T1
-    lb::T2
+@concrete struct LogarithmicReturn <: JuMPReturnsEstimator
+    w
+    lb
     function LogarithmicReturn(w::Option{<:StatsBase.AbstractWeights},
                                lb::Option{<:RkRtBounds})
         if !isnothing(w)
@@ -220,8 +220,8 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
          end)
 end
 struct MinimumRisk <: ObjectiveFunction end
-struct MaximumUtility{T1} <: ObjectiveFunction
-    l::T1
+@concrete struct MaximumUtility <: ObjectiveFunction
+    l
     function MaximumUtility(l::Number)
         @argcheck(l >= zero(l))
         return new{typeof(l)}(l)
@@ -230,9 +230,9 @@ end
 function MaximumUtility(; l::Number = 2)
     return MaximumUtility(l)
 end
-struct MaximumRatio{T1, T2} <: ObjectiveFunction
-    rf::T1
-    ohf::T2
+@concrete struct MaximumRatio <: ObjectiveFunction
+    rf
+    ohf
     function MaximumRatio(rf::Number, ohf::Option{<:Number})
         if !isnothing(ohf)
             @argcheck(ohf > zero(ohf))

@@ -112,10 +112,10 @@ SecondMoment
   - [`AbstractMomentAlgorithm`](@ref)
   - [`SecondMomentFormulation`](@ref)
 """
-struct SecondMoment{T1, T2, T3} <: LowOrderMomentMeasureAlgorithm
-    ve::T1
-    alg1::T2
-    alg2::T3
+@concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
+    ve
+    alg1
+    alg2
     function SecondMoment(ve::AbstractVarianceEstimator, alg1::AbstractMomentAlgorithm,
                           alg2::SecondMomentFormulation)
         return new{typeof(ve), typeof(alg1), typeof(alg2)}(ve, alg1, alg2)
@@ -202,8 +202,8 @@ FourthMoment
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct FourthMoment{T1} <: UnstandardisedHighOrderMomentMeasureAlgorithm
-    alg::T1
+@concrete struct FourthMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm
+    alg
     function FourthMoment(alg::AbstractMomentAlgorithm)
         return new{typeof(alg)}(alg)
     end
@@ -252,9 +252,9 @@ StandardisedHighOrderMoment
   - [`AbstractVarianceEstimator`](@ref)
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
 """
-struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
-    ve::T1
-    alg::T2
+@concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
+    ve
+    alg
     function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
                                          alg::UnstandardisedHighOrderMomentMeasureAlgorithm)
         return new{typeof(ve), typeof(alg)}(ve, alg)
@@ -617,11 +617,11 @@ LowOrderMoment
   - [`QuadRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
 """
-struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    w::T2
-    mu::T3
-    alg::T4
+@concrete struct LowOrderMoment <: RiskMeasure
+    settings
+    w
+    mu
+    alg
     function LowOrderMoment(settings::RiskMeasureSettings,
                             w::Option{<:StatsBase.AbstractWeights},
                             mu::Option{<:Num_VecNum_VecScalar},
@@ -771,11 +771,11 @@ HighOrderMoment
   - [`FourthMoment`](@ref)
   - [`StandardisedHighOrderMoment`](@ref)
 """
-struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
-    settings::T1
-    w::T2
-    mu::T3
-    alg::T4
+@concrete struct HighOrderMoment <: HierarchicalRiskMeasure
+    settings
+    w
+    mu
+    alg
     function HighOrderMoment(settings::RiskMeasureSettings,
                              w::Option{<:StatsBase.AbstractWeights},
                              mu::Option{<:Num_VecNum_VecScalar},
@@ -799,7 +799,6 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
-
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
                                               <:HighOrderMoment{T1, T2, T3, T4}}
 """

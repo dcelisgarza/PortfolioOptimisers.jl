@@ -1,12 +1,11 @@
-struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
-       ClusteringOptimisationEstimator
-    opt::T1
-    ri::T2
-    ro::T3
-    scai::T4
-    scao::T5
-    ex::T6
-    fb::T7
+@concrete struct HierarchicalEqualRiskContribution <: ClusteringOptimisationEstimator
+    opt
+    ri
+    ro
+    scai
+    scao
+    ex
+    fb
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
                                                scai::Scalariser, scao::Scalariser,

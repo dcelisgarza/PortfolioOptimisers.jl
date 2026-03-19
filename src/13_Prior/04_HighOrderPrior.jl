@@ -404,10 +404,10 @@ HighOrderPriorEstimator
   - [`Coskewness`](@ref)
   - [`prior`](@ref)
 """
-struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
-    pe::T1
-    kte::T2
-    ske::T3
+@concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
+    pe
+    kte
+    ske
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                      kte::Option{<:CokurtosisEstimator},
                                      ske::Option{<:CoskewnessEstimator})

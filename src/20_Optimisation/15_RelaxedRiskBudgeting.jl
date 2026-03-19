@@ -1,8 +1,8 @@
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
-struct RegularisedPenalisedRelaxedRiskBudgeting{T1} <: RelaxedRiskBudgetingAlgorithm
-    p::T1
+@concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
+    p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
         @argcheck(isfinite(p) && p > zero(p))
         return new{typeof(p)}(p)
@@ -11,12 +11,12 @@ end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
-struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
-    opt::T1
-    rba::T2
-    wi::T3
-    alg::T4
-    fb::T5
+@concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
+    opt
+    rba
+    wi
+    alg
+    fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Option{<:OptE_Opt})

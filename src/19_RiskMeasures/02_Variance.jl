@@ -228,12 +228,12 @@ julia> r(w)
   - [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct Variance{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    sigma::T2
-    chol::T3
-    rc::T4
-    alg::T5
+@concrete struct Variance <: RiskMeasure
+    settings
+    sigma
+    chol
+    rc
+    alg
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
                       alg::VarianceFormulation)
@@ -388,10 +388,10 @@ julia> r(w)
   - [`factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct StandardDeviation{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    sigma::T2
-    chol::T3
+@concrete struct StandardDeviation <: RiskMeasure
+    settings
+    sigma
+    chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                                chol::Option{<:MatNum})
         if isa(sigma, MatNum)
@@ -640,10 +640,10 @@ julia> r(w)
   - [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
   - [`expected_risk`](@ref)
 """
-struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    ucs::T2
-    sigma::T3
+@concrete struct UncertaintySetVariance <: RiskMeasure
+    settings
+    ucs
+    sigma
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)

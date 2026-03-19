@@ -1,5 +1,5 @@
-struct MaximumDrawdown{T1} <: RiskMeasure
-    settings::T1
+@concrete struct MaximumDrawdown <: RiskMeasure
+    settings
     function MaximumDrawdown(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end
@@ -11,8 +11,8 @@ function (::MaximumDrawdown)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return -minimum(dd)
 end
-struct RelativeMaximumDrawdown{T1} <: HierarchicalRiskMeasure
-    settings::T1
+@concrete struct RelativeMaximumDrawdown <: HierarchicalRiskMeasure
+    settings
     function RelativeMaximumDrawdown(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end

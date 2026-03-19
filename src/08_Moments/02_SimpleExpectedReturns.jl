@@ -46,9 +46,9 @@ SimpleExpectedReturns
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-struct SimpleExpectedReturns{T1, T2} <: AbstractExpectedReturnsEstimator
-    w::T1
-    idx::T2
+@concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
+    w
+    idx
     function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights},
                                    idx::Option{<:VecInt})
         assert_nonempty_finite_val(w, :w)

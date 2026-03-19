@@ -58,10 +58,10 @@ GeneralCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-struct GeneralCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ce::T1
-    w::T2
-    idx::T3
+@concrete struct GeneralCovariance <: AbstractCovarianceEstimator
+    ce
+    w
+    idx
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
                                w::Option{<:StatsBase.AbstractWeights},
                                idx::Option{<:VecInt})
@@ -234,10 +234,10 @@ Covariance
   - [`Full`](@ref)
   - [`Semi`](@ref)
 """
-struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    me::T1
-    ce::T2
-    alg::T3
+@concrete struct Covariance <: AbstractCovarianceEstimator
+    me
+    ce
+    alg
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm)
         return new{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)

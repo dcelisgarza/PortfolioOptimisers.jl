@@ -52,10 +52,10 @@ DetoneCovariance
   - [`Detone`](@ref)
   - [`Posdef`](@ref)
 """
-struct DetoneCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ce::T1
-    dt::T2
-    pdm::T3
+@concrete struct DetoneCovariance <: AbstractCovarianceEstimator
+    ce
+    dt
+    pdm
     function DetoneCovariance(ce::AbstractCovarianceEstimator, dt::Detone,
                               pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(dt), typeof(pdm)}(ce, dt, pdm)

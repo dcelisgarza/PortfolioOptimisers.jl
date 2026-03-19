@@ -1,18 +1,17 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
-struct NearOptimalCenteringResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pa::T2
-    w_min_retcode::T3
-    w_opt_retcode::T4
-    w_max_retcode::T5
-    noc_retcode::T6
-    retcode::T7
-    sol::T8
-    model::T9
-    fb::T10
+@concrete struct NearOptimalCenteringResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pa
+    w_min_retcode
+    w_opt_retcode
+    w_max_retcode
+    noc_retcode
+    retcode
+    sol
+    model
+    fb
 end
 function factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt})
     return NearOptimalCenteringResult(res.oe, res.pa, res.w_min_retcode, res.w_opt_retcode,
@@ -28,21 +27,20 @@ function Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
         getproperty(r.pa, sym)
     end
 end
-struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
-       RiskJuMPOptimisationEstimator
-    opt::T1
-    r::T2
-    obj::T3
-    bins::T4
-    w_min::T5
-    w_min_ini::T6
-    w_opt::T7
-    w_opt_ini::T8
-    w_max::T9
-    w_max_ini::T10
-    ucs_flag::T11
-    alg::T12
-    fb::T13
+@concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
+    opt
+    r
+    obj
+    bins
+    w_min
+    w_min_ini
+    w_opt
+    w_opt_ini
+    w_max
+    w_max_ini
+    ucs_flag
+    alg
+    fb
     function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
                                   w_min::Option{<:VecNum}, w_min_ini::Option{<:VecNum},
@@ -240,19 +238,19 @@ function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPr
     end
     return risk_min, risk_opt, risk_max
 end
-struct NearOptimalSetup{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12}
-    w_opt::T1
-    rk_opt::T2
-    rt_opt::T3
-    rt_min::T4
-    rt_max::T5
-    w_min::T6
-    w_max::T7
-    r::T8
-    opt::T9
-    w_min_retcode::T10
-    w_opt_retcode::T11
-    w_max_retcode::T12
+@concrete struct NearOptimalSetup <: AbstractResult
+    w_opt
+    rk_opt
+    rt_opt
+    rt_min
+    rt_max
+    w_min
+    w_max
+    r
+    opt
+    w_min_retcode
+    w_opt_retcode
+    w_max_retcode
 end
 function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
                                       dims::Int = 1)

@@ -858,8 +858,8 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MeanValue{T1} <: VectorToScalarMeasure
-    w::T1
+@concrete struct MeanValue <: VectorToScalarMeasure
+    w
     function MeanValue(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -930,8 +930,8 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MedianValue{T1} <: VectorToScalarMeasure
-    w::T1
+@concrete struct MedianValue <: VectorToScalarMeasure
+    w
     function MedianValue(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -1025,9 +1025,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct StdValue{T1, T2} <: VectorToScalarMeasure
-    w::T1
-    corrected::T2
+@concrete struct StdValue <: VectorToScalarMeasure
+    w
+    corrected
     function StdValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -1101,9 +1101,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct VarValue{T1, T2} <: VectorToScalarMeasure
-    w::T1
-    corrected::T2
+@concrete struct VarValue <: VectorToScalarMeasure
+    w
+    corrected
     function VarValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -1233,9 +1233,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
   - [`VarValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct StandardisedValue{T1, T2} <: VectorToScalarMeasure
-    mv::T1
-    sv::T2
+@concrete struct StandardisedValue <: VectorToScalarMeasure
+    mv
+    sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
         return new{typeof(mv), typeof(sv)}(mv, sv)
     end

@@ -47,10 +47,10 @@ MutualInfoCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
 """
-struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ve::T1
-    bins::T2
-    normalise::T3
+@concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
+    ve
+    bins
+    normalise
     function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
                                   normalise::Bool)
         if isa(bins, Integer)

@@ -321,18 +321,17 @@ SmythBrobyCovariance
   - [`StandardisedSmythBrobyGerber2`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
-struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       BaseSmythBrobyCovariance
-    me::T1
-    ve::T2
-    pdm::T3
-    t::T4
-    c1::T5
-    c2::T6
-    c3::T7
-    n::T8
-    alg::T9
-    ex::T10
+@concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
+    me
+    ve
+    pdm
+    t
+    c1
+    c2
+    c3
+    n
+    alg
+    ex
     function SmythBrobyCovariance(me::AbstractExpectedReturnsEstimator,
                                   ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
                                   t::Number, c1::Number, c2::Number, c3::Number, n::Number,

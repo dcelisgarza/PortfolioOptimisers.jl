@@ -1,23 +1,22 @@
-struct ProcessedJuMPOptimiserAttributes{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,
-                                        T13, T14, T15, T16, T17, T18} <: AbstractResult
-    pr::T1
-    wb::T2
-    lt::T3
-    st::T4
-    lcsr::T5
-    ctr::T6
-    gcardr::T7
-    sgcardr::T8
-    smtx::T9
-    sgmtx::T10
-    slt::T11
-    sst::T12
-    sglt::T13
-    sgst::T14
-    tn::T15
-    fees::T16
-    plr::T17
-    ret::T18
+@concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
+    pr
+    wb
+    lt
+    st
+    lcsr
+    ctr
+    gcardr
+    sgcardr
+    smtx
+    sgmtx
+    slt
+    sst
+    sglt
+    sgst
+    tn
+    fees
+    plr
+    ret
 end
 function assert_finite_nonnegative_real_or_vec(val::Number)
     @argcheck(isfinite(val))
@@ -30,49 +29,46 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)
     @argcheck(all(x -> zero(x) <= x, val))
     return nothing
 end
-struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16,
-                     T17, T18, T19, T20, T21, T22, T23, T24, T25, T26, T27, T28, T29, T30,
-                     T31, T32, T33, T34, T35, T36, T37, T38, T39} <:
-       BaseJuMPOptimisationEstimator
-    pe::T1 # PriorEstimator
-    slv::T2
-    wb::T3 # WeightBounds
-    bgt::T4 # BudgetRange
-    sbgt::T5 # LongShortSum
-    lt::T6 # l threshold
-    st::T7
-    lcse::T8
-    cte::T9
-    gcarde::T10
-    sgcarde::T11
-    smtx::T12
-    sgmtx::T13
-    slt::T14
-    sst::T15
-    sglt::T16
-    sgst::T17
-    tn::T18 # Turnover
-    fees::T19
-    sets::T20
-    tr::T21 # TrackingError
-    ple::T22
-    ret::T23
-    sca::T24
-    ccnt::T25
-    cobj::T26
-    sc::T27
-    so::T28
-    ss::T29
-    card::T30
-    scard::T31
-    nea::T32
-    l1::T33
-    l2::T34
-    linf::T35
-    lp::T36
-    brt::T37
-    cle_pr::T38
-    strict::T39
+@concrete struct JuMPOptimiser <: BaseJuMPOptimisationEstimator
+    pe
+    slv
+    wb
+    bgt
+    sbgt
+    lt
+    st
+    lcse
+    cte
+    gcarde
+    sgcarde
+    smtx
+    sgmtx
+    slt
+    sst
+    sglt
+    sgst
+    tn
+    fees
+    sets
+    tr
+    ple
+    ret
+    sca
+    ccnt
+    cobj
+    sc
+    so
+    ss
+    card
+    scard
+    nea
+    l1
+    l2
+    linf
+    lp
+    brt
+    cle_pr
+    strict
     function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
                            lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},

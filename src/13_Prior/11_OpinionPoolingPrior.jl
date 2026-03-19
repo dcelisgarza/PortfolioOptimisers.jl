@@ -247,14 +247,14 @@ OpinionPoolingPrior
   - [`LogarithmicOpinionPooling`](@ref)
   - [`prior`](@ref)
 """
-struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
-    pes::T1
-    pe1::T2
-    pe2::T3
-    p::T4
-    w::T5
-    alg::T6
-    ex::T7
+@concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+    pes
+    pe1
+    pe2
+    p
+    w
+    alg
+    ex
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,

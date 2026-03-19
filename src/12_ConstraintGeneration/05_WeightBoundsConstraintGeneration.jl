@@ -81,9 +81,9 @@ WeightBounds
   - [`WeightBoundsEstimator`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-struct WeightBounds{T1, T2} <: AbstractConstraintResult
-    lb::T1
-    ub::T2
+@concrete struct WeightBounds <: AbstractConstraintResult
+    lb
+    ub
     function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
@@ -155,11 +155,11 @@ WeightBoundsEstimator
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
-    lb::T1
-    ub::T2
-    dlb::T3
-    dub::T4
+@concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
+    lb
+    ub
+    dlb
+    dub
     function WeightBoundsEstimator(lb::Option{<:EstValType}, ub::Option{<:EstValType},
                                    dlb::Option{<:Number} = nothing,
                                    dub::Option{<:Number} = nothing)

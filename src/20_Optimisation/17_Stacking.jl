@@ -1,36 +1,34 @@
 abstract type BaseStackingOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
-struct StackingResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pr::T2
-    wb::T3
-    fees::T4
-    resi::T5
-    reso::T6
-    cv::T7
-    retcode::T8
-    w::T9
-    fb::T10
+@concrete struct StackingResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pr
+    wb
+    fees
+    resi
+    reso
+    cv
+    retcode
+    w
+    fb
 end
 function factory(res::StackingResult, fb::Option{<:OptE_Opt})
     return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
                           res.retcode, res.w, fb)
 end
-struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
-       BaseStackingOptimisationEstimator
-    pe::T1
-    wb::T2
-    fees::T3
-    sets::T4
-    scale::T5
-    opti::T6
-    opto::T7
-    cv::T8
-    wf::T9
-    ex::T10
-    fb::T11
-    brt::T12
-    strict::T13
+@concrete struct Stacking <: BaseStackingOptimisationEstimator
+    pe
+    wb
+    fees
+    sets
+    scale
+    opti
+    opto
+    cv
+    wf
+    ex
+    fb
+    brt
+    strict
     function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                       sets::Option{<:AssetSets}, scale::Option{<:VecNum}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,

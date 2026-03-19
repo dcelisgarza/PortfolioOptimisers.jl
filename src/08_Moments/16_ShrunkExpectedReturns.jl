@@ -113,8 +113,8 @@ JamesStein
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
 """
-struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    tgt::T1
+@concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
+    tgt
     function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
     end
@@ -156,8 +156,8 @@ BayesStein
   - [`JamesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
 """
-struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    tgt::T1
+@concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
+    tgt
     function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
     end
@@ -199,8 +199,8 @@ BodnarOkhrinParolya
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
 """
-struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    tgt::T1
+@concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
+    tgt
     function BodnarOkhrinParolya(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
     end
@@ -270,10 +270,10 @@ ShrunkExpectedReturns
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
-struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-    me::T1
-    ce::T2
-    alg::T3
+@concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    me
+    ce
+    alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
                                    alg::AbstractShrunkExpectedReturnsAlgorithm)

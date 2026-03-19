@@ -215,8 +215,8 @@ ShrunkDenoise
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
-    alpha::T1
+@concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
+    alpha
     function ShrunkDenoise(alpha::Number)
         @argcheck(zero(alpha) <= alpha <= one(alpha),
                   DomainError("0 <= alpha <= 1 must hold. Got\nalpha => $alpha"))
@@ -303,14 +303,14 @@ Denoise
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-struct Denoise{T1, T2, T3, T4, T5, T6, T7} <: AbstractDenoiseEstimator
-    alg::T1
-    args::T2
-    kwargs::T3
-    kernel::T4
-    m::T5
-    n::T6
-    pdm::T7
+@concrete struct Denoise <: AbstractDenoiseEstimator
+    alg
+    args
+    kwargs
+    kernel
+    m
+    n
+    pdm
     function Denoise(alg::AbstractDenoiseAlgorithm, args::Tuple, kwargs::NamedTuple, kernel,
                      m::Integer, n::Integer, pdm::Option{<:Posdef} = Posdef())
         @argcheck(1 < m, DomainError)

@@ -62,13 +62,12 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     end
     return kt_res
 end
-struct HighOrderFactorPriorEstimator{T1, T2, T3, T4, T5} <:
-       AbstractHighOrderPriorEstimator_F
-    pe::T1
-    kte::T2
-    ske::T3
-    ex::T4
-    rsd::T5
+@concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
+    pe
+    kte
+    ske
+    ex
+    rsd
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},
                                            ske::Option{<:CoskewnessEstimator},

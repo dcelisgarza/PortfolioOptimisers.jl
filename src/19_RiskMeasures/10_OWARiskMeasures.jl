@@ -98,8 +98,8 @@ MaximumEntropy
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MaximumEntropy{T1} <: AbstractOrderedWeightsArrayAlgorithm
-    alg::T1
+@concrete struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm
+    alg
     function MaximumEntropy(alg::EntropyFormulation)
         return new{typeof(alg)}(alg)
     end
@@ -107,8 +107,7 @@ end
 function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
     return MaximumEntropy(alg)
 end
-abstract type SquaredOrderedWeightsArrayAlgorithm{T1} <:
-              AbstractOrderedWeightsArrayAlgorithm end
+abstract type SquaredOrderedWeightsArrayAlgorithm{T} <: AbstractOrderedWeightsArrayAlgorithm end
 const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
 const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
 const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
@@ -175,8 +174,8 @@ The `MinimumSquaredDistance` algorithm can be configured to use different second
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MinimumSquaredDistance{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
-    alg::T1
+struct MinimumSquaredDistance{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
+    alg::__T_alg
     function MinimumSquaredDistance(alg::UnionAllSOCRiskExpr)
         return new{typeof(alg)}(alg)
     end
@@ -247,8 +246,8 @@ The `MinimumSumSquares` algorithm can be configured to use different second-orde
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct MinimumSumSquares{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
-    alg::T1
+struct MinimumSumSquares{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
+    alg::__T_alg
     function MinimumSumSquares(alg::UnionAllSOCRiskExpr)
         return new{typeof(alg)}(alg)
     end
@@ -318,8 +317,9 @@ NormalisedConstantRelativeRiskAversion
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
-    g::T1
+@concrete struct NormalisedConstantRelativeRiskAversion <:
+                 AbstractOrderedWeightsArrayEstimator
+    g
     function NormalisedConstantRelativeRiskAversion(g::Number)
         @argcheck(zero(g) < g < one(g), DomainError("0 < g < 1 must hold. Got\ng => $g"))
         return new{typeof(g)}(g)
@@ -393,12 +393,12 @@ OWAJuMP
 
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
-struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
-    slv::T1
-    max_phi::T2
-    sc::T3
-    so::T4
-    alg::T5
+@concrete struct OWAJuMP <: AbstractOrderedWeightsArrayEstimator
+    slv
+    max_phi
+    sc
+    so
+    alg
     function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Number, so::Number,
                      alg::AbstractOrderedWeightsArrayAlgorithm)
         if isa(slv, VecSlv)
@@ -1081,8 +1081,8 @@ end
 
 abstract type OrderedWeightsArrayFormulation <: AbstractAlgorithm end
 struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
-struct ApproxOrderedWeightsArray{T1} <: OrderedWeightsArrayFormulation
-    p::T1
+@concrete struct ApproxOrderedWeightsArray <: OrderedWeightsArrayFormulation
+    p
     function ApproxOrderedWeightsArray(p::VecNum)
         @argcheck(!isempty(p))
         @argcheck(all(x -> x > one(x), p))
@@ -1092,10 +1092,10 @@ end
 function ApproxOrderedWeightsArray(; p::VecNum = Float64[2, 3, 4, 10, 50])
     return ApproxOrderedWeightsArray(p)
 end
-struct OrderedWeightsArray{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    w::T2
-    alg::T3
+@concrete struct OrderedWeightsArray <: RiskMeasure
+    settings
+    w
+    alg
     function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:VecNum},
                                  alg::OrderedWeightsArrayFormulation)
         if !isnothing(w)
@@ -1113,11 +1113,11 @@ function (r::OrderedWeightsArray)(x::VecNum)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return LinearAlgebra.dot(w, sort(x))
 end
-struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    w1::T2
-    w2::T3
-    alg::T4
+@concrete struct OrderedWeightsArrayRange <: RiskMeasure
+    settings
+    w1
+    w2
+    alg
     function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::Option{<:VecNum},
                                       w2::Option{<:VecNum},
                                       alg::OrderedWeightsArrayFormulation, rev::Bool)

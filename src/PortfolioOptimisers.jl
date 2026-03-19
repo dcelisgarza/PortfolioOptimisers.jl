@@ -5,6 +5,7 @@ using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
+using ConcreteStructs: @concrete
 using DataFrames: DataFrames
 using Dates: Dates
 using Distances: Distances

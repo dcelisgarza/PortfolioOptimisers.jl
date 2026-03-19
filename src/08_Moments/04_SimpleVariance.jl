@@ -58,10 +58,10 @@ SimpleVariance
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
-struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
-    me::T1
-    w::T2
-    corrected::T3
+@concrete struct SimpleVariance <: AbstractVarianceEstimator
+    me
+    w
+    corrected
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         assert_nonempty_finite_val(w, :w)

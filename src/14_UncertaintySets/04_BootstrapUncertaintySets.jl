@@ -186,14 +186,14 @@ ARCHUncertaintySet
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
-    pe::T1
-    alg::T2
-    n_sim::T3
-    block_size::T4
-    q::T5
-    seed::T6
-    bootstrap::T7
+@concrete struct ARCHUncertaintySet <: BootstrapUncertaintySetEstimator
+    pe
+    alg
+    n_sim
+    block_size
+    q
+    seed
+    bootstrap
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, seed::Option{<:Integer},

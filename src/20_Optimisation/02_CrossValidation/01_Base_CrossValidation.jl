@@ -33,16 +33,16 @@ abstract type NonOptimisationSequentialCrossValidationResult <:
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
 
-struct PredictionReturnsResult{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractReturnsResult
-    nx::T1
-    X::T2
-    nf::T3
-    F::T4
-    nb::T5
-    B::T6
-    ts::T7
-    iv::T8
-    ivpa::T9
+@concrete struct PredictionReturnsResult <: AbstractReturnsResult
+    nx
+    X
+    nf
+    F
+    nb
+    B
+    ts
+    iv
+    ivpa
     function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
                                      nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
@@ -116,9 +116,9 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
     return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
 abstract type AbstractPredictionResult <: AbstractResult end
-struct PredictionResult{T1, T2} <: AbstractPredictionResult
-    res::T1
-    rd::T2
+@concrete struct PredictionResult <: AbstractPredictionResult
+    res
+    rd
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
                               rd::PredictionReturnsResult)
         return new{typeof(res), typeof(rd)}(res, rd)
@@ -153,10 +153,10 @@ function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:
     end
     return X
 end
-struct MultiPeriodPredictionResult{T1, T2, T3} <: AbstractPredictionResult
-    pred::T1
-    mrd::T2
-    id::T3
+@concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
+    pred
+    mrd
+    id
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
@@ -195,8 +195,8 @@ function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionR
 end
 const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
 const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
-struct PopulationPredictionResult{T1} <: AbstractPredictionResult
-    pred::T1
+@concrete struct PopulationPredictionResult <: AbstractPredictionResult
+    pred
     function PopulationPredictionResult(pred::VecPredRes_MultiPredRes)
         return new{typeof(pred)}(pred)
     end

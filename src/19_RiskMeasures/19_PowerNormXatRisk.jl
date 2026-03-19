@@ -34,12 +34,12 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
         NaN
     end
 end
-struct PowerNormValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    p::T4
-    w::T5
+@concrete struct PowerNormValueatRisk <: RiskMeasure
+    settings
+    slv
+    alpha
+    p
+    w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                   alpha::Number, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
@@ -66,14 +66,14 @@ end
 function (r::PowerNormValueatRisk)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.p, r.w)
 end
-struct PowerNormValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    beta::T4
-    pa::T5
-    pb::T6
-    w::T7
+@concrete struct PowerNormValueatRiskRange <: RiskMeasure
+    settings
+    slv
+    alpha
+    beta
+    pa
+    pb
+    w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
                                        beta::Number, pa::Number, pb::Number,
@@ -109,12 +109,12 @@ function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
     return PowerNormValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                      beta = r.beta, pa = r.pa, pb = r.pb, w = w)
 end
-struct PowerNormDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    p::T4
-    w::T5
+@concrete struct PowerNormDrawdownatRisk <: RiskMeasure
+    settings
+    slv
+    alpha
+    p
+    w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
                                      w::Option{<:StatsBase.AbstractWeights})
@@ -142,12 +142,12 @@ function (r::PowerNormDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)
 end
-struct RelativePowerNormDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    p::T4
-    w::T5
+@concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
+    settings
+    slv
+    alpha
+    p
+    w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                              slv::Option{<:Slv_VecSlv}, alpha::Number,
                                              p::Number,

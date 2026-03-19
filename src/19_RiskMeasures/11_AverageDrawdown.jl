@@ -1,6 +1,6 @@
-struct AverageDrawdown{T1, T2} <: RiskMeasure
-    settings::T1
-    w::T2
+@concrete struct AverageDrawdown <: RiskMeasure
+    settings
+    w
     function AverageDrawdown(settings::RiskMeasureSettings,
                              w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
@@ -17,9 +17,9 @@ function (r::AverageDrawdown)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, r.w))
 end
-struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
-    settings::T1
-    w::T2
+@concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
+    settings
+    w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)

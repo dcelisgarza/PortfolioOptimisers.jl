@@ -54,9 +54,9 @@ Distance
   - [`CanonicalDistance`](@ref)
   - [`VariationInfoDistance`](@ref)
 """
-struct Distance{T1, T2} <: AbstractDistanceEstimator
-    power::T1
-    alg::T2
+@concrete struct Distance <: AbstractDistanceEstimator
+    power
+    alg
     function Distance(power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
             @argcheck(one(power) <= power, DomainError)

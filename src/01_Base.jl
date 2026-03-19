@@ -208,8 +208,8 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
 """
-struct IsNothingError{T1} <: PortfolioOptimisersError
-    msg::T1
+@concrete struct IsNothingError <: PortfolioOptimisersError
+    msg
 end
 """
     struct IsEmptyError{T1} <: PortfolioOptimisersError
@@ -244,8 +244,8 @@ Stacktrace:
   - [`IsNothingError`](@ref)
   - [`IsNonFiniteError`](@ref)
 """
-struct IsEmptyError{T1} <: PortfolioOptimisersError
-    msg::T1
+@concrete struct IsEmptyError <: PortfolioOptimisersError
+    msg
 end
 """
     struct IsNonFiniteError{T1} <: PortfolioOptimisersError
@@ -280,8 +280,8 @@ Stacktrace:
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
 """
-struct IsNonFiniteError{T1} <: PortfolioOptimisersError
-    msg::T1
+@concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    msg
 end
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
@@ -742,9 +742,9 @@ VecScalar
   - [`AbstractResult`](@ref)
   - [`VecNum`](@ref)
 """
-struct VecScalar{T1, T2} <: AbstractResult
-    v::T1
-    s::T2
+@concrete struct VecScalar <: AbstractResult
+    v
+    s
     function VecScalar(v::VecNum, s::Number)
         assert_nonempty_finite_val(v, :v)
         assert_nonempty_finite_val(s, :s)

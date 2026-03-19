@@ -44,8 +44,8 @@ julia> asset_sets_matrix(est, sets)
   - [`asset_sets_matrix`]-(@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
-struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
-    val::T1
+@concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
+    val
     function AssetSetsMatrixEstimator(val::AbstractString)
         @argcheck(!isempty(val))
         return new{typeof(val)}(val)

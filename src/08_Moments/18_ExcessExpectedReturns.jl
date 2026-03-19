@@ -36,9 +36,9 @@ ExcessExpectedReturns
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
-    me::T1
-    rf::T2
+@concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    me
+    rf
     function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Number)
         return new{typeof(me), typeof(rf)}(me, rf)
     end

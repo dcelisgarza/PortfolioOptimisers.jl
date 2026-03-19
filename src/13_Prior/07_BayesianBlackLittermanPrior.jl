@@ -146,15 +146,14 @@ BayesianBlackLittermanPrior
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractLowOrderPriorEstimator_F
-    pe::T1
-    mp::T2
-    views::T3
-    sets::T4
-    views_conf::T5
-    rf::T6
-    tau::T7
+@concrete struct BayesianBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+    pe
+    mp
+    views
+    sets
+    views_conf
+    rf
+    tau
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Lc_BLV, sets::Option{<:AssetSets},

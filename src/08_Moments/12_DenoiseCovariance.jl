@@ -62,10 +62,10 @@ DenoiseCovariance
   - [`Denoise`](@ref)
   - [`Posdef`](@ref)
 """
-struct DenoiseCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ce::T1
-    dn::T2
-    pdm::T3
+@concrete struct DenoiseCovariance <: AbstractCovarianceEstimator
+    ce
+    dn
+    pdm
     function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
                                pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)

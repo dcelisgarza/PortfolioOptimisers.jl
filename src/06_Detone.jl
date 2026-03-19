@@ -109,9 +109,9 @@ Detone
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
-struct Detone{T1, T2} <: AbstractDetoneEstimator
-    n::T1
-    pdm::T2
+@concrete struct Detone <: AbstractDetoneEstimator
+    n
+    pdm
     function Detone(n::Integer, pdm::Option{<:Posdef} = Posdef())
         @argcheck(zero(n) < n, DomainError)
         return new{typeof(n), typeof(pdm)}(n, pdm)

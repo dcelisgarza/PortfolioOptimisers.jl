@@ -62,10 +62,10 @@ Coskewness
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
-    me::T1
-    mp::T2
-    alg::T3
+@concrete struct Coskewness <: CoskewnessEstimator
+    me
+    mp
+    alg
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)
         return new{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)

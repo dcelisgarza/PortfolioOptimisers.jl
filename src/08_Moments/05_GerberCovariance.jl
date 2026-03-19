@@ -167,8 +167,8 @@ StandardisedGerber0
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-struct StandardisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
-    me::T1
+@concrete struct StandardisedGerber0 <: StandardisedGerberCovarianceAlgorithm
+    me
     function StandardisedGerber0(me::AbstractExpectedReturnsEstimator)
         return new{typeof(me)}(me)
     end
@@ -217,8 +217,8 @@ StandardisedGerber1
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-struct StandardisedGerber1{T1} <: StandardisedGerberCovarianceAlgorithm
-    me::T1
+@concrete struct StandardisedGerber1 <: StandardisedGerberCovarianceAlgorithm
+    me
     function StandardisedGerber1(me::AbstractExpectedReturnsEstimator)
         return new{typeof(me)}(me)
     end
@@ -267,8 +267,8 @@ StandardisedGerber2
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-struct StandardisedGerber2{T1} <: StandardisedGerberCovarianceAlgorithm
-    me::T1
+@concrete struct StandardisedGerber2 <: StandardisedGerberCovarianceAlgorithm
+    me
     function StandardisedGerber2(me::AbstractExpectedReturnsEstimator)
         return new{typeof(me)}(me)
     end
@@ -419,11 +419,11 @@ Keyword arguments correspond to the fields above.
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
-    ve::T1
-    pdm::T2
-    t::T3
-    alg::T4
+@concrete struct GerberCovariance <: BaseGerberCovariance
+    ve
+    pdm
+    t
+    alg
     function GerberCovariance(ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
                               t::Number, alg::GerberCovarianceAlgorithm)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))

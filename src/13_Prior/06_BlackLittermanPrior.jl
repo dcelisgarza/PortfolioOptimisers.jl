@@ -119,14 +119,14 @@ BlackLittermanPrior
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
-    pe::T1
-    mp::T2
-    views::T3
-    sets::T4
-    views_conf::T5
-    rf::T6
-    tau::T7
+@concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
+    pe
+    mp
+    views
+    sets
+    views_conf
+    rf
+    tau
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
                                  sets::Option{<:AssetSets},

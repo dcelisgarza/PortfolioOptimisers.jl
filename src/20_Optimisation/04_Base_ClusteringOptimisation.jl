@@ -1,32 +1,30 @@
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
-struct HierarchicalResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pr::T2
-    clr::T3
-    wb::T4
-    fees::T5
-    retcode::T6
-    w::T7
-    fb::T8
+@concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pr
+    clr
+    wb
+    fees
+    retcode
+    w
+    fb
 end
 function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
     return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
                               fb)
 end
-struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       BaseClusteringOptimisationEstimator
-    pe::T1
-    cle::T2
-    slv::T3
-    wb::T4
-    fees::T5
-    sets::T6
-    wf::T7
-    brt::T8
-    cle_pr::T9
-    strict::T10
+@concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
+    pe
+    cle
+    slv
+    wb
+    fees
+    sets
+    wf
+    brt
+    cle_pr
+    strict
     function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,

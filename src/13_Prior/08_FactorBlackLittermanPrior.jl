@@ -144,21 +144,20 @@ FactorBlackLittermanPrior
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
-       AbstractLowOrderPriorEstimator_F
-    pe::T1
-    f_mp::T2
-    mp::T3
-    re::T4
-    ve::T5
-    views::T6
-    sets::T7
-    views_conf::T8
-    w::T9
-    rf::T10
-    l::T11
-    tau::T12
-    rsd::T13
+@concrete struct FactorBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+    pe
+    f_mp
+    mp
+    re
+    ve
+    views
+    sets
+    views_conf
+    w
+    rf
+    l
+    tau
+    rsd
     function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
