@@ -1,3 +1,6 @@
+"""
+$(DocStringExtensions.README)
+"""
 module PortfolioOptimisers
 
 using Accessors: Accessors
@@ -33,14 +36,8 @@ using StatsAPI: StatsAPI
 using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 
-# Turn readme into PortfolioOptimisers' docs.
-@doc let
-    path = joinpath(dirname(@__DIR__), "docs/src/index.md")
-    include_dependency(path)
-    read(path, String)
-end PortfolioOptimisers
-
 #=
+# Programatically include source files
 src_files = String[]
 sizehint!(src_files, 149)
 for (root, dirs, files) in walkdir(@__DIR__)

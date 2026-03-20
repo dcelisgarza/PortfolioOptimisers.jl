@@ -1,10 +1,9 @@
 """
-    assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::Number, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(args...)
+    assert_nonempty_nonneg_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    ) -> nothing
+    assert_nonempty_nonneg_finite_val(args...) -> nothing
 
 Validate that the input value is non-empty, non-negative and finite.
 
@@ -12,10 +11,6 @@ Validate that the input value is non-empty, non-negative and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Details
 
@@ -82,12 +77,11 @@ function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::Pair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::Number, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(args...)
+    assert_nonempty_gt0_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    ) -> nothing
+    assert_nonempty_gt0_finite_val(args...) -> nothing
 
 Validate that the input value is non-empty, greater than zero, and finite.
 
@@ -95,10 +89,6 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Details
 
@@ -165,12 +155,11 @@ function assert_nonempty_gt0_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_finite_val(val::AbstractDict, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::VecPair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::ArrNum, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::Pair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::Number, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(args...)
+    assert_nonempty_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    ) -> nothing
+    assert_nonempty_finite_val(args...) -> nothing
 
 Validate that the input value is non-empty and finite.
 
@@ -178,10 +167,6 @@ Validate that the input value is non-empty and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Details
 
@@ -239,7 +224,7 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X) -> nothing
 
 Assert that the input matrix is square.
 
@@ -247,10 +232,6 @@ Assert that the input matrix is square.
 
   - `X`: Input matrix to validate.
   - `X_sym`: Symbolic name used in error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Validation
 
@@ -266,7 +247,7 @@ function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
     return nothing
 end
 """
-    ⊗(A::ArrNum, B::ArrNum)
+    ⊗(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
@@ -286,7 +267,10 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 """
 ⊗(A::ArrNum, B::ArrNum) = reshape(kron(B, A), (length(A), length(B)))
 """
-    ⊙(A, B)
+    ⊙(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊙(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊙(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊙(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) multiplication.
 
@@ -317,7 +301,10 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 ⊙(A, B::ArrNum) = A * B
 ⊙(A, B) = A * B
 """
-    ⊘(A, B)
+    ⊘(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊘(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊘(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊘(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) division.
 
@@ -348,7 +335,10 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 ⊘(A, B::ArrNum) = A ./ B
 ⊘(A, B) = A / B
 """
-    ⊕(A, B)
+    ⊕(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊕(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊕(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊕(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) addition.
 
@@ -379,7 +369,10 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 ⊕(A, B::ArrNum) = A .+ B
 ⊕(A, B) = A + B
 """
-    ⊖(A, B)
+    ⊖(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊖(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊖(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊖(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) subtraction.
 
@@ -410,18 +403,14 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum)
-    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar})
-    dot_scalar(a::VecNum, b::VecNum)
+    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum) -> Number
+    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar}) -> Number
+    dot_scalar(a::VecNum, b::VecNum) -> Number
 
 Efficient scalar and vector dot product utility.
 
   - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
-
-# Returns
-
-  - `res::Number`: The resulting scalar.
 
 # Examples
 
@@ -451,12 +440,18 @@ function dot_scalar(a::VecNum, b::VecNum)
     return LinearAlgebra.dot(a, b)
 end
 """
-    nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                                       AbstractEstimatorValueAlgorithm}, ::Any)
-    nothing_scalar_array_view(x::AbstractVector, i)
-    nothing_scalar_array_view(x::VecScalar, i)
-    nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
-    nothing_scalar_array_view(x::AbstractMatrix, i)
+    nothing_scalar_array_view(
+        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
+                AbstractEstimatorValueAlgorithm},
+        ::Any
+    ) -> typeof(x)
+    nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
+    nothing_scalar_array_view(x::VecScalar, i) -> VecScalar(; v = view(x.v, i), s = x.s)
+    nothing_scalar_array_view(x::AbstractMatrix, i) -> view(x, i, i)
+    nothing_scalar_array_view(
+        x::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}},
+        i
+    ) -> [nothing_scalar_array_view(xi, i) for xi in x]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
@@ -464,16 +459,6 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
   - `i`: Index or indices to view.
-
-# Returns
-
-  - `x`: Input value.
-
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
-      + `::AbstractVector`: Returns `view(x, i)`.
-      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: Returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: Returns `view(x, i, i)`.
 
 # Examples
 
@@ -504,13 +489,15 @@ end
 function nothing_scalar_array_view(x::VecScalar, i)
     return VecScalar(; v = view(x.v, i), s = x.s)
 end
-function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}},
-                                   i)
-    return [view(xi, i) for xi in x]
-end
 function nothing_scalar_array_view(x::AbstractMatrix, i)
     return view(x, i, i)
 end
+function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
+                                                             <:AbstractMatrix, <:VecScalar}},
+                                   i)
+    return [nothing_scalar_array_view(xi, i) for xi in x]
+end
+#! up to here
 """
     nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
 
@@ -1268,7 +1255,7 @@ function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
     return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
-    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
+    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> score::Number
 
 Reduce a vector of real values to a single real value using a specified measure.
 
