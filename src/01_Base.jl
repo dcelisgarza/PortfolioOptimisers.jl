@@ -703,10 +703,7 @@ Alias for a union of an abstract string or an abstract vector.
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
 """
-    struct VecScalar{T1, T2} <: AbstractResult
-        v::T1
-        s::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a composite result containing a vector and a scalar in `PortfolioOptimisers.jl`.
 
@@ -714,8 +711,7 @@ Encapsulates a vector and a scalar value, commonly used for storing results that
 
 # Fields
 
-  - `v`: Vector value.
-  - `s`: Scalar value.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -743,7 +739,9 @@ VecScalar
   - [`VecNum`](@ref)
 """
 @concrete struct VecScalar <: AbstractResult
+    "the vector component"
     v
+    "the scalar component"
     s
     function VecScalar(v::VecNum, s::Number)
         assert_nonempty_finite_val(v, :v)

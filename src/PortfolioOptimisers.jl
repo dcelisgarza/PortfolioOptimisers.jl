@@ -10,6 +10,7 @@ using DataFrames: DataFrames
 using Dates: Dates
 using Distances: Distances
 using Distributions: Distributions
+using DocStringExtensions: DocStringExtensions
 using FLoops: FLoops
 using GLM: GLM
 using Graphs: Graphs
