@@ -12,14 +12,14 @@ hero:
     alt: PortfolioOptimisers
   actions:
     - theme: brand
-      text: Getting Started
-      link: examples/01_Getting_Started
-    - theme: alt
-      text: View on Github
-      link: https://github.com/dcelisgarza/PortfolioOptimisers.jl
+      text: User Guide
+      link: user_guide/00_User_Guide
+    - theme: brand
+      text: Examples
+      link: examples/00_Examples
     - theme: alt
       text: API
-      link: api/00_API_Introduction
+      link: api/00_API
 
 authors:
   - name: Daniel Celis Garza

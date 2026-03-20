@@ -737,9 +737,9 @@ VecScalar
   - [`VecNum`](@ref)
 """
 @concrete struct VecScalar <: AbstractResult
-    "vector component"
+    "Vector component."
     v
-    "scalar component"
+    "Scalar component."
     s
     function VecScalar(v::VecNum, s::Number)
         assert_nonempty_finite_val(v, :v)
@@ -855,83 +855,75 @@ This dictionary contains the arg_dict terms and their corresponding descriptions
 """
 const arg_dict = Dict(
                       # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector.",
-                      :ow => "`w`: Observation weights vector.",
-                      :oow => "`w`: Optional observation weights vector.",
+                      :pw => "Portfolio weights vector.",
+                      :ow => "Observation weights vector.",
+                      :oow => "Optional observation weights vector.",
                       # Matrix processing.
-                      :pdm => "`pdm`: Positive definite matrix estimator.",
-                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
-                      :dn => "`dn`: Matrix denoising estimator.",
-                      :odn => "`dn`: Optional matrix denoising estimator.",
-                      :dna => "`dna`: Matrix denoising algorithm.",
-                      :dt => "`dt`: Matrix detoning estimator.",
-                      :odt => "`dt`: Optional matrix detoning estimator.",
-                      :mp => "`mp`: Matrix processing estimator.",
-                      :omp => "`mp`: Optional matrix processing estimator.",
-                      :mpa => "`mpa`: Matrix processing algorithm.",
+                      :pdm => "Positive definite matrix estimator.",
+                      :opdm => "Optional positive definite matrix estimator.",
+                      :dn => "Matrix denoising estimator.",
+                      :odn => "Optional matrix denoising estimator.",
+                      :dna => "Matrix denoising algorithm.",
+                      :dt => "Matrix detoning estimator.",
+                      :odt => "Optional matrix detoning estimator.",
+                      :mp => "Matrix processing estimator.",
+                      :omp => "Optional matrix processing estimator.",
+                      :mpa => "Matrix processing algorithm.",
                       # Moments.
-                      :me => "`me`: Expected returns estimator.",
-                      :nme => "`nme`: New expected returns estimator with the appropriate weights applied.",
-                      :ce => "`ce`: Covariance estimator.",#
-                      :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
-                      :ve => "`ve`: Variance estimator.",#
-                      :nve => "`ve`: New variance estimator with the appropriate weights applied.",#
-                      :ske => "`ske`: Coskewness estimator.",
-                      :kte => "`kte`: Cokurtosis estimator.",
-                      :de => "`de`: Distance matrix estimator.",
+                      :me => "Expected returns estimator.",
+                      :nme => "New expected returns estimator with the appropriate weights applied.",
+                      :ce => "Covariance estimator.",#
+                      :nce => "New covariance estimator with the appropriate weights applied.",
+                      :ve => "Variance estimator.",#
+                      :nve => "New variance estimator with the appropriate weights applied.",#
+                      :ske => "Coskewness estimator.", :kte => "Cokurtosis estimator.",
+                      :de => "Distance matrix estimator.",
                       # Priors.
-                      :pe => "`pe`: Prior estimator.",#
-                      :pr => "`pr`: Prior result.",#
-                      :per => "`pr`: Prior estimator or result.",
+                      :pe => "Prior estimator.",#
+                      :pr => "Prior result.",#
+                      :per => "Prior estimator or result.",
                       # Phylogeny.
-                      :cle => "`cle`: Clusters estimator.",#
-                      :clr => "`clr`: Clusters result.",#
-                      :cler => "`clr`: Clusters estimator or result.",#
-                      :ple => "`ple`: Phylogeny estimator.",#
-                      :plr => "`plr`: Phylogeny result.",
-                      :pler => "`pl`: Phylogeny estimator or result.",
-                      :nte => "`nte`: Network estimator.",#
-                      :ntr => "`pl`: Network result.",
-                      :nter => "`pl`: Network estimator or result.",
-                      :cte => "`cte`: Centrality estimator.",#
-                      :cta => "`ct`: Centrality algorithm.",
-                      :ctr => "`ct`: Centrality result.",
-                      :cter => "`ct`: Centrality estimator or result.",
+                      :cle => "Clusters estimator.",#
+                      :clr => "Clusters result.",#
+                      :cler => "Clusters estimator or result.",#
+                      :ple => "Phylogeny estimator.",#
+                      :plr => "Phylogeny result.",
+                      :pler => "Phylogeny estimator or result.",
+                      :nte => "Network estimator.",#
+                      :ntr => "Network result.", :nter => "Network estimator or result.",
+                      :cte => "Centrality estimator.",#
+                      :cta => "Centrality algorithm.", :ctr => "Centrality result.",
+                      :cter => "Centrality estimator or result.",
                       # Turnover.
-                      :tne => "`tn`: Turnover estimator.",#
-                      :tnr => "`tn`: Turnover result.",
-                      :tner => "`tn`: Turnover estimator or result.",
-                      :tnes => "`tn`: Turnover estimator(s).",
-                      :tnrs => "`tn`: Turnover result(s).",
-                      :tners => "`tn`: Turnover estimator(s) or result(s).",
+                      :tne => "Turnover estimator.",#
+                      :tnr => "Turnover result.", :tner => "Turnover estimator or result.",
+                      :tnes => "Turnover estimator(s).", :tnrs => "Turnover result(s).",
+                      :tners => "Turnover estimator(s) or result(s).",
                       # Tracking.
-                      :tre => "`tr`: Tracking error estimator.",
-                      :trr => "`tr`: Tracking error result.",
-                      :trer => "`tr`: Tracking error estimator or result.",
-                      :tres => "`tr`: Tracking error estimator(s).",
-                      :trrs => "`tr`: Tracking error result(s).",
-                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                      :tre => "Tracking error estimator.", :trr => "Tracking error result.",
+                      :trer => "Tracking error estimator or result.",
+                      :tres => "Tracking error estimator(s).",
+                      :trrs => "Tracking error result(s).",
+                      :trers => "Tracking error estimator(s) or result(s).",
                       # Weight bounds.
-                      :wbe => "`wb`: Weight bounds estimator.",
-                      :wbr => "`wb`: Weight bounds result.",
-                      :wber => "`wb`: Weight bounds estimator or result.",
+                      :wbe => "Weight bounds estimator.", :wbr => "Weight bounds result.",
+                      :wber => "Weight bounds estimator or result.",
                       # Fees.
-                      :feese => "`fees`: Fees estimator.",#
-                      :feesr => "`fees`: Fees result.",
-                      :feeser => "`fees`: Fees estimator or result.",
+                      :feese => "Fees estimator.",#
+                      :feesr => "Fees result.", :feeser => "Fees estimator or result.",
                       # Stats.
-                      :sigma => "`sigma`: Covariance matrix.",#
-                      :mu => "`mu`: Expected returns vector.",#
-                      :rho => "`rho`: Correlation matrix.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
-                      :kt => "`kt`: Cokurtosis matrix.",#
-                      :sk => "`sk`: Coskewness matrix.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
-                      :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.",#
-                      :Xv => "`X`: Data vector.",#
-                      :dims => "`dims`: Dimensions along which to perform the computation.")
+                      :sigma => "Covariance matrix.",#
+                      :mu => "Expected returns vector.",#
+                      :rho => "Correlation matrix.",
+                      :sigrho => "Covariance-like or correlation-like matrix.",
+                      :sigrhoX => "Covariance-like or correlation-like matrix.",
+                      :kt => "Cokurtosis matrix.",#
+                      :sk => "Coskewness matrix.",#
+                      :V => "Sum of the negative spectral slices of the cokurtosis matrix",
+                      :X => "Data matrix.",#
+                      :F => "Data matrix.",#
+                      :Xv => "Data vector.",#
+                      :dims => "Dimensions along which to perform the computation.")
 
 """
     val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
