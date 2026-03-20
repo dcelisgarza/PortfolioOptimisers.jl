@@ -29,7 +29,8 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.
                                  timestamp = :Date)[(end - 7 * 252):(end - 252 * 2)],
                        TimeArray(CSV.File(joinpath(@__DIR__, "../examples/Factors.csv.gz"));
                                  timestamp = :Date)[(end - 6 * 252):(end - 252)];
-                       B = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500_idx.csv.gz"));
+                       B = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                       "../examples/SP500_idx.csv.gz"));
                                      timestamp = :Date)[(end - 5 * 252):end])
 ````
 

@@ -1101,8 +1101,8 @@ Constructs a `VarValue` instance with observation weights `w`.
 ```jldoctest
 julia> factory(VarValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
 VarValue
-        w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-corrected ┴ Bool: true
+          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+  corrected ┴ Bool: true
 ```
 
 # Related
@@ -1231,9 +1231,9 @@ Construct a `StandardisedValue` instance with observation weights `w` for both `
 julia> factory(StandardisedValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
 StandardisedValue
   mv ┼ MeanValue
-     │   w ┴ Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
   sv ┼ StdValue
-     │           w ┼ Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+     │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
      │   corrected ┴ Bool: true
 ```
 
