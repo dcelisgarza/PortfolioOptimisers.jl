@@ -146,7 +146,7 @@ RiskBudget
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(::Nothing, args...; N = N, kwargs...)
+function risk_budget_constraints(::Nothing, args...; N::Integer, kwargs...)
     iN = inv(N)
     return RiskBudget(; val = range(iN, iN; length = N))
 end
@@ -184,8 +184,9 @@ function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)
     return rb
 end
 """
-    risk_budget_constraints(rb::EstValType, sets::AssetSets;
-                            N::Number = length(sets.dict[sets.key]), strict::Bool = false)
+    risk_budget_constraints(rb::EstValType, sets::AssetSets,
+                            dval::Option{<:Number} = nothing; strict::Bool = false,
+                            kwargs...)
 
 Generate a risk budget allocation from asset/group mappings and asset sets.
 
@@ -195,7 +196,7 @@ This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group n
 
   - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
   - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
-  - `N`: Number of assets in the universe.
+  - `dval`: Default value to use for assets not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[sets.key])` is used.
   - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
 
 # Details

@@ -37,7 +37,7 @@ using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 
 #=
-# Programatically include source files
+# Programmatically include source files
 src_files = String[]
 sizehint!(src_files, 149)
 for (root, dirs, files) in walkdir(@__DIR__)

@@ -23,9 +23,6 @@ end
         if isa(wi, VecNum)
             @argcheck(!isempty(wi))
         end
-        if isa(rba.rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(opt.sets))
-        end
         return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
                                                                                   wi, alg,
                                                                                   fb)
