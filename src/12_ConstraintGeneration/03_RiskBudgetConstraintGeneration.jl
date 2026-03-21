@@ -109,7 +109,6 @@ end
 function RiskBudgetEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
     return RiskBudgetEstimator(val, dval)
 end
-const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
@@ -237,11 +236,8 @@ function risk_budget_constraints(rb::EstValType, sets::AssetSets,
     return RiskBudget(; val = val / sum(val))
 end
 """
-    risk_budget_constraints(rb::Union{<:RiskBudgetEstimator,
-                                      <:VecRkbE}, sets::AssetSets;
+    risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
                             strict::Bool = false, kwargs...)
-
-If `rb` is a vector of [`RiskBudgetEstimator`](@ref) objects, this function is broadcast over the vector.
 
 This method is a wrapper calling:
 
@@ -257,9 +253,10 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
                                  strict::Bool = false, kwargs...)
     return risk_budget_constraints(rb.val, sets, rb.dval; strict = strict, kwargs...)
 end
-function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
-                                 kwargs...)
-    return [risk_budget_constraints(rbi, sets; strict = strict, kwargs...) for rbi in rb]
-end
+# const VecRkbE = AbstractVector{<:RiskBudgetEstimator}
+# function risk_budget_constraints(rb::VecRkbE, sets::AssetSets; strict::Bool = false,
+#                                  kwargs...)
+#     return [risk_budget_constraints(rbi, sets; strict = strict, kwargs...) for rbi in rb]
+# end
 
 export RiskBudget, RiskBudgetEstimator, risk_budget_constraints

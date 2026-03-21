@@ -1695,7 +1695,8 @@
                          1.0879558335436499e-14, 8.09956925306327e-16, 0.9999960892795525];
                         rtol = 1e-6))
 
-        plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 2)
+        plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(),
+                                        B = fill(2, size(pr.X, 2)))
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
         res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
@@ -1713,6 +1714,26 @@
                             0.15784094556549422, -4.439084812281355e-13,
                             -1.4843816960768885e-12, 0.1276616300735639,
                             0.0696639310927601]; rtol = 1e-6)
+
+        plc = IntegerPhylogenyEstimator(; pl = ClustersEstimator(), B = [2, 1])
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
+                            wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
+        res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
+        @test all(JuMP.value.(res.plr.A * res.model[:ib]) .<= res.plr.B)
+        idx = [BitVector(res.plr.A[i, :]) for i in axes(res.plr.A, 1)]
+        @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 2) for i in idx])
+        @test isapprox(res.w,
+                       [-8.32253597789343e-14, -1.594625540670819e-14,
+                        -1.1337620095266581e-13, -7.615656061114373e-14,
+                        -1.4550212340578226e-13, -1.079970867058386e-13,
+                        0.23699252155911452, -2.1813171374502812e-13,
+                        -1.2603823102022852e-13, -1.8998772470476241e-13,
+                        -1.8199948157385003e-13, 0.5615378679061623, -8.861295956489424e-14,
+                        -1.9188139255250999e-13, -1.8623586726948033e-13,
+                        -1.970863146476292e-13, -5.215453906692728e-14,
+                        -1.778276197103779e-13, -1.9695027660052278e-13,
+                        0.20146961053707255], rtol = 1e-6)
+
         plc = SemiDefinitePhylogenyEstimator(; pl = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))

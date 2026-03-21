@@ -255,7 +255,7 @@
                                            onc = OptimalNumberClusters(; alg = 2)), pr.X)
         @test clr.k == 2
 
-        alg = KMeansAlgorithm(; rng = StableRNG(42), kwargs = (; init = :kmcen))
+        alg = KMeansAlgorithm(; rng = StableRNG(42), seed = 42, kwargs = (; init = :kmcen))
         @test factory(alg) === alg
         wt2 = pweights(fill(inv(size(pr.X, 2)), size(pr.X, 2)))
         alg2 = factory(alg, wt2)
