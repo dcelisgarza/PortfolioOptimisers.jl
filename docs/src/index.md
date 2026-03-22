@@ -53,7 +53,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-Please visit the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) for details.
+Please visit the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API) for details.
 
 ## Caveat emptor
 
@@ -915,10 +915,11 @@ This matrix of predicted returns is then used by the outer optimisation estimato
 
 - Nested Clustered [`NestedClustered`]-(@ref) returns a [`NestedClusteredResult`]-(@ref)
 
-##### Clustering optimisation features
+##### Nested clusters optimisation features
 
 - Any features supported by the inner and outer estimators.
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - ::: details Weight finalisers
   - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
   - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
@@ -930,13 +931,14 @@ This matrix of predicted returns is then used by the outer optimisation estimato
 
 #### Ensemble optimisation
 
-These work similar to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided. The procedure is then exactly the same as the nested clusters optimisation, only instead of an `N×C` matrix of asset weights where each column corresponds to a subset of assets, each column corresponds to a completely independent and isolated inner estimator, which also means there is no enforced sparsity pattern on this matrix.
+This works similarly to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided. The procedure is then exactly the same as the nested clusters optimisation, only instead of an `N×C` matrix of asset weights where each column corresponds to a subset of assets, each column corresponds to a completely independent and isolated inner estimator, which also means there is no enforced sparsity pattern on this matrix.
 
 - Stacking [`Stacking`]-(@ref) returns a [`StackingResult`]-(@ref)
 
 ##### Ensemble optimisation features
 
 - Any features supported by the inner and outer estimators.
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - ::: details Weight finalisers
   - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
@@ -946,6 +948,25 @@ These work similar to the Nested Clustered estimator, only instead of breaking t
     - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
     - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 - Cross validation predictor for the outer estimator
+
+#### Subset resampling optimisation
+
+This optimiser takes ideas from [`MultipleRandomised`]-(@ref) cross validation to randomly sample the asset universe and optimise each sample individually using a given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero.
+
+- [`SubsetResampling`]-(@ref) returns a [`SubsetResamplingResult`]-(@ref)
+
+##### Subset resampling optimisation features
+
+- Any features supported by the inner estimator.
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- ::: details Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 
 #### Finite allocation optimisation
 
