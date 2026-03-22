@@ -163,12 +163,10 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
             predictions[i] = fit_and_predict(opti, rdi; train_idx = train, test_idx = test)
         end
     else
-        let opt = opt
-            FLoops.@floop ex for (i, (train, test, col)) in
-                                 enumerate(zip(train_idx, test_idx, cols))
-                predictions[i] = fit_and_predict(opt, rd; train_idx = train,
-                                                 test_idx = test, cols = col)
-            end
+        FLoops.@floop ex for (i, (train, test, col)) in
+                             enumerate(zip(train_idx, test_idx, cols))
+            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
+                                             cols = col)
         end
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),

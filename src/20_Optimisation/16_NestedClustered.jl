@@ -208,24 +208,18 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
                            fb = nco.fb, brt = nco.brt, cle_pr = nco.cle_pr,
                            strict = nco.strict)
 end
-function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                                      wf::WeightFinaliser, strict::Bool, resi::VecOpt,
+function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                      resi::VecOpt,
                                       rcos::AbstractVector{<:OptimisationReturnCode},
-                                      ws::VecVecNum, wi::MatNum;
-                                      datatype::DataType = Float64)
-    wb_retcode_w = [outer_optimisation_finaliser(wb, sets, wf, strict, resi, rco, w, wi;
-                                                 datatype = datatype)
-                    for (rco, w) in zip(rcos, ws)]
-    return map(x -> x[1], wb_retcode_w), map(x -> x[2], wb_retcode_w),
-           map(x -> x[3], wb_retcode_w)
+                                      ws::VecVecNum, wi::MatNum)
+    retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi)
+                 for (rco, w) in zip(rcos, ws)]
+    return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
 end
-function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                                      wf::WeightFinaliser, strict::Bool, resi::VecOpt,
-                                      rco::OptimisationReturnCode, w::VecNum, wi::MatNum;
-                                      datatype::DataType = Float64)
+function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                      resi::VecOpt, rco::OptimisationReturnCode, w::VecNum,
+                                      wi::MatNum)
     w = wi * w
-    wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
-                                   datatype = datatype)
     retcode, w = finalise_weight_bounds(wf, wb, w)
     wb_flag = isa(retcode, OptimisationFailure)
     opto_flag = isa(rco, OptimisationFailure)
@@ -243,7 +237,7 @@ function outer_optimisation_finaliser(wb::Option{<:WbE_Wb}, sets::Option{<:Asset
         end
         retcode = OptimisationFailure(; res = msg)
     end
-    return wb, retcode, w
+    return retcode, w
 end
 """
 Overload this using nco.cv for custom cross-validation prediction
@@ -379,9 +373,9 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     rdo = predict_outer_nco_estimator_returns(nco, rd, pr, fees, wi, resi, cls)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb, retcode, w = outer_optimisation_finaliser(nco.wb, nco.sets, nco.wf, nco.strict,
-                                                  resi, reso.retcode, reso.w, wi;
-                                                  datatype = eltype(X))
+    wb = weight_bounds_constraints(nco.wb, nco.sets; N = clr.k, strict = nco.strict,
+                                   datatype = eltype(X))
+    retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
     return NestedClusteredResult(typeof(nco), pr, clr, wb, fees, resi, reso, nco.cv,
                                  retcode, w, nothing)
 end

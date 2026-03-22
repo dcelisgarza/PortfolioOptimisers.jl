@@ -87,10 +87,10 @@ function assert_internal_optimiser(opt::Stacking)
     return nothing
 end
 function needs_previous_weights(opt::Stacking)
-    return (needs_previous_weights(opt.fees) ||
-            needs_previous_weights(opt.opti) ||
-            needs_previous_weights(opt.opto) ||
-            needs_previous_weights(opt.fb))
+    return needs_previous_weights(opt.fees) ||
+           needs_previous_weights(opt.opti) ||
+           needs_previous_weights(opt.opto) ||
+           needs_previous_weights(opt.fb)
 end
 function factory(st::Stacking, w::AbstractVector)
     fees = factory(st.fees, w)
@@ -106,14 +106,13 @@ function opt_view(st::Stacking, i, X::MatNum)
     pe = prior_view(st.pe, i)
     wb = weight_bounds_view(st.wb, i)
     fees = fees_view(st.fees, i)
+    sets = asset_sets_view(st.sets, i)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
-    sets = asset_sets_view(st.sets, i)
-    return Stacking(; pe = pe, wb = wb, fees = fees, scale = st.scale, opti = opti,
-                    opto = opto, cv = st.cv, wf = st.wf, sets = sets, ex = st.ex,
+    return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
+                    opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
                     fb = st.fb, brt = st.brt, strict = st.strict)
 end
-
 """
 Overload this using st.cv for custom cross-validation prediction
 """
@@ -205,9 +204,9 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     rdo = predict_outer_st_estimator_returns(st, rd, pr, fees, swi, resi)
     reso = optimise(st.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb, retcode, w = outer_optimisation_finaliser(st.wb, st.sets, st.wf, st.strict, resi,
-                                                  reso.retcode, reso.w, wi;
-                                                  datatype = eltype(X))
+    wb = weight_bounds_constraints(st.wb, st.sets; N = Ni, strict = st.strict,
+                                   datatype = eltype(X))
+    retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode, reso.w, wi)
     return StackingResult(typeof(st), pr, wb, fees, resi, reso, st.cv, retcode, w, nothing)
 end
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
