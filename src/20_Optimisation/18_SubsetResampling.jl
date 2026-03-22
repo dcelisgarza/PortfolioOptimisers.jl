@@ -39,7 +39,7 @@ end
                               subset_size::Number, n_subsets::Integer, max_comb::Integer,
                               rng::Random.AbstractRNG, seed::Option{<:Integer},
                               fb::Option{<:OptE_Opt}, brt::Bool, strict::Bool)
-        assert_external_optimiser(opt)
+        assert_internal_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
         end
@@ -149,7 +149,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
         @argcheck(subset_size <= N,
                   "subset_size must not be greater than the number of assets")
     else
-        subset_size = round(Int, subset_size * N)
+        subset_size = max(round(Int, subset_size * N), 1)
     end
     n_comb = binomial(N, subset_size)
     @argcheck(n_subsets <= n_comb,
