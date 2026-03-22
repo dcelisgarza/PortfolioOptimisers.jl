@@ -785,22 +785,15 @@ The samples are unique and drawn without replacement.
 opt = JuMPOptimiser(; slv = slv)
 
 # Mean risk for comparison
-mr= MeanRisk(; opt = opt)
+mr = MeanRisk(; opt = opt)
 
 # Use 80% of the number of assets and take 10 samples
-sr1 = SubsetResampling(;
-    rng=StableRNG(666),
-    subset_size=0.8,
-              opt = MeanRisk(; opt = opt),
-              n_subsets=10
-              )
+sr1 = SubsetResampling(; rng = StableRNG(666), subset_size = 0.8,
+                       opt = MeanRisk(; opt = opt), n_subsets = 10)
 
 # All weights are equal, the rng does not matter
-sr2 = SubsetResampling(;
-    subset_size=1,
-              opt = MeanRisk(; opt = opt),
-              n_subsets=size(rd.X, 2)
-              )
+sr2 = SubsetResampling(; subset_size = 1, opt = MeanRisk(; opt = opt),
+                       n_subsets = size(rd.X, 2))
 
 # Optimise all estimators at once using broadcasting
 ress = optimise.([mr, sr1, sr2], rd);
@@ -823,8 +816,9 @@ rt = map(rr -> rr[2], rk_rt_ratio)
 ratio = map(rr -> rr[3], rk_rt_ratio)
 
 # Display asset weights
-pretty_table(DataFrame(:assets => rd.nx, :MeanRisk => ress[1].w, :SubsetResampling => ress[2].w, :EqualWeighted => ress[3].w); formatters = [resfmt],
-             title = "Composition")
+pretty_table(DataFrame(:assets => rd.nx, :MeanRisk => ress[1].w,
+                       :SubsetResampling => ress[2].w, :EqualWeighted => ress[3].w);
+             formatters = [resfmt], title = "Composition")
 
 # Display statistics
 pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
