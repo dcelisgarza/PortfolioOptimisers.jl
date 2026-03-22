@@ -106,11 +106,11 @@ Keyword arguments correspond to the fields above.
   - [`AbstractClusteringResult`](@ref)
   - [`ClustersEstimator`](@ref)
 """
-struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
-    res::T1
-    S::T2
-    D::T3
-    k::T4
+@concrete struct Clusters <: AbstractClusteringResult
+    res
+    S
+    D
+    k
     function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
@@ -184,8 +184,8 @@ SecondOrderDifference
   - [`OptimalNumberClusters`](@ref)
   - [`VectorToScalarMeasure`](@ref)
 """
-struct SecondOrderDifference{T1} <: AbstractOptimalNumberClustersAlgorithm
-    alg::T1
+@concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
+    alg
     function SecondOrderDifference(alg::VectorToScalarMeasure)
         return new{typeof(alg)}(alg)
     end
@@ -239,9 +239,9 @@ SilhouetteScore
   - [`VectorToScalarMeasure`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
-struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
-    alg::T1
-    metric::T2
+@concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
+    alg
+    metric
     function SilhouetteScore(alg::VectorToScalarMeasure,
                              metric::Option{<:Distances.SemiMetric})
         return new{typeof(alg), typeof(metric)}(alg, metric)
@@ -301,9 +301,9 @@ OptimalNumberClusters
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
-struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
-    max_k::T1
-    alg::T2
+@concrete struct OptimalNumberClusters <: AbstractOptimalNumberClustersEstimator
+    max_k
+    alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
             @argcheck(one(max_k) <= max_k, DomainError)
@@ -353,8 +353,8 @@ HClustAlgorithm
   - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
   - [`ClustersEstimator`](@ref)
 """
-struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
-    linkage::T1
+@concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
+    linkage
     function HClustAlgorithm(linkage::Symbol)
         return new{typeof(linkage)}(linkage)
     end
@@ -435,11 +435,11 @@ ClustersEstimator
   - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
-struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
-    ce::T1
-    de::T2
-    alg::T3
-    onc::T4
+@concrete struct ClustersEstimator <: AbstractClustersEstimator
+    ce
+    de
+    alg
+    onc
     function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
                                de::AbstractDistanceEstimator,
                                alg::AbstractClustersAlgorithm,

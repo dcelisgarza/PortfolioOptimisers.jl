@@ -43,10 +43,10 @@ KFold
   - [`split`]-(@ref)
   - [`n_splits`]-(@ref)
 """
-struct KFold{T1, T2, T3} <: NonSequentialCrossValidationEstimator
-    n::T1
-    purged_size::T2
-    embargo_size::T3
+@concrete struct KFold <: NonSequentialCrossValidationEstimator
+    n
+    purged_size
+    embargo_size
     function KFold(n::Integer, purged_size::Integer, embargo_size::Integer)
         assert_nonempty_gt0_finite_val(n, :n)
         assert_nonempty_finite_val(purged_size, :purged_size)
@@ -58,9 +58,9 @@ end
 function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
     return KFold(n, purged_size, embargo_size)
 end
-struct KFoldResult{T1, T2} <: NonSequentialCrossValidationResult
-    train_idx::T1
-    test_idx::T2
+@concrete struct KFoldResult <: NonSequentialCrossValidationResult
+    train_idx
+    test_idx
     function KFoldResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))

@@ -51,8 +51,8 @@ KendallCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-struct KendallCovariance{T1} <: RankCovarianceEstimator
-    ve::T1
+@concrete struct KendallCovariance <: RankCovarianceEstimator
+    ve
     function KendallCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
     end
@@ -169,8 +169,8 @@ SpearmanCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-struct SpearmanCovariance{T1} <: RankCovarianceEstimator
-    ve::T1
+@concrete struct SpearmanCovariance <: RankCovarianceEstimator
+    ve
     function SpearmanCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
     end

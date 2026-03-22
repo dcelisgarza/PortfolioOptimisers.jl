@@ -385,13 +385,12 @@ DenoiseDetoneAlgMatrixProcessing
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-struct DenoiseDetoneAlgMatrixProcessing{T1, T2, T3, T4, T5} <:
-       AbstractMatrixProcessingEstimator
-    pdm::T1
-    dn::T2
-    dt::T3
-    alg::T4
-    order::T5
+@concrete struct DenoiseDetoneAlgMatrixProcessing <: AbstractMatrixProcessingEstimator
+    pdm
+    dn
+    dt
+    alg
+    order
     function DenoiseDetoneAlgMatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
                                               dt::Option{<:Detone},
                                               alg::Option{<:AbstractMatrixProcessingAlgorithm},

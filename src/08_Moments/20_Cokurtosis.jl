@@ -62,10 +62,10 @@ Cokurtosis
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
-    me::T1
-    mp::T2
-    alg::T3
+@concrete struct Cokurtosis <: CokurtosisEstimator
+    me
+    mp
+    alg
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)
         return new{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)

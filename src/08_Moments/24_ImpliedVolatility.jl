@@ -1,11 +1,9 @@
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
-struct ImpliedVolatilityRegression{T1, T2,
-                                   #    T3 <: AbstractStepwiseRegressionCriterion,
-                                   T3} <: ImpliedVolatilityAlgorithm
-    ve::T1
-    ws::T2
-    # crit::T3
-    re::T3
+@concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
+    ve
+    ws
+    # crit
+    re
     function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
         @argcheck(2 < ws, DomainError)
@@ -19,11 +17,11 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
     return ImpliedVolatilityRegression(ve, ws, re)
 end
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
-struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
-    ce::T1
-    mp::T2
-    alg::T3
-    af::T4
+@concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
+    ce
+    mp
+    alg
+    af
     function ImpliedVolatility(ce::AbstractCovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, af::Number)

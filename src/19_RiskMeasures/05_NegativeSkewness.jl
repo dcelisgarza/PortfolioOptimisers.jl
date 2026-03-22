@@ -1,10 +1,10 @@
 const NSkeFormulations = Union{<:NSkeQuadFormulations, <:SOCRiskExpr}
-struct NegativeSkewness{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    mp::T2
-    sk::T3
-    V::T4
-    alg::T5
+@concrete struct NegativeSkewness <: RiskMeasure
+    settings
+    mp
+    sk
+    V
+    alg
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator, sk::Option{<:MatNum},
                               V::Option{<:MatNum}, alg::NSkeFormulations)

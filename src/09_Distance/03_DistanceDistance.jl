@@ -57,12 +57,12 @@ DistanceDistance
   - [`distance`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
-struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
-    dist::T1
-    args::T2
-    kwargs::T3
-    power::T4
-    alg::T5
+@concrete struct DistanceDistance <: AbstractDistanceEstimator
+    dist
+    args
+    kwargs
+    power
+    alg
     function DistanceDistance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                               power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)

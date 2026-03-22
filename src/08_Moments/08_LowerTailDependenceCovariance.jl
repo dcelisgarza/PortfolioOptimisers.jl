@@ -48,10 +48,10 @@ LowerTailDependenceCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
-struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ve::T1
-    alpha::T2
-    ex::T3
+@concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
+    ve
+    alpha
+    ex
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
                                            ex::FLoops.Transducers.Executor)
         @argcheck(zero(alpha) < alpha < one(alpha),

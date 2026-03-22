@@ -1,3 +1,6 @@
+"""
+$(DocStringExtensions.README)
+"""
 module PortfolioOptimisers
 
 using Accessors: Accessors
@@ -5,10 +8,12 @@ using ArgCheck: @argcheck
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
+using ConcreteStructs: @concrete
 using DataFrames: DataFrames
 using Dates: Dates
 using Distances: Distances
 using Distributions: Distributions
+using DocStringExtensions: DocStringExtensions
 using FLoops: FLoops
 using GLM: GLM
 using Graphs: Graphs
@@ -31,14 +36,8 @@ using StatsAPI: StatsAPI
 using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 
-# Turn readme into PortfolioOptimisers' docs.
-@doc let
-    path = joinpath(dirname(@__DIR__), "docs/src/index.md")
-    include_dependency(path)
-    read(path, String)
-end PortfolioOptimisers
-
 #=
+# Programmatically include source files
 src_files = String[]
 sizehint!(src_files, 149)
 for (root, dirs, files) in walkdir(@__DIR__)

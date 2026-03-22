@@ -5,9 +5,9 @@ end
 function valueat_risk_formulation_view(r::ValueatRiskFormulation, args...)
     return r
 end
-struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
-    b::T1
-    s::T2
+@concrete struct MIPValueatRisk <: ValueatRiskFormulation
+    b
+    s
     function MIPValueatRisk(b::Option{<:Number}, s::Option{<:Number})
         bflag = !isnothing(b)
         sflag = !isnothing(s)
@@ -26,11 +26,11 @@ end
 function MIPValueatRisk(; b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
     return MIPValueatRisk(b, s)
 end
-struct DistributionValueatRisk{T1, T2, T3, T4} <: ValueatRiskFormulation
-    mu::T1
-    sigma::T2
-    chol::T3
-    dist::T4
+@concrete struct DistributionValueatRisk <: ValueatRiskFormulation
+    mu
+    sigma
+    chol
+    dist
     function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
                                      chol::Option{<:MatNum},
                                      dist::Distributions.Distribution)
@@ -66,11 +66,11 @@ function valueat_risk_formulation_view(alg::DistributionValueatRisk, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
     return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
 end
-struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    w::T3
-    alg::T4
+@concrete struct ValueatRisk <: RiskMeasure
+    settings
+    alpha
+    w
+    alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:StatsBase.AbstractWeights},
                          alg::ValueatRiskFormulation)
@@ -108,12 +108,12 @@ function (r::ValueatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
     idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
 end
-struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    beta::T3
-    w::T4
-    alg::T5
+@concrete struct ValueatRiskRange <: RiskMeasure
+    settings
+    alpha
+    beta
+    w
+    alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:StatsBase.AbstractWeights},
                               alg::ValueatRiskFormulation)
@@ -170,12 +170,12 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})
     gain = -sorted_x[idx]
     return loss - gain
 end
-struct DrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    w::T3
-    b::T4
-    s::T5
+@concrete struct DrawdownatRisk <: RiskMeasure
+    settings
+    alpha
+    w
+    b
+    s
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                             w::Option{<:StatsBase.AbstractWeights}, b::Option{<:Number},
                             s::Option{<:Number})
@@ -237,10 +237,10 @@ function (r::DrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNu
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
 end
-struct RelativeDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
-    settings::T1
-    alpha::T2
-    w::T3
+@concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
+    settings
+    alpha
+    w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:StatsBase.AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))

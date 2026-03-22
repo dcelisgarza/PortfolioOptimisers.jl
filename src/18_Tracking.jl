@@ -140,8 +140,8 @@ L2Tracking
   - [`L1Tracking`](@ref)
   - [`norm_tracking`](@ref)
 """
-struct L2Tracking{T1} <: NormTracking
-    ddof::T1
+@concrete struct L2Tracking <: NormTracking
+    ddof
     function L2Tracking(ddof::Integer)
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
@@ -190,8 +190,8 @@ SquaredL2Tracking
   - [`L1Tracking`](@ref)
   - [`norm_tracking`](@ref)
 """
-struct SquaredL2Tracking{T1} <: NormTracking
-    ddof::T1
+@concrete struct SquaredL2Tracking <: NormTracking
+    ddof
     function SquaredL2Tracking(ddof::Integer)
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
@@ -222,9 +222,9 @@ L1Tracking()
   - [`norm_tracking`](@ref)
 """
 struct L1Tracking <: NormTracking end
-struct LpTracking{T1, T2} <: NormTracking
-    p::T1
-    ddof::T2
+@concrete struct LpTracking <: NormTracking
+    p
+    ddof
     function LpTracking(p::Number, ddof::Integer)
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(p), typeof(ddof)}(p, ddof)
@@ -233,9 +233,9 @@ end
 function LpTracking(; p::Number = 3, ddof::Integer = 0)
     return LpTracking(p, ddof)
 end
-struct LInfTracking{T1, T2} <: NormTracking
-    ddof::T1
-    pos::T2
+@concrete struct LInfTracking <: NormTracking
+    ddof
+    pos
     function LInfTracking(ddof::Integer, pos::Bool)
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof), typeof(pos)}(ddof, pos)
@@ -418,10 +418,10 @@ WeightsTracking
   - [`Option`](@ref)
   - [`tracking_benchmark`](@ref)
 """
-struct WeightsTracking{T1, T2, T3} <: AbstractTrackingAlgorithm
-    fees::T1
-    w::T2
-    fixed::T3
+@concrete struct WeightsTracking <: AbstractTrackingAlgorithm
+    fees
+    w
+    fixed
     function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w), typeof(fixed)}(fees, w, fixed)
@@ -652,8 +652,8 @@ ReturnsTracking
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`tracking_benchmark`](@ref)
 """
-struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
-    w::T1
+@concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
+    w
     function ReturnsTracking(w::VecNum)
         assert_nonempty_finite_val(w, :w)
         return new{typeof(w)}(w)
@@ -808,10 +808,10 @@ TrackingError
   - [`L2Tracking`](@ref)
   - [`L1Tracking`](@ref)
 """
-struct TrackingError{T1, T2, T3} <: AbstractTracking
-    tr::T1
-    err::T2
-    alg::T3
+@concrete struct TrackingError <: AbstractTracking
+    tr
+    err
+    alg
     function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormTracking)
         assert_nonempty_nonneg_finite_val(err, :err)
         return new{typeof(tr), typeof(err), typeof(alg)}(tr, err, alg)

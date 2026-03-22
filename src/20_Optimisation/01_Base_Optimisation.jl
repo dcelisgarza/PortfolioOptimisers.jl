@@ -50,8 +50,8 @@ struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 abstract type WeightFinaliser <: AbstractAlgorithm end
-struct IterativeWeightFinaliser{T1} <: WeightFinaliser
-    iter::T1
+@concrete struct IterativeWeightFinaliser <: WeightFinaliser
+    iter
     function IterativeWeightFinaliser(iter::Integer)
         @argcheck(iter > 0)
         return new{typeof(iter)}(iter)
@@ -60,11 +60,11 @@ end
 function IterativeWeightFinaliser(; iter::Integer = 100)
     return IterativeWeightFinaliser(iter)
 end
-struct JuMPWeightFinaliser{T1, T2, T3, T4} <: WeightFinaliser
-    slv::T1
-    sc::T2
-    so::T3
-    alg::T4
+@concrete struct JuMPWeightFinaliser <: WeightFinaliser
+    slv
+    sc
+    so
+    alg
     function JuMPWeightFinaliser(slv::Slv_VecSlv, sc::Number, so::Number,
                                  alg::JuMPWeightFinaliserFormulation)
         if isa(slv, VecSlv)
@@ -193,14 +193,14 @@ function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum
     end
     return retcode, w
 end
-struct OptimisationSuccess{T1} <: OptimisationReturnCode
-    res::T1
+@concrete struct OptimisationSuccess <: OptimisationReturnCode
+    res
 end
 function OptimisationSuccess(; res = nothing)
     return OptimisationSuccess(res)
 end
-struct OptimisationFailure{T1} <: OptimisationReturnCode
-    res::T1
+@concrete struct OptimisationFailure <: OptimisationReturnCode
+    res
 end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)

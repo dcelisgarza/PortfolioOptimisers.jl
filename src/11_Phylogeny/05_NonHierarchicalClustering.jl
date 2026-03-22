@@ -1,7 +1,7 @@
-struct KMeansAlgorithm{T1, T2, T3} <: AbstractNonHierarchicalClusteringAlgorithm
-    rng::T1
-    seed::T2
-    kwargs::T3
+@concrete struct KMeansAlgorithm <: AbstractNonHierarchicalClusteringAlgorithm
+    rng
+    seed
+    kwargs
     function KMeansAlgorithm(rng::Random.AbstractRNG, seed::Option{<:Integer},
                              kwargs::NamedTuple)
         if haskey(kwargs, :weights)

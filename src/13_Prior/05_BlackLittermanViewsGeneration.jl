@@ -37,9 +37,9 @@ BlackLittermanViews
 
   - [`black_litterman_views`](@ref)
 """
-struct BlackLittermanViews{T1, T2} <: AbstractResult
-    P::T1
-    Q::T2
+@concrete struct BlackLittermanViews <: AbstractResult
+    P
+    Q
     function BlackLittermanViews(P::MatNum, Q::VecNum)
         @argcheck(!isempty(P))
         @argcheck(!isempty(Q))

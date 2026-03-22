@@ -96,12 +96,12 @@ Solver
   - [`Option`](@ref)
   - [`SlvSettings`](@ref)
 """
-struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
-    name::T1
-    solver::T2
-    settings::T3
-    check_sol::T4
-    add_bridges::T5
+@concrete struct Solver <: AbstractEstimator
+    name
+    solver
+    settings
+    check_sol
+    add_bridges
     function Solver(name::Sym_Str, solver::Any, settings::Option{<:SlvSettings},
                     check_sol::NamedTuple, add_bridges::Bool)
         if isa(settings, Dict_Vec)
@@ -175,9 +175,9 @@ JuMPResult
 
   - [`optimise_JuMP_model!`](@ref)
 """
-struct JuMPResult{T1, T2} <: AbstractJuMPResult
-    trials::T1
-    success::T2
+@concrete struct JuMPResult <: AbstractJuMPResult
+    trials
+    success
     function JuMPResult(trials::AbstractDict, success::Bool)
         if !success
             @warn("Model could not be solved satisfactorily.\n$trials")

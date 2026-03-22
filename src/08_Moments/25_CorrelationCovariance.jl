@@ -1,5 +1,5 @@
-struct CorrelationCovariance{T1} <: AbstractCovarianceEstimator
-    ce::T1
+@concrete struct CorrelationCovariance <: AbstractCovarianceEstimator
+    ce
     function CorrelationCovariance(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end

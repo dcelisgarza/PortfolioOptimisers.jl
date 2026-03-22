@@ -1,5 +1,5 @@
-struct Range{T1} <: RiskMeasure
-    settings::T1
+@concrete struct Range <: RiskMeasure
+    settings
     function Range(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end

@@ -80,14 +80,14 @@ NormalUncertaintySet
   - [`BoxUncertaintySetAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 """
-struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: AbstractUncertaintySetEstimator
-    pe::T1
-    alg::T2
-    n_sim::T3
-    q::T4
-    rng::T5
-    seed::T6
-    ens::T7
+@concrete struct NormalUncertaintySet <: AbstractUncertaintySetEstimator
+    pe
+    alg
+    n_sim
+    q
+    rng
+    seed
+    ens
     function NormalUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                   q::Number, rng::Random.AbstractRNG,

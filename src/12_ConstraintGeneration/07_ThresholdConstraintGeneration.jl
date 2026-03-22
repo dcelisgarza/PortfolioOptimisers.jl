@@ -67,10 +67,10 @@ ThresholdEstimator
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
-struct ThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
-    val::T1
-    key::T2
-    dval::T3
+@concrete struct ThresholdEstimator <: AbstractConstraintEstimator
+    val
+    key
+    dval
     function ThresholdEstimator(val::EstValType, key::Option{<:AbstractString} = nothing,
                                 dval::Option{<:Number} = nothing)
         assert_nonempty_nonneg_finite_val(val, :val)
@@ -124,8 +124,8 @@ Threshold
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
 """
-struct Threshold{T1} <: AbstractConstraintResult
-    val::T1
+@concrete struct Threshold <: AbstractConstraintResult
+    val
     function Threshold(val::Num_VecNum)
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)

@@ -63,10 +63,10 @@ DeltaUncertaintySet
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`AbstractPriorEstimator`](@ref)
 """
-struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
-    pe::T1
-    dmu::T2
-    dsigma::T3
+@concrete struct DeltaUncertaintySet <: AbstractUncertaintySetEstimator
+    pe
+    dmu
+    dsigma
     function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
                                  dsigma::Number)
         @argcheck(dmu >= 0.0)

@@ -45,10 +45,10 @@ ProcessedCovariance
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
   - [`Posdef`](@ref)
 """
-struct ProcessedCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ce::T1
-    alg::T2
-    pdm::T3
+@concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
+    ce
+    alg
+    pdm
     function ProcessedCovariance(ce::AbstractCovarianceEstimator,
                                  alg::Option{<:AbstractMatrixProcessingAlgorithm},
                                  pdm::Option{<:Posdef})

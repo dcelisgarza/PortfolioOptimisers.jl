@@ -1,8 +1,8 @@
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
-struct RegularisedPenalisedRelaxedRiskBudgeting{T1} <: RelaxedRiskBudgetingAlgorithm
-    p::T1
+@concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
+    p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
         @argcheck(isfinite(p) && p > zero(p))
         return new{typeof(p)}(p)
@@ -11,20 +11,17 @@ end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
-struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
-    opt::T1
-    rba::T2
-    wi::T3
-    alg::T4
-    fb::T5
+@concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
+    opt
+    rba
+    wi
+    alg
+    fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Option{<:OptE_Opt})
         if isa(wi, VecNum)
             @argcheck(!isempty(wi))
-        end
-        if isa(rba.rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(opt.sets))
         end
         return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
                                                                                   wi, alg,
@@ -109,8 +106,9 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   w::VecJuMPScalar, sigma::MatNum,
                                                   chol::Option{<:MatNum} = nothing)
     N = length(w)
-    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
+    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
+    @argcheck(length(rb) == N)
     sc = model[:sc]
     JuMP.@variables(model, begin
                         psi >= 0

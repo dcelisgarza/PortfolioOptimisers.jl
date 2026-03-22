@@ -1,9 +1,9 @@
 # https://portfoliooptimizationbook.com/slides/slides-index-tracking.pdf
-struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
-    tr::T1
-    r::T2
-    err::T3
-    alg::T4
+@concrete struct RiskTrackingError <: AbstractTracking
+    tr
+    r
+    err
+    alg
     function RiskTrackingError(tr::WeightsTracking, r::AbstractBaseRiskMeasure, err::Number,
                                alg::VariableTracking)
         assert_nonempty_nonneg_finite_val(err, :err)
@@ -37,10 +37,10 @@ function factory(tr::RiskTrackingError, w::VecNum)
     return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
                              alg = tr.alg)
 end
-struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    tr::T2
-    alg::T3
+@concrete struct TrackingRiskMeasure <: RiskMeasure
+    settings
+    tr
+    alg
     function TrackingRiskMeasure(settings::RiskMeasureSettings,
                                  tr::AbstractTrackingAlgorithm, alg::NormTracking)
         return new{typeof(settings), typeof(tr), typeof(alg)}(settings, tr, alg)
@@ -76,11 +76,11 @@ end
 function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
     return factory(r, w)
 end
-struct RiskTrackingRiskMeasure{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    tr::T2
-    r::T3
-    alg::T4
+@concrete struct RiskTrackingRiskMeasure <: RiskMeasure
+    settings
+    tr
+    r
+    alg
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings, tr::WeightsTracking,
                                      r::AbstractBaseRiskMeasure, alg::VariableTracking)
         if isa(alg, DependentVariableTracking) && isa(r, QuadExpressionRiskMeasures)

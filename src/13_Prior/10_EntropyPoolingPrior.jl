@@ -33,13 +33,13 @@ Structured result for correlation view constraint equation parsing.
   - [`ParsingResult`](@ref)
   - [`replace_prior_views`](@ref)
 """
-struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
-    vars::T1
-    coef::T2
-    op::T3
-    rhs::T4
-    eqn::T5
-    ij::T6
+@concrete struct RhoParsingResult <: AbstractParsingResult
+    vars
+    coef
+    op
+    rhs
+    eqn
+    ij
     function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                               eqn::AbstractString,
                               ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
@@ -200,9 +200,9 @@ CVaREntropyPooling
   - [`EntropyPoolingPrior`](@ref)
   - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
 """
-struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
-    args::T1
-    kwargs::T2
+@concrete struct CVaREntropyPooling <: AbstractEntropyPoolingOptimiser
+    args
+    kwargs
     function CVaREntropyPooling(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -266,12 +266,12 @@ OptimEntropyPooling
   - [`EntropyPoolingPrior`](@ref)
   - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
 """
-struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
-    args::T1
-    kwargs::T2
-    sc1::T3
-    sc2::T4
-    alg::T5
+@concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
+    args
+    kwargs
+    sc1
+    sc2
+    alg
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
                                  alg::AbstractEntropyPoolingOptAlgorithm)
         @argcheck(sc1 >= zero(sc1))
@@ -350,12 +350,12 @@ JuMPEntropyPooling
   - [`EntropyPoolingPrior`](@ref)
   - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
 """
-struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
-    slv::T1
-    sc1::T2
-    sc2::T3
-    so::T4
-    alg::T5
+@concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
+    slv
+    sc1
+    sc2
+    so
+    alg
     function JuMPEntropyPooling(slv::Slv_VecSlv, sc1::Number, sc2::Number, so::Number,
                                 alg::AbstractEntropyPoolingOptAlgorithm)
         if isa(slv, VecSlv)
@@ -523,24 +523,23 @@ EntropyPoolingPrior
   - [`JuMPEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
 """
-struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
-                           T16} <: AbstractLowOrderPriorEstimator_AF
-    pe::T1
-    mu_views::T2
-    var_views::T3
-    cvar_views::T4
-    sigma_views::T5
-    sk_views::T6
-    kt_views::T7
-    rho_views::T8
-    var_alpha::T9
-    cvar_alpha::T10
-    sets::T11
-    ds_opt::T12
-    dm_opt::T13
-    opt::T14
-    w::T15
-    alg::T16
+@concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+    pe
+    mu_views
+    var_views
+    cvar_views
+    sigma_views
+    sk_views
+    kt_views
+    rho_views
+    var_alpha
+    cvar_alpha
+    sets
+    ds_opt
+    dm_opt
+    opt
+    w
+    alg
     function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mu_views::Option{<:LinearConstraintEstimator},
                                  var_views::Option{<:LinearConstraintEstimator},

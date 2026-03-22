@@ -100,9 +100,9 @@ Posdef
   - [`posdef`](@ref)
   - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
 """
-struct Posdef{T1, T2} <: AbstractPosdefEstimator
-    alg::T1
-    kwargs::T2
+@concrete struct Posdef <: AbstractPosdefEstimator
+    alg
+    kwargs
     function Posdef(alg::Any, kwargs::NamedTuple)
         return new{typeof(alg), typeof(kwargs)}(alg, kwargs)
     end

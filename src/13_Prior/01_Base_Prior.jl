@@ -541,20 +541,19 @@ LowOrderPrior
   - [`prior`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
-       AbstractPriorResult
-    X::T1
-    mu::T2
-    sigma::T3
-    chol::T4
-    w::T5
-    ens::T6
-    kld::T7
-    ow::T8
-    rr::T9
-    f_mu::T10
-    f_sigma::T11
-    f_w::T12
+@concrete struct LowOrderPrior <: AbstractPriorResult
+    X
+    mu
+    sigma
+    chol
+    w
+    ens
+    kld
+    ow
+    rr
+    f_mu
+    f_sigma
+    f_w
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:StatsBase.AbstractWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
@@ -702,18 +701,18 @@ HighOrderPrior
   - [`HighOrderPriorEstimator`](@ref)
   - [`prior`](@ref)
 """
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractPriorResult
-    pr::T1
-    kt::T2
-    L2::T3
-    S2::T4
-    sk::T5
-    V::T6
-    skmp::T7
-    f_kt::T8
-    # chol_kt::T9
-    f_sk::T9
-    f_V::T10
+@concrete struct HighOrderPrior <: AbstractPriorResult
+    pr
+    kt
+    L2
+    S2
+    sk
+    V
+    skmp
+    f_kt
+    # chol_kt
+    f_sk
+    f_V
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             L2::Option{<:MatNum}, S2::Option{<:MatNum},
                             sk::Option{<:MatNum}, V::Option{<:MatNum},

@@ -1,16 +1,15 @@
-struct NestedClusteredResult{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pr::T2
-    clr::T3
-    wb::T4
-    fees::T5
-    resi::T6
-    reso::T7
-    cv::T8
-    retcode::T9
-    w::T10
-    fb::T11
+@concrete struct NestedClusteredResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pr
+    clr
+    wb
+    fees
+    resi
+    reso
+    cv
+    retcode
+    w
+    fb
 end
 function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
     return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
@@ -99,22 +98,21 @@ function assert_external_optimiser(opt::VecOptE_Opt)
     assert_external_optimiser.(opt)
     return nothing
 end
-struct NestedClustered{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14} <:
-       ClusteringOptimisationEstimator
-    pe::T1
-    cle::T2
-    wb::T3
-    fees::T4
-    sets::T5
-    opti::T6
-    opto::T7
-    cv::T8
-    wf::T9
-    ex::T10
-    fb::T11
-    brt::T12
-    cle_pr::T13
-    strict::T14
+@concrete struct NestedClustered <: ClusteringOptimisationEstimator
+    pe
+    cle
+    wb
+    fees
+    sets
+    opti
+    opto
+    cv
+    wf
+    ex
+    fb
+    brt
+    cle_pr
+    strict
     function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
                              opti::NonFiniteAllocationOptimisationEstimator,
@@ -202,7 +200,7 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
     fees = fees_view(nco.fees, i)
-    sets = nothing_asset_sets_view(nco.sets, i)
+    sets = asset_sets_view(nco.sets, i)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,

@@ -269,8 +269,8 @@ ExpectedReturn
   - [`expected_return`](@ref)
   - [`expected_risk`](@ref)
 """
-struct ExpectedReturn{T1} <: NonOptimisationRiskMeasure
-    rt::T1
+@concrete struct ExpectedReturn <: NonOptimisationRiskMeasure
+    rt
     function ExpectedReturn(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
     end
@@ -392,10 +392,10 @@ ExpectedReturnRiskRatio
   - [`expected_ratio`](@ref)
   - [`expected_risk`](@ref)
 """
-struct ExpectedReturnRiskRatio{T1, T2, T3} <: NonOptimisationRiskMeasure
-    rt::T1
-    rk::T2
-    rf::T3
+@concrete struct ExpectedReturnRiskRatio <: NonOptimisationRiskMeasure
+    rt
+    rk
+    rf
     function ExpectedReturnRiskRatio(rt::JuMPReturnsEstimator, rk::AbstractBaseRiskMeasure,
                                      rf::Number)
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)

@@ -49,9 +49,9 @@ PortfolioOptimisersCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
-struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-    ce::T1
-    mp::T2
+@concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
+    ce
+    mp
     function PortfolioOptimisersCovariance(ce::AbstractCovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator)
         return new{typeof(ce), typeof(mp)}(ce, mp)

@@ -138,9 +138,9 @@ GeneralExponentialSimilarity
   - [`ExponentialSimilarity`](@ref)
   - [`dbht_similarity`](@ref)
 """
-struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
-    coef::T1
-    power::T2
+@concrete struct GeneralExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm
+    coef
+    power
     function GeneralExponentialSimilarity(coef::Number, power::Number)
         @argcheck(zero(coef) < coef, DomainError)
         @argcheck(zero(power) < power, DomainError)
@@ -233,9 +233,9 @@ DBHT
   - [`UniqueRoot`](@ref)
   - [`EqualRoot`](@ref)
 """
-struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
-    sim::T1
-    root::T2
+@concrete struct DBHT <: AbstractHierarchicalClusteringAlgorithm
+    sim
+    root
     function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
         return new{typeof(sim), typeof(root)}(sim, root)
     end
@@ -1820,10 +1820,10 @@ LoGo
   - [`ExponentialSimilarity`](@ref)
   - [`GeneralExponentialSimilarity`](@ref)
 """
-struct LoGo{T1, T2, T3} <: InverseMatrixSparsificationAlgorithm
-    dist::T1
-    sim::T2
-    pdm::T3
+@concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
+    dist
+    sim
+    pdm
     function LoGo(dist::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
                   pdm::Option{<:Posdef} = Posdef())
         return new{typeof(dist), typeof(sim), typeof(pdm)}(dist, sim, pdm)

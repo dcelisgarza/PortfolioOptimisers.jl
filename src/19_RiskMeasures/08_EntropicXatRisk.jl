@@ -27,11 +27,11 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
         NaN
     end
 end
-struct EntropicValueatRisk{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    w::T4
+@concrete struct EntropicValueatRisk <: RiskMeasure
+    settings
+    slv
+    alpha
+    w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Number, w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
@@ -53,12 +53,12 @@ end
 function (r::EntropicValueatRisk)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w)
 end
-struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    beta::T4
-    w::T5
+@concrete struct EntropicValueatRiskRange <: RiskMeasure
+    settings
+    slv
+    alpha
+    beta
+    w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
                                       beta::Number, w::Option{<:StatsBase.AbstractWeights})
@@ -93,11 +93,11 @@ function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                     beta = r.beta, w = w)
 end
-struct EntropicDrawdownatRisk{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    w::T4
+@concrete struct EntropicDrawdownatRisk <: RiskMeasure
+    settings
+    slv
+    alpha
+    w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
                                     w::Option{<:StatsBase.AbstractWeights})
@@ -121,11 +121,11 @@ function (r::EntropicDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)
 end
-struct RelativeEntropicDrawdownatRisk{T1, T2, T3, T4} <: HierarchicalRiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    w::T4
+@concrete struct RelativeEntropicDrawdownatRisk <: HierarchicalRiskMeasure
+    settings
+    slv
+    alpha
+    w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv}, alpha::Number,
                                             w::Option{<:StatsBase.AbstractWeights})

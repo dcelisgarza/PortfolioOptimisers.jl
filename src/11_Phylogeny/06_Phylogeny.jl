@@ -44,8 +44,8 @@ PhylogenyResult
   - [`phylogeny_matrix`](@ref)
   - [`centrality_vector`](@ref)
 """
-struct PhylogenyResult{T} <: AbstractPhylogenyResult
-    X::T
+@concrete struct PhylogenyResult <: AbstractPhylogenyResult
+    X
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, MatNum)
@@ -188,9 +188,9 @@ BetweennessCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
-struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    args::T1
-    kwargs::T2
+@concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
+    args
+    kwargs
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -233,9 +233,9 @@ ClosenessCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
-struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    args::T1
-    kwargs::T2
+@concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
+    args
+    kwargs
     function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -282,9 +282,9 @@ DegreeCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
-struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    kind::T1
-    kwargs::T2
+@concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
+    kind
+    kwargs
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
         @argcheck(kind in 0:2)
         return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
@@ -338,8 +338,8 @@ KatzCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
-struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
-    alpha::T1
+@concrete struct KatzCentrality <: AbstractCentralityAlgorithm
+    alpha
     function KatzCentrality(alpha::Number)
         return new{typeof(alpha)}(alpha)
     end
@@ -391,10 +391,10 @@ Pagerank
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
-struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
-    n::T1
-    alpha::T2
-    epsilon::T3
+@concrete struct Pagerank <: AbstractCentralityAlgorithm
+    n
+    alpha
+    epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
         @argcheck(0 < n, DomainError)
         @argcheck(zero(alpha) < alpha < one(alpha),
@@ -454,9 +454,9 @@ StressCentrality
   - [`AbstractCentralityAlgorithm`](@ref)
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
-struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    args::T1
-    kwargs::T2
+@concrete struct StressCentrality <: AbstractCentralityAlgorithm
+    args
+    kwargs
     function StressCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -576,9 +576,9 @@ KruskalTree
   - [`AbstractTreeType`](@ref)
   - [`Graphs.kruskal_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst)
 """
-struct KruskalTree{T1, T2} <: AbstractTreeType
-    args::T1
-    kwargs::T2
+@concrete struct KruskalTree <: AbstractTreeType
+    args
+    kwargs
     function KruskalTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -621,9 +621,9 @@ BoruvkaTree
   - [`AbstractTreeType`](@ref)
   - [`Graphs.boruvka_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst)
 """
-struct BoruvkaTree{T1, T2} <: AbstractTreeType
-    args::T1
-    kwargs::T2
+@concrete struct BoruvkaTree <: AbstractTreeType
+    args
+    kwargs
     function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -666,9 +666,9 @@ PrimTree
   - [`AbstractTreeType`](@ref)
   - [`Graphs.prim_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst)
 """
-struct PrimTree{T1, T2} <: AbstractTreeType
-    args::T1
-    kwargs::T2
+@concrete struct PrimTree <: AbstractTreeType
+    args
+    kwargs
     function PrimTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
@@ -795,11 +795,11 @@ NetworkEstimator
   - [`AbstractTreeType`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
-struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
-    ce::T1
-    de::T2
-    alg::T3
-    n::T4
+@concrete struct NetworkEstimator <: AbstractNetworkEstimator
+    ce
+    de
+    alg
+    n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
         return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
@@ -889,9 +889,9 @@ CentralityEstimator
   - [`AbstractCentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
-    pl::T1
-    ct::T2
+@concrete struct CentralityEstimator <: AbstractCentralityEstimator
+    pl
+    ct
     function CentralityEstimator(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm)
         return new{typeof(pl), typeof(ct)}(pl, ct)
     end

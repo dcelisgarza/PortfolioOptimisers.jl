@@ -1,5 +1,5 @@
-struct WorstRealisation{T1} <: RiskMeasure
-    settings::T1
+@concrete struct WorstRealisation <: RiskMeasure
+    settings
     function WorstRealisation(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end

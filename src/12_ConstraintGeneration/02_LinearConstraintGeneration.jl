@@ -38,9 +38,9 @@ PartialLinearConstraint
   - [`LinearConstraint`](@ref)
   - [`LinearConstraintEstimator`](@ref)
 """
-struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
-    A::T1
-    B::T2
+@concrete struct PartialLinearConstraint <: AbstractConstraintResult
+    A
+    B
     function PartialLinearConstraint(A::MatNum, B::VecNum)
         @argcheck(!isempty(A), IsEmptyError)
         @argcheck(!isempty(B), IsEmptyError)
@@ -98,9 +98,9 @@ LinearConstraint
   - [`PartialLinearConstraint`](@ref)
   - [`LinearConstraintEstimator`](@ref)
 """
-struct LinearConstraint{T1, T2} <: AbstractConstraintResult
-    ineq::T1
-    eq::T2
+@concrete struct LinearConstraint <: AbstractConstraintResult
+    ineq
+    eq
     function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
                               eq::Option{<:PartialLinearConstraint})
         @argcheck(!(isnothing(ineq) && isnothing(eq)),
@@ -167,12 +167,12 @@ Structured result for standard linear constraint equation parsing.
   - [`parse_equation`](@ref)
   - [`RhoParsingResult`](@ref)
 """
-struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
-    vars::T1
-    coef::T2
-    op::T3
-    rhs::T4
-    eqn::T5
+@concrete struct ParsingResult <: AbstractParsingResult
+    vars
+    coef
+    op
+    rhs
+    eqn
     function ParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                            eqn::AbstractString)
         @argcheck(length(vars) == length(coef), DimensionMismatch)
@@ -237,10 +237,10 @@ AssetSets
   - [`estimator_to_val`](@ref)
   - [`linear_constraints`](@ref)
 """
-struct AssetSets{T1, T2, T3} <: AbstractEstimator
-    key::T1
-    ukey::T2
-    dict::T3
+@concrete struct AssetSets <: AbstractEstimator
+    key
+    ukey
+    dict
     function AssetSets(key::AbstractString, ukey::AbstractString,
                        dict::AbstractDict{<:AbstractString, <:Any})
         @argcheck(!isempty(dict), IsEmptyError)
@@ -264,7 +264,7 @@ function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
                    dict::AbstractDict{<:AbstractString, <:Any})
     return AssetSets(key, ukey, dict)
 end
-function nothing_asset_sets_view(sets::AssetSets, i)
+function asset_sets_view(sets::AssetSets, i)
     key = sets.key
     ukey = sets.ukey
     dict = typeof(sets.dict)()
@@ -280,7 +280,7 @@ function nothing_asset_sets_view(sets::AssetSets, i)
     return AssetSets(; key = key, ukey = ukey, dict = dict)
 end
 """
-    nothing_asset_sets_view(::Nothing, ::Any)
+    asset_sets_view(::Nothing, ::Any)
 
 No-op fallback for indexing `nothing` asset sets.
 
@@ -288,7 +288,7 @@ No-op fallback for indexing `nothing` asset sets.
 
   - `nothing`.
 """
-function nothing_asset_sets_view(::Nothing, ::Any)
+function asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 """
@@ -1251,9 +1251,9 @@ LinearConstraint
   - [`parse_equation`](@ref)
   - [`linear_constraints`](@ref)
 """
-struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
-    val::T1
-    key::T2
+@concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
+    val
+    key
     function LinearConstraintEstimator(val::EqnType,
                                        key::Option{<:AbstractString} = nothing)
         if isa(val, Str_Vec)

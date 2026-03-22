@@ -83,17 +83,17 @@ FeesEstimator
   - [`EstValType`](@ref)
   - [`fees_constraints`](@ref)
 """
-struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimator
-    tn::T1
-    l::T2
-    s::T3
-    fl::T4
-    fs::T5
-    dl::T6
-    ds::T7
-    dfl::T8
-    dfs::T9
-    kwargs::T10
+@concrete struct FeesEstimator <: AbstractEstimator
+    tn
+    l
+    s
+    fl
+    fs
+    dl
+    ds
+    dfl
+    dfs
+    kwargs
     function FeesEstimator(tn::Option{<:TnE_Tn}, l::Option{<:EstValType},
                            s::Option{<:EstValType}, fl::Option{<:EstValType},
                            fs::Option{<:EstValType}, dl::Option{<:Number} = nothing,
@@ -343,13 +343,13 @@ Fees
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
-    tn::T1
-    l::T2
-    s::T3
-    fl::T4
-    fs::T5
-    kwargs::T6
+@concrete struct Fees <: AbstractResult
+    tn
+    l
+    s
+    fl
+    fs
+    kwargs
     function Fees(tn::Option{<:Turnover}, l::Option{<:Num_VecNum}, s::Option{<:Num_VecNum},
                   fl::Option{<:Num_VecNum}, fs::Option{<:Num_VecNum},
                   kwargs::NamedTuple = (; atol = 1e-8))

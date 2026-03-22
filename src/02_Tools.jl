@@ -1,10 +1,9 @@
 """
-    assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(val::Number, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_nonneg_finite_val(args...)
+    assert_nonempty_nonneg_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    ) -> nothing
+    assert_nonempty_nonneg_finite_val(args...) -> nothing
 
 Validate that the input value is non-empty, non-negative and finite.
 
@@ -12,10 +11,6 @@ Validate that the input value is non-empty, non-negative and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Details
 
@@ -82,12 +77,11 @@ function assert_nonempty_nonneg_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::Pair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(val::Number, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_gt0_finite_val(args...)
+    assert_nonempty_gt0_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    ) -> nothing
+    assert_nonempty_gt0_finite_val(args...) -> nothing
 
 Validate that the input value is non-empty, greater than zero, and finite.
 
@@ -95,10 +89,6 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Details
 
@@ -165,12 +155,11 @@ function assert_nonempty_gt0_finite_val(args...)
     return nothing
 end
 """
-    assert_nonempty_finite_val(val::AbstractDict, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::VecPair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::ArrNum, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::Pair, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(val::Number, val_sym::Union{Symbol,<:AbstractString} = :val)
-    assert_nonempty_finite_val(args...)
+    assert_nonempty_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    ) -> nothing
+    assert_nonempty_finite_val(args...) -> nothing
 
 Validate that the input value is non-empty and finite.
 
@@ -178,10 +167,6 @@ Validate that the input value is non-empty and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Details
 
@@ -239,7 +224,7 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X) -> nothing
 
 Assert that the input matrix is square.
 
@@ -247,10 +232,6 @@ Assert that the input matrix is square.
 
   - `X`: Input matrix to validate.
   - `X_sym`: Symbolic name used in error messages.
-
-# Returns
-
-  - `nothing`.
 
 # Validation
 
@@ -266,7 +247,7 @@ function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
     return nothing
 end
 """
-    ⊗(A::ArrNum, B::ArrNum)
+    ⊗(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
@@ -286,7 +267,10 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 """
 ⊗(A::ArrNum, B::ArrNum) = reshape(kron(B, A), (length(A), length(B)))
 """
-    ⊙(A, B)
+    ⊙(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊙(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊙(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊙(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) multiplication.
 
@@ -317,7 +301,10 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 ⊙(A, B::ArrNum) = A * B
 ⊙(A, B) = A * B
 """
-    ⊘(A, B)
+    ⊘(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊘(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊘(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊘(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) division.
 
@@ -348,7 +335,10 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 ⊘(A, B::ArrNum) = A ./ B
 ⊘(A, B) = A / B
 """
-    ⊕(A, B)
+    ⊕(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊕(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊕(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊕(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) addition.
 
@@ -379,7 +369,10 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 ⊕(A, B::ArrNum) = A .+ B
 ⊕(A, B) = A + B
 """
-    ⊖(A, B)
+    ⊖(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
+    ⊖(A::ArrNum, B) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊖(A, B::ArrNum) -> Vector{promote_type(eltype(A), eltype(B))}
+    ⊖(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) subtraction.
 
@@ -410,18 +403,14 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B
 """
-    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum)
-    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar})
-    dot_scalar(a::VecNum, b::VecNum)
+    dot_scalar(a::Union{<:Number, <:JuMP.AbstractJuMPScalar}, b::VecNum) -> Number
+    dot_scalar(a::VecNum, b::Union{<:Number, <:JuMP.AbstractJuMPScalar}) -> Number
+    dot_scalar(a::VecNum, b::VecNum) -> Number
 
 Efficient scalar and vector dot product utility.
 
   - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
-
-# Returns
-
-  - `res::Number`: The resulting scalar.
 
 # Examples
 
@@ -451,12 +440,18 @@ function dot_scalar(a::VecNum, b::VecNum)
     return LinearAlgebra.dot(a, b)
 end
 """
-    nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                                       AbstractEstimatorValueAlgorithm}, ::Any)
-    nothing_scalar_array_view(x::AbstractVector, i)
-    nothing_scalar_array_view(x::VecScalar, i)
-    nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
-    nothing_scalar_array_view(x::AbstractMatrix, i)
+    nothing_scalar_array_view(
+        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
+                AbstractEstimatorValueAlgorithm},
+        ::Any
+    ) -> typeof(x)
+    nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
+    nothing_scalar_array_view(x::VecScalar, i) -> VecScalar(; v = view(x.v, i), s = x.s)
+    nothing_scalar_array_view(x::AbstractMatrix, i) -> view(x, i, i)
+    nothing_scalar_array_view(
+        x::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}},
+        i
+    ) -> [nothing_scalar_array_view(xi, i) for xi in x]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
@@ -464,16 +459,6 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
   - `i`: Index or indices to view.
-
-# Returns
-
-  - `x`: Input value.
-
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
-      + `::AbstractVector`: Returns `view(x, i)`.
-      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: Returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: Returns `view(x, i, i)`.
 
 # Examples
 
@@ -504,15 +489,17 @@ end
 function nothing_scalar_array_view(x::VecScalar, i)
     return VecScalar(; v = view(x.v, i), s = x.s)
 end
-function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}},
-                                   i)
-    return [view(xi, i) for xi in x]
-end
 function nothing_scalar_array_view(x::AbstractMatrix, i)
     return view(x, i, i)
 end
+function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
+                                                             <:AbstractMatrix, <:VecScalar}},
+                                   i)
+    return [nothing_scalar_array_view(xi, i) for xi in x]
+end
 """
-    nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
+    nothing_scalar_array_view_odd_order(::Nothing, i, j) -> nothing
+    nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j) -> view(x, i, j)
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
 
@@ -521,12 +508,8 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
 
 # Arguments
 
-  - `x`: Input value, which may be `nothing` or an array.
+  - `x`: Input value.
   - `i`, `j`: Indices to view.
-
-# Returns
-
-  - The corresponding view or `nothing`.
 
 # Examples
 
@@ -545,11 +528,11 @@ function nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
     return view(x, i, j)
 end
 """
-    nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any)
-    nothing_scalar_array_getindex(x::AbstractVector, i)
-    nothing_scalar_array_getindex(x::VecScalar, i)
-    nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i)
-    nothing_scalar_array_getindex(x::AbstractMatrix, i)
+    nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any) -> Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}
+    nothing_scalar_array_getindex(x::AbstractVector, i) -> x[i]
+    nothing_scalar_array_getindex(x::VecScalar, i) -> VecScalar(; v = x.v[i], s = x.s)
+    nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
+    nothing_scalar_array_getindex(x::AbstractMatrix, i) -> x[i, i]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
@@ -605,7 +588,8 @@ function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
 end
 """
-    nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j)
+    nothing_scalar_array_getindex_odd_order(::Nothing, i, j) -> nothing
+    nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j) -> x[i, j]
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
 
@@ -614,12 +598,8 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
 
 # Arguments
 
-  - `x`: Input value, which may be `nothing` or an array.
+  - `x`: Input value.
   - `i`, `j`: Indices to view.
-
-# Returns
-
-  - The corresponding view or `nothing`.
 
 # Examples
 
@@ -637,7 +617,7 @@ function nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j)
     return x[i, j]
 end
 """
-    fourth_moment_index_generator(N::Integer, i)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
@@ -669,7 +649,7 @@ function fourth_moment_index_generator(N::Integer, i)
     return idx
 end
 """
-    traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing)
+    traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing) -> AbstractVector
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -677,10 +657,6 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
 
   - `t`: An abstract type whose subtypes will be traversed.
   - `ctarr`: Optional An array to collect the concrete types. If not provided, a new empty array is created.
-
-# Returns
-
-  - `types::Vector{Any}`: An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
 
 # Examples
 
@@ -712,7 +688,7 @@ function traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing
     return ctarr
 end
 """
-    concrete_typed_array(A::AbstractArray)
+    concrete_typed_array(A::AbstractArray) -> Array{Union{...}}
 
 Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 
@@ -724,7 +700,7 @@ This is useful for converting arrays with abstract element types to arrays with 
 
 # Returns
 
-  - `A_new::Vector{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
+  - `A_new::Array{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 
 # Examples
 
@@ -743,7 +719,7 @@ function concrete_typed_array(A::AbstractArray)
 end
 """
     factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
-                     <:AbstractResult}, args...; kwargs...)
+                     <:AbstractResult}, args...; kwargs...) -> a
 
 No-op factory function for constructing objects with a uniform interface.
 
@@ -754,10 +730,6 @@ Defining methods which dispatch on the first argument allows for a consistent fa
   - `a`: Indicates no object should be constructed.
   - `args...`: Arbitrary positional arguments (ignored).
   - `kwargs...`: Arbitrary keyword arguments (ignored).
-
-# Returns
-
-  - `a`: The input unchanged.
 
 # Related
 
@@ -771,7 +743,7 @@ function factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
     return a
 end
 """
-    abstract type VectorToScalarMeasure <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for algorithms mapping a vector of real values to a single real value.
 
@@ -788,7 +760,7 @@ Abstract supertype for algorithms mapping a vector of real values to a single re
 """
 abstract type VectorToScalarMeasure <: AbstractAlgorithm end
 """
-    const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
+    const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
 
 Union type representing either a numeric value or a `VectorToScalarMeasure`.
 
@@ -798,9 +770,9 @@ This type is used to allow functions and fields to accept both plain numbers and
 
   - [`VectorToScalarMeasure`](@ref)
 """
-const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure}
+const Num_VecToScaM = Union{<:Number, <:VectorToScalarMeasure, <:Function}
 """
-    struct MinValue <: VectorToScalarMeasure end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its minimum.
 
@@ -821,21 +793,17 @@ julia> PortfolioOptimisers.vec_to_real_measure(MinValue(), [1.2, 3.4, 0.7])
 """
 struct MinValue <: VectorToScalarMeasure end
 """
-    struct MeanValue{T1} <: VectorToScalarMeasure
-        w::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted mean.
 
 # Fields
 
-  - $(arg_dict[:oow])
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
-```
+    MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -858,8 +826,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MeanValue{T1} <: VectorToScalarMeasure
-    w::T1
+@concrete struct MeanValue <: VectorToScalarMeasure
+    "$(arg_dict[:oow])"
+    w
     function MeanValue(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -871,18 +840,22 @@ function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MeanValue(w)
 end
 """
-    factory(mv::MeanValue, w::StatsBase.AbstractWeights)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Construct a `MeanValue` instance with observation weights `w`.
 
 # Arguments
 
   - `mv`: Instance to update.
-  - $(arg_dict[:ow])
+  - `w`: $(arg_dict[:ow])
 
-# Returns
+# Examples
 
-  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
+```jldoctest
+julia> factory(MeanValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
+MeanValue
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+```
 
 # Related
 
@@ -893,21 +866,17 @@ function factory(::MeanValue, w::StatsBase.AbstractWeights)
     return MeanValue(; w = w)
 end
 """
-    struct MedianValue{T1} <: VectorToScalarMeasure
-        w::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted median.
 
 # Fields
 
-  - $(arg_dict[:oow])
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
-```
+    MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
 
 Keyword arguments correspond to the fields above.
 
@@ -930,8 +899,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct MedianValue{T1} <: VectorToScalarMeasure
-    w::T1
+@concrete struct MedianValue <: VectorToScalarMeasure
+    "$(arg_dict[:oow])"
+    w
     function MedianValue(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -943,18 +913,22 @@ function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
     return MedianValue(w)
 end
 """
-    factory(mv::MedianValue, w::StatsBase.AbstractWeights)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Constructs a `MedianValue` instance with observation weights `w`.
 
 # Arguments
 
   - `mv`: Instance to update.
-  - $(arg_dict[:ow])
+  - `w`: $(arg_dict[:ow])
 
-# Returns
+# Examples
 
-  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
+```jldoctest
+julia> factory(MedianValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
+MedianValue
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+```
 
 # Related
 
@@ -965,7 +939,7 @@ function factory(::MedianValue, w::StatsBase.AbstractWeights)
     return MedianValue(; w = w)
 end
 """
-    struct MaxValue <: VectorToScalarMeasure end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its maximum.
 
@@ -986,23 +960,17 @@ julia> PortfolioOptimisers.vec_to_real_measure(MaxValue(), [1.2, 3.4, 0.7])
 """
 struct MaxValue <: VectorToScalarMeasure end
 """
-    struct StdValue{T1, T2} <: VectorToScalarMeasure
-        w::T1
-        corrected::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted standard deviation.
 
 # Fields
 
-  - $(arg_dict[:oow])
-  - `corrected`: Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
-```
+    StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -1025,9 +993,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct StdValue{T1, T2} <: VectorToScalarMeasure
-    w::T1
-    corrected::T2
+@concrete struct StdValue <: VectorToScalarMeasure
+    "$(arg_dict[:oow])"
+    w
+    "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
+    corrected
     function StdValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -1040,18 +1010,23 @@ function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
     return StdValue(w, corrected)
 end
 """
-    factory(sv::StdValue, w::StatsBase.AbstractWeights)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Constructs a `StdValue` instance with observation weights `w`.
 
 # Arguments
 
   - `sv`: Instance to update.
-  - $(arg_dict[:ow])
+  - `w`: $(arg_dict[:ow])
 
-# Returns
+# Examples
 
-  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
+```jldoctest
+julia> factory(StdValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
+StdValue
+          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+  corrected ┴ Bool: true
+```
 
 # Related
 
@@ -1062,23 +1037,17 @@ function factory(sv::StdValue, w::StatsBase.AbstractWeights)
     return StdValue(; w = w, corrected = sv.corrected)
 end
 """
-    struct VarValue{T1, T2} <: VectorToScalarMeasure
-        w::T1
-        corrected::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted variance.
 
 # Fields
 
-  - $(arg_dict[:oow])
-  - `corrected`: Indicates whether to use Bessel's correction (`true` for sample variance, `false` for population).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
-```
+    VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
 
 Keyword arguments correspond to the fields above.
 
@@ -1101,9 +1070,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct VarValue{T1, T2} <: VectorToScalarMeasure
-    w::T1
-    corrected::T2
+@concrete struct VarValue <: VectorToScalarMeasure
+    "$(arg_dict[:oow])"
+    w
+    "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
+    corrected
     function VarValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError)
@@ -1116,18 +1087,23 @@ function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
     return VarValue(w, corrected)
 end
 """
-    factory(vv::VarValue, w::StatsBase.AbstractWeights)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Constructs a `VarValue` instance with observation weights `w`.
 
 # Arguments
 
   - `vv`: Instance to update.
-  - $(arg_dict[:ow])
+  - `w`: $(arg_dict[:ow])
 
-# Returns
+# Examples
 
-  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
+```jldoctest
+julia> factory(VarValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
+VarValue
+          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+  corrected ┴ Bool: true
+```
 
 # Related
 
@@ -1138,7 +1114,7 @@ function factory(vv::VarValue, w::StatsBase.AbstractWeights)
     return VarValue(; w = w, corrected = vv.corrected)
 end
 """
-    SumValue <: VectorToScalarMeasure
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its sum.
 
@@ -1158,7 +1134,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(SumValue(), [1.2, 3.4, 0.7])
 """
 struct SumValue <: VectorToScalarMeasure end
 """
-    ProdValue <: VectorToScalarMeasure
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its product.
 
@@ -1178,7 +1154,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(ProdValue(), [1.2, 3.4, 0.7])
 """
 struct ProdValue <: VectorToScalarMeasure end
 """
-    ModeValue <: VectorToScalarMeasure
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its mode.
 
@@ -1198,23 +1174,17 @@ julia> PortfolioOptimisers.vec_to_real_measure(ModeValue(), [1.2, 3.4, 0.7, 1.2]
 """
 struct ModeValue <: VectorToScalarMeasure end
 """
-    struct StandardisedValue{T1, T2} <: VectorToScalarMeasure
-        mv::T1
-        sv::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted mean divided by its optionally weighted standard deviation.
 
 # Fields
 
-  - `mv`: The mean value measure used for the numerator.
-  - `sv`: The standard deviation measure used for the denominator.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
-```
+    StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
 
 Keyword arguments correspond to the fields above.
 
@@ -1233,9 +1203,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
   - [`VarValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-struct StandardisedValue{T1, T2} <: VectorToScalarMeasure
-    mv::T1
-    sv::T2
+@concrete struct StandardisedValue <: VectorToScalarMeasure
+    "The mean value measure used for the numerator."
+    mv
+    "The standard deviation measure used for the denominator."
+    sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
         return new{typeof(mv), typeof(sv)}(mv, sv)
     end
@@ -1244,18 +1216,26 @@ function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValu
     return StandardisedValue(mv, sv)
 end
 """
-    factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Construct a `StandardisedValue` instance with observation weights `w`.
+Construct a `StandardisedValue` instance with observation weights `w` for both `mv` and `sv`.
 
 # Arguments
 
   - `msv`: Instance to update.
-  - $(arg_dict[:ow])
+  - `w`: $(arg_dict[:ow])
 
-# Returns
+# Examples
 
-  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
+```jldoctest
+julia> factory(StandardisedValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
+StandardisedValue
+  mv ┼ MeanValue
+     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+  sv ┼ StdValue
+     │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
+     │   corrected ┴ Bool: true
+```
 
 # Related
 
@@ -1268,7 +1248,7 @@ function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
     return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
-    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum)
+    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> score::Number
 
 Reduce a vector of real values to a single real value using a specified measure.
 
@@ -1341,6 +1321,9 @@ function vec_to_real_measure(::ProdValue, val::VecNum; kwargs...)
 end
 function vec_to_real_measure(::ModeValue, val::VecNum; kwargs...)
     return StatsBase.mode(val)
+end
+function vec_to_real_measure(f::Function, val::VecNum; kwargs...)
+    return f(val)
 end
 
 export factory, traverse_concrete_subtypes, concrete_typed_array, MinValue, MeanValue,

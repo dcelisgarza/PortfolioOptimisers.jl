@@ -1,22 +1,21 @@
-struct GreedyAllocationResult{T1, T2, T3, T4, T5, T6, T7} <:
-       FiniteAllocationOptimisationResult
-    oe::T1
-    retcode::T2
-    shares::T3
-    cost::T4
-    w::T5
-    cash::T6
-    fb::T7
+@concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
+    oe
+    retcode
+    shares
+    cost
+    w
+    cash
+    fb
 end
 function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
     return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
                                   res.cash, fb)
 end
-struct GreedyAllocation{T1, T2, T3, T4} <: FiniteAllocationOptimisationEstimator
-    unit::T1
-    args::T2
-    kwargs::T3
-    fb::T4
+@concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
+    unit
+    args
+    kwargs
+    fb
     function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
                               fb::Option{<:FOptE_FOpt} = nothing)
         return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,

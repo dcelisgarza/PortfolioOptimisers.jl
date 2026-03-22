@@ -1,7 +1,7 @@
-struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    w::T3
+@concrete struct ConditionalValueatRisk <: RiskMeasure
+    settings
+    alpha
+    w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Option{<:StatsBase.AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -16,12 +16,12 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
-struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    l::T3
-    r::T4
-    w::T5
+@concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
+    settings
+    alpha
+    l
+    r
+    w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
                                                           r::Number,
@@ -75,11 +75,11 @@ function (r::RMCVaR{<:StatsBase.AbstractWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
-struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    beta::T3
-    w::T4
+@concrete struct ConditionalValueatRiskRange <: RiskMeasure
+    settings
+    alpha
+    beta
+    w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
                                          beta::Number,
                                          w::Option{<:StatsBase.AbstractWeights})
@@ -104,16 +104,15 @@ function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args..
     return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                        beta = r.beta, w = w)
 end
-struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6, T7, T8} <:
-       RiskMeasure
-    settings::T1
-    alpha::T2
-    l_a::T3
-    r_a::T4
-    beta::T5
-    l_b::T6
-    r_b::T7
-    w::T8
+@concrete struct DistributionallyRobustConditionalValueatRiskRange <: RiskMeasure
+    settings
+    alpha
+    l_a
+    r_a
+    beta
+    l_b
+    r_b
+    w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
                                                                alpha::Number, l_a::Number,
                                                                r_a::Number, beta::Number,
@@ -212,10 +211,10 @@ function (r::RMCVaRRg{<:StatsBase.AbstractWeights})(x::VecNum)
     end
     return loss - gain
 end
-struct ConditionalDrawdownatRisk{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    w::T3
+@concrete struct ConditionalDrawdownatRisk <: RiskMeasure
+    settings
+    alpha
+    w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                                        w::Option{<:StatsBase.AbstractWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -230,12 +229,12 @@ function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasure
                                    w::Option{<:StatsBase.AbstractWeights} = nothing)
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
-struct DistributionallyRobustConditionalDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    alpha::T2
-    l::T3
-    r::T4
-    w::T5
+@concrete struct DistributionallyRobustConditionalDrawdownatRisk <: RiskMeasure
+    settings
+    alpha
+    l
+    r
+    w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Number, l::Number,
                                                              r::Number,
@@ -291,10 +290,10 @@ function (r::RMCDaR{<:StatsBase.AbstractWeights})(x::VecNum)
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
-struct RelativeConditionalDrawdownatRisk{T1, T2, T3} <: HierarchicalRiskMeasure
-    settings::T1
-    alpha::T2
-    w::T3
+@concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
+    settings
+    alpha
+    w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Number,
                                                w::Option{<:StatsBase.AbstractWeights})

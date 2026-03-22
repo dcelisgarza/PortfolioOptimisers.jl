@@ -2,11 +2,11 @@ abstract type MedianCenteringFunction <: AbstractAlgorithm end
 struct MedianCentering <: MedianCenteringFunction end
 struct MeanCentering <: MedianCenteringFunction end
 const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
-struct MedianAbsoluteDeviation{T1, T2, T3, T4} <: HierarchicalRiskMeasure
-    settings::T1
-    w::T2
-    mu::T3
-    flag::T4
+@concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
+    settings
+    w
+    mu
+    flag
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:StatsBase.AbstractWeights},
                                      mu::MedAbsDevMu, flag::Bool = true)

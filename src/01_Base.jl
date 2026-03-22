@@ -1,5 +1,5 @@
 """
-    abstract type AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
 
@@ -14,7 +14,7 @@ Estimators consume data to estimate parameters or models. Some estimators may ut
 """
 abstract type AbstractEstimator end
 """
-    abstract type AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
 
@@ -29,7 +29,7 @@ Algorithms are often used by estimators to perform specific tasks. These can be 
 """
 abstract type AbstractAlgorithm end
 """
-    abstract type AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all result types in `PortfolioOptimisers.jl`.
 
@@ -44,7 +44,7 @@ Result types encapsulate the outcomes of estimators. This makes dispatch and usa
 """
 abstract type AbstractResult end
 """
-    @define_pretty_show(T)
+    define_pretty_show(T, flag::Bool = true)
 
 Macro to define a custom pretty-printing `Base.show` method for types in `PortfolioOptimisers.jl`.
 
@@ -138,7 +138,7 @@ macro define_pretty_show(T, flag::Bool = true)
         end)
 end
 """
-    has_pretty_show_method(::Any)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Default method indicating whether a type has a custom pretty-printing `show` method.
 
@@ -162,7 +162,7 @@ has_pretty_show_method(::Clustering.Hclust) = true
 has_pretty_show_method(::Clustering.KmeansResult) = true
 @define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
 """
-    abstract type PortfolioOptimisersError <: Exception end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
 
@@ -176,15 +176,13 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
-    struct IsNothingError{T1} <: PortfolioOptimisersError
-        msg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Exception type thrown when an argument or value is unexpectedly `nothing`.
 
 # Fields
 
-  - `msg`: Error message describing the condition that triggered the exception.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -208,19 +206,18 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
 """
-struct IsNothingError{T1} <: PortfolioOptimisersError
-    msg::T1
+@concrete struct IsNothingError <: PortfolioOptimisersError
+    "error message describing the condition that triggered the exception."
+    msg
 end
 """
-    struct IsEmptyError{T1} <: PortfolioOptimisersError
-        msg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Exception type thrown when an argument or value is unexpectedly empty.
 
 # Fields
 
-  - `msg`: Error message describing the condition that triggered the exception.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -244,19 +241,18 @@ Stacktrace:
   - [`IsNothingError`](@ref)
   - [`IsNonFiniteError`](@ref)
 """
-struct IsEmptyError{T1} <: PortfolioOptimisersError
-    msg::T1
+@concrete struct IsEmptyError <: PortfolioOptimisersError
+    "error message describing the condition that triggered the exception."
+    msg
 end
 """
-    struct IsNonFiniteError{T1} <: PortfolioOptimisersError
-        msg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Exception type thrown when an argument or value is unexpectedly non-finite (e.g., contains `NaN` or `Inf`).
 
 # Fields
 
-  - `msg`: Error message describing the condition that triggered the exception.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -280,8 +276,9 @@ Stacktrace:
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
 """
-struct IsNonFiniteError{T1} <: PortfolioOptimisersError
-    msg::T1
+@concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    "error message describing the condition that triggered the exception."
+    msg
 end
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
@@ -298,7 +295,7 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
 """
-    const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of numeric types or JuMP scalar types.
 
@@ -308,9 +305,9 @@ Alias for an abstract vector of numeric types or JuMP scalar types.
   - [`MatNum`](@ref)
   - [`JuMP.AbstractJuMPScalar`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.JuMP.AbstractJuMPScalar)
 """
-const VecNum = Union{<:AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
+const VecNum = AbstractVector{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 """
-    const VecInt = AbstractVector{<:Integer}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of integer types.
 
@@ -322,7 +319,7 @@ Alias for an abstract vector of integer types.
 """
 const VecInt = AbstractVector{<:Integer}
 """
-    const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract matrix of numeric types or JuMP scalar types.
 
@@ -332,9 +329,9 @@ Alias for an abstract matrix of numeric types or JuMP scalar types.
   - [`ArrNum`](@ref)
   - [`VecMatNum`](@ref)
 """
-const MatNum = Union{<:AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
+const MatNum = AbstractMatrix{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 """
-    const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract array of numeric types or JuMP scalar types.
 
@@ -343,7 +340,7 @@ Alias for an abstract array of numeric types or JuMP scalar types.
   - [`VecNum`](@ref)
   - [`MatNum`](@ref)
 """
-const ArrNum = Union{<:AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}}
+const ArrNum = AbstractArray{<:Union{<:Number, <:JuMP.AbstractJuMPScalar}}
 """
     const VecNum_MatNum = Union{<:VecNum, <:MatNum}
 
@@ -378,7 +375,7 @@ Alias for a union of a numeric type or an abstract array of numeric types.
 """
 const Num_ArrNum = Union{<:Number, <:ArrNum}
 """
-    const PairStrNum = Pair{<:AbstractString, <:Number}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for a pair consisting of an abstract string and a numeric type.
 
@@ -389,7 +386,7 @@ Alias for a pair consisting of an abstract string and a numeric type.
 """
 const PairStrNum = Pair{<:AbstractString, <:Number}
 """
-    const PairGSCV = Pair{<:AbstractString, <:AbstractVector}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for a pair consisting of an abstract string and an abstract vector.
 
@@ -400,7 +397,7 @@ Alias for a pair consisting of an abstract string and an abstract vector.
 """
 const PairGSCV = Pair{<:AbstractString, <:AbstractVector}
 """
-    const DictStrNum = AbstractDict{<:AbstractString, <:Number}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract dictionary with string keys and numeric values.
 
@@ -411,7 +408,7 @@ Alias for an abstract dictionary with string keys and numeric values.
 """
 const DictStrNum = AbstractDict{<:AbstractString, <:Number}
 """
-    const DictGSCV = AbstractDict{<:AbstractString, <:AbstractVector}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract dictionary with string keys and abstract vector values.
 
@@ -447,7 +444,7 @@ Alias for a union of an abstract dictionary with string keys and abstract vector
 """
 const MultiGSCVValType = Union{<:DictGSCV, <:AbstractVector{<:PairGSCV}}
 """
-    const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of `MultiGSCVValType` elements.
 
@@ -461,7 +458,7 @@ Alias for an abstract vector of `MultiGSCVValType` elements.
 const VecMultiGSCVValType = AbstractVector{<:MultiGSCVValType}
 """
     const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
-                                                   <:VecMultiGSCVValType}
+                                                       <:VecMultiGSCVValType}
 
 Alias for a union of `MultiGSCVValType` and `VecMultiGSCVValType` elements.
 
@@ -475,7 +472,7 @@ Alias for a union of `MultiGSCVValType` and `VecMultiGSCVValType` elements.
 const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
                                                    <:VecMultiGSCVValType}
 """
-    abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all estimator value algorithm types in `PortfolioOptimisers.jl`.
 
@@ -487,7 +484,8 @@ Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing
 """
 abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
 """
-    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType, <:AbstractEstimatorValueAlgorithm}
+    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                             <:AbstractEstimatorValueAlgorithm}
 
 Alias for a union of numeric, vector of numeric, string-number pair, or multi-estimator value types.
 
@@ -512,7 +510,7 @@ Alias for a union of abstract string or Julia expression.
 """
 const Str_Expr = Union{<:AbstractString, Expr}
 """
-    const VecStr_Expr = AbstractVector{<:Str_Expr}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of strings or Julia expressions.
 
@@ -534,7 +532,7 @@ Alias for a union of string, Julia expression, or vector of strings/expressions.
 """
 const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
 """
-    const VecVecNum = AbstractVector{<:VecNum}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of numeric vectors.
 
@@ -545,7 +543,7 @@ Alias for an abstract vector of numeric vectors.
 """
 const VecVecNum = AbstractVector{<:VecNum}
 """
-    const VecVecInt = AbstractVector{<:VecInt}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of integer vectors.
 
@@ -566,7 +564,7 @@ Alias for a union of an abstract vector of integers or an abstract vector of int
 """
 const VecInt_VecVecInt = Union{<:VecInt, <:VecVecInt}
 """
-    const VecVecVecInt = AbstractVector{<:VecVecInt}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of abstract vector of integer vectors.
 
@@ -576,7 +574,7 @@ Alias for an abstract vector of abstract vector of integer vectors.
 """
 const VecVecVecInt = AbstractVector{<:VecVecInt}
 """
-    const VecMatNum = AbstractVector{<:MatNum}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of numeric matrices.
 
@@ -587,7 +585,7 @@ Alias for an abstract vector of numeric matrices.
 """
 const VecMatNum = AbstractVector{<:MatNum}
 """
-    const VecStr = Union{<:AbstractVector{<:AbstractString}}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of strings.
 
@@ -596,9 +594,9 @@ Alias for an abstract vector of strings.
   - [`Str_Expr`](@ref)
   - [`VecStr_Expr`](@ref)
 """
-const VecStr = Union{<:AbstractVector{<:AbstractString}}
+const VecStr = AbstractVector{<:AbstractString}
 """
-    const VecPair = AbstractVector{<:Pair}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of pairs.
 
@@ -608,7 +606,7 @@ Alias for an abstract vector of pairs.
 """
 const VecPair = AbstractVector{<:Pair}
 """
-    const VecJuMPScalar = Union{<:AbstractVector{<:JuMP.AbstractJuMPScalar}}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of JuMP scalar types.
 
@@ -660,7 +658,7 @@ Alias for a union of a numeric vector or a vector of numeric vectors.
 """
 const VecNum_VecVecNum = Union{<:VecNum, <:VecVecNum}
 """
-    const VecDate = AbstractVector{<:Dates.AbstractTime}
+$(DocStringExtensions.TYPEDEF)
 
 Alias for an abstract vector of date or time types.
 
@@ -703,10 +701,7 @@ Alias for a union of an abstract string or an abstract vector.
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
 """
-    struct VecScalar{T1, T2} <: AbstractResult
-        v::T1
-        s::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a composite result containing a vector and a scalar in `PortfolioOptimisers.jl`.
 
@@ -714,8 +709,7 @@ Encapsulates a vector and a scalar value, commonly used for storing results that
 
 # Fields
 
-  - `v`: Vector value.
-  - `s`: Scalar value.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -742,9 +736,11 @@ VecScalar
   - [`AbstractResult`](@ref)
   - [`VecNum`](@ref)
 """
-struct VecScalar{T1, T2} <: AbstractResult
-    v::T1
-    s::T2
+@concrete struct VecScalar <: AbstractResult
+    "Vector component."
+    v
+    "Scalar component."
+    s
     function VecScalar(v::VecNum, s::Number)
         assert_nonempty_finite_val(v, :v)
         assert_nonempty_finite_val(s, :s)
@@ -776,6 +772,16 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
   - [`VecScalar`](@ref)
 """
 const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Singleton vector type that represents a vector with a single element with value equal to 1. Used for reducing matrix vector products to dropping the matrix's second dimension.
+
+# Constructors
+
+    SingletonVector()
+"""
 struct SingletonVector{T} <: AbstractVector{T} end
 function SingletonVector()
     return SingletonVector{Int}()
@@ -849,83 +855,75 @@ This dictionary contains the arg_dict terms and their corresponding descriptions
 """
 const arg_dict = Dict(
                       # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector.",
-                      :ow => "`w`: Observation weights vector.",
-                      :oow => "`w`: Optional observation weights vector.",
+                      :pw => "Portfolio weights vector.",
+                      :ow => "Observation weights vector.",
+                      :oow => "Optional observation weights vector.",
                       # Matrix processing.
-                      :pdm => "`pdm`: Positive definite matrix estimator.",
-                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
-                      :dn => "`dn`: Matrix denoising estimator.",
-                      :odn => "`dn`: Optional matrix denoising estimator.",
-                      :dna => "`dna`: Matrix denoising algorithm.",
-                      :dt => "`dt`: Matrix detoning estimator.",
-                      :odt => "`dt`: Optional matrix detoning estimator.",
-                      :mp => "`mp`: Matrix processing estimator.",
-                      :omp => "`mp`: Optional matrix processing estimator.",
-                      :mpa => "`mpa`: Matrix processing algorithm.",
+                      :pdm => "Positive definite matrix estimator.",
+                      :opdm => "Optional positive definite matrix estimator.",
+                      :dn => "Matrix denoising estimator.",
+                      :odn => "Optional matrix denoising estimator.",
+                      :dna => "Matrix denoising algorithm.",
+                      :dt => "Matrix detoning estimator.",
+                      :odt => "Optional matrix detoning estimator.",
+                      :mp => "Matrix processing estimator.",
+                      :omp => "Optional matrix processing estimator.",
+                      :mpa => "Matrix processing algorithm.",
                       # Moments.
-                      :me => "`me`: Expected returns estimator.",
-                      :nme => "`nme`: New expected returns estimator with the appropriate weights applied.",
-                      :ce => "`ce`: Covariance estimator.",#
-                      :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
-                      :ve => "`ve`: Variance estimator.",#
-                      :nve => "`ve`: New variance estimator with the appropriate weights applied.",#
-                      :ske => "`ske`: Coskewness estimator.",
-                      :kte => "`kte`: Cokurtosis estimator.",
-                      :de => "`de`: Distance matrix estimator.",
+                      :me => "Expected returns estimator.",
+                      :nme => "New expected returns estimator with the appropriate weights applied.",
+                      :ce => "Covariance estimator.",#
+                      :nce => "New covariance estimator with the appropriate weights applied.",
+                      :ve => "Variance estimator.",#
+                      :nve => "New variance estimator with the appropriate weights applied.",#
+                      :ske => "Coskewness estimator.", :kte => "Cokurtosis estimator.",
+                      :de => "Distance matrix estimator.",
                       # Priors.
-                      :pe => "`pe`: Prior estimator.",#
-                      :pr => "`pr`: Prior result.",#
-                      :per => "`pr`: Prior estimator or result.",
+                      :pe => "Prior estimator.",#
+                      :pr => "Prior result.",#
+                      :per => "Prior estimator or result.",
                       # Phylogeny.
-                      :cle => "`cle`: Clusters estimator.",#
-                      :clr => "`clr`: Clusters result.",#
-                      :cler => "`clr`: Clusters estimator or result.",#
-                      :ple => "`ple`: Phylogeny estimator.",#
-                      :plr => "`plr`: Phylogeny result.",
-                      :pler => "`pl`: Phylogeny estimator or result.",
-                      :nte => "`nte`: Network estimator.",#
-                      :ntr => "`pl`: Network result.",
-                      :nter => "`pl`: Network estimator or result.",
-                      :cte => "`cte`: Centrality estimator.",#
-                      :cta => "`ct`: Centrality algorithm.",
-                      :ctr => "`ct`: Centrality result.",
-                      :cter => "`ct`: Centrality estimator or result.",
+                      :cle => "Clusters estimator.",#
+                      :clr => "Clusters result.",#
+                      :cler => "Clusters estimator or result.",#
+                      :ple => "Phylogeny estimator.",#
+                      :plr => "Phylogeny result.",
+                      :pler => "Phylogeny estimator or result.",
+                      :nte => "Network estimator.",#
+                      :ntr => "Network result.", :nter => "Network estimator or result.",
+                      :cte => "Centrality estimator.",#
+                      :cta => "Centrality algorithm.", :ctr => "Centrality result.",
+                      :cter => "Centrality estimator or result.",
                       # Turnover.
-                      :tne => "`tn`: Turnover estimator.",#
-                      :tnr => "`tn`: Turnover result.",
-                      :tner => "`tn`: Turnover estimator or result.",
-                      :tnes => "`tn`: Turnover estimator(s).",
-                      :tnrs => "`tn`: Turnover result(s).",
-                      :tners => "`tn`: Turnover estimator(s) or result(s).",
+                      :tne => "Turnover estimator.",#
+                      :tnr => "Turnover result.", :tner => "Turnover estimator or result.",
+                      :tnes => "Turnover estimator(s).", :tnrs => "Turnover result(s).",
+                      :tners => "Turnover estimator(s) or result(s).",
                       # Tracking.
-                      :tre => "`tr`: Tracking error estimator.",
-                      :trr => "`tr`: Tracking error result.",
-                      :trer => "`tr`: Tracking error estimator or result.",
-                      :tres => "`tr`: Tracking error estimator(s).",
-                      :trrs => "`tr`: Tracking error result(s).",
-                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                      :tre => "Tracking error estimator.", :trr => "Tracking error result.",
+                      :trer => "Tracking error estimator or result.",
+                      :tres => "Tracking error estimator(s).",
+                      :trrs => "Tracking error result(s).",
+                      :trers => "Tracking error estimator(s) or result(s).",
                       # Weight bounds.
-                      :wbe => "`wb`: Weight bounds estimator.",
-                      :wbr => "`wb`: Weight bounds result.",
-                      :wber => "`wb`: Weight bounds estimator or result.",
+                      :wbe => "Weight bounds estimator.", :wbr => "Weight bounds result.",
+                      :wber => "Weight bounds estimator or result.",
                       # Fees.
-                      :feese => "`fees`: Fees estimator.",#
-                      :feesr => "`fees`: Fees result.",
-                      :feeser => "`fees`: Fees estimator or result.",
+                      :feese => "Fees estimator.",#
+                      :feesr => "Fees result.", :feeser => "Fees estimator or result.",
                       # Stats.
-                      :sigma => "`sigma`: Covariance matrix.",#
-                      :mu => "`mu`: Expected returns vector.",#
-                      :rho => "`rho`: Correlation matrix.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
-                      :kt => "`kt`: Cokurtosis matrix.",#
-                      :sk => "`sk`: Coskewness matrix.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
-                      :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.",#
-                      :Xv => "`X`: Data vector.",#
-                      :dims => "`dims`: Dimensions along which to perform the computation.")
+                      :sigma => "Covariance matrix.",#
+                      :mu => "Expected returns vector.",#
+                      :rho => "Correlation matrix.",
+                      :sigrho => "Covariance-like or correlation-like matrix.",
+                      :sigrhoX => "Covariance-like or correlation-like matrix.",
+                      :kt => "Cokurtosis matrix.",#
+                      :sk => "Coskewness matrix.",#
+                      :V => "Sum of the negative spectral slices of the cokurtosis matrix",
+                      :X => "Data matrix.",#
+                      :F => "Data matrix.",#
+                      :Xv => "Data vector.",#
+                      :dims => "Dimensions along which to perform the computation.")
 
 """
     val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")

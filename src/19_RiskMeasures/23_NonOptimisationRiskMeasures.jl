@@ -1,6 +1,6 @@
-struct MeanReturn{T1, T2} <: NonOptimisationRiskMeasure
-    w::T1
-    flag::T2
+@concrete struct MeanReturn <: NonOptimisationRiskMeasure
+    w
+    flag
     function MeanReturn(w::Option{<:StatsBase.AbstractWeights}, flag::Bool)
         if !isnothing(w)
             @argcheck(!isempty(w))
@@ -24,10 +24,10 @@ end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
     return r
 end
-struct MeanReturnRiskRatio{T1, T2, T3} <: NonOptimisationRiskMeasure
-    rt::T1
-    rk::T2
-    rf::T3
+@concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
+    rt
+    rk
+    rf
     function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
@@ -48,9 +48,9 @@ end
 function needs_previous_weights(r::MeanReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
-struct ThirdCentralMoment{T1, T2} <: NonOptimisationRiskMeasure
-    w::T1
-    mu::T2
+@concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
+    w
+    mu
     function ThirdCentralMoment(w::Option{<:StatsBase.AbstractWeights},
                                 mu::Option{<:Num_VecNum_VecScalar})
         if !isnothing(w)
@@ -66,10 +66,10 @@ function ThirdCentralMoment(; w::Option{<:StatsBase.AbstractWeights} = nothing,
                             mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
-struct Skewness{T1, T2, T3} <: NonOptimisationRiskMeasure
-    ve::T1
-    w::T2
-    mu::T3
+@concrete struct Skewness <: NonOptimisationRiskMeasure
+    ve
+    w
+    mu
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:StatsBase.AbstractWeights},
                       mu::Option{<:Num_VecNum_VecScalar})
         if !isnothing(w)

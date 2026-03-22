@@ -91,12 +91,12 @@ FactorPrior
   - [`SimpleVariance`](@ref)
   - [`prior`](@ref)
 """
-struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
-    pe::T1
-    mp::T2
-    re::T3
-    ve::T4
-    rsd::T5
+@concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
+    pe
+    mp
+    re
+    ve
+    rsd
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
                          re::AbstractRegressionEstimator, ve::AbstractVarianceEstimator,

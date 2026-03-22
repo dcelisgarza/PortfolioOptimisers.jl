@@ -43,39 +43,47 @@ function pre_process_content_nb(content)
 end
 
 fix_suffix_md(filename) = replace(filename, ".jl" => ".md")
-function postprocess(cont)
-    return """
-           The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
-           """ * cont
-end
 
-example_path = joinpath(@__DIR__, "../examples/")
-build_path_md = joinpath(@__DIR__, "src", "examples/")
-files = readdir(example_path)
-code_files = filter(x -> endswith(x, ".jl"), files)
-data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
-example_pages = fix_suffix_md.("examples/" .* code_files)
-
-for file in data_files
-    if isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, "../examples/" * file))`))))
-        continue
+function generate_files(source::String, build::String, diff_flag::Bool)
+    function postprocess(cont)
+        return """
+               The source files can be found in [$(build)](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/$(build)).
+               """ * cont
     end
-    cp(joinpath(@__DIR__, "../examples/" * file),
-       joinpath(@__DIR__, "src/examples/" * file); force = true)
+
+    src_path = joinpath(@__DIR__, source)
+    build_path = joinpath(@__DIR__, "src", build)
+    files = readdir(src_path)
+    code_files = filter(x -> endswith(x, ".jl"), files)
+    data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
+    pages = fix_suffix_md.(build .* code_files)
+
+    for file in data_files
+        if isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, source, file))`))))
+            continue
+        end
+        cp(joinpath(@__DIR__, source, file), joinpath(@__DIR__, "src", build, file);
+           force = true)
+    end
+
+    for file in code_files
+        if diff_flag &&
+           isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, source, file))`))))
+            continue
+        end
+        Literate.markdown(src_path * file, build_path; preprocess = pre_process_content_md,
+                          postprocess = postprocess, documenter = true, credit = true)
+        Literate.notebook(src_path * file, src_path; preprocess = pre_process_content_nb,
+                          documenter = true, credit = true)
+    end
+
+    return pages
 end
 
-diff_flags = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
-for file in code_files
-    if diff_flags &&
-       isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, "../examples/" * file))`))))
-        continue
-    end
-    Literate.markdown(example_path * file, build_path_md;
-                      preprocess = pre_process_content_md, postprocess = postprocess,
-                      documenter = true, credit = true)
-    Literate.notebook(example_path * file, example_path;
-                      preprocess = pre_process_content_nb, documenter = true, credit = true)
-end
+diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
+
+examples = generate_files("../examples/", "examples/", diff_flag)
+user_guide = generate_files("../user_guide/", "user_guide/", diff_flag)
 
 root_pages = [file
               for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]
@@ -92,7 +100,8 @@ makedocs(; #modules = [PortfolioOptimisers],
          format = DocumenterVitepress.MarkdownVitepress(;
                                                         repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
          pages = ["Home" => root_pages[1];
-                  "Examples" => example_pages;
+                  "Examples" => examples;
+                  "User Guide" => user_guide;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
                             "Moments" => joinpath.(api_pages[2][1][idx1:end],
                                                    api_pages[2][3])
@@ -107,14 +116,14 @@ makedocs(; #modules = [PortfolioOptimisers],
                                                             api_pages[7][3])
                             "Risk Measures" => joinpath.(api_pages[8][1][idx1:end],
                                                          api_pages[8][3])
-                            "Optimisation" => joinpath.(api_pages[9][1][idx1:end],
-                                                        api_pages[9][3])
-                            "Cross Validation" => joinpath.(api_pages[10][1][idx1:end],
-                                                            api_pages[10][3])
-                            "Constraints" => joinpath.(api_pages[11][1][idx1:end],
-                                                       api_pages[11][3])
-                            "Risk Constraints" => joinpath.(api_pages[12][1][idx1:end],
-                                                            api_pages[12][3])];
+                            "Optimisation" => [joinpath.(api_pages[9][1][idx1:end],
+                                                         api_pages[9][3]);
+                                               joinpath.(api_pages[10][1][idx1:end],
+                                                         api_pages[10][3]);
+                                               joinpath.(api_pages[11][1][idx1:end],
+                                                         api_pages[11][3]);
+                                               joinpath.(api_pages[12][1][idx1:end],
+                                                         api_pages[12][3])]];
                   "Contribute" => contribute;
                   "References" => root_pages[2]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");

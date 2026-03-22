@@ -77,12 +77,12 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
         end
     end
 end
-struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    kappa::T4
-    w::T5
+@concrete struct RelativisticValueatRisk <: RiskMeasure
+    settings
+    slv
+    alpha
+    kappa
+    w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
                                      kappa::Number, w::Option{<:StatsBase.AbstractWeights})
@@ -110,14 +110,14 @@ end
 function (r::RelativisticValueatRisk)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
-struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    kappa_a::T4
-    beta::T5
-    kappa_b::T6
-    w::T7
+@concrete struct RelativisticValueatRiskRange <: RiskMeasure
+    settings
+    slv
+    alpha
+    kappa_a
+    beta
+    kappa_b
+    w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
                                           slv::Option{<:Slv_VecSlv}, alpha::Number,
                                           kappa_a::Number, beta::Number, kappa_b::Number,
@@ -155,12 +155,12 @@ function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
 end
-struct RelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    kappa::T4
-    w::T5
+@concrete struct RelativisticDrawdownatRisk <: RiskMeasure
+    settings
+    slv
+    alpha
+    kappa
+    w
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number,
                                         w::Option{<:StatsBase.AbstractWeights})
@@ -189,12 +189,12 @@ function (r::RelativisticDrawdownatRisk)(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
 end
-struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4, T5} <: HierarchicalRiskMeasure
-    settings::T1
-    slv::T2
-    alpha::T3
-    kappa::T4
-    w::T5
+@concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
+    settings
+    slv
+    alpha
+    kappa
+    w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,
                                                 kappa::Number,

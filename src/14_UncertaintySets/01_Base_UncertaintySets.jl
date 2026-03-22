@@ -333,9 +333,9 @@ BoxUncertaintySet
   - [`AbstractUncertaintySetResult`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
-    lb::T1
-    ub::T2
+@concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
+    lb
+    ub
     function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
         @argcheck(!isempty(lb))
         @argcheck(!isempty(ub))
@@ -388,8 +388,8 @@ NormalKUncertaintyAlgorithm
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
 """
-struct NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
-    kwargs::T1
+@concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
+    kwargs
     function NormalKUncertaintyAlgorithm(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
     end
@@ -515,9 +515,9 @@ EllipsoidalUncertaintySetAlgorithm
   - [`EllipsoidalUncertaintySet`](@ref)
   - [`BoxUncertaintySetAlgorithm`](@ref)
 """
-struct EllipsoidalUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
-    method::T1
-    diagonal::T2
+@concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
+    method
+    diagonal
     function EllipsoidalUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
     end
@@ -612,10 +612,10 @@ EllipsoidalUncertaintySet
   - [`BoxUncertaintySet`](@ref)
   - [`k_ucs`](@ref)
 """
-struct EllipsoidalUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
-    sigma::T1
-    k::T2
-    class::T3
+@concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
+    sigma
+    k
+    class
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractEllipsoidalUncertaintySetResultClass)
         @argcheck(!isempty(sigma))

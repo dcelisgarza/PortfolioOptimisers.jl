@@ -1,6 +1,6 @@
-struct OptimisationCrossValidation{T1, T2} <: AbstractEstimator
-    cv::T1
-    scorer::T2
+@concrete struct OptimisationCrossValidation <: AbstractEstimator
+    cv
+    scorer
     function OptimisationCrossValidation(cv::OptCVER,
                                          scorer::Option{<:PredictionCrossValScorer})
         return new{typeof(cv), typeof(scorer)}(cv, scorer)

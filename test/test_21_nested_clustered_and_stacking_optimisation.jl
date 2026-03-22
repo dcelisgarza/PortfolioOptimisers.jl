@@ -183,7 +183,7 @@
                                 opto = NearOptimalCentering(; opt = jopto)),
                 NestedClustered(; cle = clr,
                                 opti = RiskBudgeting(;
-                                                     rba = AssetRiskBudgeting(;
+                                                     rba = AssetRiskBudgeting(; sets = sets,
                                                                               rkb = RiskBudgetEstimator(;
                                                                                                         val = UniformValues())),
                                                      opt = jopti),

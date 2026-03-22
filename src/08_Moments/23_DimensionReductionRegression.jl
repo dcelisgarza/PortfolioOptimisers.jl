@@ -51,8 +51,8 @@ PCA
   - [`DimensionReductionRegression`](@ref)
   - [`PPCA`](@ref)
 """
-struct PCA{T1} <: DimensionReductionTarget
-    kwargs::T1
+@concrete struct PCA <: DimensionReductionTarget
+    kwargs
     function PCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
     end
@@ -118,8 +118,8 @@ PPCA
   - [`DimensionReductionRegression`](@ref)
   - [`PCA`](@ref)
 """
-struct PPCA{T1} <: DimensionReductionTarget
-    kwargs::T1
+@concrete struct PPCA <: DimensionReductionTarget
+    kwargs
     function PPCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
     end
@@ -209,11 +209,11 @@ DimensionReductionRegression
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
-struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
-    me::T1
-    ve::T2
-    drtgt::T3
-    retgt::T4
+@concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
+    me
+    ve
+    drtgt
+    retgt
     function DimensionReductionRegression(me::AbstractExpectedReturnsEstimator,
                                           ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,

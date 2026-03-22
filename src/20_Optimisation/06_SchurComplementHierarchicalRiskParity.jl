@@ -1,14 +1,14 @@
 const Sd_Var = Union{<:StandardDeviation, <:Variance}
-struct SchurComplementHierarchicalRiskParityResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pr::T2
-    wb::T3
-    clr::T4
-    gamma::T5
-    retcode::T6
-    w::T7
-    fb::T8
+@concrete struct SchurComplementHierarchicalRiskParityResult <:
+                 NonFiniteAllocationOptimisationResult
+    oe
+    pr
+    wb
+    clr
+    gamma
+    retcode
+    w
+    fb
 end
 function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
     return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
@@ -16,11 +16,11 @@ function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:
 end
 abstract type SchurComplementAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
-struct MonotonicSchurComplement{T1, T2, T3, T4} <: SchurComplementAlgorithm
-    N::T1
-    tol::T2
-    iter::T3
-    strict::T4
+@concrete struct MonotonicSchurComplement <: SchurComplementAlgorithm
+    N
+    tol
+    iter
+    strict
     function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
                                       strict::Bool)
         @argcheck(N > 0)
@@ -36,12 +36,12 @@ function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
                                   iter::Option{<:Integer} = nothing, strict::Bool = false)
     return MonotonicSchurComplement(N, tol, iter, strict)
 end
-struct SchurComplementParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
-    r::T1
-    gamma::T2
-    pdm::T3
-    alg::T4
-    flag::T5
+@concrete struct SchurComplementParams <: AbstractAlgorithm
+    r
+    gamma
+    pdm
+    alg
+    flag
     function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
                                    alg::SchurComplementAlgorithm, flag::Bool)
         @argcheck(one(gamma) >= gamma >= zero(gamma))
@@ -65,10 +65,10 @@ function schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
 end
-struct SchurComplementHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisationEstimator
-    opt::T1
-    params::T2
-    fb::T3
+@concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
+    opt
+    params
+    fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
                                                    fb::Option{<:OptE_Opt})

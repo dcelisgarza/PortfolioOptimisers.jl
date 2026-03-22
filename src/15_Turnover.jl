@@ -74,11 +74,11 @@ TurnoverEstimator
   - [`Option`](@ref)
   - [`turnover_constraints`](@ref)
 """
-struct TurnoverEstimator{T1, T2, T3, T4} <: AbstractEstimator
-    w::T1
-    val::T2
-    dval::T3
-    fixed::T4
+@concrete struct TurnoverEstimator <: AbstractEstimator
+    w
+    val
+    dval
+    fixed
     function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
                                fixed::Bool)
         assert_nonempty_finite_val(w, :w)
@@ -345,10 +345,10 @@ Turnover
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
   - [`turnover_view`](@ref)
 """
-struct Turnover{T1, T2, T3} <: AbstractResult
-    w::T1
-    val::T2
-    fixed::T3
+@concrete struct Turnover <: AbstractResult
+    w
+    val
+    fixed
     function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)

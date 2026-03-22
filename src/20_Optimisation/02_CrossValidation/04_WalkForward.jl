@@ -1,7 +1,7 @@
 abstract type WalkForwardEstimator <: SequentialCrossValidationEstimator end
-struct WalkForwardResult{T1, T2} <: SequentialCrossValidationResult
-    train_idx::T1
-    test_idx::T2
+@concrete struct WalkForwardResult <: SequentialCrossValidationResult
+    train_idx
+    test_idx
     function WalkForwardResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx))
         @argcheck(!isempty(test_idx))
@@ -65,12 +65,12 @@ IndexWalkForward
   - [`split`]-(@ref)
   - [`n_splits`]-(@ref)
 """
-struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
-    train_size::T1
-    test_size::T2
-    purged_size::T3
-    expend_train::T4
-    reduce_test::T5
+@concrete struct IndexWalkForward <: WalkForwardEstimator
+    train_size
+    test_size
+    purged_size
+    expend_train
+    reduce_test
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
                               expend_train::Bool, reduce_test::Bool)
         assert_nonempty_nonneg_finite_val(test_size, :test_size)
@@ -197,16 +197,16 @@ DateWalkForward
   - [`split`]-(@ref)
   - [`n_splits`]-(@ref)
 """
-struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimator
-    train_size::T1
-    test_size::T2
-    period::T3
-    period_offset::T4
-    purged_size::T5
-    adjuster::T6
-    previous::T7
-    expend_train::T8
-    reduce_test::T9
+@concrete struct DateWalkForward <: WalkForwardEstimator
+    train_size
+    test_size
+    period
+    period_offset
+    purged_size
+    adjuster
+    previous
+    expend_train
+    reduce_test
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
                              period::DatesUnionPeriod,
                              period_offset::Option{<:DatesUnionPeriod},

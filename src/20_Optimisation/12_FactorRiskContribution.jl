@@ -1,13 +1,12 @@
-struct FactorRiskContributionResult{T1, T2, T3, T4, T5, T6, T7, T8} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pa::T2
-    rr::T3
-    frc_plr::T4
-    retcode::T5
-    sol::T6
-    model::T7
-    fb::T8
+@concrete struct FactorRiskContributionResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pa
+    rr
+    frc_plr
+    retcode
+    sol
+    model
+    fb
 end
 function factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt})
     return FactorRiskContributionResult(res.oe, res.pa, res.rr, res.frc_plr, res.retcode,
@@ -26,17 +25,16 @@ function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
         getfield(r, sym)
     end
 end
-struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
-       RiskJuMPOptimisationEstimator
-    opt::T1
-    re::T2
-    r::T3
-    obj::T4
-    frc_ple::T5
-    sets::T6
-    wi::T7
-    flag::T8
-    fb::T9
+@concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
+    opt
+    re
+    r
+    obj
+    frc_ple
+    sets
+    wi
+    flag
+    fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,
                                     frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC},

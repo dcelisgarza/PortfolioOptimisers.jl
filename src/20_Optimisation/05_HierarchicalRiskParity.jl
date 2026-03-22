@@ -1,8 +1,8 @@
-struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
-    opt::T1
-    r::T2
-    sca::T3
-    fb::T4
+@concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
+    opt
+    r
+    sca
+    fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)

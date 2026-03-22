@@ -91,14 +91,14 @@ Kurtosis
   - [`HighOrderPrior`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
-    settings::T1
-    w::T2
-    mu::T3
-    kt::T4
-    N::T5
-    alg1::T6
-    alg2::T7
+@concrete struct Kurtosis <: RiskMeasure
+    settings
+    w
+    mu
+    kt
+    N
+    alg1
+    alg2
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:StatsBase.AbstractWeights},
                       mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
                       N::Option{<:Integer}, alg1::AbstractMomentAlgorithm,

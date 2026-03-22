@@ -51,11 +51,11 @@ CombinatorialCrossValidation
   - [`split`]-(@ref)
   - [`n_splits`]-(@ref)
 """
-struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidationEstimator
-    n_folds::T1
-    n_test_folds::T2
-    purged_size::T3
-    embargo_size::T4
+@concrete struct CombinatorialCrossValidation <: NonSequentialCrossValidationEstimator
+    n_folds
+    n_test_folds
+    purged_size
+    embargo_size
     function CombinatorialCrossValidation(n_folds::Integer, n_test_folds::Integer,
                                           purged_size::Integer, embargo_size::Integer,
                                           warn_comb::Integer = 100_000)
@@ -76,10 +76,10 @@ function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Int
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
                                         warn_comb)
 end
-struct CombinatorialCrossValidationResult{T1, T2, T3} <: NonSequentialCrossValidationResult
-    train_idx::T1
-    test_idx::T2
-    path_ids::T3
+@concrete struct CombinatorialCrossValidationResult <: NonSequentialCrossValidationResult
+    train_idx
+    test_idx
+    path_ids
     function CombinatorialCrossValidationResult(train_idx::VecVecInt,
                                                 test_idx::VecVecVecInt,
                                                 path_ids::AbstractMatrix{<:Integer})

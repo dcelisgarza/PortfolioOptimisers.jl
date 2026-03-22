@@ -8,27 +8,26 @@ end
 function assert_external_optimiser(::NaiveOptimisationEstimator)
     return nothing
 end
-struct NaiveOptimisationResult{T1, T2, T3, T4, T5, T6} <:
-       NonFiniteAllocationOptimisationResult
-    oe::T1
-    pr::T2
-    wb::T4
-    retcode::T5
-    w::T3
-    fb::T6
+@concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
+    oe
+    pr
+    wb
+    retcode
+    w
+    fb
 end
 function factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
-struct InverseVolatility{T1, T2, T3, T4, T5, T6, T7, T8} <: NaiveOptimisationEstimator
-    pe::T1
-    wb::T2
-    sets::T3
-    wf::T4
-    fb::T5
-    sq::T6
-    brt::T7
-    strict::T8
+@concrete struct InverseVolatility <: NaiveOptimisationEstimator
+    pe
+    wb
+    sets
+    wf
+    fb
+    sq
+    brt
+    strict
     function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                wf::WeightFinaliser, fb::Option{<:OptE_Opt}, sq::Bool,
                                brt::Bool, strict::Bool)
@@ -55,7 +54,7 @@ end
 function opt_view(opt::InverseVolatility, i, args...)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                              sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
@@ -83,12 +82,12 @@ function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
-struct EqualWeighted{T1, T2, T3, T4, T5} <: NaiveOptimisationEstimator
-    wb::T1
-    sets::T2
-    wf::T3
-    fb::T4
-    strict::T5
+@concrete struct EqualWeighted <: NaiveOptimisationEstimator
+    wb
+    sets
+    wf
+    fb
+    strict
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                            wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
@@ -112,7 +111,7 @@ function factory(opt::EqualWeighted, w::AbstractVector)
 end
 function opt_view(opt::EqualWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                          strict = opt.strict)
 end
@@ -131,15 +130,15 @@ function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
-struct RandomWeighted{T1, T2, T3, T4, T5, T6, T7, T8} <: NaiveOptimisationEstimator
-    alpha::T1
-    rng::T2
-    seed::T3
-    wb::T4
-    sets::T5
-    wf::T6
-    fb::T7
-    strict::T8
+@concrete struct RandomWeighted <: NaiveOptimisationEstimator
+    alpha
+    rng
+    seed
+    wb
+    sets
+    wf
+    fb
+    strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::Option{<:WbE_Wb},
                             sets::Option{<:AssetSets}, wf::WeightFinaliser,
@@ -170,7 +169,7 @@ function factory(opt::RandomWeighted, w::AbstractVector)
 end
 function opt_view(opt::RandomWeighted, i, args...)
     wb = weight_bounds_view(opt.wb, i)
-    sets = nothing_asset_sets_view(opt.sets, i)
+    sets = asset_sets_view(opt.sets, i)
     alpha = nothing_scalar_array_view(opt.alpha, i)
     return RandomWeighted(; alpha = alpha, rng = opt.rng, seed = opt.seed, wb = wb,
                           sets = sets, wf = opt.wf, fb = opt.fb, strict = opt.strict)

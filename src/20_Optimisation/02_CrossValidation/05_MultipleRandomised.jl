@@ -1,12 +1,11 @@
-struct MultipleRandomised{T1, T2, T3, T4, T5, T6, T7} <:
-       NonOptimisationSequentialCrossValidationEstimator
-    cv::T1
-    subset_size::T2
-    n_subsets::T3
-    max_comb::T4
-    window_size::T5
-    rng::T6
-    seed::T7
+@concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
+    cv
+    subset_size
+    n_subsets
+    max_comb
+    window_size
+    rng
+    seed
     function MultipleRandomised(cv::WalkForwardEstimator, subset_size::Integer,
                                 n_subsets::Integer, max_comb::Integer,
                                 window_size::Option{<:Integer}, rng::Random.AbstractRNG,
@@ -30,12 +29,11 @@ function MultipleRandomised(cv::WalkForwardEstimator; subset_size::Integer = 1,
                             seed::Option{<:Integer} = nothing)
     return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
 end
-struct MultipleRandomisedResult{T1, T2, T3, T4} <:
-       NonOptimisationSequentialCrossValidationResult
-    train_idx::T1
-    test_idx::T2
-    asset_idx::T3
-    path_ids::T4
+@concrete struct MultipleRandomisedResult <: NonOptimisationSequentialCrossValidationResult
+    train_idx
+    test_idx
+    asset_idx
+    path_ids
     function MultipleRandomisedResult(train_idx::VecVecInt, test_idx::VecVecInt,
                                       asset_idx::VecVecInt, path_ids::VecInt)
         @argcheck(!isempty(train_idx))

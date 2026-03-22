@@ -5,9 +5,9 @@ abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 function set_budget_costs!(args...)
     return nothing
 end
-struct BudgetRange{T1, T2} <: BudgetEstimator
-    lb::T1
-    ub::T2
+@concrete struct BudgetRange <: BudgetEstimator
+    lb
+    ub
     function BudgetRange(lb::Option{<:Number}, ub::Option{<:Number})
         lb_flag = isnothing(lb)
         ub_flag = isnothing(ub)
@@ -34,13 +34,13 @@ end
 function set_budget_constraints!(args...)
     return nothing
 end
-struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
-    bgt::T1
-    w::T2
-    vp::T3
-    vn::T4
-    up::T5
-    un::T6
+@concrete struct BudgetCosts <: BudgetCostEstimator
+    bgt
+    w
+    vp
+    vn
+    up
+    un
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                          up::Num_VecNum, un::Num_VecNum)
         @argcheck(!isempty(w))
@@ -88,14 +88,14 @@ function budget_view(bgt::BudgetCosts, i)
     un = nothing_scalar_array_view(bgt.un, i)
     return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
 end
-struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
-    bgt::T1
-    w::T2
-    vp::T3
-    vn::T4
-    up::T5
-    un::T6
-    beta::T7
+@concrete struct BudgetMarketImpact <: BudgetCostEstimator
+    bgt
+    w
+    vp
+    vn
+    up
+    un
+    beta
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                                 up::Num_VecNum, un::Num_VecNum, beta::Number)
         @argcheck(!isempty(w))

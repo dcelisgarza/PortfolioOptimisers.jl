@@ -2,10 +2,10 @@ abstract type BrownianDistanceVarianceFormulation <: AbstractAlgorithm end
 struct NormOneConeBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
-struct BrownianDistanceVariance{T1, T2, T3} <: RiskMeasure
-    settings::T1
-    alg1::T2
-    alg2::T3
+@concrete struct BrownianDistanceVariance <: RiskMeasure
+    settings
+    alg1
+    alg2
     function BrownianDistanceVariance(settings::RiskMeasureSettings,
                                       alg1::BDVarRkFormulations,
                                       alg2::BrownianDistanceVarianceFormulation)
