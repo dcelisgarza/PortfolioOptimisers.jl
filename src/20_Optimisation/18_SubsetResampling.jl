@@ -37,7 +37,8 @@ end
                               opt::NonFiniteAllocationOptimisationEstimator,
                               wf::WeightFinaliser, ex::FLoops.Transducers.Executor,
                               subset_size::Number, n_subsets::Integer, max_comb::Integer,
-                              rng::Random.AbstractRNG, seed::Option{<:Integer})
+                              rng::Random.AbstractRNG, seed::Option{<:Integer},
+                              fb::Option{<:OptE_Opt}, brt::Bool, strict::Bool)
         assert_external_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -82,9 +83,9 @@ function assert_internal_optimiser(opt::SubsetResampling)
     return assert_internal_optimiser(opt.opt)
 end
 function needs_previous_weights(opt::SubsetResampling)
-    return needs_previous_weights(opt.fees) ||
-           needs_previous_weights(opt.opt) ||
-           needs_previous_weights(opt.fb)
+    return (needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.fb))
 end
 function factory(sr::SubsetResampling, w::AbstractVector)
     fees = factory(sr.fees, w)

@@ -154,10 +154,10 @@ Since the package's structs are all immutable, we provide factory functions that
 ## All priors are the same so we can use the first one
 pr = ress[1].pr
 
-## This generates the variance risk measure with the right covariance matrix.
-## Alternatively, we could do `Variance(; sigma = pr.sigma)`, but factory
+## This generates the standard deviation risk measure with the right covariance matrix.
+## Alternatively, we could do `StandardDeviation(; sigma = pr.sigma)`, but factory
 ## functions let you do this programmatically.
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## There are `ArithmeticReturns` (default) and `LogarithmicReturns`.
 ret = mr1.opt.ret
@@ -175,7 +175,7 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
              formatters = [resfmt], title = "Composition")
 
 ## Display statistics
-pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'),
                             [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn]));
              formatters = [resfmt], title = "Statistics")
@@ -310,7 +310,7 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
              formatters = [resfmt], title = "Composition")
 
 ## Display statistics
-pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'),
                             [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn]));
              formatters = [resfmt], title = "Statistics")
@@ -483,7 +483,7 @@ View and compute the results.
 pr = ress[1].pr
 
 ## Generate the risk measure with the appropriate covariance matrix
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## Compute and normalise the risk contributions for each estimator
 rkcs = [risk_contribution(r, res.w, pr.X) for res in ress]
@@ -519,7 +519,7 @@ View and compute the results.
 
 ## Construct the variance with the appropriate covariance matrix
 pr = res.pr
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## Compute the risk, return and risk adjusted return
 rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
@@ -529,7 +529,7 @@ pretty_table(DataFrame(:assets => rd.nx, :Weights => res.w); formatters = [resfm
              title = "Composition")
 
 ## Display risk, return and risk adjusted return
-pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
+pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt],
              title = "Statistics")
 
@@ -582,7 +582,7 @@ We can compute the statistics and visualise the results of each estimator.
 pr = ress[1].pr
 
 ## Generate the risk measure with the appropriate covariance matrix
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## Compute the risk, return and risk adjusted return of all results
 rk_rt_ratio = [expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr) for res in ress]
@@ -597,7 +597,7 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
              formatters = [resfmt], title = "Composition")
 
 ## Display statistics
-pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'),
                             ["HRP", "gamma = 0", "MVO", "gamma = 1", "gamma = :max"]));
              formatters = [resfmt], title = "Statistics")
@@ -631,7 +631,7 @@ We can view the results and verify that for the originsl formulation, all assets
 pr = ress[1].pr
 
 ## Generate the risk measure with the appropriate covariance matrix
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## Compute the risk, return and risk adjusted return of all results
 rk_rt_ratio = [expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr) for res in ress]
@@ -645,7 +645,7 @@ pretty_table(DataFrame(:assets => rd.nx, :cluster => assignments(res.clr),
              formatters = [resfmt], title = "Composition")
 
 ## Display statistics
-pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'), [:Original, :Flipped]));
              formatters = [resfmt], title = "Statistics")
 
@@ -657,6 +657,8 @@ The [`NestedClustered`]-(@ref) optimiser uses the same idea as the [`Hierarchica
 It is also possible to optimise the outer estimator by using cross-validation via the `cv` keyword. If provided, a cross-validation prediction is applied to the inner estimators, yielding a predicted returns series for each cluster. The returns vector for each cluster is then taken as the returns vector for a synthetic asset. These are placed into a matrix which is used to optimise the outer estimator. When not using a cross-validation approach, the returns of the synthetic assets are computed directly by multiplying the original returns matrix by an `N×C` matrix, where `N` is the number of assets and `C` is the number of clusters. This weights matrix contains the inner weights of the assets in each cluster, if an asset is not in a cluster, its weight in the corresponding column is 0.
 
 The outer optimisation is performed using the synthetic asset returns matrix using the `opto` estimator. The final weights are computed by multiplying the `N×C` inner weights matrix by the `C×1` outer weights vector, where `N` is the number of assets and `C` is the number of clusters.
+
+[`NestedClustered`]-(@ref) can take any non finite allocation optimiser as the inner or outer optimiser.
 =#
 
 ## We'll use the same optimiser for all optimisations
@@ -686,7 +688,7 @@ We can compute some risk characteristics and visualise the results. We can see h
 pr = ress[1].pr
 
 ## Generate the risk measure with the appropriate covariance matrix
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## Compute the risk, return and risk adjusted return of all results
 rk_rt_ratio = [expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr) for res in ress]
@@ -701,19 +703,19 @@ pretty_table(hcat(DataFrame(:assets => rd.nx, :clusters => assignments(ress[1].c
              formatters = [resfmt], title = "Composition")
 
 ## Display statistics
-pretty_table(hcat(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"]),
+pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'),
                             ["EW-RB", "MR-MR", "NC-HERC-RB_NC-RB-MR"]));
              formatters = [resfmt])
 
 #=
-#### 2.3.5 Stacking optimisation
+#### 2.4 Stacking optimisation
 
 The [`Stacking`]-(@ref) optimiser uses a similar approach to [`NestedClustered`]-(@ref), but instead of using a single inner estimator, it uses a vector of estimators, inheriting the requirements of each estimator being used.
 
 The inner weights matrix is constructed by horizontally concatenating the weights returned by optimising each inner estimator. The returns series used in the outer optimisation can be computed using the same approaches as in [`NestedClustered`]-(@ref). The final weights are also computed the same way. It is also possible to provide a vector of weights by which to scale the weights of each inner estimator in order to bias the computation of the outer returns series in favour or against a particular estimator.
 
-[`Stacking`]-(@ref) can be used in [`NestedClustered`]-(@ref) and vice-versa.
+[`Stacking`]-(@ref) can take any non finite allocation optimiser as the inner or outer optimiser.
 
 The keywords for the inner and outer optimisers are the same as [`NestedClustered`]-(@ref).
 =#
@@ -738,7 +740,7 @@ Compute and view the results.
 pr = res.pr
 
 ## Construct the risk measure with the right covariance matrix
-r = factory(Variance(), pr)
+r = factory(StandardDeviation(), pr)
 
 ## Compute the risk, return, and risk adjusted return ratio
 rk, rt, ratio = expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr)
@@ -748,6 +750,60 @@ pretty_table(DataFrame(:assets => rd.nx, :Weights => res.w); formatters = [resfm
              title = "Composition")
 
 ## Display statistics
-pretty_table(DataFrame(:Stat => ["Variance", "Return", "Return/Variance"],
+pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt],
              title = "Statistics")
+
+#=
+#### 2.5 Subset resampling optimisation
+
+The [`SubsetResampling`]-(@ref) optimiser takes given number of random subsets of the data and optimises those subsets using the given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero. It is possible to provide a `subset_size` keyword can be a float between (0, 1) in which case it specifies a proportion of the data to use in each subset, or an integer which directly specifies subset size. It is also possible to provide a `n_subsets` keyword to specify the number of subsets to use.
+
+In escence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`]-(@ref) optimiser. If `subset_size` is 1, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`]-(@ref) optimiser.
+
+The samples are unique and drawn without replacement.
+=#
+
+## We'll use the same optimiser
+opt = JuMPOptimiser(; slv = slv)
+
+## Mean risk for comparison
+mr = MeanRisk(; opt = opt)
+
+## Use 80% of the number of assets and take 10 samples
+sr1 = SubsetResampling(; rng = StableRNG(666), subset_size = 0.8,
+                       opt = MeanRisk(; opt = opt), n_subsets = 10)
+
+## All weights are equal, the rng does not matter
+sr2 = SubsetResampling(; subset_size = 1, opt = MeanRisk(; opt = opt),
+                       n_subsets = size(rd.X, 2))
+
+## Optimise all estimators at once using broadcasting
+ress = optimise.([mr, sr1, sr2], rd);
+
+#=
+Compute and view the results.
+=#
+
+## All priors are the same so we can use the first one
+pr = ress[1].pr
+
+## Construct the risk measure with the right covariance matrix
+r = factory(StandardDeviation(), pr)
+
+## Compute the risk, return and risk adjusted return of all results
+rk_rt_ratio = [expected_risk_ret_ratio(r, ArithmeticReturn(), res.w, pr) for res in ress]
+rk = map(rr -> rr[1], rk_rt_ratio)
+rt = map(rr -> rr[2], rk_rt_ratio)
+ratio = map(rr -> rr[3], rk_rt_ratio)
+
+## Display asset weights
+pretty_table(DataFrame(:assets => rd.nx, :MeanRisk => ress[1].w,
+                       :SubsetResampling => ress[2].w, :EqualWeighted => ress[3].w);
+             formatters = [resfmt], title = "Composition")
+
+## Display statistics
+pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
+                  DataFrame(vcat(rk', rt', ratio'),
+                            [:MeanRisk, :SubsetResampling, :EqualWeighted]));
+             formatters = [resfmt])
