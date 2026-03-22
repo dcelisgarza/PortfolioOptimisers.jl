@@ -34,11 +34,11 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.
                                      timestamp = :Date)[(end - 5 * 252):end])
 ````
 
-## 2. Basic Optimisations
+## 2. Basic optimisations
 
 There are many optimisers available in `PortfolioOptimisers.jl`. Here we will showcase their basic usage.
 
-### 2.1 Naive Optimisers
+### 2.1 Naive optimisers
 
 Naive optimisers use very basic algorithms that offer robustness and diversification by virtue of being unsophisticated.
 
@@ -124,7 +124,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 nothing #hide
 ````
 
-#### 2.2.1 Mean Risk
+#### 2.2.1 Mean risk
 
 [`MeanRisk`]-(@ref) is the traditional portfolio optimisation problem. It seeks to minimise the risk with respect to a target return, or maximise the return with respect to a target risk. It supports four objective functions via the `obj` keyword which defaults to [`MinimumRisk`]-(@ref), the risk measure(s) are specified with the `r` keyword which defaults to [`Variance`](@ref).
 
@@ -186,7 +186,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt], title = "Statistics")
 ````
 
-#### 2.2.2 Factor Risk Contribution
+#### 2.2.2 Factor risk contribution
 
 The [`FactorRiskContribution`]-(@ref) is a more complex estimator that requires more setup. It accepts objective functions, but can also define risk contributions per factor for the variance risk measure. The minimum risk optimisation will follow the risk contribution constraints the closest. With enough data and assets, it can be quite exact up to the user-provided convergence settings for the solvers used.
 
@@ -261,7 +261,7 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
              formatters = [resfmt], title = "Factor Risk Contributions")
 ````
 
-#### 2.2.3 Near Optimal Centering
+#### 2.2.3 Near optimal centering
 
 [`NearOptimalCentering`]-(@ref) is a way to smear an optimal portfolio within a region around the point of optimality. The size of this region can be tuned by the user via the `bins` keyword, or automatically decided based on the number of observations and assets (default). This makes the portfolio more robust to estimation error and more diversified. It is not compatible with risk measures which produce quadratic risk expressions, so the risk measure keyword `r` defaults to [`StandardDeviation`](@ref).
 
@@ -325,11 +325,11 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt], title = "Statistics")
 ````
 
-#### 2.2.4 Risk Budgeting
+#### 2.2.4 Risk budgeting
 
 [`RiskBudgeting`]-(@ref) provides a way to allocate risk across assets or factors via the `rba` keyword according to a user-defined risk budgeting vector provided via the `rkb` keyword of [`AssetRiskBudgeting`]-(@ref) and [`FactorRiskBudgeting`]-(@ref) risk budgeting algorithms. The risk budget vectors do not have to be normalised. The risk being budgeted depends on the risk measures used. This does not support objective functions, the optimisation is solely focused on achieving the risk budgeting as closely as possible. It is compatible with the same risk measures as [`MeanRisk`]-(@ref).
 
-##### 2.2.4.1 Asset Risk Budgeting
+##### 2.2.4.1 Asset risk budgeting
 
 This version allocates risk across assets.
 
@@ -378,7 +378,7 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
                              "Incr Risk Budget"])); formatters = [resfmt])
 ````
 
-##### 2.2.4.1 Factor Risk Budgeting
+##### 2.2.4.1 Factor risk budgeting
 
 This version allocates risk across factors.
 
@@ -442,7 +442,7 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
              title = "Factor risk contribution")
 ````
 
-#### 2.2.5 Relaxed Risk Budgeting
+#### 2.2.5 Relaxed risk budgeting
 
 [`RelaxedRiskBudgeting`]-(@ref) provides a way to allocate risk across assets or factors according to a user-defined risk budgeting vector, which does not have to be normalised. They are provided in the same way as for [`RiskBudgeting`]-(@ref), it does not accept risk measures as it's only available for the variance, and it will not follow the risk budget as closely.
 
@@ -665,7 +665,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt], title = "Statistics")
 ````
 
-#### 2.3.4 Nested clustered optimisation
+#### 2.3.4 Nested clustered
 
 The [`NestedClustered`]-(@ref) optimiser uses the same idea as the [`HierarchicalEqualRiskContribution`]-(@ref), where the optimisation process is split into inner and outer optimisations using the same scoring system for finding the optimal number of clusters. However, unlike [`HierarchicalEqualRiskContribution`]-(@ref), the intra- and inter-cluster optimisations are completely independent. It is possible to provide any non-finite allocation optimisation estimator for the inner and outer estimators independently via the keywords `opti` and `opto` respectively. This means it inherits the requirements for the inner and outer estimators respectively.
 
@@ -725,7 +725,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt])
 ````
 
-#### 2.4 Stacking optimisation
+### 2.4 Stacking
 
 The [`Stacking`]-(@ref) optimiser uses a similar approach to [`NestedClustered`]-(@ref), but instead of using a single inner estimator, it uses a vector of estimators, inheriting the requirements of each estimator being used.
 
@@ -772,11 +772,11 @@ pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
              title = "Statistics")
 ````
 
-#### 2.5 Subset resampling optimisation
+### 2.5 Subset resampling
 
 The [`SubsetResampling`]-(@ref) optimiser takes given number of random subsets of the data and optimises those subsets using the given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero. It is possible to provide a `subset_size` keyword can be a float between (0, 1) in which case it specifies a proportion of the data to use in each subset, or an integer which directly specifies subset size. It is also possible to provide a `n_subsets` keyword to specify the number of subsets to use.
 
-In escence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`]-(@ref) optimiser. If `subset_size` is 1, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`]-(@ref) optimiser.
+In escence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`]-(@ref) optimiser. If `subset_size` is `1`, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`]-(@ref) optimiser.
 
 The samples are unique and drawn without replacement.
 
