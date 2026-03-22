@@ -172,7 +172,7 @@ Here we will use the traditional Mean-Risk [`MeanRisk`]-(@ref) optimisation esti
 mr = MeanRisk(; opt = opt)
 ```
 
-As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction). For now, we will perform the optimisation via [`optimise`]-(@ref).
+As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples). For now, we will perform the optimisation via [`optimise`]-(@ref).
 
 ```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
@@ -242,7 +242,7 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
 ```
 
-This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
+This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
 
 We can also plot the returns' histogram and probability density.
 
@@ -256,7 +256,7 @@ We can also plot the compounded or uncompounded drawdowns, here we plot the form
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
-There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
+There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
 
 ## Roadmap
 
