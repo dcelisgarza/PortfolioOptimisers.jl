@@ -424,7 +424,20 @@
                                                       HierarchicalRiskParity(; opt = hopto),
                                                       MeanRisk(; obj = MaximumRatio(),
                                                                opt = jopto)]),
-                         opto = MeanRisk(; opt = jopto))]
+                         opto = MeanRisk(; opt = jopto)),
+                NestedClustered(;
+                                cle = ClustersEstimator(onc = OptimalNumberClusters(alg = 3)),
+                                opti = SubsetResampling(rng = StableRNG(100), seed = 42,
+                                                        pe = pr,
+                                                        opt = MeanRisk(; opt = jopti)),
+                                opto = SubsetResampling(rng = StableRNG(100), seed = 42,
+                                                        opt = MeanRisk(; opt = jopto))),
+                Stacking(;
+                         opti = [SubsetResampling(rng = StableRNG(100), seed = 42, pe = pr,
+                                                  opt = MeanRisk(; opt = jopti)),
+                                 MeanRisk(; opt = jopti), InverseVolatility()],
+                         opto = SubsetResampling(rng = StableRNG(100), seed = 42,
+                                                 opt = MeanRisk(; opt = jopto)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = try
@@ -437,7 +450,6 @@
                     rethrow(err)
                 end
             end
-
             if i == 3
                 @test isapprox(optimise(NestedClustered(; cle = clr,
                                                         opti = RiskBudgeting(; opt = jopti),
