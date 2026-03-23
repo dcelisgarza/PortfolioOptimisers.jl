@@ -1,4 +1,4 @@
-@safetestset "Subset resampling optimisation" begin
+@safetestset "Subset Resampling Optimisation" begin
     using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames, StableRNGs,
           Pajarito, HiGHS, JuMP, Clustering, NearestCorrelationMatrix
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
@@ -89,11 +89,11 @@
     jopt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; lb = Frontier(5)))
     mr = MeanRisk(; opt = jopt)
 
-    opt = SubsetResampling(; subset_size = 1, n_subsets = 20, pe = pr, opt = mr)
+    opt = SubsetResampling(; subset_size = eps(), n_subsets = 20, pe = pr, opt = mr)
     res = optimise(opt, rd)
     @test all(x -> isapprox(x, w0), res.w)
 
-    opt = SubsetResampling(; subset_size = 19, n_subsets = 20, pe = pr, opt = mr)
+    opt = SubsetResampling(; subset_size = 0.95, n_subsets = 20, pe = pr, opt = mr)
     res = optimise(opt, rd)
     df = CSV.read(joinpath(@__DIR__, "./assets/SubsetResamplingFrontier.csv.gz"), DataFrame)
     success = isapprox(Matrix(df), reduce(hcat, res.w); rtol = 1e-6)

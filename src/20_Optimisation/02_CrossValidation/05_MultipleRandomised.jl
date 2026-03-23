@@ -42,7 +42,7 @@ end
 function MultipleRandomised(cv::WalkForwardEstimator; subset_size::SubsetSizeE = 1,
                             n_subsets::NumberSubsetsE = 2,
                             max_comb::Integer = 1_000_000_000,
-                            window_size::Option{<:Integer} = nothing,
+                            window_size::Option{<:WindowSizeE} = nothing,
                             rng::Random.AbstractRNG = Random.default_rng(),
                             seed::Option{<:Integer} = nothing)
     return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
@@ -156,7 +156,7 @@ function get_window_size(window_size::WindowSizeEC, rd::Pr_RR)
               "window_size must not be greater than the number of observations")
     return res
 end
-function get_n_subsets(n_subsets::Integer, rd::Pr_RR, args...)
+function get_n_subsets(n_subsets::Integer, args...)
     return n_subsets
 end
 function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Pr_RR)

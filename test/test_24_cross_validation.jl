@@ -525,6 +525,25 @@
                                 n_subsets = 5, subset_size = 7, window_size = 321)
         (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
 
+        cv2 = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666),
+                                 seed = 42, n_subsets = x -> 5,
+                                 subset_size = 7 / size(rd.X, 2),
+                                 window_size = 321 / size(rd.X, 1))
+        cv2_res = split(cv2, rd)
+        @test cv2_res.train_idx == train_idx
+        @test cv2_res.test_idx == test_idx
+        @test cv2_res.asset_idx == asset_idx
+        @test cv2_res.path_ids == path_ids
+
+        cv2 = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666),
+                                 seed = 42, n_subsets = x -> 5, subset_size = x -> 7,
+                                 window_size = x -> 321)
+        cv2_res = split(cv2, rd)
+        @test cv2_res.train_idx == train_idx
+        @test cv2_res.test_idx == test_idx
+        @test cv2_res.asset_idx == asset_idx
+        @test cv2_res.path_ids == path_ids
+
         N = n_splits(cv.cv, rd)
         @test length(train_idx) == length(train_idx) == N
         @test all(length.(train_idx) .== cv.cv.train_size)

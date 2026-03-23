@@ -15,7 +15,6 @@ function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
     return SubsetResamplingResult(sr.oe, sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode,
                                   sr.w, fb)
 end
-
 @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     pe
     wb
