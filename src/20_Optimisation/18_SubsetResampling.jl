@@ -150,6 +150,9 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
     subset_size = get_subset_size(subset_size, pr)
     n_subsets = get_n_subsets(n_subsets, pr)
+    n_comb = binomial(N, subset_size)
+    @argcheck(n_subsets <= n_comb,
+              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
     fees = fees_constraints(sr.fees, sr.sets; datatype = eltype(X), strict = sr.strict)
