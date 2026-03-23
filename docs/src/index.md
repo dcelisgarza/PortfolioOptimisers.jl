@@ -53,7 +53,7 @@ There exist myriad statistical, pre- and post-processing, optimisations, and con
 
 `PortfolioOptimisers.jl` is an attempt at providing as many of these as possible under a single banner. We make extensive use of `Julia`'s type system, module extensions, and multiple dispatch to simplify development and maintenance.
 
-Please visit the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) for details.
+Please visit the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) and [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API) for details.
 
 ## Caveat emptor
 
@@ -74,7 +74,7 @@ julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
 
 ## Quick-start
 
-The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API_Introduction) docs contain toy examples of the many, many features.
+The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API) docs contain toy examples of the many, many features.
 
 First we import the packages we will need for the example.
 
@@ -172,7 +172,7 @@ Here we will use the traditional Mean-Risk [`MeanRisk`]-(@ref) optimisation esti
 mr = MeanRisk(; opt = opt)
 ```
 
-As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction). For now, we will perform the optimisation via [`optimise`]-(@ref).
+As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples). For now, we will perform the optimisation via [`optimise`]-(@ref).
 
 ```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
@@ -242,7 +242,7 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
 ```
 
-This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
+This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
 
 We can also plot the returns' histogram and probability density.
 
@@ -256,7 +256,7 @@ We can also plot the compounded or uncompounded drawdowns, here we plot the form
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
-There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
+There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
 
 ## Roadmap
 
@@ -915,10 +915,11 @@ This matrix of predicted returns is then used by the outer optimisation estimato
 
 - Nested Clustered [`NestedClustered`]-(@ref) returns a [`NestedClusteredResult`]-(@ref)
 
-##### Clustering optimisation features
+##### Nested clusters optimisation features
 
 - Any features supported by the inner and outer estimators.
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - ::: details Weight finalisers
   - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
   - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
@@ -930,13 +931,14 @@ This matrix of predicted returns is then used by the outer optimisation estimato
 
 #### Ensemble optimisation
 
-These work similar to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided. The procedure is then exactly the same as the nested clusters optimisation, only instead of an `N×C` matrix of asset weights where each column corresponds to a subset of assets, each column corresponds to a completely independent and isolated inner estimator, which also means there is no enforced sparsity pattern on this matrix.
+This works similarly to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided. The procedure is then exactly the same as the nested clusters optimisation, only instead of an `N×C` matrix of asset weights where each column corresponds to a subset of assets, each column corresponds to a completely independent and isolated inner estimator, which also means there is no enforced sparsity pattern on this matrix.
 
 - Stacking [`Stacking`]-(@ref) returns a [`StackingResult`]-(@ref)
 
 ##### Ensemble optimisation features
 
 - Any features supported by the inner and outer estimators.
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - ::: details Weight finalisers
   - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
@@ -946,6 +948,25 @@ These work similar to the Nested Clustered estimator, only instead of breaking t
     - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
     - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 - Cross validation predictor for the outer estimator
+
+#### Subset resampling optimisation
+
+This optimiser takes ideas from [`MultipleRandomised`]-(@ref) cross validation to randomly sample the asset universe and optimise each sample individually using a given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero.
+
+- [`SubsetResampling`]-(@ref) returns a [`SubsetResamplingResult`]-(@ref)
+
+##### Subset resampling optimisation features
+
+- Any features supported by the inner estimator.
+- Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
+- Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
+- ::: details Weight finalisers
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
 
 #### Finite allocation optimisation
 

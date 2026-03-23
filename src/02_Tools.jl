@@ -827,7 +827,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct MeanValue <: VectorToScalarMeasure
-    "$(arg_dict[:oow])"
+    "$(field_dict[:oow])"
     w
     function MeanValue(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
@@ -847,7 +847,7 @@ Construct a `MeanValue` instance with observation weights `w`.
 # Arguments
 
   - `mv`: Instance to update.
-  - `w`: $(arg_dict[:ow])
+  - $(arg_dict[:ow])
 
 # Examples
 
@@ -900,7 +900,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct MedianValue <: VectorToScalarMeasure
-    "$(arg_dict[:oow])"
+    "$(field_dict[:oow])"
     w
     function MedianValue(w::Option{<:StatsBase.AbstractWeights})
         if !isnothing(w)
@@ -920,7 +920,7 @@ Constructs a `MedianValue` instance with observation weights `w`.
 # Arguments
 
   - `mv`: Instance to update.
-  - `w`: $(arg_dict[:ow])
+  - $(arg_dict[:ow])
 
 # Examples
 
@@ -994,7 +994,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct StdValue <: VectorToScalarMeasure
-    "$(arg_dict[:oow])"
+    "$(field_dict[:oow])"
     w
     "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
     corrected
@@ -1017,7 +1017,7 @@ Constructs a `StdValue` instance with observation weights `w`.
 # Arguments
 
   - `sv`: Instance to update.
-  - `w`: $(arg_dict[:ow])
+  - $(arg_dict[:ow])
 
 # Examples
 
@@ -1071,7 +1071,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct VarValue <: VectorToScalarMeasure
-    "$(arg_dict[:oow])"
+    "$(field_dict[:oow])"
     w
     "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
     corrected
@@ -1094,7 +1094,7 @@ Constructs a `VarValue` instance with observation weights `w`.
 # Arguments
 
   - `vv`: Instance to update.
-  - `w`: $(arg_dict[:ow])
+  - $(arg_dict[:ow])
 
 # Examples
 
@@ -1223,7 +1223,7 @@ Construct a `StandardisedValue` instance with observation weights `w` for both `
 # Arguments
 
   - `msv`: Instance to update.
-  - `w`: $(arg_dict[:ow])
+  - $(arg_dict[:ow])
 
 # Examples
 
