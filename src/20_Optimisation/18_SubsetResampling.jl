@@ -36,9 +36,10 @@ end
                               sets::Option{<:AssetSets},
                               opt::NonFiniteAllocationOptimisationEstimator,
                               wf::WeightFinaliser, ex::FLoops.Transducers.Executor,
-                              subset_size::Number, n_subsets::Integer, max_comb::Integer,
-                              rng::Random.AbstractRNG, seed::Option{<:Integer},
-                              fb::Option{<:OptE_Opt}, brt::Bool, strict::Bool)
+                              subset_size::SubsetSizeE, n_subsets::NumberSubsetsE,
+                              max_comb::Integer, rng::Random.AbstractRNG,
+                              seed::Option{<:Integer}, fb::Option{<:OptE_Opt}, brt::Bool,
+                              strict::Bool)
         assert_internal_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -48,10 +49,12 @@ end
         end
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
-        else
+        elseif isa(subset_size, AbstractFloat)
             @argcheck(0 < subset_size < 1)
         end
-        assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
+        if isa(n_subsets, Integer)
+            assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
+        end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
                    typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
@@ -66,7 +69,7 @@ function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} 
                           opt::NonFiniteAllocationOptimisationEstimator,
                           wf::WeightFinaliser = IterativeWeightFinaliser(),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                          subset_size::Number = 0.8, n_subsets::Integer = 2,
+                          subset_size::SubsetSizeE = 0.8, n_subsets::NumberSubsetsE = 2,
                           max_comb::Integer = 1_000_000_000,
                           rng::Random.AbstractRNG = Random.default_rng(),
                           seed::Option{<:Integer} = nothing,
@@ -145,15 +148,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
-    if isa(subset_size, Integer)
-        @argcheck(subset_size <= N,
-                  "subset_size must not be greater than the number of assets")
-    else
-        subset_size = max(round(Int, subset_size * N), 1)
-    end
-    n_comb = binomial(N, subset_size)
-    @argcheck(n_subsets <= n_comb,
-              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
+    subset_size = get_subset_size(subset_size, pr)
+    n_subsets = get_n_subsets(n_subsets, pr)
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
     fees = fees_constraints(sr.fees, sr.sets; datatype = eltype(X), strict = sr.strict)

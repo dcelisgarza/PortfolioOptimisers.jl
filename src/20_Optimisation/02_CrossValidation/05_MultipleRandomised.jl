@@ -1,3 +1,9 @@
+abstract type SubsetSizeEstimator <: AbstractEstimator end
+abstract type NumberSubsetsEstimator <: AbstractEstimator end
+const SubsetSizeEC = Union{<:SubsetSizeEstimator, <:Function}
+const NumberSubsetsEC = Union{<:NumberSubsetsEstimator, <:Function}
+const SubsetSizeE = Union{<:Number, <:SubsetSizeEC}
+const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
 @concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
     cv
     subset_size
@@ -6,12 +12,18 @@
     window_size
     rng
     seed
-    function MultipleRandomised(cv::WalkForwardEstimator, subset_size::Integer,
-                                n_subsets::Integer, max_comb::Integer,
+    function MultipleRandomised(cv::WalkForwardEstimator, subset_size::SubsetSizeE,
+                                n_subsets::NumberSubsetsE, max_comb::Integer,
                                 window_size::Option{<:Integer}, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer})
-        assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
-        assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
+        if isa(subset_size, Integer)
+            assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
+        elseif isa(subset_size, AbstractFloat)
+            @argcheck(0 < subset_size < 1)
+        end
+        if isa(n_subsets, Integer)
+            assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
+        end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
         if !isnothing(window_size)
             assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
@@ -22,8 +34,9 @@
                                                                    window_size, rng, seed)
     end
 end
-function MultipleRandomised(cv::WalkForwardEstimator; subset_size::Integer = 1,
-                            n_subsets::Integer = 2, max_comb::Integer = 1_000_000_000,
+function MultipleRandomised(cv::WalkForwardEstimator; subset_size::SubsetSizeE = 1,
+                            n_subsets::NumberSubsetsE = 2,
+                            max_comb::Integer = 1_000_000_000,
                             window_size::Option{<:Integer} = nothing,
                             rng::Random.AbstractRNG = Random.default_rng(),
                             seed::Option{<:Integer} = nothing)
@@ -101,17 +114,45 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
     end
     return subsets
 end
+function get_subset_size(subset_size::Integer, rd::Pr_RR, args...)
+    @argcheck(subset_size <= size(rd.X, 2),
+              "subset_size must not be greater than the number of assets")
+    return subset_size
+end
+function get_subset_size(subset_size::AbstractFloat, rd::Pr_RR, args...)
+    subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
+    return subset_size
+end
+function get_subset_size(subset_size::SubsetSizeEC, rd::Pr_RR)
+    res = subset_size(rd)
+    assert_nonempty_nonneg_finite_val(res - 1, "subset_size - 1")
+    @argcheck(res <= size(rd.X, 2),
+              "subset_size must not be greater than the number of assets")
+    return res
+end
+function get_n_subsets(n_subsets::Integer, rd::Pr_RR, args...)
+    n_comb = binomial(size(rd.X, 2), subset_size)
+    @argcheck(n_subsets <= n_comb,
+              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
+    return n_subsets
+end
+function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Pr_RR)
+    res = n_subsets(rd)
+    assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
+    n_comb = binomial(size(rd.X, 2), res)
+    @argcheck(res <= n_comb,
+              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
+    return res
+end
 function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     T, N = size(rd.X)
     (; cv, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv
-    @argcheck(subset_size <= N, "subset_size must not be greater than the number of assets")
+    subset_size = get_subset_size(subset_size, rd)
+    n_subsets = get_n_subsets(n_subsets, rd)
     if !isnothing(window_size)
         @argcheck(window_size <= T,
                   "window_size must not be greater than the number of observations")
     end
-    n_comb = binomial(N, subset_size)
-    @argcheck(n_subsets <= n_comb,
-              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
     path_ids = Vector{typeof(n_subsets)}(undef, 0)

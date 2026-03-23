@@ -757,9 +757,9 @@ pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
 #=
 ### 2.5 Subset resampling
 
-The [`SubsetResampling`]-(@ref) optimiser takes given number of random subsets of the data and optimises those subsets using the given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero. It is possible to provide a `subset_size` keyword can be a float between (0, 1) in which case it specifies a proportion of the data to use in each subset, or an integer which directly specifies subset size. It is also possible to provide a `n_subsets` keyword to specify the number of subsets to use.
+The [`SubsetResampling`]-(@ref) optimiser takes a given number of random asset subsets and optimises those subsets using the given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero. It is possible to provide a `subset_size` keyword can be a float in `(0, 1)`, in which case it specifies a proportion of the data to use in each subset, or an integer which directly specifies subset size. It is also possible to provide a `n_subsets` keyword to specify the number of subsets to use.
 
-In escence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`]-(@ref) optimiser. If `subset_size` is `1`, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`]-(@ref) optimiser.
+In essence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`]-(@ref) optimiser. If `subset_size` is `1`, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`]-(@ref) optimiser.
 
 The samples are unique and drawn without replacement.
 =#
