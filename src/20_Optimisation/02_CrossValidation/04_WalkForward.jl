@@ -3,8 +3,10 @@ abstract type WalkForwardEstimator <: SequentialCrossValidationEstimator end
     train_idx
     test_idx
     function WalkForwardResult(train_idx::VecVecInt, test_idx::VecVecInt)
-        @argcheck(!isempty(train_idx))
-        @argcheck(!isempty(test_idx))
+        @argcheck(!isempty(train_idx),
+                  IsEmptyError("not enough data to cover the training + testing periods, please check your inputs to ensure they are compatible."))
+        @argcheck(!isempty(test_idx),
+                  IsEmptyError("not enough data to cover the training + testing periods, please check your inputs to ensure they are compatible."))
         @argcheck(length(train_idx) == length(test_idx))
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
@@ -266,7 +268,6 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
         end
         push!(idx, i)
     end
-
     N = length(idx)
     i = 1
     train_indices = Vector{UnitRange{tt}}(undef, 0)
@@ -287,7 +288,6 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
         push!(train_indices, train_start:(idx[i + train_size] - purged_size - 1))
         i += test_size
     end
-
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 function special_div(a::Integer, b::Integer)
@@ -338,7 +338,6 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     if po_flag
         date_range += period_offset
     end
-
     idx = Vector{typeof(T)}(undef, 0)
     for date in date_range
         i = searchsortedlast(ts, date)
@@ -350,7 +349,6 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         end
         push!(idx, i)
     end
-
     train_idx = Vector{typeof(T)}(undef, 0)
     for date in date_range
         date = date - train_size
@@ -360,7 +358,6 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         end
         push!(train_idx, i)
     end
-
     N = length(idx)
     i = searchsortedlast(train_idx, 0) + 1
     train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
@@ -381,7 +378,6 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         push!(train_indices, train_start:(idx[i] - 1))
         i += test_size
     end
-
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)

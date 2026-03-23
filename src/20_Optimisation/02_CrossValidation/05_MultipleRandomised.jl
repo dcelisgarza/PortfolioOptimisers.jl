@@ -70,6 +70,18 @@ function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
                                   asset_idx::VecVecInt, path_ids::VecInt)
     return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
 end
+function n_splits(mre::MultipleRandomised, rd::ReturnsResult)
+    if !isnothing(mre.window_size) && isa(mre.cv, DateWalkForward)
+        throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling `split`."))
+    end
+    if !isnothing(mre.window_size)
+        rd = returns_result_view(rd, 1:(mre.window_size), :)
+    end
+    return mre.n_subsets * n_splits(mre.cv, rd)
+end
+function n_splits(mrr::MultipleRandomisedResult)
+    return length(mrr.path_ids)
+end
 const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
@@ -189,14 +201,22 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
             rdi = returns_result_view(rd, idx, :)
         end
         start_obs -= 1
-        (; train_idx, test_idx) = split(cv, rdi)
+        (; train_idx, test_idx) = try
+            split(cv, rdi)
+        catch err
+            if isa(err, IsEmptyError)
+                throw(IsEmptyError(err.msg *
+                                   "\nthe local rd does not contain enough observations for the window size:\n$rdi"))
+            else
+                rethrow(err)
+            end
+        end
         num_splits = length(train_idx)
         append!(path_ids, fill(i, num_splits))
         append!(train_indices, [t .+ start_obs for t in train_idx])
         append!(test_indices, [t .+ start_obs for t in test_idx])
         append!(asset_indices, Iterators.repeated(view(asset_idx, :, i), num_splits))
     end
-
     return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
                                     asset_idx = asset_indices, path_ids = path_ids)
 end

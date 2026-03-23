@@ -509,7 +509,8 @@
         train0, test0 = res.train_idx, res.test_idx
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 69)
-        (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
 
         N = n_splits(cv.cv, rd)
         @test length(train_idx) == length(train_idx) == cv.n_subsets * N
@@ -520,10 +521,13 @@
             @test all(path_ids[idx] .== i)
             @test all(length.(asset_idx[idx]) .== cv.subset_size)
         end
+        @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 42,
                                 n_subsets = 5, subset_size = 7, window_size = 321)
-        (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+        @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
 
         cv2 = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666),
                                  seed = 42, n_subsets = x -> 5,
@@ -565,6 +569,36 @@
         @test all(length.(asset_idx) .== cv.subset_size)
         @test unique(asset_idx) != asset_idx
         @test unique.(asset_idx) == asset_idx
+
+        function ldm(x)
+            val = lastdayofmonth.(x)
+            while !isempty(val)
+                if val[end] > x[end]
+                    val = val[1:(end - 1)]
+                else
+                    break
+                end
+            end
+            return val
+        end
+        cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
+                                rng = StableRNG(666), seed = 69)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+        @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
+
+        cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
+                                rng = StableRNG(666), seed = 42, n_subsets = 5,
+                                subset_size = 7, window_size = 336)
+        @test_throws IsEmptyError split(cv, rd)
+
+        cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
+                                rng = StableRNG(666), seed = 42, n_subsets = 5,
+                                subset_size = 7, window_size = 340)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+        @test_throws ArgumentError n_splits(cv, rd)
+        @test n_splits(cv_res) == length(path_ids)
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
