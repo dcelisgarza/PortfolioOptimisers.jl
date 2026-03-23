@@ -1,9 +1,12 @@
 abstract type SubsetSizeEstimator <: AbstractEstimator end
 abstract type NumberSubsetsEstimator <: AbstractEstimator end
+abstract type WindowSizeEstimator <: AbstractEstimator end
 const SubsetSizeEC = Union{<:SubsetSizeEstimator, <:Function}
 const NumberSubsetsEC = Union{<:NumberSubsetsEstimator, <:Function}
+const WindowSizeEC = Union{<:WindowSizeEstimator, <:Function}
 const SubsetSizeE = Union{<:Number, <:SubsetSizeEC}
 const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
+const WindowSizeE = Union{<:Number, <:WindowSizeEC}
 @concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
     cv
     subset_size
@@ -14,7 +17,7 @@ const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
     seed
     function MultipleRandomised(cv::WalkForwardEstimator, subset_size::SubsetSizeE,
                                 n_subsets::NumberSubsetsE, max_comb::Integer,
-                                window_size::Option{<:Integer}, rng::Random.AbstractRNG,
+                                window_size::Option{<:WindowSizeE}, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer})
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
@@ -25,8 +28,10 @@ const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
-        if !isnothing(window_size)
+        if isa(window_size, Integer)
             assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
+        elseif isa(window_size, AbstractFloat)
+            @argcheck(0 < window_size < 1)
         end
         return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
                    typeof(window_size), typeof(rng), typeof(seed)}(cv, subset_size,
@@ -130,6 +135,25 @@ function get_subset_size(subset_size::SubsetSizeEC, rd::Pr_RR)
               "subset_size must not be greater than the number of assets")
     return res
 end
+function get_window_size(::Nothing, args...)
+    return nothing
+end
+function get_window_size(window_size::Integer, rd::Pr_RR, args...)
+    @argcheck(window_size <= size(rd.X, 1),
+              "window_size must not be greater than the number of observations")
+    return window_size
+end
+function get_window_size(window_size::AbstractFloat, rd::Pr_RR, args...)
+    window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
+    return window_size
+end
+function get_window_size(window_size::WindowSizeEC, rd::Pr_RR)
+    res = window_size(rd)
+    assert_nonempty_nonneg_finite_val(res - 2, "window_size - 2")
+    @argcheck(res <= size(rd.X, 1),
+              "window_size must not be greater than the number of observations")
+    return res
+end
 function get_n_subsets(n_subsets::Integer, rd::Pr_RR, args...)
     n_comb = binomial(size(rd.X, 2), subset_size)
     @argcheck(n_subsets <= n_comb,
@@ -149,10 +173,7 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     (; cv, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv
     subset_size = get_subset_size(subset_size, rd)
     n_subsets = get_n_subsets(n_subsets, rd)
-    if !isnothing(window_size)
-        @argcheck(window_size <= T,
-                  "window_size must not be greater than the number of observations")
-    end
+    window_size = get_window_size(window_size, rd)
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
     path_ids = Vector{typeof(n_subsets)}(undef, 0)
