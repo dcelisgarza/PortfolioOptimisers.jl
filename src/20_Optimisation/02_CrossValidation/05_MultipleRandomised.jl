@@ -145,6 +145,8 @@ function get_window_size(window_size::Integer, rd::Pr_RR, args...)
 end
 function get_window_size(window_size::AbstractFloat, rd::Pr_RR, args...)
     window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
+    @argcheck(window_size <= size(rd.X, 1),
+              "window_size must not be greater than the number of observations")
     return window_size
 end
 function get_window_size(window_size::WindowSizeEC, rd::Pr_RR)
