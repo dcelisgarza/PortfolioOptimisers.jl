@@ -155,17 +155,11 @@ function get_window_size(window_size::WindowSizeEC, rd::Pr_RR)
     return res
 end
 function get_n_subsets(n_subsets::Integer, rd::Pr_RR, args...)
-    n_comb = binomial(size(rd.X, 2), subset_size)
-    @argcheck(n_subsets <= n_comb,
-              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     return n_subsets
 end
 function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Pr_RR)
     res = n_subsets(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
-    n_comb = binomial(size(rd.X, 2), res)
-    @argcheck(res <= n_comb,
-              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     return res
 end
 function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
@@ -174,6 +168,9 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     subset_size = get_subset_size(subset_size, rd)
     n_subsets = get_n_subsets(n_subsets, rd)
     window_size = get_window_size(window_size, rd)
+    n_comb = binomial(N, subset_size)
+    @argcheck(n_subsets <= n_comb,
+              "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
                                      rng = rng, seed = seed)
     path_ids = Vector{typeof(n_subsets)}(undef, 0)
