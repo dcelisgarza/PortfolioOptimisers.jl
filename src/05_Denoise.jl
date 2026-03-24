@@ -9,8 +9,8 @@ All concrete and/or abstract types that implement denoising of covariance-like o
 
 In order to implement a new denoising estimator which will work seamlessly with the library, subtype `AbstractDenoiseEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `denoise!(dn::AbstractDenoiseEstimator, X::MatNum, q::Number)`: In-place denoising.
-  - `denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number)`: Optional out-of-place denoising.
+  - `denoise!(dn::AbstractDenoiseEstimator, X::MatNum, q::Number) -> MatNum`: In-place denoising.
+  - `denoise(dn::AbstractDenoiseEstimator, X::MatNum, q::Number) -> MatNum`: Optional out-of-place denoising.
 
 ## Arguments
 

@@ -5,26 +5,32 @@ description: Generate Julia docstrings.
 
 Create Julia docstrings for the selected code.
 
-- Follow the intructions for each type.
+- Extremely important to follow the established style.
+- Place the type (without constructor), function (with type information), or macro (with type information).
+- Give a general description.
 
 ## Abstract types
 
-- Declare the type as `$(DocStringExtensions.TYPEDEF)`.
-- Describe what it is a supertype of.
-- Describe that all concrete types implementing the funcionality related to the abstract type must be subtypes.
-- If applicable, add a heading "# Interfaces".
-  - Describe that concrete subtypes must implement applicable interfaces.
-  - For each interface add the following a subheading "## <interface name>", where <interface name> is an appropriate name for the interface:
-    - A subheading "### Functions".
-      - Add the typed function signatures and return type, and a short description of what they do.
-      - Add a subheading "#### Arguments" where you list and describe the arguments to the function.
-    - Add a subheading "### Examples" where you provide an example as a `jldoctest` of how to implement the interface.
+- Add a heading "# Interfaces".
 
-Use the example provided at the end of this prompt as a reference.
+  - List the interfaces it implements.
 
-```julia
+  - For each interface add:
 
-```
+    - Add a subheading "## Arguments".
+      - List and describe the arguments of the interface.
+
+    - Add a subheading "## Returns".
+
+      - List the return values with their types and a description
+
+- Add a heading "# Examples".
+
+  - Provide an example of implementing all the interfaces as a jldoctest.
+
+- Add a heading "# Related Types" at the end of the docstring.
+
+  - List the subtypes.
 
 ## Concrete Types
 

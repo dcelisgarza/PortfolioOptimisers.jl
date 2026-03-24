@@ -213,3 +213,188 @@ include("22_Plotting.jl")
 include("23_Precompilation.jl")
 
 end
+
+#=
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all custom processes in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types that implement a custom process should subtype `MyAbstractCustomProcess`.
+
+# Interfaces
+
+In order to implement a new custom process that can seamlessly work with the library, subtype `MyAbstractCustomProcess`, ensuring that the structure contains all necessary parameters for the custom process, and implement the following methods:
+
+## Custom process interface
+
+### Functions
+
+- `do_process(pr::MyAbstractCustomProcess, b::Real, c::Integer) -> nothing`: Performs the custom process.
+
+#### Arguments
+
+- `pr`: Custom process.
+- `b`: First argument for the custom process.
+- `c`: Second argument for the custom process.
+
+### Examples
+
+```jldoctest
+julia> struct MyNewCustomProcess{T1, T2} <: PortfolioOptimisers.MyAbstractCustomProcess
+           alg::T1
+           new_param::T2
+           function MyNewCustomProcess(alg::MyAbstractCustomProcessAlgorithm, new_param::Symbol)
+               return new{typeof(alg), typeof(new_param)}(alg, new_param)
+           end
+       end
+
+julia> function MyNewCustomProcess(; alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1(), new_param::Symbol = :Foo)
+           return MyNewCustomProcess(alg, new_param)
+        end
+
+julia> function PortfolioOptimisers.do_process(a::MyNewCustomProcess, b::Real, c::Integer)
+          println("new custom process: $b $c $(a.sym)")
+          do_algorithm(a.alg, c)
+          return nothing
+       end
+
+julia> do_process(MyNewCustomProcess(), -0.5, 9)
+new custom process: -0.5 9 Foo
+algorithm 1: 9
+```
+
+# Related
+
+- [`MyAbstractCustomProcessAlgorithm`](@ref)
+- [`do_process`](@ref)
+- [`do_algorithm`](@ref)
+"""
+abstract type MyAbstractCustomProcess end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all custom process algorithms in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types that implement a custom process algorithms should subtype `MyAbstractCustomProcessAlgorithm`.
+
+# Interfaces
+
+In order to implement a new custom process algorithms that can seamlessly work with the library, subtype `MyAbstractCustomProcessAlgorithm`, ensuring that the structure contains all necessary parameters for the custom process algorithm, and implement the following methods:
+
+## Custom process algorithm interface
+
+### Functions
+
+- `do_algorithm(pra::MyAbstractCustomProcessAlgorithm, c::Integer) -> nothing`: Performs the custom process algorithm.
+
+#### Arguments
+
+- `pra`: Custom process algorithm.
+- `c`: Argument for the custom process algorithm.
+
+### Examples
+
+```jldoctest
+julia> struct MyNewCustomProcessAlgorithm{T} <: PortfolioOptimisers.MyAbstractCustomProcessAlgorithm
+           new_param::T
+           function MyNewCustomProcessAlgorithm(new_param::Symbol)
+               return new{typeof(new_param)}(new_param)
+           end
+       end
+
+julia> function MyNewCustomProcessAlgorithm(; new_param::Symbol = :Bar)
+           return MyNewCustomProcessAlgorithm(new_param)
+        end
+
+julia> function PortfolioOptimisers.do_algorithm(alg::MyNewCustomProcessAlgorithm, c::Integer)
+          println("new algorithm: $c $(alg.new_param)")
+          return nothing
+       end
+
+julia> do_algorithm(MyNewCustomProcessAlgorithm(), 3)
+new algorithm: 3 Bar
+```
+
+# Related
+
+- [`MyAbstractCustomProcess`](@ref)
+- [`do_process`](@ref)
+- [`do_algorithm`](@ref)
+"""
+abstract type MyAbstractCustomProcessAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Implements my custom process algorithm 1.
+
+# Related
+
+- [`MyAbstractCustomProcess`](@ref)
+- [`MyAbstractCustomProcessAlgorithm`](@ref)
+- [`do_process`](@ref)
+- [`do_algorithm`](@ref)
+"""
+struct MyCustomProcessAlgorithm1 <: MyAbstractCustomProcessAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Performs the custom process algorithm 1.
+
+# Arguments
+
+- `alg::MyCustomProcessAlgorithm1`: The algorithm to perform.
+- `c::Integer`: The input integer.
+
+# Details
+
+- Multiplies `c` by 2.
+- Prints the result with a custom message.
+
+```jldoctest
+julia> do_algorithm(MyCustomProcessAlgorithm1(), 3)
+algorithm 1: 6
+```
+
+# Related
+
+- [`MyAbstractCustomProcess`](@ref)
+- [`MyAbstractCustomProcessAlgorithm`](@ref)
+- [`do_process`](@ref)
+"""
+function do_algorithm(::MyCustomProcessAlgorithm1, c::Integer)
+    c = c * 2
+    println("algorithm 1: $c")
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Defines my custom process 1.
+
+# Arguments
+
+- `alg::MyAbstractCustomProcessAlgorithm`: The algorithm to use.
+
+# Constructors
+
+    MyConcreteCustomProcess1(; alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1())
+
+-
+"""
+struct MyConcreteCustomProcess1{T} <: MyAbstractCustomProcess
+    alg::T
+    function MyConcreteCustomProcess1(alg::MyAbstractCustomProcessAlgorithm)
+        return new{typeof(alg)}(alg)
+    end
+end
+function MyConcreteCustomProcess1(; alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1())
+    return MyConcreteCustomProcess1(alg)
+end
+function do_process(a::MyConcreteCustomProcess1, b::Real, c::Integer)
+    @argcheck(b >= 0, "b must be non-negative")
+    println("Customprocess 1: $b + $c")
+    do_algorithm(a.alg, c)
+    return nothing
+end
+=#
