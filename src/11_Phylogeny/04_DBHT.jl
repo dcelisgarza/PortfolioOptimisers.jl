@@ -673,7 +673,7 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
 
 # Arguments
 
-  - `M`: `N×Nc` binary matrix of node-to-3-clique memberships, where `M[i, n] = 1` if node `i` belongs to 3-clique `n`.
+  - `M`: `N × Nc` binary matrix of node-to-3-clique memberships, where `M[i, n] = 1` if node `i` belongs to 3-clique `n`.
 
 # Details
 
@@ -684,7 +684,7 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
 
 # Returns
 
-  - `Pred::Vector{Int}`: `Nc×1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique.
+  - `Pred::Vector{Int}`: `NC × 1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique.
 
 # Related
 
@@ -767,8 +767,8 @@ This function constructs the bubble hierarchy tree and the bubble membership mat
 
 # Arguments
 
-  - `Pred`: `Nc×1` vector of predicted parent indices for each 3-clique, as returned by [`BuildHierarchy`](@ref).
-  - `Sb`: `Nc×1` vector indicating the size of the separating set for each 3-clique (`Sb[n] ≠ 0` means clique `n` is separating).
+  - `Pred`: `NC × 1` vector of predicted parent indices for each 3-clique, as returned by [`BuildHierarchy`](@ref).
+  - `Sb`: `NC × 1` vector indicating the size of the separating set for each 3-clique (`Sb[n] ≠ 0` means clique `n` is separating).
 
 # Details
 
@@ -1022,7 +1022,7 @@ This function assigns directions to each separating 3-clique in the undirected b
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
   - `Hb`: Undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)).
   - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
 # Details
@@ -1105,7 +1105,7 @@ This function assigns each vertex to a cluster based on the directed bubble hier
   - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
   - `Hb`: Undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
   - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
 # Details
@@ -1118,7 +1118,7 @@ This function assigns each vertex to a cluster based on the directed bubble hier
 
 # Returns
 
-  - `Adjv::SparseMatrixCSC{Int, Int}`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster.
+  - `Adjv::SparseMatrixCSC{Int, Int}`: `N × Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster.
   - `Tc::Vector{Int}`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
 
 # Related
@@ -1192,7 +1192,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 # Arguments
 
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Mc`: Matrix indicating bubbles that coincide with clusters.
 
 # Details
@@ -1203,7 +1203,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 
 # Returns
 
-  - `Mvv::Matrix{Int}`: `N×Nb` matrix where `Mvv[n, bi] = 1` if vertex `n` is assigned to bubble `bi`.
+  - `Mvv::Matrix{Int}`: `N × Nb` matrix where `Mvv[n, bi] = 1` if vertex `n` is assigned to bubble `bi`.
 
 # Related
 
@@ -1387,7 +1387,7 @@ This function builds a hierarchical clustering (dendrogram) by first constructin
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
   - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
   - `Tc`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
-  - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
 
 # Details
 
@@ -1562,7 +1562,7 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - `Rpm::SparseMatrixCSC{<:Number, Int}`: `N × N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
   - `Adjv::SparseMatrixCSC{Int, Int}`: Bubble cluster membership matrix from [`BubbleCluster8s`](@ref).
   - `Dpm::Matrix{<:Number}`: `N × N` shortest path length matrix of the PMFG.
-  - `Mv::SparseMatrixCSC{Int, Int}`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv::SparseMatrixCSC{Int, Int}`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Z::Matrix{<:Number}`: `(N-1)×3` linkage matrix in Matlab format.
   - `Z_hclust::Clustering.Hclust`: Dendrogram in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
 

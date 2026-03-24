@@ -616,7 +616,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N×N`.
+Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
 # Arguments
 
