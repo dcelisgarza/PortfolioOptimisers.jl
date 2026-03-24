@@ -442,9 +442,9 @@ end
 """
     nothing_scalar_array_view(
         x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                AbstractEstimatorValueAlgorithm},
+                 AbstractEstimatorValueAlgorithm},
         ::Any
-    ) -> typeof(x)
+    ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
     nothing_scalar_array_view(x::VecScalar, i) -> VecScalar(; v = view(x.v, i), s = x.s)
     nothing_scalar_array_view(x::AbstractMatrix, i) -> view(x, i, i)
@@ -528,11 +528,17 @@ function nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
     return view(x, i, j)
 end
 """
-    nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any) -> Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}
+    nothing_scalar_array_getindex(
+        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict},
+        ::Any
+    ) -> Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict} -> x
     nothing_scalar_array_getindex(x::AbstractVector, i) -> x[i]
     nothing_scalar_array_getindex(x::VecScalar, i) -> VecScalar(; v = x.v[i], s = x.s)
-    nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
     nothing_scalar_array_getindex(x::AbstractMatrix, i) -> x[i, i]
+    nothing_scalar_array_getindex(
+        x::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}},
+        i
+    ) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
@@ -540,16 +546,6 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
   - `i`: Index or indices to view.
-
-# Returns
-
-  - `x`: Input value.
-
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
-      + `::AbstractVector`: Returns `view(x, i)`.
-      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: Returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: Returns `view(x, i, i)`.
 
 # Examples
 
@@ -580,12 +576,13 @@ end
 function nothing_scalar_array_getindex(x::VecScalar, i)
     return VecScalar(; v = x.v[i], s = x.s)
 end
-function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector,
-                                                                 <:VecScalar}}, i)
-    return [xi[i] for xi in x]
-end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
+end
+function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector,
+                                                                 <:AbstractMatrix,
+                                                                 <:VecScalar}}, i)
+    return [nothing_scalar_array_getindex(xi, i) for xi in x]
 end
 """
     nothing_scalar_array_getindex_odd_order(::Nothing, i, j) -> nothing
@@ -619,16 +616,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
+Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N×N`.
 
 # Arguments
 
   - `N`: Size of the full covariance matrix.
   - `i`: Indices of the variables of interest.
-
-# Returns
-
-  - `idx::VecInt`: Indices for extracting the fourth moment submatrix.
 
 # Examples
 
@@ -697,10 +690,6 @@ This is useful for converting arrays with abstract element types to arrays with 
 # Arguments
 
   - `A`: The input array.
-
-# Returns
-
-  - `A_new::Array{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 
 # Examples
 
@@ -1248,7 +1237,7 @@ function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
     return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
-    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> score::Number
+    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> Number
 
 Reduce a vector of real values to a single real value using a specified measure.
 
@@ -1258,10 +1247,6 @@ Reduce a vector of real values to a single real value using a specified measure.
 
   - `measure`: An instance of a concrete subtype of [`VectorToScalarMeasure`](@ref), or the predefined value to return.
   - `val`: A vector of real values to be reduced (ignored if `measure` is a `Number`).
-
-# Returns
-
-  - `score::Number`: Computed value according to `measure`.
 
 # Examples
 
