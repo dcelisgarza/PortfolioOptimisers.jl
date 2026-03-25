@@ -20,7 +20,7 @@ DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(), dt::Detone = 
                  pdm::Option{<:Posdef} = Posdef())
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

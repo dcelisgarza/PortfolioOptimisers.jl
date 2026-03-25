@@ -18,7 +18,7 @@ A simple expected returns estimator for `PortfolioOptimisers.jl`, representing t
     SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing,
                            idx::Option{<:VecInt} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

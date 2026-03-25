@@ -83,7 +83,7 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 
     Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

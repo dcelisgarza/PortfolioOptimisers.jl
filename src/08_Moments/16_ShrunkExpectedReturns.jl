@@ -96,7 +96,7 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
     JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -139,7 +139,7 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
     BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -182,7 +182,7 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
     BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -231,7 +231,7 @@ Container type for shrinkage-based expected returns estimators.
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                           alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

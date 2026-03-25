@@ -34,7 +34,7 @@ Container type for cokurtosis estimators.
                mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                alg::AbstractMomentAlgorithm = Full())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

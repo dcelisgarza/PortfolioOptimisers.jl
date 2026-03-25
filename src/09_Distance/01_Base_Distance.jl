@@ -137,7 +137,7 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
     VariationInfoDistance(; bins::Int_Bin = HacineGharbiRavier(),
                           normalise::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

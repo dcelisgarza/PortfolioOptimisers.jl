@@ -15,7 +15,7 @@ Container for the result of a risk budget constraint.
 
     RiskBudget(; val::VecNum)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -71,7 +71,7 @@ Container for a risk budget allocation mapping or vector.
 
     RiskBudgetEstimator(; val::EstValType)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

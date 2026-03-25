@@ -29,7 +29,7 @@ Estimator for box or ellipsoidal uncertainty sets under the assumption of normal
                          rng::Random.AbstractRNG = Random.default_rng(),
                          seed::Option{<:Integer} = nothing, ens::Option{<:Number} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

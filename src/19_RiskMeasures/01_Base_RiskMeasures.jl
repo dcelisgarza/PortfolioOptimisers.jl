@@ -123,7 +123,7 @@ Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`
 
     PortfolioOptimisers._Frontier(; N::Integer = 20, factor::Number, flag::Bool)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -448,7 +448,7 @@ Where:
 
     LogSumExpScalariser(; gamma::Number = 1.0)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

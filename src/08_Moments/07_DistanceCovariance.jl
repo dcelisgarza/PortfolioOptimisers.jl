@@ -25,7 +25,7 @@ A flexible container type for configuring and applying distance-based covariance
                        kwargs::NamedTuple = (;), w::Option{<:StatsBase.AbstractWeights} = nothing,
                        ex::FLoops.Transducers.Executor = ThreadedEx())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

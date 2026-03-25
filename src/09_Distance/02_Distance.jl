@@ -28,7 +28,7 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
     Distance(; power::Option{<:Integer} = nothing,
              alg::AbstractDistanceAlgorithm = SimpleDistance())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

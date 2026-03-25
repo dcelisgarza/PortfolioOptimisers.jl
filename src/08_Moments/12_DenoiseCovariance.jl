@@ -24,7 +24,7 @@ DenoiseCovariance(; ce::AbstractCovarianceEstimator; dn::Denoise = Denoise(),
                   pdm::Option{<:Posdef} = Posdef())
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

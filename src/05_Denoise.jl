@@ -190,7 +190,7 @@ A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a c
 
     ShrunkDenoise(; alpha::Number = 0.0)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -257,7 +257,7 @@ A flexible container type for configuring and applying denoising algorithms to c
             n::Integer = 1000, kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
             args::Tuple = (), kwargs::NamedTuple = (;), pdm::Option{<:Posdef} = Posdef())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

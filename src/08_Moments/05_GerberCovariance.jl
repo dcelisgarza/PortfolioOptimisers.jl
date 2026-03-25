@@ -142,7 +142,7 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
     StandardisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -192,7 +192,7 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
     StandardisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -242,7 +242,7 @@ Implements the second variant of the Gerber covariance algorithm on Z-transforme
 
     StandardisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -395,7 +395,7 @@ A flexible container type for configuring and applying Gerber covariance estimat
                      pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
                      alg::GerberCovarianceAlgorithm = Gerber1())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

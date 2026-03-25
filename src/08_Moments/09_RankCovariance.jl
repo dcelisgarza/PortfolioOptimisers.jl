@@ -29,7 +29,7 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
     KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -147,7 +147,7 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
     SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

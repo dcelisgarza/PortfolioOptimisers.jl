@@ -33,7 +33,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
                        alg1::AbstractMomentAlgorithm = Full(),
                        alg2::VarianceFormulation = SOCRiskExpr())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

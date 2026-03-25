@@ -43,7 +43,7 @@ This estimator can be converted into a concrete [`Fees`](@ref) constraint using 
                   ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
                   dfs::Option{<:Number} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

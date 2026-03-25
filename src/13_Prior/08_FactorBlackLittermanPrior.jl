@@ -50,7 +50,7 @@ Factor Black-Litterman prior estimator for asset returns.
                               l::Option{<:Number} = nothing,
                               tau::Option{<:Number} = nothing, rsd::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

@@ -34,7 +34,7 @@ Black-Litterman prior estimator for asset returns.
                         views_conf::Option{<:Num_VecNum} = nothing,
                         rf::Number = 0.0, tau::Option{<:Number} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

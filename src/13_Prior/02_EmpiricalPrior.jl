@@ -21,7 +21,7 @@ Empirical prior estimator for asset returns.
                    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                    horizon::Option{<:Number} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

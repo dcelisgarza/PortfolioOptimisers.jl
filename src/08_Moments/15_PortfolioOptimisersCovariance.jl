@@ -18,7 +18,7 @@ Composite covariance estimator with post-processing.
     PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                                   mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

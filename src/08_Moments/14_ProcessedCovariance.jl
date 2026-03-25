@@ -17,7 +17,7 @@ ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                     pdm::Option{<:Posdef} = Posdef())
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

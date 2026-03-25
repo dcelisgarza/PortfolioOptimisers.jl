@@ -90,7 +90,7 @@ Computes portfolio risk using the second central (full) or lower (semi) moment o
                  alg1::AbstractMomentAlgorithm = Full(),
                  alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -187,7 +187,7 @@ Computes portfolio risk using the fourth central (full) or lower (semi) moment o
 
     FourthMoment(; alg::AbstractMomentAlgorithm = Full())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -232,7 +232,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
                                 ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
                                 alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -295,7 +295,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
                    mu::Option{<:Num_VecNum_VecScalar} = nothing,
                    alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -671,7 +671,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
                     mu::Option{<:Num_VecNum_VecScalar} = nothing,
                     alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

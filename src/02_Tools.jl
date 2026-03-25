@@ -2,8 +2,8 @@
     assert_nonempty_nonneg_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val
-    ) -> nothing
-    assert_nonempty_nonneg_finite_val(args...) -> nothing
+    )
+    assert_nonempty_nonneg_finite_val(args...)
 
 Validate that the input value is non-empty, non-negative and finite.
 
@@ -80,8 +80,8 @@ end
     assert_nonempty_gt0_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val
-    ) -> nothing
-    assert_nonempty_gt0_finite_val(args...) -> nothing
+    )
+    assert_nonempty_gt0_finite_val(args...)
 
 Validate that the input value is non-empty, greater than zero, and finite.
 
@@ -158,8 +158,8 @@ end
     assert_nonempty_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val
-    ) -> nothing
-    assert_nonempty_finite_val(args...) -> nothing
+    )
+    assert_nonempty_finite_val(args...)
 
 Validate that the input value is non-empty and finite.
 
@@ -224,7 +224,7 @@ function assert_nonempty_finite_val(args...)
     return nothing
 end
 """
-    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X) -> nothing
+    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
 
 Assert that the input matrix is square.
 
@@ -498,7 +498,7 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
-    nothing_scalar_array_view_odd_order(::Nothing, i, j) -> nothing
+    nothing_scalar_array_view_odd_order(::Nothing, i, j)
     nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j) -> view(x, i, j)
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
@@ -585,7 +585,7 @@ function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVecto
     return [nothing_scalar_array_getindex(xi, i) for xi in x]
 end
 """
-    nothing_scalar_array_getindex_odd_order(::Nothing, i, j) -> nothing
+    nothing_scalar_array_getindex_odd_order(::Nothing, i, j)
     nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j) -> x[i, j]
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
@@ -794,7 +794,7 @@ $(DocStringExtensions.FIELDS)
 
     MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -867,7 +867,7 @@ $(DocStringExtensions.FIELDS)
 
     MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -961,7 +961,7 @@ $(DocStringExtensions.FIELDS)
 
     StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -1038,7 +1038,7 @@ $(DocStringExtensions.FIELDS)
 
     VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -1175,7 +1175,7 @@ $(DocStringExtensions.FIELDS)
 
     StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

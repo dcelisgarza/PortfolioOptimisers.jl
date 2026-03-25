@@ -263,7 +263,7 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
                          alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                          ex::FLoops.Transducers.Executor = ThreadedEx())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

@@ -15,7 +15,7 @@ Stepwise regression criterion based on p-value thresholding.
 
     PValue(; t::Number = 0.05)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -95,7 +95,7 @@ Estimator for stepwise regression-based moment estimation.
                        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                        tgt::AbstractRegressionTarget = LinearModel())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

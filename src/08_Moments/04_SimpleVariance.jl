@@ -21,7 +21,7 @@ A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional e
                    me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                    w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

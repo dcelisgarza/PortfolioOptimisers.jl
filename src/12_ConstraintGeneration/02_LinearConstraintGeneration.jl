@@ -17,7 +17,7 @@ Container for a set of linear constraints (either equality or inequality) in the
 
     PartialLinearConstraint(; A::MatNum, B::VecNum)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -70,7 +70,7 @@ Container for a set of linear constraints, separating inequality and equality co
     LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
                      eq::Option{<:PartialLinearConstraint} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -209,7 +209,7 @@ If a key in `dict` starts with the same value as `key`, it means that the corres
     AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
               dict::AbstractDict{<:AbstractString, <:Any})
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -1221,7 +1221,7 @@ Container for one or more linear constraint equations to be parsed and converted
 
     LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

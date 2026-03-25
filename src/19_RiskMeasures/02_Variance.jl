@@ -130,7 +130,7 @@ Represents the portfolio variance using a covariance matrix.
              rc::Option{<:LcE_Lc} = nothing,
              alg::VarianceFormulation = SquaredSOCRiskExpr())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -318,7 +318,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
     StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                        sigma::Option{<:MatNum} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -465,7 +465,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
                            ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
                            sigma::Option{<:MatNum} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

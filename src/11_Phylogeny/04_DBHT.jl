@@ -115,7 +115,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale fa
 
     GeneralExponentialSimilarity(; coef::Number = 1.0, power::Number = 1.0)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -211,7 +211,7 @@ Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
     DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
          root::DBHTRootMethod = UniqueRoot())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -1795,7 +1795,7 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
          sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
          pdm::Option{<:Posdef} = Posdef())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

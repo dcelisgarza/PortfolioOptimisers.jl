@@ -83,7 +83,7 @@ Opinion pooling prior estimator for asset returns.
 
     OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, ex)
 
-Keyword arguments correspond to the fields above. All arguments are validated for type and value consistency.
+Keywords correspond to the struct's fields. All arguments are validated for type and value consistency.
 
 ## Validation
 

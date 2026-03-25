@@ -25,7 +25,7 @@ Node type for representing clusters in a hierarchical clustering tree.
                 right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
                 level::Int = 1)
 
-Positional and keyword arguments correspond to the fields above. The `level` is automatically computed based on the levels of child nodes if they exist.
+Positional and Keywords correspond to the struct's fields. The `level` is automatically computed based on the levels of child nodes if they exist.
 
 # Examples
 

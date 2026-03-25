@@ -23,7 +23,7 @@ CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
                              warn_comb::Integer = 100_000)
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

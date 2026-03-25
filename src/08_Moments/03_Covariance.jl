@@ -23,7 +23,7 @@ A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrar
                       w::Option{<:StatsBase.AbstractWeights} = nothing,
                       idx::Option{<:VecInt} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -209,7 +209,7 @@ A flexible container type for configuring and applying joint expected returns an
                ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
                alg::AbstractMomentAlgorithm = Full())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

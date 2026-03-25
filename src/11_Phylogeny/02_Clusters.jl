@@ -92,7 +92,7 @@ Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
     Clusters(; res::Clustering.Hclust, S::MatNum,
                            D::MatNum, k::Integer)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -163,7 +163,7 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
 
     SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -216,7 +216,7 @@ Algorithm type for estimating the optimal number of clusters using the standardi
     SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
                      metric::Option{<:Distances.SemiMetric} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -274,7 +274,7 @@ Estimator type for selecting the optimal number of clusters in `PortfolioOptimis
     OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
                           alg::Int_ONC = SecondOrderDifference())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -338,7 +338,7 @@ Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
     HClustAlgorithm(; linkage::Symbol = :ward)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -388,7 +388,7 @@ Estimator type for clustering in `PortfolioOptimisers.jl`.
                         alg::AbstractClustersAlgorithm = HClustAlgorithm(),
                         onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

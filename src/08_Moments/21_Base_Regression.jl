@@ -101,7 +101,7 @@ Regression target type for standard linear models in `PortfolioOptimisers.jl`.
 
     LinearModel(; kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -173,7 +173,7 @@ Regression target type for generalised linear models (GLMs) in `PortfolioOptimis
 
     GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -415,7 +415,7 @@ Container type for regression results in `PortfolioOptimisers.jl`.
     Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                b::Option{<:VecNum} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

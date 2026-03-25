@@ -15,7 +15,7 @@ Container type for phylogeny matrix or vector results in `PortfolioOptimisers.jl
 
     PhylogenyResult(; X::ArrNum)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -172,7 +172,7 @@ Centrality algorithm type for betweenness centrality in `PortfolioOptimisers.jl`
 
     BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -217,7 +217,7 @@ Centrality algorithm type for closeness centrality in `PortfolioOptimisers.jl`.
 
     ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -262,7 +262,7 @@ Centrality algorithm type for degree centrality in `PortfolioOptimisers.jl`.
 
     DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -323,7 +323,7 @@ Centrality algorithm type for Katz centrality in `PortfolioOptimisers.jl`.
 
     KatzCentrality(; alpha::Number = 0.3)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -368,7 +368,7 @@ Centrality algorithm type for PageRank in `PortfolioOptimisers.jl`.
 
     Pagerank(; alpha::Number = 0.85, n::Integer = 100, epsilon::Number = 1e-6)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -438,7 +438,7 @@ Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs
 
     StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -560,7 +560,7 @@ Algorithm type for Kruskal's minimum spanning tree (MST) in `PortfolioOptimisers
 
     KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -605,7 +605,7 @@ Algorithm type for Boruvka's minimum spanning tree (MST) in `PortfolioOptimisers
 
     BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -650,7 +650,7 @@ Algorithm type for Prim's minimum spanning tree (MST) in `PortfolioOptimisers.jl
 
     PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -755,7 +755,7 @@ Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
                      alg::Tree_SimMat = KruskalTree(),
                      n::Integer = 1)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -846,7 +846,7 @@ Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
                         pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
                         ct::AbstractCentralityAlgorithm = DegreeCentrality())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

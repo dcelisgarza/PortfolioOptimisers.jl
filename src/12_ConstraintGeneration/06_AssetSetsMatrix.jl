@@ -15,7 +15,7 @@ Estimator for constructing asset set membership matrices from asset groupings.
 
     AssetSetsMatrixEstimator(; val::AbstractString)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

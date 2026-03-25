@@ -41,7 +41,7 @@ IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::Integer =
                  expend_train::Bool = false, reduce_test::Bool = false)
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -169,7 +169,7 @@ DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                 reduce_test::Bool = false)
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

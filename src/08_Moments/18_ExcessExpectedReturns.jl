@@ -18,7 +18,7 @@ Container type for excess expected returns estimators.
     ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                           rf::Number = 0.0)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

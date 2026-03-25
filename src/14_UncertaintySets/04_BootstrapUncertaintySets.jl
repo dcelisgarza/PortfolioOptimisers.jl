@@ -132,7 +132,7 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
                        seed::Option{<:Integer} = nothing,
                        bootstrap::ARCHBootstrapSet = StationaryBootstrap())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

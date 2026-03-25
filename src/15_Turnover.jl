@@ -308,7 +308,7 @@ Where:
 
     Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

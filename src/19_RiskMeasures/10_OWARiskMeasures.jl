@@ -75,7 +75,7 @@ Where:
 
     MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Details
 
@@ -151,7 +151,7 @@ Where:
 
     MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -223,7 +223,7 @@ Where:
 
     MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -294,7 +294,7 @@ Where:
 
     NormalisedConstantRelativeRiskAversion(; g::Number = 0.5)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -354,7 +354,7 @@ Estimator type for OWA weights using JuMP-based optimization.
     OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
             so::Number = 1.0, alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

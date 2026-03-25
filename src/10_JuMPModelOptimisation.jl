@@ -67,7 +67,7 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
            settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
            add_bridges::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -160,7 +160,7 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
 
     JuMPResult(; trials::AbstractDict, success::Bool)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

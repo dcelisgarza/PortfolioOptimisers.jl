@@ -21,7 +21,7 @@ Container type for equilibrium expected returns estimators.
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                w::Option{<:VecNum} = nothing, l::Number = 1)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

@@ -17,7 +17,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
     BlackLittermanViews(; P::MatNum, Q::VecNum)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

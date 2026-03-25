@@ -715,7 +715,7 @@ $(DocStringExtensions.FIELDS)
 
     VecScalar(; v::VecNum, s::Number)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

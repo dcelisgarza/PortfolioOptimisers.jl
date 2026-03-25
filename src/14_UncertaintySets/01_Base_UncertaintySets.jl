@@ -310,7 +310,7 @@ Stores lower and upper bounds for the uncertain quantity, such as expected retur
 
     BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -587,7 +587,7 @@ Stores a covariance matrix, a scaling parameter, and a class identifier for the 
     EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
                           class::AbstractEllipsoidalUncertaintySetResultClass)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

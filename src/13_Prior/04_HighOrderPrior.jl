@@ -334,7 +334,7 @@ High order prior estimator for asset returns.
                             ske::Option{<:CoskewnessEstimator} = Coskewness(;
                                                                                     alg = Full()))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

@@ -329,7 +329,7 @@ A flexible container type for configuring and applying matrix processing routine
                                      alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                                      order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

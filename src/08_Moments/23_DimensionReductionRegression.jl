@@ -35,7 +35,7 @@ Principal Component Analysis (PCA) dimension reduction target.
 
     PCA(; kwargs::NamedTuple = ())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -102,7 +102,7 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
     PPCA(; kwargs::NamedTuple = ())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -179,7 +179,7 @@ Estimator for dimension reduction regression-based moment estimation.
                                  drtgt::DimensionReductionTarget = PCA(),
                                  retgt::AbstractRegressionTarget = LinearModel())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

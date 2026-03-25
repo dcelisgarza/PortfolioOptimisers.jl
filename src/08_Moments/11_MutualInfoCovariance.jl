@@ -21,7 +21,7 @@ Covariance estimator based on mutual information.
                          bins::Int_Bin = HacineGharbiRavier(),
                          normalise::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

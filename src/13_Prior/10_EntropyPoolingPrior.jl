@@ -181,7 +181,7 @@ Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
 
     CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -237,7 +237,7 @@ end
                         sc2::Number = 1e3,
                         alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -314,7 +314,7 @@ end
                        sc2::Number = 1e5, so::Number = 1,
                        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -437,7 +437,7 @@ Entropy pooling prior estimator for asset returns.
                         w::Option{<:StatsBase.ProbabilityWeights} = nothing,
                         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

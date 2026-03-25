@@ -26,7 +26,7 @@ Factor-based prior estimator for asset returns.
                 re::AbstractRegressionEstimator = StepwiseRegression(),
                 ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

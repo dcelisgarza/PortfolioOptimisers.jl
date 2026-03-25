@@ -20,7 +20,7 @@ Lower tail dependence covariance estimator.
     LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Number = 0.05,
                   ex::FLoops.Transducers.Executor = ThreadedEx())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

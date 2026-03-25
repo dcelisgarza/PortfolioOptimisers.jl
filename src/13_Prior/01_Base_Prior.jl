@@ -500,7 +500,7 @@ Container type for low order prior results in `PortfolioOptimisers.jl`.
                   f_sigma::Option{<:MatNum} = nothing,
                   f_w::Option{<:VecNum} = nothing)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -651,7 +651,7 @@ Container type for high order prior results in `PortfolioOptimisers.jl`.
                    V::Option{<:MatNum} = nothing,
                    skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing())
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

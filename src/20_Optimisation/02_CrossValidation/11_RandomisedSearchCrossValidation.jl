@@ -47,7 +47,7 @@ RandomisedSearchCrossValidation(p::Union{AbstractVector{<:Pair{<:AbstractString,
                                 train_score::Bool = false, kwargs::NamedTuple = (;))
 ```
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

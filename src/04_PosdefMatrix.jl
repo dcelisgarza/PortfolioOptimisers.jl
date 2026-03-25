@@ -82,7 +82,7 @@ A concrete estimator type for projecting a matrix to the nearest positive defini
 
     Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 

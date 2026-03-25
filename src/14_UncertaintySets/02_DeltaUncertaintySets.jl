@@ -18,7 +18,7 @@ Estimator for box uncertainty sets using delta bounds on mean and covariance sta
     DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
                         dsigma::Number = 0.1)
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
