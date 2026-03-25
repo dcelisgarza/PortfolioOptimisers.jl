@@ -1,9 +1,5 @@
 """
-    struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
-        pe::T1
-        dmu::T2
-        dsigma::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for box uncertainty sets using delta bounds on mean and covariance statistics in portfolio optimisation.
 

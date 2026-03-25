@@ -1,5 +1,5 @@
 """
-    abstract type AbstractRegressionEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression estimator types in `PortfolioOptimisers.jl`.
 
@@ -13,7 +13,7 @@ All concrete and/or abstract types implementing regression estimation algorithms
 """
 abstract type AbstractRegressionEstimator <: AbstractEstimator end
 """
-    abstract type AbstractRegressionResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression result types in `PortfolioOptimisers.jl`.
 
@@ -28,7 +28,7 @@ All concrete and/or abstract types representing the output of regression-based m
 abstract type AbstractRegressionResult <: AbstractResult end
 const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
-    abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression algorithm types in `PortfolioOptimisers.jl`.
 
@@ -46,7 +46,7 @@ These types are used to specify the algorithm when constructing a regression est
 """
 abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression algorithm types in `PortfolioOptimisers.jl`.
 
@@ -60,7 +60,7 @@ All concrete and/or abstract types implementing stepwise regression algorithms s
 """
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
 """
-    abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criterion types in `PortfolioOptimisers.jl`.
 
@@ -73,7 +73,7 @@ All concrete and/or abstract types representing criteria for stepwise regression
 """
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
 """
-    abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression target types in `PortfolioOptimisers.jl`.
 
@@ -85,9 +85,7 @@ All concrete and/or abstract types representing regression targets (such as line
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
-    struct LinearModel{T1} <: AbstractRegressionTarget
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Regression target type for standard linear models in `PortfolioOptimisers.jl`.
 
@@ -155,10 +153,7 @@ function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
     return StatsAPI.fit(GLM.LinearModel, X, y; tgt.kwargs...)
 end
 """
-    struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Regression target type for generalised linear models (GLMs) in `PortfolioOptimisers.jl`.
 
@@ -230,7 +225,7 @@ function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
     return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; tgt.kwargs...)
 end
 """
-    abstract type AbstractMinMaxValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criteria in `PortfolioOptimisers.jl` where model fit is evaluated by either minimising or maximising the criterion value.
 
@@ -244,8 +239,7 @@ All concrete and/or abstract types representing stepwise regression criteria (su
 abstract type AbstractMinMaxValStepwiseRegressionCriterion <:
               AbstractStepwiseRegressionCriterion end
 """
-    abstract type AbstractMinValStepwiseRegressionCriterion <:
-                  AbstractMinMaxValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criteria where lower values indicate better model fit in `PortfolioOptimisers.jl`.
 
@@ -261,8 +255,7 @@ All concrete and/or abstract types implementing minimisation-based stepwise regr
 abstract type AbstractMinValStepwiseRegressionCriterion <:
               AbstractMinMaxValStepwiseRegressionCriterion end
 """
-    abstract type AbstractMaxValStepwiseRegressionCriteria <:
-                  AbstractMinMaxValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criteria where higher values indicate better model fit in `PortfolioOptimisers.jl`.
 
@@ -277,7 +270,7 @@ All concrete and/or abstract types implementing maximisation-based stepwise regr
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
               AbstractMinMaxValStepwiseRegressionCriterion end
 """
-    struct AIC <: AbstractMinValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -292,7 +285,7 @@ Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimise
 """
 struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 """
-    struct AICC <: AbstractMinValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Corrected Akaike Information Criterion (AICC) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -307,7 +300,7 @@ Corrected Akaike Information Criterion (AICC) for stepwise regression in `Portfo
 """
 struct AICC <: AbstractMinValStepwiseRegressionCriterion end
 """
-    struct BIC <: AbstractMinValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -322,7 +315,7 @@ Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimi
 """
 struct BIC <: AbstractMinValStepwiseRegressionCriterion end
 """
-    struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
+$(DocStringExtensions.TYPEDEF)
 
 Coefficient of determination (R²) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -336,7 +329,7 @@ Coefficient of determination (R²) for stepwise regression in `PortfolioOptimise
 """
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
 """
-    struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
+$(DocStringExtensions.TYPEDEF)
 
 Adjusted coefficient of determination (Adjusted R²) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -394,11 +387,7 @@ function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
     return -Inf
 end
 """
-    struct Regression{T1, T2, T3} <: AbstractRegressionResult
-        M::T1
-        L::T2
-        b::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for regression results in `PortfolioOptimisers.jl`.
 

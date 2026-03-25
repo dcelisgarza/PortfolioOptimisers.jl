@@ -1,16 +1,5 @@
 """
-    struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimator
-        tn::T1
-        l::T2
-        s::T3
-        fl::T4
-        fs::T5
-        dl::T6
-        ds::T7
-        dfl::T8
-        dfs::T9
-        kwargs::T10
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for portfolio transaction fees constraints.
 
@@ -213,14 +202,7 @@ function fees_view(fees::FeesEstimator, i)
                          ds = fees.ds, dfl = fees.dfl, dfs = fees.dfs, kwargs = fees.kwargs)
 end
 """
-    struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
-        tn::T1
-        l::T2
-        s::T3
-        fl::T4
-        fs::T5
-        kwargs::T6
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for portfolio transaction fee constraints.
 

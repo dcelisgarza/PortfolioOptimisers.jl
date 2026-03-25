@@ -1,5 +1,5 @@
 """
-    abstract type AbstractDenoiseEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all denoising estimator types in `PortfolioOptimisers.jl`.
 
@@ -65,7 +65,7 @@ Denoising matrix in-place...
 """
 abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 """
-    abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all denoising algorithm types in `PortfolioOptimisers.jl`.
 
@@ -128,7 +128,7 @@ Denoising matrix using custom algorithm...
 """
 abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
 """
-    struct SpectralDenoise <: AbstractDenoiseAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
 
@@ -152,7 +152,7 @@ SpectralDenoise()
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
-    struct FixedDenoise <: AbstractDenoiseAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
 
@@ -176,9 +176,7 @@ FixedDenoise()
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
-    struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
-        alpha::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
 
@@ -227,15 +225,7 @@ function ShrunkDenoise(; alpha::Number = 0.0)
     return ShrunkDenoise(alpha)
 end
 """
-    struct Denoise{T1, T2, T3, T4, T5, T6, T7} <: AbstractDenoiseEstimator
-        alg::T1
-        args::T2
-        kwargs::T3
-        kernel::T4
-        m::T5
-        n::T6
-        pdm::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in `PortfolioOptimisers.jl`.
 

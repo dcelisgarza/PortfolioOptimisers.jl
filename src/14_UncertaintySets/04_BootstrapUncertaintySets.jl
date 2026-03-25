@@ -1,5 +1,5 @@
 """
-    abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract type for estimators that construct uncertainty sets using bootstrap methods in portfolio optimisation.
 
@@ -11,7 +11,7 @@ Subtypes implement specific bootstrap algorithms (e.g., stationary, circular, mo
 """
 abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
 """
-    abstract type ARCHBootstrapSet <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract type for bootstrap algorithms used in constructing uncertainty sets for time series data in portfolio optimisation.
 
@@ -25,7 +25,7 @@ Subtypes implement specific bootstrap methods using [`archpy`](https://pypi.org/
 """
 abstract type ARCHBootstrapSet <: AbstractAlgorithm end
 """
-    struct StationaryBootstrap <: ARCHBootstrapSet end
+$(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [stationary bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.StationaryBootstrap.html#arch.bootstrap.StationaryBootstrap) in time series data.
 
@@ -37,7 +37,7 @@ Bootstrap algorithm for constructing uncertainty sets using a [stationary bootst
 """
 struct StationaryBootstrap <: ARCHBootstrapSet end
 """
-    struct CircularBootstrap <: ARCHBootstrapSet end
+$(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [circular bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.CircularBlockBootstrap.html#arch.bootstrap.CircularBlockBootstrap) in time series data.
 
@@ -49,7 +49,7 @@ Bootstrap algorithm for constructing uncertainty sets using a [circular bootstra
 """
 struct CircularBootstrap <: ARCHBootstrapSet end
 """
-    struct MovingBootstrap <: ARCHBootstrapSet end
+$(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [moving bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.MovingBlockBootstrap.html#arch.bootstrap.MovingBlockBootstrap) in time series data.
 
@@ -102,15 +102,7 @@ function bootstrap_func(::MovingBootstrap, block_size, X, seed)
                                                                       seed = seed)
 end
 """
-    struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
-        pe::T1
-        alg::T2
-        n_sim::T3
-        block_size::T4
-        q::T5
-        seed::T6
-        bootstrap::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for time series data in portfolio optimisation.
 

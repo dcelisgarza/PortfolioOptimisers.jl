@@ -1,5 +1,5 @@
 """
-    abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all risk measure estimators in `PortfolioOptimisers.jl`.
 
@@ -26,7 +26,7 @@ function needs_previous_weights(r::VecBaseRM)
     return any(needs_previous_weights.(r))
 end
 """
-    abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
 
@@ -41,7 +41,7 @@ These risk measures are typically used for analysis, reporting, or diagnostics, 
 """
 abstract type NonOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 """
-    abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are intended for use in portfolio optimisation routines.
 
@@ -58,7 +58,7 @@ abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 const VecOptRM = AbstractVector{<:OptimisationRiskMeasure}
 const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
 """
-    abstract type RiskMeasure <: OptimisationRiskMeasure end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for standard risk measures used in portfolio optimisation.
 
@@ -73,7 +73,7 @@ abstract type RiskMeasure <: OptimisationRiskMeasure end
 const VecRM = AbstractVector{<:RiskMeasure}
 const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
 """
-    abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for hierarchical risk measures used in portfolio optimisation.
 
@@ -86,7 +86,7 @@ Subtype `HierarchicalRiskMeasure` to implement risk measures that operate on hie
 """
 abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 """
-    abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all risk measure settings in `PortfolioOptimisers.jl`.
 
@@ -99,11 +99,7 @@ Defines the interface for settings types that configure the behavior of risk mea
 """
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
 """
-    struct Frontier{T1, T2, T3} <: AbstractAlgorithm
-        N::T1
-        factor::T2
-        flag::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Defines the number of points on the efficient frontier (Pareto Front).
 
@@ -164,11 +160,7 @@ end
 const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
 const Front_NumVec = Union{<:VecNum, <:Frontier}
 """
-    struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
-        scale::T1
-        ub::T2
-        rke::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Settings type for configuring risk measure estimators in `PortfolioOptimisers.jl`.
 Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures used in optimisation routines.
@@ -224,9 +216,7 @@ function RiskMeasureSettings(; scale::Number = 1.0, ub::Option{<:RkRtBounds} = n
     return RiskMeasureSettings(scale, ub, rke)
 end
 """
-    struct HierarchicalRiskMeasureSettings{T1} <: AbstractRiskMeasureSettings
-        scale::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Settings type for configuring hierarchical risk measure estimators in `PortfolioOptimisers.jl`.
 
@@ -283,7 +273,7 @@ function risk_measure_view(rs::VecBaseRM, i, X::MatNum)
     return [risk_measure_view(r, i, X) for r in rs]
 end
 """
-    abstract type Scalariser <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for scalarisation strategies used to combine multiple risk measures into a single scalar value for optimisation.
 
@@ -296,7 +286,7 @@ Subtype `Scalariser` to implement different methods for aggregating risk measure
 """
 abstract type Scalariser <: AbstractEstimator end
 """
-    abstract type NonHierarchicalScalariser <: Scalariser end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible with all portfolio optimisation estimators.
 
@@ -312,7 +302,7 @@ Subtype `NonHierarchicalScalariser` to implement aggregation methods that work w
 """
 abstract type NonHierarchicalScalariser <: Scalariser end
 """
-    abstract type HierarchicalScalariser <: Scalariser end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for scalarisation strategies that combine multiple risk measures into a single scalar value compatible only with hierarchical optimisations.
 
@@ -326,7 +316,7 @@ Subtype `HierarchicalScalariser` to implement aggregation methods that only work
 """
 abstract type HierarchicalScalariser <: Scalariser end
 """
-    struct SumScalariser <: NonHierarchicalScalariser end
+$(DocStringExtensions.TYPEDEF)
 
 Scalariser that combines multiple risk measures using a weighted sum.
 
@@ -356,7 +346,7 @@ Where:
 """
 struct SumScalariser <: NonHierarchicalScalariser end
 """
-    struct MaxScalariser <: NonHierarchicalScalariser end
+$(DocStringExtensions.TYPEDEF)
 
 Scalariser that selects the risk expression whose scaled value is the largest.
 
@@ -386,7 +376,7 @@ Where:
 """
 struct MaxScalariser <: NonHierarchicalScalariser end
 """
-    struct MinScalariser <: HierarchicalScalariser end
+$(DocStringExtensions.TYPEDEF)
 
 Scalariser that selects the risk expression whose scaled value is the largest.
 
@@ -416,9 +406,7 @@ Where:
 """
 struct MinScalariser <: HierarchicalScalariser end
 """
-    struct LogSumExpScalariser{T1} <: NonHierarchicalScalariser
-        gamma::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Scalariser that aggregates multiple risk measures using the log-sum-exp function.
 

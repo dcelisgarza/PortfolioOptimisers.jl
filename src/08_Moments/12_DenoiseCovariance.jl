@@ -1,13 +1,5 @@
 """
-    struct DenoiseCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ce::T1
-        dn::T2
-        pdm::T3
-        function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
-                                   pdm::Option{<:Posdef})
-            return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)
-        end
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A covariance estimator that applies a denoising algorithm and positive definite projection to the output of another covariance estimator. This type enables robust estimation of covariance matrices by first computing a base covariance, then applying denoising and positive definiteness corrections in sequence.
 

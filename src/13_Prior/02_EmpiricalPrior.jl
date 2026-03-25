@@ -1,9 +1,5 @@
 """
-    struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
-        ce::T1
-        me::T2
-        horizon::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Empirical prior estimator for asset returns.
 

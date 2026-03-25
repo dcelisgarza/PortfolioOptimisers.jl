@@ -1,5 +1,5 @@
 """
-    abstract type CokurtosisEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cokurtosis estimators in `PortfolioOptimisers.jl`.
 
@@ -12,11 +12,7 @@ All concrete and/or abstract types implementing cokurtosis estimation algorithms
 """
 abstract type CokurtosisEstimator <: AbstractEstimator end
 """
-    struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
-        me::T1
-        mp::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for cokurtosis estimators.
 

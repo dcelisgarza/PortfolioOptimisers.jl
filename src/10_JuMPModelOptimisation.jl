@@ -1,5 +1,5 @@
 """
-    abstract type AbstractJuMPResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all JuMP-based optimisation result types in `PortfolioOptimisers.jl`.
 
@@ -41,13 +41,7 @@ Represents solver settings as either a single pair of string key and value, or a
 """
 const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
 """
-    struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
-        name::T1
-        solver::T2
-        settings::T3
-        check_sol::T4
-        add_bridges::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for configuring a JuMP solver and its settings.
 
@@ -142,10 +136,7 @@ Represents either a single solver configuration or a collection of solver config
 """
 const Slv_VecSlv = Union{<:Solver, <:VecSlv}
 """
-    struct JuMPResult{T1, T2} <: AbstractJuMPResult
-        trials::T1
-        success::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Result type for JuMP model optimisation.
 

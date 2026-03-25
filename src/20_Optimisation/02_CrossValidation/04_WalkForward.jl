@@ -16,13 +16,7 @@ function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)
 end
 const WFCVER = Union{<:WalkForwardEstimator, <:WalkForwardResult}
 """
-    struct IndexWalkForward{T1, T2, T3, T4, T5} <: WalkForwardEstimator
-        train_size
-        test_size
-        purged_size
-        expend_train
-        reduce_test
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements index-based walk-forward cross-validation for time series, supporting purging and flexible train/test windowing.
 
@@ -132,17 +126,7 @@ const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
 const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
 const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
 """
-    struct DateWalkForward{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: WalkForwardEstimator
-        train_size::T1
-        test_size::T2
-        period::T3
-        period_offset::T4
-        purged_size::T5
-        adjuster::T6
-        previous::T7
-        expend_train::T8
-        reduce_test::T9
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements date-based walk-forward cross-validation for time series, supporting flexible windowing, purging, and custom date adjustment.
 

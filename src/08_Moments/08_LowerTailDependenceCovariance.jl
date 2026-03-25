@@ -1,9 +1,5 @@
 """
-    struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ve::T1
-        alpha::T2
-        ex::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Lower tail dependence covariance estimator.
 

@@ -1,9 +1,5 @@
 """
-    struct GeneralCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ce::T1
-        w::T2
-        idx::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrary covariance estimators and optional observation weights.
 
@@ -187,11 +183,7 @@ function factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
     return GeneralCovariance(; ce = factory(ce.ce, w), w = w, idx = ce.idx)
 end
 """
-    struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        me::T1
-        ce::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying joint expected returns and covariance estimation in `PortfolioOptimisers.jl`.
 

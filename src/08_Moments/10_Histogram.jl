@@ -1,5 +1,5 @@
 """
-    abstract type AbstractBins <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all histogram binning algorithms.
 
@@ -16,7 +16,7 @@ Abstract supertype for all histogram binning algorithms.
 abstract type AbstractBins <: AbstractAlgorithm end
 const Int_Bin = Union{<:AbstractBins, <:Integer}
 """
-    abstract type AstroPyBins <: AbstractBins end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all histogram binning algorithms implemented using AstroPy's bin width selection methods.
 
@@ -31,7 +31,7 @@ Abstract supertype for all histogram binning algorithms implemented using AstroP
 """
 abstract type AstroPyBins <: AbstractBins end
 """
-    struct Knuth <: AstroPyBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Knuth's rule.
 
@@ -47,7 +47,7 @@ Histogram binning algorithm using Knuth's rule.
 """
 struct Knuth <: AstroPyBins end
 """
-    struct FreedmanDiaconis <: AstroPyBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using the Freedman-Diaconis rule.
 
@@ -63,7 +63,7 @@ Histogram binning algorithm using the Freedman-Diaconis rule.
 """
 struct FreedmanDiaconis <: AstroPyBins end
 """
-    struct Scott <: AstroPyBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Scott's rule.
 
@@ -79,7 +79,7 @@ Histogram binning algorithm using Scott's rule.
 """
 struct Scott <: AstroPyBins end
 """
-    struct HacineGharbiRavier <: AbstractBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 

@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPriorEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all prior estimators.
 
@@ -13,7 +13,7 @@ Abstract supertype for all prior estimators.
 """
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for low order prior estimators.
 
@@ -28,7 +28,7 @@ Abstract supertype for low order prior estimators.
 """
 abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Low order prior estimator using only asset returns.
 
@@ -42,7 +42,7 @@ Low order prior estimator using only asset returns.
 """
 abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Low order prior estimator using factor returns.
 
@@ -56,7 +56,7 @@ Low order prior estimator using factor returns.
 """
 abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Low order prior estimator using both asset and factor returns.
 
@@ -124,7 +124,7 @@ const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstim
                                                     <:AbstractLowOrderPriorEstimator_F,
                                                     <:AbstractLowOrderPriorEstimator_AF}
 """
-    abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for high order prior estimators.
 
@@ -141,7 +141,7 @@ abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimat
 const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
                                                 <:AbstractHighOrderPriorEstimator_F}
 """
-    abstract type AbstractPriorResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all prior result types.
 
@@ -452,21 +452,7 @@ function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
     return centrality_constraints(ccs, X; kwargs...)
 end
 """
-    struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
-           AbstractPriorResult
-        X::T1
-        mu::T2
-        sigma::T3
-        chol::T4
-        w::T5
-        ens::T6
-        kld::T7
-        ow::T8
-        rr::T9
-        f_mu::T10
-        f_sigma::T11
-        f_w::T12
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for low order prior results in `PortfolioOptimisers.jl`.
 
@@ -618,15 +604,7 @@ function prior_view(pr::LowOrderPrior, i)
                          f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
 """
-    struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
-        pr::T1
-        kt::T2
-        L2::T3
-        S2::T4
-        sk::T5
-        V::T6
-        skmp::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for high order prior results in `PortfolioOptimisers.jl`.
 

@@ -1,7 +1,5 @@
 """
-    struct PhylogenyResult{T} <: AbstractPhylogenyResult
-        X::T
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for phylogeny matrix or vector results in `PortfolioOptimisers.jl`.
 
@@ -129,7 +127,7 @@ function centrality_vector(plr::PhylogenyResult{<:VecNum}, args...; kwargs...)
     return plr
 end
 """
-    abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality algorithm types in `PortfolioOptimisers.jl` from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
 
@@ -154,10 +152,7 @@ function centrality_vector(plr::PhylogenyResult{<:MatNum}, ct::AbstractCentralit
     return PhylogenyResult(; X = calc_centrality(ct, G))
 end
 """
-    struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for betweenness centrality in `PortfolioOptimisers.jl`.
 
@@ -199,10 +194,7 @@ function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality(args, kwargs)
 end
 """
-    struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for closeness centrality in `PortfolioOptimisers.jl`.
 
@@ -244,10 +236,7 @@ function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality(args, kwargs)
 end
 """
-    struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        kind::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for degree centrality in `PortfolioOptimisers.jl`.
 
@@ -294,7 +283,7 @@ function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
     return DegreeCentrality(kind, kwargs)
 end
 """
-    struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D) in `PortfolioOptimisers.jl`.
 
@@ -307,9 +296,7 @@ Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/G
 """
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 """
-    struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
-        alpha::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for Katz centrality in `PortfolioOptimisers.jl`.
 
@@ -348,11 +335,7 @@ function KatzCentrality(; alpha::Number = 0.3)
     return KatzCentrality(alpha)
 end
 """
-    struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
-        n::T1
-        alpha::T2
-        epsilon::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for PageRank in `PortfolioOptimisers.jl`.
 
@@ -407,7 +390,7 @@ function Pagerank(; n::Integer = 100, alpha::Number = 0.85, epsilon::Number = 1e
     return Pagerank(n, alpha, epsilon)
 end
 """
-    struct RadialityCentrality <: AbstractCentralityAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D) in `PortfolioOptimisers.jl`.
 
@@ -420,10 +403,7 @@ Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Gra
 """
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
 """
-    struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality) in `PortfolioOptimisers.jl`.
 
@@ -527,7 +507,7 @@ function calc_centrality(ct::StressCentrality, g::Graphs.AbstractGraph)
     return Graphs.stress_centrality(g, ct.args...; ct.kwargs...)
 end
 """
-    abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all minimum spanning tree (MST) algorithm types in `PortfolioOptimisers.jl`.
 
@@ -542,10 +522,7 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
 """
-    struct KruskalTree{T1, T2} <: AbstractTreeType
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for Kruskal's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
 
@@ -587,10 +564,7 @@ function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree(args, kwargs)
 end
 """
-    struct BoruvkaTree{T1, T2} <: AbstractTreeType
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for Boruvka's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
 
@@ -632,10 +606,7 @@ function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree(args, kwargs)
 end
 """
-    struct PrimTree{T1, T2} <: AbstractTreeType
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for Prim's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
 
@@ -713,7 +684,7 @@ function calc_mst(ct::PrimTree, g::Graphs.AbstractGraph)
     return Graphs.prim_mst(g, ct.args...; ct.kwargs...)
 end
 """
-    abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all network estimator types in `PortfolioOptimisers.jl`.
 
@@ -730,12 +701,7 @@ const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
                              <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
 const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
-    struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
-        ce::T1
-        de::T2
-        alg::T3
-        n::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
 
@@ -813,7 +779,7 @@ function NetworkEstimator(;
     return NetworkEstimator(ce, de, alg, n)
 end
 """
-    abstract type AbstractCentralityEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality estimator types in `PortfolioOptimisers.jl`.
 
@@ -826,10 +792,7 @@ All concrete and/or abstract types implementing centrality-based estimation algo
 """
 abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
-    struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
-        pl::T1
-        ct::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
 

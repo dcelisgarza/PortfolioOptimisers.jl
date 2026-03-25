@@ -1,11 +1,5 @@
 """
-    struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
-        id::tid
-        left::tl
-        right::tr
-        height::td
-        level::tcnt
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Node type for representing clusters in a hierarchical clustering tree.
 
@@ -92,7 +86,7 @@ function is_leaf(a::ClusterNode)
     return isnothing(a.left)
 end
 """
-    abstract type AbstractPreorderBy <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all preorder traversal strategies in `PortfolioOptimisers.jl`.
 
@@ -105,7 +99,7 @@ All concrete and/or abstract types implementing specific preorder traversal logi
 """
 abstract type AbstractPreorderBy <: AbstractAlgorithm end
 """
-    struct PreorderTreeByID <: AbstractPreorderBy end
+$(DocStringExtensions.TYPEDEF)
 
 Preorder traversal strategy that visits nodes by their ID.
 

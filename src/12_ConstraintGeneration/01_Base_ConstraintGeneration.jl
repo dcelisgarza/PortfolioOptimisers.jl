@@ -1,5 +1,5 @@
 """
-    abstract type AbstractConstraintResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all constraint result types in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ All concrete and/or abstract types representing the result of constraint generat
 """
 abstract type AbstractConstraintResult <: AbstractResult end
 """
-    abstract type AbstractConstraintEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all constraint estimator types in `PortfolioOptimisers.jl`.
 

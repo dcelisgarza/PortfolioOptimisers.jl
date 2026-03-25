@@ -1,13 +1,5 @@
 """
-    struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: AbstractUncertaintySetEstimator
-        pe::T1
-        alg::T2
-        n_sim::T3
-        q::T4
-        rng::T5
-        seed::T6
-        ens::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for box or ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
 

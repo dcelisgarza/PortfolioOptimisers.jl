@@ -1,9 +1,5 @@
 """
-    struct KFold{T1, T2, T3} <: NonSequentialCrossValidationEstimator
-        n::T1
-        purged_size::T2
-        embargo_size::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements non-sequential k-fold cross-validation with optional purging and embargoing of training samples.
 

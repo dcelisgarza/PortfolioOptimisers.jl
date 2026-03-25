@@ -1,5 +1,5 @@
 """
-    abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Ordered Weights Array (OWA) estimator types in `PortfolioOptimisers.jl`.
 
@@ -13,7 +13,7 @@ All concrete and/or abstract types implementing OWA estimation algorithms should
 """
 abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 """
-    abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Ordered Weights Array (OWA) algorithm types in `PortfolioOptimisers.jl`.
 
@@ -34,9 +34,7 @@ abstract type EntropyFormulation <: AbstractAlgorithm end
 struct ExponentialConeEntropy <: EntropyFormulation end
 struct RelativeEntropy <: EntropyFormulation end
 """
-    struct MaximumEntropy{T1} <: AbstractOrderedWeightsArrayAlgorithm
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -112,9 +110,7 @@ const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRis
 const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
 const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
 """
-    struct MinimumSquaredDistance{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the Minimum Squared Distance algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -184,9 +180,7 @@ function MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
     return MinimumSquaredDistance(alg)
 end
 """
-    struct MinimumSumSquares{T1} <: SquaredOrderedWeightsArrayAlgorithm{T1}
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -256,9 +250,7 @@ function MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
     return MinimumSumSquares(alg)
 end
 """
-    struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
-        g::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for normalised constant relative risk aversion (CRRA) OWA weights.
 
@@ -329,13 +321,7 @@ function NormalisedConstantRelativeRiskAversion(; g::Number = 0.5)
     return NormalisedConstantRelativeRiskAversion(g)
 end
 """
-    struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
-        slv::T1
-        max_phi::T2
-        sc::T3
-        so::T4
-        alg::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for OWA weights using JuMP-based optimization.
 

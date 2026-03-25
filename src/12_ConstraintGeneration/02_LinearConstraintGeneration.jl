@@ -1,8 +1,5 @@
 """
-    struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
-        A::T1
-        B::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for a set of linear constraints (either equality or inequality) in the form `A * x = B` or `A * x ≤ B`.
 
@@ -51,10 +48,7 @@ function PartialLinearConstraint(; A::MatNum, B::VecNum)
     return PartialLinearConstraint(A, B)
 end
 """
-    struct LinearConstraint{T1, T2} <: AbstractConstraintResult
-        ineq::T1
-        eq::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for a set of linear constraints, separating inequality and equality constraints.
 
@@ -128,7 +122,7 @@ function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     end
 end
 """
-    abstract type AbstractParsingResult <: AbstractConstraintResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all equation parsing result types in `PortfolioOptimisers.jl`.
 
@@ -141,13 +135,7 @@ All concrete and/or abstract types representing parsing results should be subtyp
 """
 abstract type AbstractParsingResult <: AbstractConstraintResult end
 """
-    struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
-        vars::T1
-        coef::T2
-        op::T3
-        rhs::T4
-        eqn::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Structured result for standard linear constraint equation parsing.
 
@@ -186,11 +174,7 @@ end
 const VecPR = AbstractVector{<:ParsingResult}
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
-    struct AssetSets{T1, T2, T3} <: AbstractEstimator
-        key::T1
-        ukey::T2
-        dict::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for asset set and group information used in constraint generation.
 
@@ -476,7 +460,7 @@ function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
     return val
 end
 """
-    struct UniformValues <: AbstractEstimatorValueAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
 
@@ -1205,10 +1189,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
     end
 end
 """
-    struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
-        val::T1
-        key::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for one or more linear constraint equations to be parsed and converted into constraint matrices.
 

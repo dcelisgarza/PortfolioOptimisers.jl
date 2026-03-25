@@ -6,7 +6,7 @@ Cross-validations compatible with search-based hyperparameter tuning.
 const SearchCV = Union{<:KFold, <:KFoldResult, <:WalkForwardEstimator, <:WalkForwardResult}
 abstract type AbstractSearchCrossValidationEstimator <: AbstractEstimator end
 """
-    abstract type AbstractSearchCrossValidationResult <: AbstractResult
+$(DocStringExtensions.TYPEDEF)
 
 Abstract result type for search-based cross-validation routines. Serves as the parent for all result types produced by search cross-validation algorithms, encapsulating optimal estimator, score matrices, parameter grid, and selected index.
 
@@ -65,15 +65,7 @@ function (s::HighestMeanScore)(X::MatNum; dims::Integer = 1)
     return argmax(dropdims(mean(X; dims = dims); dims = dims))
 end
 """
-    struct SearchCrossValidationResult{T1, T2, T3, T4, T5, T6} <:
-           AbstractSearchCrossValidationResult
-        opt::T1
-        test_scores::T2
-        train_scores::T3
-        lens_grid::T4
-        val_grid::T5
-        idx::T6
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Result type for search-based cross-validation routines. Stores the optimal estimator, score matrices, parameter grid, and selected index for hyperparameter search.
 

@@ -1,8 +1,5 @@
 """
-    struct Distance{T1, T2} <: AbstractDistanceEstimator
-        power::T1
-        alg::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 If power is not `nothing`, computes the generalised distance estimator.
 

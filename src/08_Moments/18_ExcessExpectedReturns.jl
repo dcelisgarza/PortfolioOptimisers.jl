@@ -1,8 +1,5 @@
 """
-    struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
-        me::T1
-        rf::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for excess expected returns estimators.
 

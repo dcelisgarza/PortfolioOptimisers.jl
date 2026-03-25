@@ -1,5 +1,5 @@
 """
-    abstract type SecondMomentFormulation <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation formulations of second moment risk measures in `PortfolioOptimisers.jl`.
 
@@ -13,7 +13,7 @@ Abstract supertype for optimisation formulations of second moment risk measures 
 """
 abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
-    abstract type VarianceFormulation <: SecondMomentFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation formulations of variance-based risk measures in `PortfolioOptimisers.jl`.
 
@@ -24,7 +24,7 @@ Abstract supertype for optimisation formulations of variance-based risk measures
 """
 abstract type VarianceFormulation <: SecondMomentFormulation end
 """
-    struct QuadRiskExpr <: VarianceFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form. This can be in two ways.
 
@@ -65,7 +65,7 @@ Where:
 """
 struct QuadRiskExpr <: VarianceFormulation end
 """
-    struct SquaredSOCRiskExpr <: VarianceFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Squared second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using the square of a variable constrained by a second order cone.
 
@@ -78,7 +78,7 @@ Squared second-order cone risk expression optimisation formulation for applicabl
 """
 struct SquaredSOCRiskExpr <: VarianceFormulation end
 """
-    struct RSOCRiskExpr <: SecondMomentFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Rotated second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure using a variable constrained to be in a rotated second order cone representing the sum of squares.
 
@@ -91,7 +91,7 @@ Rotated second-order cone risk expression optimisation formulation for applicabl
 """
 struct RSOCRiskExpr <: SecondMomentFormulation end
 """
-    struct SOCRiskExpr <: SecondMomentFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using a variable constrained by a second order cone.
 
@@ -107,12 +107,7 @@ struct SOCRiskExpr <: SecondMomentFormulation end
 const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 """
-    struct Variance{T1, T2, T3, T4} <: RiskMeasure
-        settings::T1
-        sigma::T2
-        rc::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio variance using a covariance matrix.
 
@@ -301,10 +296,7 @@ function risk_measure_view(r::Variance, i, args...)
                     alg = r.alg)
 end
 """
-    struct StandardDeviation{T1, T2} <: RiskMeasure
-        settings::T1
-        sigma::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio standard deviation using a covariance matrix. It is the square root of the variance.
 
@@ -449,7 +441,7 @@ function risk_measure_view(r::StandardDeviation, i, args...)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 """
-    struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
+$(DocStringExtensions.TYPEDEF)
 
 Represents the variance risk measure under uncertainty sets. Works the same way as the [`Variance`](@ref) risk measure but allows specifying uncertainty set estimators or results. These are only used in `JuMP`-based optimisations because they dictate how the variance is formulated as an optimisation problem. By encapsulating the uncertainty set estimator or result, enables the use of multiple uncertainty set variances in the same optimisation model.
 

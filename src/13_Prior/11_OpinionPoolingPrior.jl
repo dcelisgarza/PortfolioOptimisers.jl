@@ -1,5 +1,5 @@
 """
-    abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for opinion pooling algorithms.
 
@@ -13,7 +13,7 @@ Abstract supertype for opinion pooling algorithms.
 """
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 """
-    struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Linear opinion pooling algorithm for consensus prior estimation.
 
@@ -34,7 +34,7 @@ Linear opinion pooling algorithm for consensus prior estimation.
 """
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 """
-    struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Logarithmic opinion pooling algorithm for consensus prior estimation.
 
@@ -55,15 +55,7 @@ Logarithmic opinion pooling algorithm for consensus prior estimation.
 """
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
 """
-    struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
-        pes::T1
-        pe1::T2
-        pe2::T3
-        p::T4
-        w::T5
-        alg::T6
-        ex::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Opinion pooling prior estimator for asset returns.
 

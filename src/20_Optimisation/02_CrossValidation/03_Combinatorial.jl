@@ -1,10 +1,5 @@
 """
-    struct CombinatorialCrossValidation{T1, T2, T3, T4} <: NonSequentialCrossValidationEstimator
-        n_folds::T1
-        n_test_folds::T2
-        purged_size::T3
-        embargo_size::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements combinatorial non-sequential cross-validation with purging and embargoing, allowing for all possible combinations of test folds.
 

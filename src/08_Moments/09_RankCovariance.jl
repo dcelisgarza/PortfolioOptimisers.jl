@@ -1,5 +1,5 @@
 """
-    abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rank-based covariance estimators in `PortfolioOptimisers.jl`.
 
@@ -13,9 +13,7 @@ All concrete and/or abstract types implementing rank-based covariance estimation
 """
 abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 """
-    struct KendallCovariance{T1} <: RankCovarianceEstimator
-        ve::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Robust covariance estimator based on Kendall's tau rank correlation.
 
@@ -131,9 +129,7 @@ function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs.
     return StatsBase.cor2cov!(sigma, std_vec)
 end
 """
-    struct SpearmanCovariance{T1} <: RankCovarianceEstimator
-        ve::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Robust covariance estimator based on Spearman's rho rank correlation.
 

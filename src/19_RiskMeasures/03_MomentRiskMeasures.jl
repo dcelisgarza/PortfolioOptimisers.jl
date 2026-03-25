@@ -1,5 +1,5 @@
 """
-    abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ Defines the interface for algorithms that compute portfolio risk using statistic
 """
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
 """
-    abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all low-order moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
 
@@ -24,7 +24,7 @@ Defines the interface for algorithms that compute portfolio risk using low-order
 """
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
-    abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance in `PortfolioOptimisers.jl`.
 
@@ -40,7 +40,7 @@ function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
 """
-    struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the first lower moment risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -54,7 +54,7 @@ Computes portfolio risk using the first lower moment, which is the negative mean
 """
 struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
-    struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the mean absolute deviation risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -68,11 +68,7 @@ Computes portfolio risk as the mean of the absolute deviations of the returns se
 """
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
-    struct SecondMoment{T1, T2, T3} <: LowOrderMomentMeasureAlgorithm
-        ve::T1
-        alg1::T2
-        alg2::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a second moment (variance or standard deviation) risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -130,7 +126,7 @@ function factory(alg::SecondMoment, w::StatsBase.AbstractWeights)
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
-    abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all high-order moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
 
@@ -143,7 +139,7 @@ Defines the interface for algorithms that compute portfolio risk using high-orde
 """
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
-    abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for high-order moment risk measure algorithms that are not standardised by the variance in `PortfolioOptimisers.jl`.
 
@@ -157,7 +153,7 @@ Defines the interface for algorithms that compute portfolio risk using high-orde
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
 """
-    struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the unstandardised semi-skewness risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -171,9 +167,7 @@ Computes portfolio risk using the third lower moment (unstandardised semi-skewne
 """
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 """
-    struct FourthMoment{T1} <: UnstandardisedHighOrderMomentMeasureAlgorithm
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -212,10 +206,7 @@ function FourthMoment(; alg::AbstractMomentAlgorithm = Full())
     return FourthMoment(alg)
 end
 """
-    struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
-        ve::T1
-        alg::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a standardised high-order moment risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -270,12 +261,7 @@ function factory(alg::StandardisedHighOrderMoment, w::StatsBase.AbstractWeights)
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """
-    struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
-        settings::T1
-        w::T2
-        mu::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a low-order moment risk measure in `PortfolioOptimisers.jl`.
 
@@ -646,12 +632,7 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     return LowOrderMoment(settings, w, mu, alg)
 end
 """
-    struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
-        settings::T1
-        w::T2
-        mu::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a high-order moment risk measure in `PortfolioOptimisers.jl`.
 

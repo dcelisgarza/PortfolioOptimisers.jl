@@ -1,9 +1,5 @@
 """
-    struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ve::T1
-        bins::T2
-        normalise::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Covariance estimator based on mutual information.
 

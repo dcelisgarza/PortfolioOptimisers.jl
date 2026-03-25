@@ -1,14 +1,5 @@
 """
-    struct GridSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7} <:
-           AbstractSearchCrossValidationEstimator
-        p::T1
-        cv::T2
-        r::T3
-        scorer::T4
-        ex::T5
-        train_score::T6
-        kwargs::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Performs grid search cross-validation for portfolio optimisation estimators. Iterates over parameter grids, applies cross-validation splits, and scores each configuration to select the optimal parameters.
 

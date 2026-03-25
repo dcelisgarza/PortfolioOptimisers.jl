@@ -1,9 +1,5 @@
 """
-    struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
-        me::T1
-        w::T2
-        corrected::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional expected returns estimators, observation weights, and bias correction.
 

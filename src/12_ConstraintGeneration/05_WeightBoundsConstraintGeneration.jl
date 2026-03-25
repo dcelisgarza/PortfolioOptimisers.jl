@@ -34,10 +34,7 @@ function weight_bounds_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct WeightBounds{T1, T2} <: AbstractConstraintResult
-        lb::T1
-        ub::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for lower and upper portfolio weight bounds.
 
@@ -98,12 +95,7 @@ function weight_bounds_view(wb::WeightBounds, i)
     return WeightBounds(; lb = lb, ub = ub)
 end
 """
-    struct WeightBoundsEstimator{T1, T2, T3, T4} <: AbstractConstraintEstimator
-        lb::T1
-        ub::T2
-        dlb::T3
-        dub::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for portfolio weight bounds constraints.
 

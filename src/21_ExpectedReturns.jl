@@ -235,9 +235,7 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
     return rk, rt, sr - N / (T * sr)
 end
 """
-    struct ExpectedReturn{T1} <: NonOptimisationRiskMeasure
-        rt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Return-based risk measure.
 
@@ -343,11 +341,7 @@ function expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult,
     return expected_return(r.rt, w, pr, fees)
 end
 """
-    struct ExpectedReturnRiskRatio{T1, T2, T3} <: NonOptimisationRiskMeasure
-        rt::T1
-        rk::T2
-        rf::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Ratio-based risk measure.
 

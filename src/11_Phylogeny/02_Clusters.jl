@@ -1,5 +1,5 @@
 """
-    abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering estimator types in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ All concrete and/or abstract types implementing clustering-based estimation algo
 """
 abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 """
-    abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering algorithm types in `PortfolioOptimisers.jl`.
 
@@ -30,7 +30,7 @@ end
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
-    abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all optimal number of clusters estimator types in `PortfolioOptimisers.jl`.
 
@@ -42,7 +42,7 @@ All concrete and/or abstract types implementing algorithms to estimate the optim
 """
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 """
-    abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all optimal number of clusters algorithm types in `PortfolioOptimisers.jl`.
 
@@ -55,7 +55,7 @@ All concrete and/or abstract types implementing specific algorithms for determin
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
-    abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering result types in `PortfolioOptimisers.jl`.
 
@@ -69,12 +69,7 @@ All concrete and/or abstract types representing the result of a clustering estim
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
-    struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
-        res::T1
-        S::T2
-        D::T3
-        k::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
@@ -147,9 +142,7 @@ function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
 """
-    struct SecondOrderDifference{T1} <: AbstractOptimalNumberClustersAlgorithm
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for estimating the optimal number of clusters using the second-order difference method.
 
@@ -197,10 +190,7 @@ function factory(alg::SecondOrderDifference, w::StatsBase.AbstractWeights)
     return SecondOrderDifference(; alg = factory(alg.alg, w))
 end
 """
-    struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
-        alg::T1
-        metric::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
 
@@ -255,10 +245,7 @@ function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)
     return SilhouetteScore(; alg = factory(alg.alg, w), metric = alg.metric)
 end
 """
-    struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
-        max_k::T1
-        alg::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for selecting the optimal number of clusters in `PortfolioOptimisers.jl`.
 
@@ -322,9 +309,7 @@ function factory(onc::OptimalNumberClusters, w::StatsBase.AbstractWeights)
     return OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
 end
 """
-    struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
-        linkage::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
@@ -363,12 +348,7 @@ function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
 end
 """
-    struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
-        ce::T1
-        de::T2
-        alg::T3
-        onc::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for clustering in `PortfolioOptimisers.jl`.
 

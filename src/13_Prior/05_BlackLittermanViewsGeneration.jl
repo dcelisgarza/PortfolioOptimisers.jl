@@ -1,8 +1,5 @@
 """
-    struct BlackLittermanViews{T1, T2} <: AbstractResult
-        P::T1
-        Q::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for Black-Litterman investor views in canonical matrix form.
 

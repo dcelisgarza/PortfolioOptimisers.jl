@@ -1,5 +1,5 @@
 """
-    abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Gerber covariance estimators in `PortfolioOptimisers.jl`.
 
@@ -16,7 +16,7 @@ All concrete and/or abstract types implementing Gerber covariance estimation alg
 """
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
-    abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Gerber covariance algorithm types in `PortfolioOptimisers.jl`.
 
@@ -37,7 +37,7 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
-    abstract type UnstandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all unstandardised Gerber covariance algorithm types.
 
@@ -57,7 +57,7 @@ Concrete types implementing unstandardised Gerber covariance algorithms should s
 """
 abstract type UnstandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 """
-    abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all standardised Gerber covariance algorithm types. These Z-transform the data before applying the Gerber covariance algorithm.
 
@@ -77,7 +77,7 @@ Concrete types implementing standardised Gerber covariance algorithms should sub
 """
 abstract type StandardisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 """
-    struct Gerber0 <: UnstandardisedGerberCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber covariance algorithm.
 
@@ -94,7 +94,7 @@ Implements the original Gerber covariance algorithm.
 """
 struct Gerber0 <: UnstandardisedGerberCovarianceAlgorithm end
 """
-    struct Gerber1 <: UnstandardisedGerberCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Gerber covariance algorithm.
 
@@ -111,7 +111,7 @@ Implements the first variant of the Gerber covariance algorithm.
 """
 struct Gerber1 <: UnstandardisedGerberCovarianceAlgorithm end
 """
-    struct Gerber2 <: UnstandardisedGerberCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Gerber covariance algorithm.
 
@@ -128,9 +128,7 @@ Implements the second variant of the Gerber covariance algorithm.
 """
 struct Gerber2 <: UnstandardisedGerberCovarianceAlgorithm end
 """
-    struct StandardisedGerber0{T1} <: StandardisedGerberCovarianceAlgorithm
-        me::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber covariance algorithm on Z-transformed data.
 
@@ -178,9 +176,7 @@ function StandardisedGerber0(;
     return StandardisedGerber0(me)
 end
 """
-    struct StandardisedGerber1{T1} <: StandardisedGerberCovarianceAlgorithm
-        me::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Gerber covariance algorithm on Z-transformed data.
 
@@ -228,9 +224,7 @@ function StandardisedGerber1(;
     return StandardisedGerber1(me)
 end
 """
-    struct StandardisedGerber2{T1} <: StandardisedGerberCovarianceAlgorithm
-        me::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Gerber covariance algorithm on Z-transformed data.
 
@@ -371,12 +365,7 @@ for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, Standardise
          end)
 end
 """
-    struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
-        ve::T1
-        pdm::T2
-        t::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying Gerber covariance estimators in `PortfolioOptimisers.jl`.
 

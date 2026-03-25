@@ -77,7 +77,7 @@ In order to implement a new custom process algorithms that can seamlessly work w
 
 ### Functions
 
-- `do_algorithm(pra::MyAbstractCustomProcessAlgorithm, c::Integer)`: Performs the custom process algorithm.
+- `do_algorithm(pra::MyAbstractCustomProcessAlgorithm, c::Integer) -> Integer`: Performs the custom process algorithm and returns the result.
 
 #### Arguments
 
@@ -100,11 +100,12 @@ julia> function MyNewCustomProcessAlgorithm(; new_param::Symbol = :Bar)
 
 julia> function PortfolioOptimisers.do_algorithm(alg::MyNewCustomProcessAlgorithm, c::Integer)
           println("new algorithm: $c $(alg.new_param)")
-          return nothing
+          return c + 1
        end
 
 julia> do_algorithm(MyNewCustomProcessAlgorithm(), 3)
 new algorithm: 3 Bar
+4
 ```
 
 # Related
@@ -141,10 +142,12 @@ Performs the custom process algorithm 1.
 
 - Multiplies `c` by 2.
 - Prints the result with a custom message.
+- Returns the result.
 
 ```jldoctest
 julia> do_algorithm(MyCustomProcessAlgorithm1(), 3)
 algorithm 1: 6
+6
 ```
 
 # Related
@@ -156,7 +159,7 @@ algorithm 1: 6
 function do_algorithm(::MyCustomProcessAlgorithm1, c::Integer)
     c = c * 2
     println("algorithm 1: $c")
-    return nothing
+    return c
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -341,5 +344,4 @@ function do_process(a::MyConcreteCustomProcess2, b::Real, c::Integer)
     do_algorithm(a.alg, c)
     return nothing
 end
-
 ```

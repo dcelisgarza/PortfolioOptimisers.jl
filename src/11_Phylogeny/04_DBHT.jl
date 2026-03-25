@@ -1,5 +1,5 @@
 """
-    abstract type DBHTRootMethod <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in `PortfolioOptimisers.jl`.
 
@@ -11,7 +11,7 @@ Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection me
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
-    struct UniqueRoot <: DBHTRootMethod end
+$(DocStringExtensions.TYPEDEF)
 
 A DBHT root selection method that enforces a unique root in the hierarchy.
 
@@ -23,7 +23,7 @@ A DBHT root selection method that enforces a unique root in the hierarchy.
 """
 struct UniqueRoot <: DBHTRootMethod end
 """
-    struct EqualRoot <: DBHTRootMethod end
+$(DocStringExtensions.TYPEDEF)
 
 A DBHT root selection method that creates a root from the adjacency tree of all root candidates. This can be used to represent multiple equally plausible roots in the DBHT hierarchy.
 
@@ -35,7 +35,7 @@ A DBHT root selection method that creates a root from the adjacency tree of all 
 """
 struct EqualRoot <: DBHTRootMethod end
 """
-    abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all similarity matrix algorithms used in the creation of Planar Maximally Filtered Graph (PMFG) used in [`DBHT`](@ref) and [`LoGo`](@ref) methods.
 
@@ -49,7 +49,7 @@ Abstract supertype for all similarity matrix algorithms used in the creation of 
 """
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 """
-    struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using the maximum distance transformation.
 
@@ -70,7 +70,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
 """
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
-    struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using the exponential transformation.
 
@@ -91,10 +91,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
 """
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
-    struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
-        coef::T1
-        power::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using a generalised exponential transformation.
 
@@ -192,10 +189,7 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::MatNum, kwargs...)
     return exp.(-coef * D .^ power)
 end
 """
-    struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
-        sim::T1
-        root::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
@@ -1762,7 +1756,7 @@ function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
 """
-    abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all inverse matrix sparsification algorithms in `PortfolioOptimisers.jl`.
 
@@ -1773,11 +1767,7 @@ Abstract supertype for all inverse matrix sparsification algorithms in `Portfoli
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 """
-    struct LoGo{T1, T2, T3} <: InverseMatrixSparsificationAlgorithm
-        dist::T1
-        sim::T2
-        pdm::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 

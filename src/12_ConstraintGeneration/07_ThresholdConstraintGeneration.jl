@@ -1,9 +1,5 @@
 """
-    struct ThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
-        val::T1
-        key::T2
-        dval::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for buy-in threshold portfolio constraints.
 
@@ -86,9 +82,7 @@ function ThresholdEstimator(; val::EstValType, key::Option{<:AbstractString} = n
     return ThresholdEstimator(val, key, dval)
 end
 """
-    struct Threshold{T1} <: AbstractConstraintResult
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for buy-in threshold portfolio constraints.
 

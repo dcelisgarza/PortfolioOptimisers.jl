@@ -1,11 +1,5 @@
 """
-    struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
-        pe::T1
-        mp::T2
-        re::T3
-        ve::T4
-        rsd::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Factor-based prior estimator for asset returns.
 

@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny-based constraint estimators in `PortfolioOptimisers.jl`.
 
@@ -14,7 +14,7 @@ All concrete and/or abstract types representing phylogeny-based constraint estim
 """
 abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
 """
-    abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny-based constraint result types in `PortfolioOptimisers.jl`.
 
@@ -35,10 +35,7 @@ const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
-    struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-        pl::T1
-        p::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for generating semi-definite phylogeny-based constraints in `PortfolioOptimisers.jl`.
 
@@ -114,10 +111,7 @@ function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(
 end
 const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
-    struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
-        A::T1
-        p::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for the result of semi-definite phylogeny-based constraint generation.
 
@@ -256,11 +250,7 @@ function validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-        pl::T1
-        B::T2
-        scale::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for generating integer phylogeny-based constraints in `PortfolioOptimisers.jl`.
 
@@ -344,11 +334,7 @@ function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
     return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
-    struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
-        A::T1
-        B::T2
-        scale::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for the result of integer phylogeny-based constraint generation.
 
@@ -467,11 +453,7 @@ function phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
 end
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
-    struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
-        A::T1
-        B::T2
-        comp::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for generating centrality-based portfolio constraints.
 

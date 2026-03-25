@@ -1,5 +1,5 @@
 """
-    abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Smyth-Broby covariance estimators in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ All concrete and/or abstract types implementing Smyth-Broby covariance estimatio
 """
 abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
 """
-    abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Smyth-Broby covariance algorithm types in `PortfolioOptimisers.jl`.
 
@@ -29,7 +29,7 @@ These types are used to specify the algorithm when constructing a [`SmythBrobyCo
 """
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
-    abstract type UnstandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all unstandardised Smyth-Broby covariance algorithm types.
 
@@ -48,7 +48,7 @@ Concrete types implementing unstandardised Smyth-Broby covariance algorithms sho
 """
 abstract type UnstandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 """
-    abstract type StandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all standardised Smyth-Broby covariance algorithm types. These Z-transform the data before applying the Smyth-Broby covariance algorithm.
 
@@ -67,7 +67,7 @@ Concrete types implementing standardised Smyth-Broby covariance algorithms shoul
 """
 abstract type StandardisedSmythBrobyCovarianceAlgorithm <: SmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
 
@@ -80,7 +80,7 @@ Implements the original Smyth-Broby covariance algorithm (unstandardised variant
 """
 struct SmythBroby0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm (unstandardised).
 
@@ -93,7 +93,7 @@ Implements the first variant of the Smyth-Broby covariance algorithm (unstandard
 """
 struct SmythBroby1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBroby2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm (unstandardised).
 
@@ -106,7 +106,7 @@ Implements the second variant of the Smyth-Broby covariance algorithm (unstandar
 """
 struct SmythBroby2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
@@ -119,7 +119,7 @@ Implements the original Gerber-style variant of the Smyth-Broby covariance algor
 """
 struct SmythBrobyGerber0 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
@@ -132,7 +132,7 @@ Implements the first Gerber-style variant of the Smyth-Broby covariance algorith
 """
 struct SmythBrobyGerber1 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyGerber2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
 
@@ -145,7 +145,7 @@ Implements the second Gerber-style variant of the Smyth-Broby covariance algorit
 """
 struct SmythBrobyGerber2 <: UnstandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct StandardisedSmythBroby0 <: StandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm on Z-transformed data (standardised variant).
 
@@ -158,7 +158,7 @@ Implements the original Smyth-Broby covariance algorithm on Z-transformed data (
 """
 struct StandardisedSmythBroby0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct StandardisedSmythBroby1 <: StandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
@@ -171,7 +171,7 @@ Implements the first variant of the Smyth-Broby covariance algorithm on Z-transf
 """
 struct StandardisedSmythBroby1 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct StandardisedSmythBroby2 <: StandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
@@ -184,7 +184,7 @@ Implements the second variant of the Smyth-Broby covariance algorithm on Z-trans
 """
 struct StandardisedSmythBroby2 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct StandardisedSmythBrobyGerber0 <: StandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
@@ -197,7 +197,7 @@ Implements the original Gerber-style variant of the Smyth-Broby covariance algor
 """
 struct StandardisedSmythBrobyGerber0 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct StandardisedSmythBrobyGerber1 <: StandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
@@ -210,7 +210,7 @@ Implements the first Gerber-style variant of the Smyth-Broby covariance algorith
 """
 struct StandardisedSmythBrobyGerber1 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct StandardisedSmythBrobyGerber2 <: StandardisedSmythBrobyCovarianceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm on Z-transformed data (standardised).
 
@@ -223,19 +223,7 @@ Implements the second Gerber-style variant of the Smyth-Broby covariance algorit
 """
 struct StandardisedSmythBrobyGerber2 <: StandardisedSmythBrobyCovarianceAlgorithm end
 """
-    struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-           BaseSmythBrobyCovariance
-        me::T1
-        ve::T2
-        pdm::T3
-        t::T4
-        c1::T5
-        c2::T6
-        c3::T7
-        n::T8
-        alg::T9
-        ex::T10
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying Smyth-Broby covariance estimators in `PortfolioOptimisers.jl`.
 

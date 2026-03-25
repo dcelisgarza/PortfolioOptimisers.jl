@@ -1,9 +1,5 @@
 """
-    struct DetoneCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ce::T1
-        dt::T2
-        pdm::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A covariance estimator that applies a detoning algorithm and positive definite projection to the output of another covariance estimator. This type enables robust estimation of covariance matrices by first computing a base covariance, then applying detoning and positive definiteness corrections in sequence.
 

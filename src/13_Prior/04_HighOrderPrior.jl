@@ -310,11 +310,7 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     end
 end
 """
-    struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
-        pe::T1
-        kte::T2
-        ske::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 High order prior estimator for asset returns.
 

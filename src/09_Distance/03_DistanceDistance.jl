@@ -1,11 +1,5 @@
 """
-    struct DistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
-        dist::T1
-        args::T2
-        kwargs::T3
-        power::T4
-        alg::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Distance-of-distances estimator for portfolio optimization.
 

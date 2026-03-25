@@ -1,13 +1,5 @@
 """
-    struct Kurtosis{T1, T2, T3, T4, T5, T6, T7} <: RiskMeasure
-        settings::T1
-        w::T2
-        mu::T3
-        kt::T4
-        N::T5
-        alg1::T6
-        alg2::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the square root kurtosis risk measure in `PortfolioOptimisers.jl`.
 

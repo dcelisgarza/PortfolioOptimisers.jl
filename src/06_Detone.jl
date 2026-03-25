@@ -1,5 +1,5 @@
 """
-    abstract type AbstractDetoneEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
@@ -63,10 +63,7 @@ Detoning matrix in-place...
 """
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
-    struct Detone{T1, T2} <: AbstractDetoneEstimator
-        n::T1
-        pdm::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix in [`detone!`](@ref) and [`detone`](@ref).
 

@@ -1,8 +1,5 @@
 """
-    struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-        ce::T1
-        mp::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Composite covariance estimator with post-processing.
 

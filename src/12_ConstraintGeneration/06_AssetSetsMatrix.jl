@@ -1,7 +1,5 @@
 """
-    struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for constructing asset set membership matrices from asset groupings.
 

@@ -1,5 +1,5 @@
 """
-    abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all matrix processing estimator types in `PortfolioOptimisers.jl`.
 
@@ -69,7 +69,7 @@ Processing matrix in-place...
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
-    abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all matrix processing algorithm types in `PortfolioOptimisers.jl`.
 
@@ -140,7 +140,7 @@ Applying custom matrix processing algorithm in-place...
 """
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractMatrixProcessingOrder <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for matrix processing order types in `PortfolioOptimisers.jl`.
 
@@ -161,7 +161,7 @@ Given that these are meant to be used by matrix processing estimators, there are
 """
 abstract type AbstractMatrixProcessingOrder <: AbstractAlgorithm end
 """
-    struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Denoising → Detoning → Custom Algorithm.
 
@@ -178,7 +178,7 @@ Matrix processing order: Denoising → Detoning → Custom Algorithm.
 """
 struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
 """
-    struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Denoising → Custom Algorithm → Detoning.
 
@@ -195,7 +195,7 @@ Matrix processing order: Denoising → Custom Algorithm → Detoning.
 """
 struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
 """
-    struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Detoning → Denoising → Custom Algorithm.
 
@@ -212,7 +212,7 @@ Matrix processing order: Detoning → Denoising → Custom Algorithm.
 """
 struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
 """
-    struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Detoning → Custom Algorithm → Denoising.
 
@@ -229,7 +229,7 @@ Matrix processing order: Detoning → Custom Algorithm → Denoising.
 """
 struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
 """
-    struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Custom Algorithm → Denoising → Detoning.
 
@@ -246,7 +246,7 @@ Matrix processing order: Custom Algorithm → Denoising → Detoning.
 """
 struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
 """
-    struct AlgDetoneDenoise <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Custom Algorithm → Detoning → Denoising.
 
@@ -301,13 +301,7 @@ function matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs..
     return sigma
 end
 """
-    struct DenoiseDetoneAlgMatrixProcessing{T1, T2, T3, T4, T5} <: AbstractMatrixProcessingEstimator
-        pdm::T1
-        dn::T2
-        dt::T3
-        alg::T4
-        order::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying matrix processing routines in `PortfolioOptimisers.jl`.
 

@@ -1,9 +1,5 @@
 """
-    struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-        ce::T1
-        w::T2
-        l::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for equilibrium expected returns estimators.
 

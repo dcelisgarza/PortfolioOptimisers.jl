@@ -24,12 +24,7 @@ function turnover_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct TurnoverEstimator{T1, T2, T3, T4} <: AbstractEstimator
-        w::T1
-        val::T2
-        dval::T3
-        fixed::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for turnover portfolio constraints.
 
@@ -270,11 +265,7 @@ function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
                                            strict = strict), fixed = tn.fixed)
 end
 """
-    struct Turnover{T1, T2, T3} <: AbstractResult
-        w::T1
-        val::T2
-        fixed::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for turnover portfolio constraints.
 

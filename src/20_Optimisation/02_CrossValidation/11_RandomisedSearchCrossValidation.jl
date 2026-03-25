@@ -1,17 +1,5 @@
 """
-    struct RandomisedSearchCrossValidation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-           AbstractSearchCrossValidationEstimator
-        p::T1
-        cv::T2
-        r::T3
-        scorer::T4
-        ex::T5
-        n_iter::T6
-        rng::T7
-        seed::T8
-        train_score::T9
-        kwargs::T10
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Randomised search cross-validation estimator for portfolio optimisation. Samples parameter sets from distributions or vectors, applies cross-validation splits, fits and scores each configuration, and selects the optimal parameters using the provided scoring strategy.
 

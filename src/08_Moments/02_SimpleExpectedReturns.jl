@@ -1,8 +1,5 @@
 """
-    struct SimpleExpectedReturns{T1, T2} <: AbstractExpectedReturnsEstimator
-        w::T1
-        idx::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
 

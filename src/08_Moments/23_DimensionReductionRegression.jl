@@ -1,5 +1,5 @@
 """
-    abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all dimension reduction regression algorithm targets in `PortfolioOptimisers.jl`.
 
@@ -19,9 +19,7 @@ function factory(drtgt::DimensionReductionTarget, args...; kwargs...)
     return drtgt
 end
 """
-    struct PCA{T1} <: DimensionReductionTarget
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Principal Component Analysis (PCA) dimension reduction target.
 
@@ -86,9 +84,7 @@ function StatsAPI.fit(drtgt::PCA, X::MatNum)
     return StatsAPI.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
 """
-    struct PPCA{T1} <: DimensionReductionTarget
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
@@ -153,12 +149,7 @@ function StatsAPI.fit(drtgt::PPCA, X::MatNum)
     return StatsAPI.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
 """
-    struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
-        me::T1
-        ve::T2
-        drtgt::T3
-        retgt::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for dimension reduction regression-based moment estimation.
 

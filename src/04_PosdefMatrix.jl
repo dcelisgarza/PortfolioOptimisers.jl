@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPosdefEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
 
@@ -9,17 +9,13 @@ All concrete and/or abstract types that implement positive definite matrix proje
 
 In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum)`: In-place projection of a matrix to the nearest positive definite matrix.
-  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum)`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: In-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
 
 ## Arguments
 
   - $(arg_dict[:pdm])
   - $(arg_dict[:sigrhoX])
-
-## Returns
-
-  - `X::MatNum`: The projected input matrix `X`.
 
 # Examples
 
@@ -64,10 +60,7 @@ Projecting to positive definite matrix in-place...
 """
 abstract type AbstractPosdefEstimator <: AbstractEstimator end
 """
-    struct Posdef{T1, T2} <: AbstractPosdefEstimator
-        alg::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A concrete estimator type for projecting a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
 

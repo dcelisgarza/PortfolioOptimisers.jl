@@ -1,21 +1,5 @@
 """
-    struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,
-                                        T14} <: AbstractLowOrderPriorEstimator_F
-        a_pe::T1
-        f_pe::T2
-        mp::T3
-        re::T4
-        a_views::T5
-        f_views::T6
-        a_sets::T7
-        f_sets::T8
-        a_views_conf::T9
-        f_views_conf::T10
-        w::T11
-        rf::T12
-        l::T13
-        tau::T14
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Augmented Black-Litterman prior estimator for asset returns.
 

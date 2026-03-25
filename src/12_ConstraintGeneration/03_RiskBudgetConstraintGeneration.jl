@@ -1,7 +1,5 @@
 """
-    struct RiskBudget{T1} <: AbstractConstraintResult
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for the result of a risk budget constraint.
 
@@ -55,9 +53,7 @@ function risk_budget_view(rb::RiskBudget, i)
     return RiskBudget(; val = val)
 end
 """
-    struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for a risk budget allocation mapping or vector.
 

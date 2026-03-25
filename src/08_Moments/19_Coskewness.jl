@@ -1,5 +1,5 @@
 """
-    abstract type CoskewnessEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all coskewness estimators in `PortfolioOptimisers.jl`.
 
@@ -12,11 +12,7 @@ All concrete and/or abstract types implementing coskewness estimation algorithms
 """
 abstract type CoskewnessEstimator <: AbstractEstimator end
 """
-    struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
-        me::T1
-        mp::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for coskewness estimators.
 

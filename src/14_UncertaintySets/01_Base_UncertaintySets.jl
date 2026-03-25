@@ -1,5 +1,5 @@
 """
-    abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Defines the abstract interface for uncertainty set estimators in portfolio optimisation.
 Subtypes of this abstract type are responsible for constructing and estimating uncertainty sets for risk or prior statistics, such as box or ellipsoidal uncertainty sets.
@@ -11,7 +11,7 @@ Subtypes of this abstract type are responsible for constructing and estimating u
 """
 abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
 """
-    abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Defines the abstract interface for algorithms that construct uncertainty sets in portfolio optimisation.
 Subtypes implement specific methods for generating uncertainty sets, such as box or ellipsoidal uncertainty sets, which are used to model uncertainty in risk or prior statistics.
@@ -25,7 +25,7 @@ Subtypes implement specific methods for generating uncertainty sets, such as box
 """
 abstract type AbstractUncertaintySetAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractUncertaintySetResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract type for results produced by uncertainty set algorithms in portfolio optimisation.
 
@@ -41,7 +41,7 @@ Represents the interface for all result types that encode uncertainty sets for r
 abstract type AbstractUncertaintySetResult <: AbstractResult end
 const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
 """
-    abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Defines the abstract interface for algorithms that compute the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio optimisation.
 
@@ -280,7 +280,7 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwarg
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 """
-    struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for constructing box uncertainty sets in portfolio optimisation.
 Box uncertainty sets model uncertainty by specifying lower and upper bounds for risk or prior statistics.
@@ -293,10 +293,7 @@ Box uncertainty sets model uncertainty by specifying lower and upper bounds for 
 """
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 """
-    struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
-        lb::T1
-        ub::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a box uncertainty set for risk or prior statistics in portfolio optimisation.
 Stores lower and upper bounds for the uncertain quantity, such as expected returns or covariance.
@@ -353,9 +350,7 @@ function ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 """
-    struct NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
 
@@ -398,7 +393,7 @@ function NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
     return NormalKUncertaintyAlgorithm(kwargs)
 end
 """
-    struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using a general formula `sqrt((1 - q) / q)`, this ignores the distribution of the underlying data.
 
@@ -411,7 +406,7 @@ Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty se
 """
 struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
-    struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using the chi-squared distribution in portfolio optimisation.
 
@@ -477,10 +472,7 @@ function k_ucs(type::Number, args...)
     return type
 end
 """
-    struct EllipsoidalUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
-        method::T1
-        diagonal::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm for constructing ellipsoidal uncertainty sets in portfolio optimisation.
 Ellipsoidal uncertainty sets model uncertainty by specifying an ellipsoidal region for risk or prior statistics, typically using a covariance matrix and a scaling parameter.
@@ -528,7 +520,7 @@ function EllipsoidalUncertaintySetAlgorithm(;
     return EllipsoidalUncertaintySetAlgorithm(method, diagonal)
 end
 """
-    abstract type AbstractEllipsoidalUncertaintySetResultClass <: AbstractUncertaintySetResult end
+$(DocStringExtensions.TYPEDEF)
 
 Defines the abstract interface for ellipsoidal uncertainty set result classes in portfolio optimisation.
 
@@ -541,7 +533,7 @@ Subtypes of this abstract type represent the class or category of ellipsoidal un
 """
 abstract type AbstractEllipsoidalUncertaintySetResultClass <: AbstractUncertaintySetResult end
 """
-    struct MuEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the class identifier for mean ellipsoidal uncertainty sets in portfolio optimisation.
 
@@ -554,7 +546,7 @@ Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for mea
 """
 struct MuEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
 """
-    struct SigmaEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the class identifier for covariance ellipsoidal uncertainty sets in portfolio optimisation.
 
@@ -567,11 +559,7 @@ Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for cov
 """
 struct SigmaEllipsoidalUncertaintySet <: AbstractEllipsoidalUncertaintySetResultClass end
 """
-    struct EllipsoidalUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
-        sigma::T1
-        k::T2
-        class::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents an ellipsoidal uncertainty set for risk or prior statistics in portfolio optimisation.
 Stores a covariance matrix, a scaling parameter, and a class identifier for the uncertain quantity, such as expected returns or covariance.

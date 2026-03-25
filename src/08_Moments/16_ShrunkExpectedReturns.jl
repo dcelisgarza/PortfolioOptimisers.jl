@@ -1,5 +1,5 @@
 """
-    abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all shrunk expected returns estimators in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ All concrete and/or abstract types implementing shrinkage-based expected returns
 """
 abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
 """
-    abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all shrinkage algorithms for expected returns estimation.
 
@@ -27,7 +27,7 @@ All concrete and/or abstract types implementing specific shrinkage algorithms (e
 """
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
 """
-    abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all shrinkage targets used in expected returns estimation.
 
@@ -41,7 +41,7 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 """
-    struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage target representing the grand mean of expected returns.
 
@@ -54,7 +54,7 @@ Shrinkage target representing the grand mean of expected returns.
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 """
-    struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage target representing the volatility-weighted mean of expected returns.
 
@@ -67,7 +67,7 @@ Shrinkage target representing the volatility-weighted mean of expected returns.
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 """
-    struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage target representing the mean squared error of expected returns.
 
@@ -80,9 +80,7 @@ Shrinkage target representing the mean squared error of expected returns.
 """
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 """
-    struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        tgt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
@@ -123,9 +121,7 @@ function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return JamesStein(tgt)
 end
 """
-    struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        tgt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
@@ -166,9 +162,7 @@ function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BayesStein(tgt)
 end
 """
-    struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        tgt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expected returns.
 
@@ -209,11 +203,7 @@ function BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandM
     return BodnarOkhrinParolya(tgt)
 end
 """
-    struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-        me::T1
-        ce::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for shrinkage-based expected returns estimators.
 

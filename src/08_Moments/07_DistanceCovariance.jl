@@ -1,11 +1,5 @@
 """
-    struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
-        dist::T1
-        args::T2
-        kwargs::T3
-        w::T4
-        ex::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying distance-based covariance estimators in `PortfolioOptimisers.jl`.
 

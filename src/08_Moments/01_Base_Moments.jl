@@ -23,7 +23,7 @@ function factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
     return ce
 end
 """
-    abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all covariance estimator types in `PortfolioOptimisers.jl`.
 
@@ -137,7 +137,7 @@ julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 """
 abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 """
-    abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all variance estimator types in `PortfolioOptimisers.jl`.
 
@@ -270,7 +270,7 @@ julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 @define_pretty_show(AbstractCovarianceEstimator)
 """
-    abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns estimator types in `PortfolioOptimisers.jl`.
 
@@ -360,7 +360,7 @@ julia> mean(MyExpectedReturnsEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1]; dims = 2)
 """
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
-    abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns algorithm types in `PortfolioOptimisers.jl`.
 
@@ -377,7 +377,7 @@ Given that these are meant to be used by expected returns estimators, there are 
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all moment algorithm types in `PortfolioOptimisers.jl`.
 
@@ -394,7 +394,7 @@ Given that these are meant to be used by covariance estimators, there are no spe
 """
 abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
-    struct Full <: AbstractMomentAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 `Full` is used to indicate that all available data points are included in the moment estimation process.
 
@@ -405,7 +405,7 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
 struct Full <: AbstractMomentAlgorithm end
 """
-    struct Semi <: AbstractMomentAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 `Semi` is used for semi-moment estimators, where only observations below the mean (i.e., negative deviations) are considered.
 

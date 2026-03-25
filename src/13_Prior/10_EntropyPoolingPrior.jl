@@ -1,12 +1,5 @@
 """
-    struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
-        vars::T1
-        coef::T2
-        op::T3
-        rhs::T4
-        eqn::T5
-        ij::T6
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Structured result for correlation view constraint equation parsing.
 
@@ -50,7 +43,7 @@ Structured result for correlation view constraint equation parsing.
     end
 end
 """
-    abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for entropy pooling optimisers.
 
@@ -65,7 +58,7 @@ Abstract supertype for entropy pooling optimisers.
 """
 abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
 """
-    abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for entropy pooling algorithms.
 
@@ -80,7 +73,7 @@ Abstract supertype for entropy pooling algorithms.
 """
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 """
-    struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 One-shot entropy pooling. It sets and optimises all the constraints simultaneously. This introduces bias in the posterior probabilities, but is faster.
 
@@ -92,7 +85,7 @@ One-shot entropy pooling. It sets and optimises all the constraints simultaneous
 """
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
-    struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Uses the initial probabilities to optimise the posterior probabilities at every step. This reduces bias in the posterior probabilities, but is slower.
 
@@ -104,7 +97,7 @@ Uses the initial probabilities to optimise the posterior probabilities at every 
 """
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
-    struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Uses the previous step's probabilities to optimise the next step's probabilities. This is faster but may introduce bias.
 
@@ -117,7 +110,7 @@ Uses the previous step's probabilities to optimise the next step's probabilities
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 """
-    abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for entropy pooling optimisation algorithms.
 
@@ -133,7 +126,7 @@ Abstract supertype for entropy pooling optimisation algorithms.
 """
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 """
-    struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Logarithmic entropy pooling optimisation algorithm.
 
@@ -148,7 +141,7 @@ Logarithmic entropy pooling optimisation algorithm.
 """
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
-    struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Exponential entropy pooling optimisation algorithm.
 
@@ -163,10 +156,7 @@ Exponential entropy pooling optimisation algorithm.
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
-    struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
 
@@ -211,13 +201,7 @@ function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple
     return CVaREntropyPooling(args, kwargs)
 end
 """
-    struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
-        args::T1
-        kwargs::T2
-        sc1::T3
-        sc2::T4
-        alg::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)-based entropy pooling optimiser.
 
@@ -288,13 +272,7 @@ function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
 """
-    struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
-        slv::T1
-        sc1::T2
-        sc2::T3
-        so::T4
-        alg::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)-based entropy pooling optimiser.
 
@@ -376,25 +354,7 @@ function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e
 end
 const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
 """
-    struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
-                               T16} <: AbstractLowOrderPriorEstimator_AF
-        pe::T1
-        mu_views::T2
-        var_views::T3
-        cvar_views::T4
-        sigma_views::T5
-        sk_views::T6
-        kt_views::T7
-        rho_views::T8
-        var_alpha::T9
-        cvar_alpha::T10
-        sets::T11
-        ds_opt::T12
-        dm_opt::T13
-        opt::T14
-        w::T15
-        alg::T16
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Entropy pooling prior estimator for asset returns.
 

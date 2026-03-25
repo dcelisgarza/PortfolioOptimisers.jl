@@ -1,5 +1,5 @@
 """
-    abstract type AbstractTracking <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all tracking result types in `PortfolioOptimisers.jl`.
 
@@ -41,7 +41,7 @@ Union type for a single tracking result or a vector of tracking results.
 """
 const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
-    abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all tracking algorithm types in `PortfolioOptimisers.jl`.
 
@@ -59,7 +59,7 @@ function needs_previous_weights(::AbstractTrackingAlgorithm)
     return false
 end
 """
-    abstract type TrackingFormulation <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all tracking formulation algorithm types in `PortfolioOptimisers.jl`.
 
@@ -76,7 +76,7 @@ All concrete and/or abstract types representing tracking formulation algorithms 
 """
 abstract type TrackingFormulation <: AbstractAlgorithm end
 """
-    abstract type NormTracking <: TrackingFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all norm-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
@@ -91,7 +91,7 @@ All concrete and/or abstract types representing norm-based tracking algorithms (
 """
 abstract type NormTracking <: TrackingFormulation end
 """
-    abstract type VariableTracking <: TrackingFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all variable-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
@@ -105,9 +105,7 @@ All concrete and/or abstract types representing variable-based tracking algorith
 """
 abstract type VariableTracking <: TrackingFormulation end
 """
-    struct L2Tracking{T1} <: NormTracking
-        ddof::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) norm-based tracking formulation.
 
@@ -151,9 +149,7 @@ function L2Tracking(; ddof::Integer = 1)
     return L2Tracking(ddof)
 end
 """
-    struct SquaredL2Tracking{T1} <: NormTracking
-        ddof::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) squared norm-based tracking formulation.
 
@@ -201,7 +197,7 @@ function SquaredL2Tracking(; ddof::Integer = 1)
     return SquaredL2Tracking(ddof)
 end
 """
-    struct L1Tracking <: NormTracking end
+$(DocStringExtensions.TYPEDEF)
 
 Norm-one (NOC) tracking formulation.
 
@@ -318,7 +314,7 @@ function norm_tracking(f::LInfTracking, a, b, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a - b, p) / factor
 end
 """
-    struct IndependentVariableTracking <: VariableTracking end
+$(DocStringExtensions.TYPEDEF)
 
 Independent variable-based tracking formulation.
 
@@ -331,7 +327,7 @@ Independent variable-based tracking formulation.
 """
 struct IndependentVariableTracking <: VariableTracking end
 """
-    struct DependentVariableTracking <: VariableTracking end
+$(DocStringExtensions.TYPEDEF)
 
 Dependent variable-based tracking formulation.
 
@@ -375,11 +371,7 @@ function tracking_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct WeightsTracking{T1, T2, T3} <: AbstractTrackingAlgorithm
-        fees::T1
-        w::T2
-        fixed::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Asset weights-based tracking algorithm.
 
@@ -617,9 +609,7 @@ function tracking_benchmark(tr::WeightsTracking, X::MatNum)
     return calc_net_returns(tr.w, X, tr.fees)
 end
 """
-    struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
-        w::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Returns-based tracking algorithm.
 
@@ -758,11 +748,7 @@ function factory(tr::ReturnsTracking, ::Any)
     return tr
 end
 """
-    struct TrackingError{T1, T2, T3} <: AbstractTracking
-        tr::T1
-        err::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Tracking error result type.
 

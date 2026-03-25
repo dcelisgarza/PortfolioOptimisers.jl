@@ -1,7 +1,5 @@
 """
-    struct PValue{T1} <: AbstractStepwiseRegressionCriterion
-        t::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Stepwise regression criterion based on p-value thresholding.
 
@@ -45,7 +43,7 @@ function PValue(; t::Number = 0.05)
     return PValue(t)
 end
 """
-    struct Forward <: AbstractStepwiseRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Stepwise regression algorithm: forward selection.
 
@@ -59,7 +57,7 @@ Stepwise regression algorithm: forward selection.
 """
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
 """
-    struct Backward <: AbstractStepwiseRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Stepwise regression algorithm: backward elimination.
 
@@ -73,11 +71,7 @@ Stepwise regression algorithm: backward elimination.
 """
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
 """
-    struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
-        crit::T1
-        alg::T2
-        tgt::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for stepwise regression-based moment estimation.
 
