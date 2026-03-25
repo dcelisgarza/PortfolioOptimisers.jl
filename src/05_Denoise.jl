@@ -18,10 +18,6 @@ In order to implement a new denoising estimator which will work seamlessly with 
   - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
-## Returns
-
-  - `X::MatNum`: The denoised input matrix `X`.
-
 # Examples
 
 We can create a dummy denoising estimator as follows:
@@ -75,7 +71,7 @@ All concrete and/or abstract types that implement a specific denoising algorithm
 
 If you wish to implement a new denoising algorithm that works with an existing denoising estimator, subtype `AbstractDenoiseAlgorithm`, with all necessary parameters as part of the struct, and implement the following method:
 
-  - `_denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum, num_factors::Integer)`: In-place denoising of a covariance or correlation matrix using the specific algorithm.
+  - `_denoise!(alg::AbstractDenoiseAlgorithm, X::MatNum, vals::VecNum, vecs::MatNum, num_factors::Integer) -> MatNum`: In-place denoising of a covariance or correlation matrix using the specific algorithm.
 
 ## Arguments
 

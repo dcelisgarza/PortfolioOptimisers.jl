@@ -31,6 +31,8 @@ In order to implement a new custom process that can seamlessly work with the lib
 
 ### Examples
 
+We can create a dummy custom process as follows:
+
 ```jldoctest
 julia> struct MyNewCustomProcess{T1, T2} <: PortfolioOptimisers.MyAbstractCustomProcess
            alg::T1
@@ -85,6 +87,8 @@ In order to implement a new custom process algorithms that can seamlessly work w
 - `c`: Argument for the custom process algorithm.
 
 ### Examples
+
+We can create a dummy custom process algorithm as follows:
 
 ```jldoctest
 julia> struct MyNewCustomProcessAlgorithm{T} <: PortfolioOptimisers.MyAbstractCustomProcessAlgorithm
@@ -344,4 +348,5 @@ function do_process(a::MyConcreteCustomProcess2, b::Real, c::Integer)
     do_algorithm(a.alg, c)
     return nothing
 end
+
 ```
