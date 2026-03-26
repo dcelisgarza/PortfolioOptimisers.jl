@@ -4,5 +4,5 @@
     public_names = Base.undocumented_names(PortfolioOptimisers; private = false)
     private_names = setdiff(all_names, public_names)
     @test length(public_names) == 164
-    @test length(private_names) == 430
+    @test length(private_names) == 429
 end

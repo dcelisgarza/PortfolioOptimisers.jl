@@ -106,7 +106,7 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple
 end
 """
     posdef!(pdm::Posdef, X::MatNum) -> MatNum
-    posdef!(::Nothing, X::MatNum) -> MatNum
+    posdef!(pdm::Nothing, X::MatNum) -> MatNum
 
 In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
 
@@ -127,13 +127,13 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Details
 
-- If `pdm` is `::Nothing`, or `X` is already positive definite, the function returns `X` without modification.
-- If `X` is already positive definite, it is left unchanged.
-- If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
-- Calls `NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)` to perform the projection.
-- If the algorithm fails to converge, a warning is emitted.
-- If `X` is not a correlation matrix, it is converted back after the projection.
-- Returns `X`.
+  - If `pdm` is `::Nothing`, or `X` is already positive definite, the function returns `X` without modification.
+  - If `X` is already positive definite, it is left unchanged.
+  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
+  - Calls `NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)` to perform the projection.
+  - If the algorithm fails to converge, a warning is emitted.
+  - If `X` is not a correlation matrix, it is converted back after the projection.
+  - Returns `X`.
 
 # Examples
 

@@ -33,16 +33,16 @@ DenoiseCovariance
       │       │   idx ┴ nothing
       │   alg ┴ Full()
    dn ┼ Denoise
+      │      pdm ┼ Posdef
+      │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      alg ┼ ShrunkDenoise
       │          │   alpha ┴ Float64: 0.0
       │     args ┼ Tuple{}: ()
       │   kwargs ┼ @NamedTuple{}: NamedTuple()
       │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
       │        m ┼ Int64: 10
-      │        n ┼ Int64: 1000
-      │      pdm ┼ Posdef
-      │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │        n ┴ Int64: 1000
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
