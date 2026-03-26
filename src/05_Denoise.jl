@@ -81,10 +81,6 @@ If you wish to implement a new denoising algorithm that works with an existing d
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
 
-## Returns
-
-  - `X::MatNum`: The input matrix `X` is modified in-place.
-
 # Examples
 
 We can create a dummy denoising algorithm as follows:
@@ -178,7 +174,7 @@ A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a c
 
 # Fields
 
-  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues.
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -210,6 +206,7 @@ ShrunkDenoise
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
+    "Shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues."
     alpha
     function ShrunkDenoise(alpha::Number)
         @argcheck(zero(alpha) <= alpha <= one(alpha),
@@ -229,13 +226,7 @@ A flexible container type for configuring and applying denoising algorithms to c
 
 # Fields
 
-  - `alg`: Denoising algorithm.
-  - `args`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kwargs`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
-  - $(arg_dict[:opdm])
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -290,12 +281,19 @@ Denoise
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct Denoise <: AbstractDenoiseEstimator
+    "Denoising algorithm."
     alg
+    "Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl)."
     args
+    "Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl)."
     kwargs
+    "Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl)."
     kernel
+    "Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl)."
     m
+    "Number of points in the range of eigenvalues used in the [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) density estimation."
     n
+    "$(arg_dict[:opdm])"
     pdm
     function Denoise(alg::AbstractDenoiseAlgorithm, args::Tuple, kwargs::NamedTuple, kernel,
                      m::Integer, n::Integer, pdm::Option{<:Posdef} = Posdef())
