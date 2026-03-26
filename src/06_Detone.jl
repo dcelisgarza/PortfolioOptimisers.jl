@@ -9,8 +9,8 @@ All concrete and/or abstract types representing detoning estimators should be su
 
 In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `detone!(dt::AbstractDetoneEstimator, X::MatNum)`: In-place detoning.
-  - `detone(dt::AbstractDetoneEstimator, X::MatNum)`: Optional out-of-place detoning.
+  - `detone!(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: In-place detoning.
+  - `detone(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Optional out-of-place detoning.
 
 ## Arguments
 
@@ -73,8 +73,7 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 
 # Fields
 
-  - `n`: Number of leading principal components to remove.
-  - $(arg_dict[:opdm])
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -91,10 +90,10 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> Detone(; n = 2)
 Detone
-    n ┼ Int64: 2
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    n ┴ Int64: 2
 ```
 
 # Related
@@ -107,19 +106,21 @@ Detone
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
-    n
+    "$(field_dict[:opdm])"
     pdm
-    function Detone(n::Integer, pdm::Option{<:Posdef} = Posdef())
+    "Number of leading principal components to remove."
+    n
+    function Detone(pdm::Option{<:Posdef}, n::Integer)
         @argcheck(zero(n) < n, DomainError)
-        return new{typeof(n), typeof(pdm)}(n, pdm)
+        return new{typeof(pdm), typeof(n)}(pdm, n)
     end
 end
-function Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
-    return Detone(n, pdm)
+function Detone(; pdm::Option{<:Posdef} = Posdef(), n::Integer = 1)
+    return Detone(pdm, n)
 end
 """
-    detone!(dt::Detone, X::MatNum)
-    detone!(::Nothing, X::MatNum)
+    detone!(dt::Detone, X::MatNum) -> MatNum
+    detone!(dt::Nothing, X::MatNum) -> MatNum
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -130,17 +131,27 @@ For matrices without unit diagonal, the function converts them into correlation 
   - $(arg_dict[:odt])
 
       + `::Detone`: The top `n` principal components are removed from `X` in-place.
-      + `::Nothing`: No-op and returns `nothing`.
+      + `::Nothing`: No-op.
 
   - $(arg_dict[:sigrhoX])
+
+# Validation
+
+  - `0 < dt.n <= size(X, 2)`.
 
 # Returns
 
   - `X::MatNum`: The input matrix `X` is modified in-place.
 
-# Validation
+# Details
 
-  - `0 < dt.n <= size(X, 2)`.
+  - Asserts the number of elements to remove is within the valid range.
+  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
+  - Performs an eigenvector decomposition of `X`.
+  - Removes the top `n` principal components (market modes) from the eigenvalues and eigenvectors of `X`.
+  - Reconstructs the correlation matrix `X` in-place from the modified eigenvalues `vals` and eigenvectors `vecs`.
+  - If `X` was not originally a correlation matrix, it is converted back.
+  - Returns `X`.
 
 # Examples
 
@@ -207,7 +218,7 @@ function detone!(de::Detone, X::MatNum)
 end
 """
     detone(dt::Detone, X::MatNum)
-    detone(::Nothing, X::MatNum)
+    detone(dt::Nothing, X::MatNum)
 
 Out-of-place version of [`detone!`](@ref).
 

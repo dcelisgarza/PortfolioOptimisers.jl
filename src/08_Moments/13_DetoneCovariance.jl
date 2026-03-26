@@ -33,10 +33,10 @@ DetoneCovariance
       │       │   idx ┴ nothing
       │   alg ┴ Full()
    dt ┼ Detone
-      │     n ┼ Int64: 1
       │   pdm ┼ Posdef
       │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │     n ┴ Int64: 1
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()

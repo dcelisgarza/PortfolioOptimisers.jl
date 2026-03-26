@@ -140,7 +140,7 @@ For matrices without unit diagonal, the function converts them into correlation 
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Calls `NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)` to perform the projection.
   - If the algorithm fails to converge, a warning is emitted.
-  - If `X` is not a correlation matrix, it is converted back after the projection.
+  - If `X` is not a correlation matrix, it is converted back.
   - Returns `X`.
 
 # Examples

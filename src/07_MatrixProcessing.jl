@@ -355,10 +355,10 @@ DenoiseDetoneAlgMatrixProcessing
         │        m ┼ Int64: 10
         │        n ┴ Int64: 1000
      dt ┼ Detone
-        │     n ┼ Int64: 2
         │   pdm ┼ Posdef
         │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
         │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     n ┴ Int64: 2
     alg ┼ nothing
   order ┴ DenoiseDetoneAlg()
 ```

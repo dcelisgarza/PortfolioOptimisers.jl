@@ -291,7 +291,7 @@ Denoise
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct Denoise <: AbstractDenoiseEstimator
-    "$(arg_dict[:opdm])"
+    "$(field_dict[:opdm])"
     pdm
     "Denoising algorithm."
     alg
@@ -495,7 +495,8 @@ For matrices without unit diagonal, the function converts them into correlation 
   - Uses the Marčenko-Pastur distribution to compute the maximum feasable noise eigenvalue.
   - Applies the denoising algorithm to `X` in `dn.alg` via [`_denoise!`](@ref) to the eigenvalues which are below this value.
   - Applies the positive definite projection to `X` in `dn.pdm` via [`denoise!`](@ref).
-  - If `X` was not originally a correlation matrix, it is converted back to a covariance matrix.
+  - If `X` was not originally a correlation matrix, it is converted back.
+  - Returns `X`.
 
 # Examples
 
