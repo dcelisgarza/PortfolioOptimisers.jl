@@ -12,6 +12,10 @@ Validate that the input value is non-empty, non-negative and finite.
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
 
+# Returns
+
+  - `nothing`.
+
 # Details
 
   - `val`: Input value to validate.
@@ -89,6 +93,10 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`.
 
 # Details
 
@@ -168,6 +176,10 @@ Validate that the input value is non-empty and finite.
   - `val`: Input value to validate.
   - `val_sym`: Symbolic name used in the error messages.
 
+# Returns
+
+  - `nothing`.
+
 # Details
 
   - `val`: Input value to validate.
@@ -232,6 +244,10 @@ Assert that the input matrix is square.
 
   - `X`: Input matrix to validate.
   - `X_sym`: Symbolic name used in error messages.
+
+# Returns
+
+  - `nothing`.
 
 # Validation
 
@@ -412,6 +428,10 @@ Efficient scalar and vector dot product utility.
   - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
 
+# Returns
+
+  - `res::Number`: The resulting scalar.
+
 # Examples
 
 ```jldoctest
@@ -459,6 +479,16 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
   - `i`: Index or indices to view.
+
+# Returns
+
+  - `x`: Input value.
+
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `view(x, i)`.
+      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractMatrix`: Returns `view(x, i, i)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of views for each element in `x`.
 
 # Examples
 
@@ -511,6 +541,10 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
   - `x`: Input value.
   - `i`, `j`: Indices to view.
 
+# Returns
+
+  - The corresponding view or `nothing`.
+
 # Examples
 
 ```jldoctest
@@ -546,6 +580,16 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
   - `i`: Index or indices to view.
+
+# Returns
+
+  - `x`: Input value.
+
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `view(x, i)`.
+      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of views for each element in `x`.
+      + `::AbstractMatrix`: Returns `view(x, i, i)`.
 
 # Examples
 
@@ -598,6 +642,10 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
   - `x`: Input value.
   - `i`, `j`: Indices to view.
 
+# Returns
+
+  - The corresponding matrix index or `nothing`.
+
 # Examples
 
 ```jldoctest
@@ -622,6 +670,10 @@ Constructs an index vector for extracting the fourth moment submatrix correspond
 
   - `N`: Size of the full covariance matrix.
   - `i`: Indices of the variables of interest.
+
+# Returns
+
+  - `idx::VecInt`: Indices for extracting the fourth moment submatrix.
 
 # Examples
 
@@ -650,6 +702,10 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
 
   - `t`: An abstract type whose subtypes will be traversed.
   - `ctarr`: Optional An array to collect the concrete types. If not provided, a new empty array is created.
+
+# Returns
+
+  - `types::Vector{Any}`: An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
 
 # Examples
 
@@ -691,6 +747,10 @@ This is useful for converting arrays with abstract element types to arrays with 
 
   - `A`: The input array.
 
+# Returns
+
+  - `A_new::Vector{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
+
 # Examples
 
 ```jldoctest
@@ -719,6 +779,10 @@ Defining methods which dispatch on the first argument allows for a consistent fa
   - `a`: Indicates no object should be constructed.
   - `args...`: Arbitrary positional arguments (ignored).
   - `kwargs...`: Arbitrary keyword arguments (ignored).
+
+# Returns
+
+  - `a`: The input unchanged.
 
 # Related
 
@@ -838,6 +902,10 @@ Construct a `MeanValue` instance with observation weights `w`.
   - `mv`: Instance to update.
   - $(arg_dict[:ow])
 
+# Returns
+
+  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
+
 # Examples
 
 ```jldoctest
@@ -910,6 +978,10 @@ Constructs a `MedianValue` instance with observation weights `w`.
 
   - `mv`: Instance to update.
   - $(arg_dict[:ow])
+
+# Returns
+
+  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
 
 # Examples
 
@@ -1008,6 +1080,10 @@ Constructs a `StdValue` instance with observation weights `w`.
   - `sv`: Instance to update.
   - $(arg_dict[:ow])
 
+# Returns
+
+  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
+
 # Examples
 
 ```jldoctest
@@ -1084,6 +1160,10 @@ Constructs a `VarValue` instance with observation weights `w`.
 
   - `vv`: Instance to update.
   - $(arg_dict[:ow])
+
+# Returns
+
+  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
 
 # Examples
 
@@ -1214,6 +1294,10 @@ Construct a `StandardisedValue` instance with observation weights `w` for both `
   - `msv`: Instance to update.
   - $(arg_dict[:ow])
 
+# Returns
+
+  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
+
 # Examples
 
 ```jldoctest
@@ -1247,6 +1331,10 @@ Reduce a vector of real values to a single real value using a specified measure.
 
   - `measure`: An instance of a concrete subtype of [`VectorToScalarMeasure`](@ref), or the predefined value to return.
   - `val`: A vector of real values to be reduced (ignored if `measure` is a `Number`).
+
+# Returns
+
+  - `score::Number`: Computed value according to `measure`.
 
 # Examples
 

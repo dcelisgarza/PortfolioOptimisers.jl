@@ -23,6 +23,10 @@ Validate that asset or factor names and their corresponding returns matrix are p
   - `names_sym`: Symbolic name for the names argument displayed in error messages.
   - `mat_sym`: Symbolic name for the matrix argument displayed in error messages.
 
+# Returns
+
+  - `nothing`.
+
 # Details
 
   - If either `names` or `mat` is not `nothing`:
@@ -187,6 +191,10 @@ Return a view of the `ReturnsResult` object for the assets at indices `i`.
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
   - `i`: Indices of the assets to view.
 
+# Returns
+
+  - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified index.
+
 # Details
 
   - Extracts the asset name, returns, implied volatility, and risk premium adjustment for indices `i`.
@@ -240,12 +248,12 @@ function returns_result_view(rd::ReturnsResult, i)
                          iv = iv, ivpa = ivpa)
 end
 """
-returns_result_view(
-rd::ReturnsResult,
-i,
-j,
-k = :
-) -> ReturnsResult
+    returns_result_view(
+                        rd::ReturnsResult,
+                        i,
+                        j,
+                        k = :
+    ) -> ReturnsResult
 
 Return a view of the `ReturnsResult` object for assets at indices `j`, observations at indices `i`, and factors at indices `k`.
 
@@ -255,6 +263,10 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
   - `i`: Index or indices of the observation(s) to view.
   - `j`: Index or indices of the assets to view.
   - `k`: Index or indices of the factors to view.
+
+# Returns
+
+  - `new_rr::ReturnsResult`: A new `ReturnsResult` containing only the data for the specified indices.
 
 # Details
 
@@ -303,6 +315,12 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
 
   - `rd`: A `ReturnsResult` object containing asset, factor and/or benchmark returns.
   - `brt`: Boolean flag indicating whether benchmark-tracking behaviour should be applied. When `true`, asset returns are adjusted by subtracting the benchmark `B` (if present).
+
+# Returns
+
+  - `rd::ReturnsResult`:
+      + If `brt` is `true` and a benchmark `B` is present: A new `ReturnsResult` with adjusted asset returns
+      + Otherwise: The `rd` is returned unchanged.
 
 # Details
 
@@ -410,6 +428,10 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset, factor data and benchmark data (`:outer`, `:inner`, etc.).
   - `impute_method`: Optional imputation method for missing data.
+
+# Returns
+
+  - `rr::ReturnsResult`: Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
 # Validation
 
@@ -589,6 +611,10 @@ This function scans the specified dimension of the input matrix and returns the 
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `res::VecInt`: Indices of columns (or rows) in `X` that are complete.
 
 # Details
 

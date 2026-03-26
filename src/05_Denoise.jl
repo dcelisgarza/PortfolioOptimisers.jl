@@ -18,6 +18,10 @@ In order to implement a new denoising estimator which will work seamlessly with 
   - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
 
+## Returns
+
+  - `X::MatNum`: The denoised input matrix `X`.
+
 # Examples
 
 We can create a dummy denoising estimator as follows:
@@ -80,6 +84,10 @@ If you wish to implement a new denoising algorithm that works with an existing d
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
+
+## Returns
+
+  - `X::MatNum`: The input matrix `X` is modified in-place.
 
 # Examples
 
@@ -333,6 +341,10 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - `vecs`: Corresponding eigenvectors of `X`.
   - `num_factors`: Number of eigenvalues to treat as noise.
 
+# Returns
+
+  - `X::MatNum`: The input matrix `X` is modified in-place.
+
 # Details
 
   - Applies the algorithm `alg` to `vals` using `num_factors`.
@@ -409,6 +421,10 @@ This function fits the MP distribution to the observed spectrum by minimizing th
   - `args`: Additional positional arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
   - `kwargs`: Additional keyword arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
 
+# Returns
+
+  - `e_max::Number`: Estimated upper edge of the noise eigenvalue spectrum.
+
 # Details
 
   - Minimises the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
@@ -467,6 +483,10 @@ For matrices without unit diagonal, the function converts them into correlation 
       + `::Nothing`: No-op.
   - $(arg_dict[:sigrhoX])
   - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
+
+# Returns
+
+  - `X::MatNum`: The input matrix `X` is modified in-place.
 
 # Details
 

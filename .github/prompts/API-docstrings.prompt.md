@@ -29,6 +29,10 @@ In order to implement a new custom process that can seamlessly work with the lib
 - `b`: First argument for the custom process.
 - `c`: Second argument for the custom process.
 
+#### Returns
+
+- `nothing`.
+
 ### Examples
 
 We can create a dummy custom process as follows:
@@ -86,6 +90,10 @@ In order to implement a new custom process algorithms that can seamlessly work w
 - `pra`: Custom process algorithm.
 - `c`: Argument for the custom process algorithm.
 
+#### Returns
+
+- `res::Integer`: The result of the algorithm.
+
 ### Examples
 
 We can create a dummy custom process algorithm as follows:
@@ -141,6 +149,10 @@ Performs the custom process algorithm 1.
 
 - `alg::MyCustomProcessAlgorithm1`: The algorithm to perform.
 - `c::Integer`: The input integer.
+
+# Returns
+
+- `res::Integer`: The result of the algorithm.
 
 # Details
 
@@ -220,6 +232,10 @@ Performs the custom process 1.
 
 - `b >= 0`: `b` must be non-negative.
 
+# Returns
+
+- `nothing`.
+
 # Details
 
 - Checks `b >= 0` before performing the process.
@@ -255,6 +271,14 @@ Validates that `val > 2`.
 # Arguments
 
 - `val::Real`: The value to validate.
+
+# Returns
+
+- `nothing`.
+
+# Related
+
+- [`MyConcreteCustomProcess2`](@ref)
 """
 function assert_val_value(val::Real)
     @argcheck(val >= 2 * one(eltype(val)), "val must be non-negative")
@@ -322,6 +346,10 @@ Performs the custom process 2.
 - `a::MyConcreteCustomProcess2`: The custom process to perform.
 - `b::Real`: The first argument.
 - `c::Integer`: The second argument.
+
+# Returns
+
+- `nothing`.
 
 # Details
 

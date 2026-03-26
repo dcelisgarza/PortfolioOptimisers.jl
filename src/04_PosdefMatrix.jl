@@ -17,6 +17,10 @@ In order to implement a new positive definite matrix estimator which will work s
   - $(arg_dict[:pdm])
   - $(arg_dict[:sigrhoX])
 
+## Returns
+
+  - `X::MatNum`: The projected input matrix `X`.
+
 # Examples
 
 We can create a dummy positive definite estimator as follows:
@@ -124,6 +128,10 @@ For matrices without unit diagonal, the function converts them into correlation 
 # Validation
 
   - `X` is validated with [`assert_matrix_issquare`](@ref).
+
+# Returns
+
+  - `X::MatNum`: The input matrix `X` modified in-place.
 
 # Details
 
