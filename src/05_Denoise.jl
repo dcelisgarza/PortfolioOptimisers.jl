@@ -433,7 +433,6 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
 # Related
 
-  - [`errPDF`](@ref)
   - [`Denoise`](@ref)
   - [`VecNum`](@ref)
   - [`AverageShiftedHistograms.Kernels`](https://joshday.github.io/AverageShiftedHistograms.jl/stable/kernels/)

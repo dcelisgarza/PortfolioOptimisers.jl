@@ -11,7 +11,6 @@ SpectralDenoise
 FixedDenoise
 ShrunkDenoise
 Denoise
-errPDF
 find_max_eval
 _denoise!
 denoise!
