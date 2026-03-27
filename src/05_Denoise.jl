@@ -322,12 +322,12 @@ function Denoise(; pdm::Option{<:Posdef} = Posdef(),
 end
 """
     _denoise!(
-              alg::AbstractDenoiseAlgorithm,
-              X::MatNum,
-              vals::VecNum,
-              vecs::MatNum,
-              num_factors::Integer
-             ) -> MatNum
+        alg::AbstractDenoiseAlgorithm,
+        X::MatNum,
+        vals::VecNum,
+        vecs::MatNum,
+        num_factors::Integer
+    ) -> MatNum
 
 In-place denoising of a correlation matrix using a specific denoising algorithm.
 
@@ -398,14 +398,14 @@ function _denoise!(alg::ShrunkDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
 end
 """
     find_max_eval(
-                  vals::VecNum,
-                  q::Number,
-                  kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
-                  m::Integer = 10,
-                  n::Integer = 1000,
-                  args::Tuple = (),
-                  kwargs::NamedTuple = (;)
-                 ) -> Number
+        vals::VecNum,
+        q::Number,
+        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
+        m::Integer = 10,
+        n::Integer = 1000,
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> Number
 
 Estimate the upper edge of the Marčenko–Pastur (MP) distribution for a set of eigenvalues, used to separate signal from noise in random matrix denoising.
 
@@ -468,8 +468,7 @@ function find_max_eval(vals::VecNum, q::Number,
     return x * op_sqrt_iq_sq
 end
 """
-    denoise!(dn::Denoise, X::MatNum, q::Number) -> MatNum
-    denoise!(dn::Nothing, X::MatNum, args...) -> MatNum
+    denoise!(dn::Option{<:Denoise}, X::MatNum, q::Number) -> MatNum
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
@@ -563,8 +562,7 @@ function denoise!(dn::Denoise, X::MatNum, q::Number)
     return X
 end
 """
-    denoise(dn::Denoise, X::MatNum, q::Number) -> MatNum
-    denoise(dn::Nothing, X::MatNum, args...) -> MatNum
+    denoise(dn::Option{<:Denoise}, X::MatNum, q::Number) -> MatNum
 
 Out-of-place version of [`denoise!`](@ref).
 

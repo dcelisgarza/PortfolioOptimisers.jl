@@ -109,8 +109,7 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple
     return Posdef(alg, kwargs)
 end
 """
-    posdef!(pdm::Posdef, X::MatNum) -> MatNum
-    posdef!(pdm::Nothing, X::MatNum) -> MatNum
+    posdef!(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
 
 In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
 
@@ -193,8 +192,7 @@ function posdef!(pdm::Posdef, X::MatNum)
     return X
 end
 """
-    posdef(pdm::Posdef, X::MatNum) -> MatNum
-    posdef(::Nothing, X::MatNum) -> MatNum
+    posdef(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
 
 Out-of-place version of [`posdef!`](@ref).
 

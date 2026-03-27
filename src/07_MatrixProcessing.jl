@@ -9,8 +9,8 @@ All concrete and/or abstract types that implement matrix processing routines---s
 
 In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...)`: In-place processing of a covariance or correlation matrix.
-  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...)`: Optional out-of-place processing of a covariance or correlation matrix.
+  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: In-place processing of a covariance or correlation matrix.
+  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix.
 
 ## Arguments
 
@@ -79,8 +79,8 @@ All concrete and/or abstract types that implement a specific matrix processing a
 
 In order to implement a new matrix processing algorithm that works with the current matrix processing estimator, subtype `AbstractMatrixProcessingAlgorithm`, with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...)`: In-place application of a custom matrix processing algorithm.
-  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...)`: Optional out-of-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: In-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place application of a custom matrix processing algorithm.
 
 ## Arguments
 
@@ -309,11 +309,7 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Fields
 
-  - $(arg_dict[:opdm])
-  - $(arg_dict[:odn])
-  - $(arg_dict[:odt])
-  - `alg`: Optional custom matrix processing algorithm.
-  - `order`: Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -380,10 +376,15 @@ DenoiseDetoneAlgMatrixProcessing
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct DenoiseDetoneAlgMatrixProcessing <: AbstractMatrixProcessingEstimator
+    "$(field_dict[:opdm])"
     pdm
+    "$(field_dict[:odn])"
     dn
+    "$(field_dict[:odt])"
     dt
+    "Optional custom matrix processing algorithm."
     alg
+    "Specifies the order in which denoising, detoning, and custom algorithm steps are applied."
     order
     function DenoiseDetoneAlgMatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
                                               dt::Option{<:Detone},
@@ -402,41 +403,13 @@ function DenoiseDetoneAlgMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
     return DenoiseDetoneAlgMatrixProcessing(pdm, dn, dt, alg, order)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
-                       kwargs...)
-    matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
-
-No-op fallback for in-place processing of a covariance or correlation matrix.
-
-# Arguments
-
-  - $(arg_dict[:omp])
-  - $(arg_dict[:sigrho])
-  - $(arg_dict[:X])
-  - `args...`: Additional positional arguments passed to custom algorithms.
-  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
-
-# Returns
-
-  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
-
-# Related
-
-  - [`matrix_processing`](@ref)
-  - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
-  - [`posdef!`](@ref)
-  - [`denoise!`](@ref)
-  - [`detone!`](@ref)
-  - [`matrix_processing_algorithm!`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`MatNum`](@ref)
-"""
-function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
-    return sigma
-end
-"""
-    matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing, sigma::MatNum, X::MatNum, args...;
-                       kwargs...)
+    matrix_processing!(
+        mp::Option{<:DenoiseDetoneAlgMatrixProcessing},
+        sigma::MatNum,
+        X::MatNum,
+        args...;
+        kwargs...
+    ) -> MatNum
 
 In-place matrix processing pipeline using the `DenoiseDetoneAlg` order.
 
@@ -445,6 +418,8 @@ This method applies a sequence of matrix processing steps to the input covarianc
 # Arguments
 
   - $(arg_dict[:omp])
+      + `::DenoiseDetoneAlgMatrixProcessing`: The specified matrix processing estimator is applied to `X` in-place.
+      + `::Nothing`: No-op.
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
@@ -456,6 +431,7 @@ This method applies a sequence of matrix processing steps to the input covarianc
 
 # Details
 
+  - If `mp` is `nothing`, the function returns `sigma` without modification.
   - Applies positive definiteness enforcement using `mp.pdm`.
   - Applies denoising using `mp.dn` and the ratio `T / N` from `X`.
   - Applies detoning using `mp.dt`.
@@ -521,6 +497,9 @@ julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; dt = Detone()), sig
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
+function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
+    return sigma
+end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:DenoiseDetoneAlg},
                             sigma::MatNum, X::MatNum, args...; kwargs...)
@@ -582,9 +561,13 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     return sigma
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
-                      kwargs...)
-    matrix_processing(::Nothing, args...; kwargs...)
+    matrix_processing(
+        mp::Option{<:AbstractMatrixProcessingEstimator},
+        sigma::MatNum,
+        X::MatNum,
+        args...;
+        kwargs...
+    ) -> MatNum
 
 Out-of-place version of [`matrix_processing!`](@ref).
 

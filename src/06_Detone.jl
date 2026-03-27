@@ -119,8 +119,7 @@ function Detone(; pdm::Option{<:Posdef} = Posdef(), n::Integer = 1)
     return Detone(pdm, n)
 end
 """
-    detone!(dt::Detone, X::MatNum) -> MatNum
-    detone!(dt::Nothing, X::MatNum) -> MatNum
+    detone!(dt::Option{<:Detone}, X::MatNum) -> MatNum
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -217,8 +216,7 @@ function detone!(de::Detone, X::MatNum)
     return X
 end
 """
-    detone(dt::Detone, X::MatNum)
-    detone(dt::Nothing, X::MatNum)
+    detone(dt::Option{<:Detone}, X::MatNum)
 
 Out-of-place version of [`detone!`](@ref).
 
