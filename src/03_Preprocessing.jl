@@ -319,6 +319,7 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
 # Returns
 
   - `rd::ReturnsResult`:
+
       + If `brt` is `true` and a benchmark `B` is present: A new `ReturnsResult` with adjusted asset returns
       + Otherwise: The `rd` is returned unchanged.
 
@@ -397,19 +398,20 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, 
     end
 end
 """
-    prices_to_returns(X::TimeSeries.TimeArray,
-                      F::Option{<:TimeSeries.TimeArray} = nothing;
-                      B::Option{<:TimeSeries.TimeArray} = nothing,
-                      iv::Option{<:TimeSeries.TimeArray} = nothing,
-                      ivpa::Option{<:Num_VecNum} = nothing,
-                      ret_method::Symbol = :simple, padding::Bool = false,
-                      missing_col_percent::Number = 1.0,
-                      missing_row_percent::Option{<:Number} = 1.0,
-                      collapse_args::Tuple = (),
-                      map_func::Option{<:Function} = nothing,
-                      join_method::Symbol = :outer,
-                      impute_method::Option{<:Impute.Imputor} = nothing
-                    ) -> ReturnsResult
+    prices_to_returns(
+        X::TimeSeries.TimeArray,
+        F::Option{<:TimeSeries.TimeArray} = nothing;
+        B::Option{<:TimeSeries.TimeArray} = nothing,
+        iv::Option{<:TimeSeries.TimeArray} = nothing,
+        ivpa::Option{<:Num_VecNum} = nothing,
+        ret_method::Symbol = :simple, padding::Bool = false,
+        missing_col_percent::Number = 1.0,
+        missing_row_percent::Option{<:Number} = 1.0,
+        collapse_args::Tuple = (),
+        map_func::Option{<:Function} = nothing,
+        join_method::Symbol = :outer,
+        impute_method::Option{<:Impute.Imputor} = nothing
+    ) -> ReturnsResult
 
 Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
@@ -446,10 +448,15 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 # Details
 
   - Joins asset, factor, and benchmark data as specified.
+
   - Optionally applies a mapping function and/or collapses the time series.
+
   - Handles missing values by filtering, imputation, and dropping as configured.
+
   - Computes returns using the specified method.
+
       + If `B` is not `nothing`, it is subtracted from asset returns. Used for returns tracking error optimisations.
+
   - Returns a `ReturnsResult` with asset/factor names, returns, timestamps, and optional implied volatility data.
 
 # Examples

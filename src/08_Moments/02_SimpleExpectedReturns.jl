@@ -3,12 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
 
-`SimpleExpectedReturns` is the standard estimator for computing expected returns as the (possibly weighted) mean of asset returns. It supports both unweighted and weighted mean estimation by storing an optional weights vector.
+`SimpleExpectedReturns` is the standard estimator for computing expected returns as the possibly weighted mean of asset returns.
 
 # Fields
 
-  - `w`: Optional weights for each observation. If `nothing`, the unweighted mean is computed.
-  - `idx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -20,7 +19,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
     - $(val_dict[:oow])
-    - If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.
+    - $(val_dict[:oidx])
 
 # Examples
 
@@ -44,7 +43,9 @@ SimpleExpectedReturns
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:oidx])"
     idx
     function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights},
                                    idx::Option{<:VecInt})
@@ -58,7 +59,12 @@ function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothin
     return SimpleExpectedReturns(w, idx)
 end
 """
-    Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(
+        me::SimpleExpectedReturns,
+        X::MatNum;
+        dims::Int = 1,
+        kwargs...
+    ) -> ArrNum
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
@@ -73,7 +79,7 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Returns
 
-  - `mu::VecNum`: The expected returns vector.
+  - $(ret_dict[:mu])
 
 # Examples
 
@@ -124,7 +130,10 @@ function Statistics.mean(me::SimpleExpectedReturns{<:Any, <:VecInt}, X::MatNum;
     end
 end
 """
-    factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
+    factory(
+        me::SimpleExpectedReturns,
+        w::StatsBase.AbstractWeights
+    ) -> SimpleExpectedReturns
 
 Create a new `SimpleExpectedReturns` estimator with observation weights `w`.
 
@@ -137,7 +146,7 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 
 # Returns
 
-  - `me::SimpleExpectedReturns`: New estimator with observation weights `w`.
+  - $(ret_dict[:me])
 
 # Related
 

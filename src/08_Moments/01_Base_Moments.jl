@@ -1,5 +1,9 @@
 """
-    factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
+    factory(
+        ce::StatsBase.CovarianceEstimator,
+        args...;
+        kwargs...
+    ) -> StatsBase.CovarianceEstimator
 
 Fallback for covariance estimator factory methods.
 
@@ -35,8 +39,8 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Covariance and correlation
 
-  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`: Covariance matrix estimation.
-  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`: Correlation matrix estimation.
+  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Covariance matrix estimation.
+  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Correlation matrix estimation.
 
 ### Arguments
 
@@ -46,11 +50,11 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigrho])
 
 ## Factory
 
-  - `factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+  - `factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -59,7 +63,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Returns
 
-  - $(arg_dict[:nce])
+  - $(ret_dict[:ce])
 
 # Examples
 
@@ -149,10 +153,10 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Variance and standard deviation
 
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Standard deviation estimation.
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Num`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Num`: Standard deviation estimation.
 
 ### Arguments
 
@@ -169,15 +173,15 @@ In order to implement a new covariance estimator which will work seamlessly with
 
   - $(arg_dict[:X])
 
-      + `val::MatNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+      + $(ret_dict[:stdvar])
 
   - $(arg_dict[:Xv])
 
-      + `val::VecNum`: Variance or standard deviation of `X`.
+      + $(ret_dict[:stdvarnum])
 
 ## Factory
 
-  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -186,7 +190,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Returns
 
-  - $(arg_dict[:nve])
+  - $(ret_dict[:ve])
 
 # Examples
 
@@ -282,7 +286,7 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ## Expected returns
 
-  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...)`: Expected returns estimation.
+  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...) -> ArrNum`: Expected returns estimation.
 
 ### Arguments
 
@@ -292,11 +296,11 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ### Returns
 
-    - `val::VecNum`: Expected returns vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+    - $(ret_dict[:mu])
 
 ## Factory
 
-  - `factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+  - `factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -305,7 +309,7 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ### Returns
 
-    - $(arg_dict[:nme])
+    - $(ret_dict[:me])
 
 # Examples
 
@@ -368,7 +372,7 @@ All concrete and/or abstract types that implement a specific algorithm used by a
 
 # Interfaces
 
-Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different expected returns algorithms within the library. The interfaces should be defined at the level of the expected returns estimator that utilises these algorithms.
+Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different expected returns algorithms within the library. The interfaces should be defined at the level of the expected returns estimator that utilises these algorithms.
 
 # Related
 
@@ -385,7 +389,7 @@ All concrete and/or abstract types that implement a specific algorithm for momen
 
 # Interfaces
 
-Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different moment algorithms within the library. The interfaces should be defined at the level of the covariance estimator that utilises these algorithms.
+Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different moment algorithms within the library. The interfaces should be defined at the level of the covariance estimator that utilises these algorithms.
 
 # Related
 
@@ -416,8 +420,14 @@ $(DocStringExtensions.TYPEDEF)
 """
 struct Semi <: AbstractMomentAlgorithm end
 """
-    robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::StatsBase.AbstractWeights];
-               dims::Int = 1, mean = nothing, kwargs...)
+    robust_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
@@ -427,17 +437,17 @@ Compute the covariance matrix robustly using the specified covariance estimator 
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean array to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigma])
 
 # Details
 
   - This function attempts to compute the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility. This ensures robust covariance estimation across different estimator types.
+  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility.
 
 # Related
 
@@ -476,8 +486,14 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
     =#
 end
 """
-    robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::StatsBase.AbstractWeights];
-               dims::Int = 1, mean = nothing, kwargs...)
+    robust_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
@@ -487,18 +503,18 @@ Compute the correlation matrix robustly using the specified covariance estimator
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean array to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix.
+  - $(ret_dict[:rho])
 
 # Details
 
   - This function attempts to compute the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - If an error occurs, it falls back to computing the optionally weighted covariance matrix and then converts it to a correlation matrix.
-  - If that also errors, it tries again with [`robust_cov`](@ref) and converts the result to a correlation matrix. This ensures robust correlation estimation across different estimator types.
+  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility.
+  - If that also errors, it tries again with [`robust_cov`](@ref) and converts the result to a correlation matrix.
 
 # Related
 

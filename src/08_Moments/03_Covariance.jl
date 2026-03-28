@@ -7,9 +7,7 @@ A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrar
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `w`: Optional weights for each observation. If `nothing`, the estimator is unweighted.
-  - `idx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -23,8 +21,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
-  - If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.
+  - $(val_dict[:oow])
+  - $(val_dict[:oidx])
 
 # Details
 
@@ -55,8 +53,11 @@ GeneralCovariance
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 @concrete struct GeneralCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:oidx])"
     idx
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
                                w::Option{<:StatsBase.AbstractWeights},
@@ -74,7 +75,13 @@ function GeneralCovariance(;
     return GeneralCovariance(ce, w, idx)
 end
 """
-    Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cov(
+        ce::GeneralCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
 
@@ -82,15 +89,19 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
 
 # Arguments
 
-  - `ce`: Covariance estimator containing the method and optional weights.
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean vector to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to [`robust_cov`](@ref).
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigma])
+
+# Details
+
+  - Calls [`robust_cov`](@ref) with the appropriate covariance estimator.
 
 # Related
 
@@ -117,7 +128,13 @@ function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum
     end
 end
 """
-    Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cor(
+        ce::GeneralCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
 
@@ -125,15 +142,19 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
 
 # Arguments
 
-  - `ce`: Covariance estimator containing the method and optional weights.
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean vector to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to [`robust_cor`](@ref).
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix.
+  - $(ret_dict[:rho])
+
+# Details
+
+  - Calls [`robust_cor`](@ref) with the appropriate covariance estimator.
 
 # Related
 
@@ -160,18 +181,21 @@ function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum
     end
 end
 """
-    factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
+    factory(
+        ce::GeneralCovariance,
+        w::StatsBase.AbstractWeights
+    ) -> GeneralCovariance
 
 Return a new `GeneralCovariance` estimator with observation weights `w`.
 
 # Arguments
 
-  - `ce`: A `GeneralCovariance` estimator.
+  - $(arg_dict[:ce])
   - $(arg_dict[:ow])
 
 # Returns
 
-  - `ce::GeneralCovariance`: A new estimator with the same covariance estimator and observation weights `w`.
+  - $(ret_dict[:ce])
 
 # Related
 
@@ -191,9 +215,7 @@ A flexible container type for configuring and applying joint expected returns an
 
 # Fields
 
-  - `me`: Expected returns estimator.
-  - `ce`: Covariance estimator.
-  - `alg`: Moment algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -227,8 +249,11 @@ Covariance
   - [`Semi`](@ref)
 """
 @concrete struct Covariance <: AbstractCovarianceEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:malg])"
     alg
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm)
@@ -241,7 +266,10 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
     return Covariance(me, ce, alg)
 end
 """
-    factory(ce::Covariance, w::StatsBase.AbstractWeights)
+    factory(
+        ce::Covariance,
+        w::StatsBase.AbstractWeights
+    ) -> Covariance
 
 Return a new `Covariance` estimator with observation weights `w` applied to both the expected returns and covariance estimators.
 
@@ -252,7 +280,7 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 
 # Returns
 
-  - `ce::Covariance`: New estimator with weights applied to both the mean and covariance estimators.
+  - $(ret_dict[:ce])
 
 # Details
 
@@ -297,28 +325,29 @@ function factory(ce::Covariance, w::StatsBase.AbstractWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """
-    Statistics.cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cov(
+        ce::Covariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce`: Covariance estimator.
-
+  - $(arg_dict[:ce])
       + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
-
-  - `X`: Data matrix (observations × assets).
-
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
-
+  - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(arg_dict[:sigma])
 
 # Related
 
@@ -341,28 +370,34 @@ function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::I
     return Statistics.cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 """
-    Statistics.cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cor(
+        ce::Covariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce`: Covariance estimator.
+  - $(arg_dict[:ce])
 
       + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
 
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:X])
 
   - $(arg_dict[:dims])
 
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+  - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix.
+  - $(arg_dict[:rho])
 
 # Related
 

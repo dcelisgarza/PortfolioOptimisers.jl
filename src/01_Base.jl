@@ -857,7 +857,7 @@ const arg_dict = Dict(
                       # Weight vectors.
                       :pw => "`w`: Portfolio weights vector.",
                       :ow => "`w`: Observation weights vector.",
-                      :oow => "`w`: Optional observation weights vector.",
+                      :oow => "`w`: Optional observation weights vector. If `nothing`, the computation is unweighted.",
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
                       :opdm => "`pdm`: Optional positive definite matrix estimator.",
@@ -871,14 +871,13 @@ const arg_dict = Dict(
                       :mpa => "`mpa`: Matrix processing algorithm.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
-                      :nme => "`nme`: New expected returns estimator with the appropriate weights applied.",
                       :ce => "`ce`: Covariance estimator.",#
-                      :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
                       :ve => "`ve`: Variance estimator.",#
-                      :nve => "`ve`: New variance estimator with the appropriate weights applied.",#
                       :ske => "`ske`: Coskewness estimator.",
                       :kte => "`kte`: Cokurtosis estimator.",
                       :de => "`de`: Distance matrix estimator.",
+                      :oidx => "`oidx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.",
+                      :malg => "`alg`: Moment algorithm.",
                       # Priors.
                       :pe => "`pe`: Prior estimator.",#
                       :pr => "`pr`: Prior result.",#
@@ -931,22 +930,31 @@ const arg_dict = Dict(
                       :X => "`X`: Data matrix.",#
                       :F => "`F`: Data matrix.",#
                       :Xv => "`X`: Data vector.",#
-                      :dims => "`dims`: Dimensions along which to perform the computation.")
-const field_dict = Dict(key=>strip(val[(findfirst(":", val)[1] + 1):end])
+                      :dims => "`dims`: Dimensions along which to perform the computation.",#
+                      :omean => "`mean`: Optional mean vector to use for centering.")
+const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
     val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 """
-val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector.",
-                :sigma => "`sigma::MatNum`: Covariance matrix.",
-                :sk => "`sk::MatNum`: Coskewness matrix.",
-                :kt => "`kt::MatNum`: Cokurtosis matrix.")
+ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector (features x 1) for dims = 1, (1 x features) for dims = 2.",#
+                :sigma => "`sigma::MatNum`: Covariance matrix (features x features).",#
+                :rho => "`rho::MatNum`: Correlation matrix (features x features).",#
+                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix (features x features).",#
+                :sk => "`sk::MatNum`: Coskewness matrix (features x features).",#
+                :kt => "`kt::MatNum`: Cokurtosis matrix (features x features).",#
+                :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                :ce => "`ce`: New covariance estimator of the same type as the argument, with the appropriate weights applied.",#
+                :ve => "`ve`: New variance estimator of the same type as the argument, with the appropriate weights applied.",
+                :stdvar => "`stdvar::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                :stdvarnum => "`stdvar::Number`: Variance or standard deviation `X`")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar
