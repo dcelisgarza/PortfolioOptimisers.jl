@@ -959,7 +959,11 @@ ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector (features x 1) for
                 :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
                 :ce => "`ce`: New covariance estimator of the same type as the argument, with the appropriate weights applied.",#
                 :ve => "`ve`: New variance estimator of the same type as the argument, with the appropriate weights applied.",
-                :stdvar => "`stdvar::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
-                :stdvarnum => "`stdvar::Number`: Variance or standard deviation `X`")
+                :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
+                :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                :stdnum => "`vr::Number`: Standard deviation of `X`",
+                :varnum => "`vr::Number`: Variance of `X`")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

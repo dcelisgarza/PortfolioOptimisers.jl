@@ -74,7 +74,13 @@ function SimpleVariance(;
     return SimpleVariance(me, w, corrected)
 end
 """
-    Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.std(
+        ve::SimpleVariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...,
+    ) -> ArrNum
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -82,15 +88,15 @@ This method computes the standard deviation of the input array `X` using the con
 
 # Arguments
 
-  - `ve`: Variance estimator specifying the mean estimator, weights, and bias correction.
-  - `X`: Data array (vector or matrix) for which to compute the standard deviation.
+  - $(arg_dict[:ve])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
 
-  - `sd::VecNum`: Standard deviation vector of `X`.
+  - $(ret_dict[:stdarr])
 
 # Examples
 
@@ -138,7 +144,11 @@ function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
     end
 end
 """
-    Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
+    Statistics.std(
+        ve::SimpleVariance,
+        X::VecNum;
+        mean = nothing
+    ) -> Number
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
 
@@ -146,13 +156,13 @@ This method computes the standard deviation of the input vector `X` using the co
 
 # Arguments
 
-  - `ve`: Variance estimator specifying weights and bias correction.
-  - `X`: Data vector for which to compute the standard deviation.
-  - `mean`: Optional Mean value for centering. If not provided, the default mean is used.
+  - $(arg_dict[:ve])
+  - $(arg_dict[:Xv])
+  - $(arg_dict[:omean])
 
 # Returns
 
-  - `sd::Number`: Standard deviation of `X`.
+  - $(ret_dict[:stdnum])
 
 # Examples
 
@@ -198,7 +208,13 @@ function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
     end
 end
 """
-    Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.var(
+        ve::SimpleVariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> ArrNum
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -206,15 +222,15 @@ This method computes the variance of the input array `X` using the configuration
 
 # Arguments
 
-  - `ve`: Variance estimator specifying the mean estimator, weights, and bias correction.
-  - `X`: Data array (vector or matrix) for which to compute the variance.
+  - $(arg_dict[:ve])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
 
-  - `v::VecNum`: Variance vector of `X`.
+  - $(ret_dict[:vararr])
 
 # Examples
 
@@ -262,7 +278,11 @@ function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
     end
 end
 """
-    Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
+    Statistics.var(
+        ve::SimpleVariance,
+        X::VecNum;
+        mean = nothing
+    ) -> Number
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 
@@ -270,13 +290,13 @@ This method computes the variance of the input vector `X` using the configuratio
 
 # Arguments
 
-  - `ve`: Variance estimator specifying weights and bias correction.
-  - `X`: Data vector for which to compute the variance.
-  - `mean`: Optional mean value for centering. If not provided, the default mean is used.
+  - $(arg_dict[:ve])
+  - $(arg_dict[:Xv])
+  - $(arg_dict[:omean])
 
 # Returns
 
-  - `v::Number`: Variance of `X`.
+  - $(ret_dict[:varnum])
 
 # Examples
 
@@ -322,18 +342,21 @@ function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
     end
 end
 """
-    factory(ve::SimpleVariance, w::StatsBase.AbstractWeights)
+    factory(
+        ve::SimpleVariance,
+        w::StatsBase.AbstractWeights
+    ) -> SimpleVariance
 
 Return a new `SimpleVariance` estimator with the specified observation weights.
 
 # Arguments
 
-  - `ve`: The original `SimpleVariance` estimator to update.
-  - `w`: Observation weights to use in the new estimator.
+  - $(arg_dict[:ve])
+  - $(arg_dict[:ow])
 
 # Returns
 
-  - `ve::SimpleVariance`: A new `SimpleVariance` estimator with the same mean estimator and bias correction as `ve`, but with the provided weights.
+  - $(ret_dict[:ve])
 
 # Details
 
