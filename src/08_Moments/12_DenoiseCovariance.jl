@@ -11,10 +11,11 @@ A covariance estimator that applies a denoising algorithm and positive definite 
 
 # Constructors
 
-```julia
-DenoiseCovariance(; ce::AbstractCovarianceEstimator; dn::Denoise = Denoise(),
-                  pdm::Option{<:Posdef} = Posdef())
-```
+    DenoiseCovariance(;
+        ce::AbstractCovarianceEstimator,
+        dn::Denoise = Denoise(),
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> DenoiseCovariance
 
 Keywords correspond to the struct's fields.
 

@@ -161,9 +161,9 @@ Second-order cone (SOC) squared norm-based tracking formulation.
 
 # Constructors
 
-```julia
-SquaredL2Tracking(; ddof::Integer = 1)
-```
+    SquaredL2Tracking(;
+        ddof::Integer = 1,
+    ) -> SquaredL2Tracking
 
   - `ddof`: Sets the degrees of freedom adjustment.
 

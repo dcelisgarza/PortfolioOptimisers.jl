@@ -242,6 +242,8 @@
         @test isapprox(var(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1),
                        std(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1) .^
                        2)
+        @test std(SimpleVariance(), rd.X) == std(SimpleVariance(; me = nothing), rd.X)
+        @test var(SimpleVariance(), rd.X) == var(SimpleVariance(; me = nothing), rd.X)
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),

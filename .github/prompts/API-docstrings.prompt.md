@@ -188,7 +188,9 @@ Defines my custom process 1.
 
 # Constructors
 
-    MyConcreteCustomProcess1(; alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1())
+    MyConcreteCustomProcess1(;
+        alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1()
+    ) -> MyConcreteCustomProcess1
 
 Keywords correspond to the struct's fields.
 
@@ -297,8 +299,9 @@ Defines my custom process 2.
 # Constructors
 
     MyConcreteCustomProcess2(;
-                             alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1(),
-                             val::Real = 2.0)
+        alg::MyAbstractCustomProcessAlgorithm = MyCustomProcessAlgorithm1(),
+        val::Real = 2.0
+    ) -> MyConcreteCustomProcess2
 
 Keywords correspond to the struct's fields.
 

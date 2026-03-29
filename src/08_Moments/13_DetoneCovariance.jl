@@ -11,10 +11,11 @@ A covariance estimator that applies a detoning algorithm and positive definite p
 
 # Constructors
 
-```julia
-DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(), dt::Detone = Detone(),
-                 pdm::Option{<:Posdef} = Posdef())
-```
+    DetoneCovariance(;
+        ce::AbstractCovarianceEstimator = Covariance(),
+        dt::Detone = Detone(),
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> DetoneCovariance
 
 Keywords correspond to the struct's fields.
 

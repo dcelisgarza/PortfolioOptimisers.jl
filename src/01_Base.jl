@@ -713,7 +713,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    VecScalar(; v::VecNum, s::Number)
+    VecScalar(;
+        v::VecNum,
+        s::Number
+    ) -> VecScalar
 
 Keywords correspond to the struct's fields.
 
@@ -871,6 +874,7 @@ const arg_dict = Dict(
                       :mpa => "`mpa`: Matrix processing algorithm.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
+                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector, if `nothing` and used on a matrix defaults to [`SimpleExpectedReturns`](@ref).",
                       :ce => "`ce`: Covariance estimator.",#
                       :ve => "`ve`: Variance estimator.",#
                       :ske => "`ske`: Coskewness estimator.",
@@ -878,6 +882,7 @@ const arg_dict = Dict(
                       :de => "`de`: Distance matrix estimator.",
                       :oidx => "`oidx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.",
                       :malg => "`alg`: Moment algorithm.",
+                      :corrected => "`corrected`: Whether to apply Bessel's correction.",
                       # Priors.
                       :pe => "`pe`: Prior estimator.",#
                       :pr => "`pr`: Prior result.",#

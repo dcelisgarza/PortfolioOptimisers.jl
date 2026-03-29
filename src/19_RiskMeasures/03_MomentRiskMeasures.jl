@@ -82,9 +82,11 @@ Computes portfolio risk using the second central (full) or lower (semi) moment o
 
 # Constructors
 
-    SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                 alg1::AbstractMomentAlgorithm = Full(),
-                 alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
+    SecondMoment(;
+        ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+        alg1::AbstractMomentAlgorithm = Full(),
+        alg2::SecondMomentFormulation = SquaredSOCRiskExpr(),
+    ) -> SecondMoment
 
 Keywords correspond to the struct's fields.
 
@@ -179,7 +181,9 @@ Computes portfolio risk using the fourth central (full) or lower (semi) moment o
 
 # Constructors
 
-    FourthMoment(; alg::AbstractMomentAlgorithm = Full())
+    FourthMoment(;
+        alg::AbstractMomentAlgorithm = Full(),
+    ) -> FourthMoment
 
 Keywords correspond to the struct's fields.
 
@@ -220,8 +224,9 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 # Constructors
 
     StandardisedHighOrderMoment(;
-                                ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                                alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+        ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+        alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+    ) -> StandardisedHighOrderMoment
 
 Keywords correspond to the struct's fields.
 
@@ -276,10 +281,12 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
 # Constructors
 
-    LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                   w::Option{<:StatsBase.AbstractWeights} = nothing,
-                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                   alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+    LowOrderMoment(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
+    ) -> LowOrderMoment
 
 Keywords correspond to the struct's fields.
 
@@ -647,10 +654,12 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
 # Constructors
 
-    HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                    w::Option{<:StatsBase.AbstractWeights} = nothing,
-                    mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                    alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+    HighOrderMoment(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+    ) -> HighOrderMoment
 
 Keywords correspond to the struct's fields.
 

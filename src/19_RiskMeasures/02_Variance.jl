@@ -120,10 +120,12 @@ Represents the portfolio variance using a covariance matrix.
 
 # Constructors
 
-    Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             sigma::Option{<:MatNum} = nothing,
-             rc::Option{<:LcE_Lc} = nothing,
-             alg::VarianceFormulation = SquaredSOCRiskExpr())
+    Variance(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        sigma::Option{<:MatNum} = nothing,
+        rc::Option{<:LcE_Lc} = nothing,
+        alg::VarianceFormulation = SquaredSOCRiskExpr(),
+    ) -> Variance
 
 Keywords correspond to the struct's fields.
 
@@ -307,8 +309,10 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 
 # Constructors
 
-    StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       sigma::Option{<:MatNum} = nothing)
+    StandardDeviation(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        sigma::Option{<:MatNum} = nothing,
+    ) -> StandardDeviation
 
 Keywords correspond to the struct's fields.
 
@@ -453,9 +457,11 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
 # Constructors
 
-    UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
-                           sigma::Option{<:MatNum} = nothing)
+    UncertaintySetVariance(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
+        sigma::Option{<:MatNum} = nothing,
+    ) -> UncertaintySetVariance
 
 Keywords correspond to the struct's fields.
 

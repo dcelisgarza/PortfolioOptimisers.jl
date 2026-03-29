@@ -118,11 +118,15 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
 
 # Constructors
 
-    ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
-                       alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                       n_sim::Integer = 3_000, block_size::Integer = 3, q::Number = 0.05,
-                       seed::Option{<:Integer} = nothing,
-                       bootstrap::ARCHBootstrapSet = StationaryBootstrap())
+    ARCHUncertaintySet(;
+        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
+        n_sim::Integer = 3_000,
+        block_size::Integer = 3,
+        q::Number = 0.05,
+        seed::Option{<:Integer} = nothing,
+        bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
+    ) -> ARCHUncertaintySet
 
 Keywords correspond to the struct's fields.
 

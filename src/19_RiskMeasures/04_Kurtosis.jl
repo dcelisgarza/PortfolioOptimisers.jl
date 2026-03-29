@@ -17,13 +17,15 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 
 # Constructors
 
-    Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       w::Option{<:StatsBase.AbstractWeights} = nothing,
-                       mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                       kt::Option{<:MatNum} = nothing,
-                       N::Option{<:Integer} = nothing,
-                       alg1::AbstractMomentAlgorithm = Full(),
-                       alg2::VarianceFormulation = SOCRiskExpr())
+    Kurtosis(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        kt::Option{<:MatNum} = nothing,
+        N::Option{<:Integer} = nothing,
+        alg1::AbstractMomentAlgorithm = Full(),
+        alg2::VarianceFormulation = SOCRiskExpr(),
+    ) -> Kurtosis
 
 Keywords correspond to the struct's fields.
 

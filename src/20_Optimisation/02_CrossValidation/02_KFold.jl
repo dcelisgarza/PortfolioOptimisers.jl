@@ -11,9 +11,11 @@ Implements non-sequential k-fold cross-validation with optional purging and emba
 
 # Constructors
 
-```julia
-KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
-```
+    KFold(;
+        n::Integer = 5,
+        purged_size::Integer = 0,
+        embargo_size::Integer = 0,
+    ) -> KFold
 
 Keywords correspond to the struct's fields.
 

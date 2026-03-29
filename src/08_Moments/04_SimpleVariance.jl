@@ -7,9 +7,7 @@ A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional e
 
 # Fields
 
-  - `me`: Optional expected returns estimator. If `nothing`, the mean is not estimated.
-  - `w`: Optional observation weights. If `nothing`, the estimator is unweighted.
-  - `corrected`: Whether to apply Bessel's correction (unbiased variance).
+$(DocStringExtensions.FIELDS)
 
 # Constructor
 
@@ -21,7 +19,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+$(val_dict[:oow])
 
 # Examples
 
@@ -55,8 +53,11 @@ SimpleVariance
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 @concrete struct SimpleVariance <: AbstractVarianceEstimator
+    "$(field_dict[:ome])"
     me
+    "$(field_dict[:ow])"
     w
+    "$(field_dict[:corrected])"
     corrected
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
@@ -118,6 +119,16 @@ julia> std(sv, Xmat; dims = 1)
 function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
+    return if isnothing(ve.w)
+        Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
+    else
+        Statistics.std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+    end
+end
+function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
+                        mean = nothing, kwargs...)
+    me = SimpleExpectedReturns()
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
@@ -232,6 +243,16 @@ julia> var(sv, Xmat; dims = 1)
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
+    return if isnothing(ve.w)
+        Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
+    else
+        Statistics.var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+    end
+end
+function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
+                        mean = nothing, kwargs...)
+    me = SimpleExpectedReturns()
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
     else

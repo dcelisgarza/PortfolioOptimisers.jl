@@ -12,11 +12,13 @@ Implements combinatorial non-sequential cross-validation with purging and embarg
 
 # Constructors
 
-```julia
-CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
-                             purged_size::Integer = 0, embargo_size::Integer = 0,
-                             warn_comb::Integer = 100_000)
-```
+    CombinatorialCrossValidation(;
+        n_folds::Integer = 10,
+        n_test_folds::Integer = 8,
+        purged_size::Integer = 0,
+        embargo_size::Integer = 0,
+        warn_comb::Integer = 100_000,
+    ) -> CombinatorialCrossValidation
 
 Keywords correspond to the struct's fields.
 

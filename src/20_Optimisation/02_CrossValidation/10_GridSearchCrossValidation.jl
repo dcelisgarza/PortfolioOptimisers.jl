@@ -15,13 +15,15 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 
 # Constructors
 
-```julia
-GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType; cv::SearchCV = KFold(),
-                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                          scorer::CrossValSearchScorer = HighestMeanScore(),
-                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                          train_score::Bool = false, kwargs::NamedTuple = (;))
-```
+    GridSearchCrossValidation(
+        p::MultiGSCVValType_VecMultiGSCVValType;
+        cv::SearchCV = KFold(),
+        r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+        scorer::CrossValSearchScorer = HighestMeanScore(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        train_score::Bool = false,
+        kwargs::NamedTuple = (;),
+    ) -> GridSearchCrossValidation
 
   - Arguments correspond to fields above.
 

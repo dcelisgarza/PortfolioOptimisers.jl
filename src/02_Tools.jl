@@ -856,7 +856,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    MeanValue(;
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+    ) -> MeanValue
 
 Keywords correspond to the struct's fields.
 
@@ -933,7 +935,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    MedianValue(;
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+    ) -> MedianValue
 
 Keywords correspond to the struct's fields.
 
@@ -1031,7 +1035,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+    StdValue(;
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        corrected::Bool = true,
+    ) -> StdValue
 
 Keywords correspond to the struct's fields.
 
@@ -1057,7 +1064,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
 @concrete struct StdValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
+    "$(field_dict[:corrected])"
     corrected
     function StdValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
         if !isnothing(w)
@@ -1112,7 +1119,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+    VarValue(;
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        corrected::Bool = true,
+    ) -> VarValue
 
 Keywords correspond to the struct's fields.
 
@@ -1253,7 +1263,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
+    StandardisedValue(;
+        mv::MeanValue = MeanValue(),
+        sv::StdValue = StdValue(),
+    ) -> StandardisedValue
 
 Keywords correspond to the struct's fields.
 

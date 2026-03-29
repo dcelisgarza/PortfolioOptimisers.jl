@@ -173,9 +173,11 @@ Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures 
 
 # Constructors
 
-    RiskMeasureSettings(; scale::Number = 1.0,
-                        ub::Option{<:RkRtBounds} = nothing,
-                        rke::Bool = true)
+    RiskMeasureSettings(;
+        scale::Number = 1.0,
+        ub::Option{<:RkRtBounds} = nothing,
+        rke::Bool = true,
+    ) -> RiskMeasureSettings
 
 Creates a `RiskMeasureSettings` instance with the specified scale, upper bound, and risk evaluation flag.
 
@@ -434,7 +436,9 @@ Where:
 
 # Constructors
 
-    LogSumExpScalariser(; gamma::Number = 1.0)
+    LogSumExpScalariser(;
+        gamma::Number = 1.0,
+    ) -> LogSumExpScalariser
 
 Keywords correspond to the struct's fields.
 

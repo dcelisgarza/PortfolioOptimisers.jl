@@ -71,7 +71,9 @@ Where:
 
 # Constructors
 
-    MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
+    MaximumEntropy(;
+        alg::EntropyFormulation = RelativeEntropy(),
+    ) -> MaximumEntropy
 
 Keywords correspond to the struct's fields.
 

@@ -30,10 +30,11 @@ Implements index-based walk-forward cross-validation for time series, supporting
 
 # Constructors
 
-```julia
-IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::Integer = 0,
-                 expend_train::Bool = false, reduce_test::Bool = false)
-```
+    IndexWalkForward(train_size::Integer, test_size::Integer;
+        purged_size::Integer = 0,
+        expend_train::Bool = false,
+        reduce_test::Bool = false,
+    ) -> IndexWalkForward
 
 Keywords correspond to the struct's fields.
 
@@ -144,14 +145,17 @@ Implements date-based walk-forward cross-validation for time series, supporting 
 
 # Constructors
 
-```julia
-DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
-                period::DatesUnionPeriod = Dates.Day(1),
-                period_offset::Option{<:DatesUnionPeriod} = nothing,
-                purged_size::Integer = 0, adjuster::DateAdjType = identity,
-                previous::Bool = false, expend_train::Bool = false,
-                reduce_test::Bool = false)
-```
+    DateWalkForward(
+        train_size::IntPeriodDateRange,
+        test_size::Integer;
+        period::DatesUnionPeriod = Dates.Day(1),
+        period_offset::Option{<:DatesUnionPeriod} = nothing,
+        purged_size::Integer = 0,
+        adjuster::DateAdjType = identity,
+        previous::Bool = false,
+        expend_train::Bool = false,
+        reduce_test::Bool = false,
+    ) -> DateWalkForward
 
 Keywords correspond to the struct's fields.
 

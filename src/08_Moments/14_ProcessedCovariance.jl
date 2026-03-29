@@ -11,11 +11,11 @@ A covariance estimator that applies a custom matrix processing algorithm and pos
 
 # Constructors
 
-```julia
-ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                    alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                    pdm::Option{<:Posdef} = Posdef())
-```
+    ProcessedCovariance(;
+        ce::AbstractCovarianceEstimator = Covariance(),
+        alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> ProcessedCovariance
 
 Keywords correspond to the struct's fields.
 
