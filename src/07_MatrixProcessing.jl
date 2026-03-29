@@ -311,13 +311,15 @@ A flexible container type for configuring and applying matrix processing routine
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    DenoiseDetoneAlgMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
-                                     dn::Option{<:Denoise} = nothing,
-                                     dt::Option{<:Detone} = nothing,
-                                     alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                                     order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg())
+    DenoiseDetoneAlgMatrixProcessing(;
+        pdm::Option{<:Posdef} = Posdef(),
+        dn::Option{<:Denoise} = nothing,
+        dt::Option{<:Detone} = nothing,
+        alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
+        order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg()
+    ) -> DenoiseDetoneAlgMatrixProcessing
 
 Keywords correspond to the struct's fields.
 

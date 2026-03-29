@@ -136,9 +136,11 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
   - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
-# Constructor
+# Constructors
 
-    StandardisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+    StandardisedGerber0(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
+    ) -> StandardisedGerber0
 
 Keywords correspond to the struct's fields.
 
@@ -184,9 +186,11 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
   - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
-# Constructor
+# Constructors
 
-    StandardisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+    StandardisedGerber1(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
+    ) -> StandardisedGerber1
 
 Keywords correspond to the struct's fields.
 
@@ -232,9 +236,11 @@ Implements the second variant of the Gerber covariance algorithm on Z-transforme
 
   - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
-# Constructor
+# Constructors
 
-    StandardisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+    StandardisedGerber2(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
+    ) -> StandardisedGerber2
 
 Keywords correspond to the struct's fields.
 
@@ -378,11 +384,14 @@ A flexible container type for configuring and applying Gerber covariance estimat
   - `t`: Threshold parameter for Gerber covariance computation.
   - `alg`: Gerber covariance algorithm variant.
 
-# Constructor
+# Constructors
 
-    GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                     pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
-                     alg::GerberCovarianceAlgorithm = Gerber1())
+    GerberCovariance(;
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+        pdm::Option{<:Posdef} = Posdef(),
+        t::Number = 0.5,
+        alg::GerberCovarianceAlgorithm = Gerber1()
+    ) -> GerberCovariance
 
 Keywords correspond to the struct's fields.
 

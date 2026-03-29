@@ -11,11 +11,13 @@ Container type for equilibrium expected returns estimators.
   - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
   - `l`: Risk aversion parameter.
 
-# Constructor
+# Constructors
 
     EquilibriumExpectedReturns(;
-                               ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               w::Option{<:VecNum} = nothing, l::Number = 1)
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        w::Option{<:VecNum} = nothing,
+        l::Number = 1
+    ) -> EquilibriumExpectedReturns
 
 Keywords correspond to the struct's fields.
 

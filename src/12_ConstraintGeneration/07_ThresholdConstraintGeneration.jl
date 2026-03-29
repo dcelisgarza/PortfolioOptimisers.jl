@@ -11,10 +11,13 @@ Estimator for buy-in threshold portfolio constraints.
   - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
   - `dval`: Default threshold value applied to assets not explicitly specified in `val`.
 
-# Constructor
+# Constructors
 
-    ThresholdEstimator(; val::EstValType, dval::Option{<:Number} = nothing,
-                             key::Option{<:AbstractString} = nothing)
+    ThresholdEstimator(;
+        val::EstValType,
+        dval::Option{<:Number} = nothing,
+        key::Option{<:AbstractString} = nothing
+    ) -> ThresholdEstimator
 
 ## Validation
 
@@ -92,9 +95,11 @@ Container for buy-in threshold portfolio constraints.
 
   - `val`: Scalar or vector of threshold values for portfolio weights.
 
-# Constructor
+# Constructors
 
-    Threshold(; val::Num_VecNum)
+    Threshold(;
+        val::Num_VecNum
+    ) -> Threshold
 
 ## Validation
 

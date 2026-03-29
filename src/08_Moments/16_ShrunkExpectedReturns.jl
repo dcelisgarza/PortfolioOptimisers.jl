@@ -90,9 +90,11 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
   - `tgt`: The shrinkage target type.
 
-# Constructor
+# Constructors
 
-    JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    JamesStein(;
+        tgt::AbstractShrunkExpectedReturnsTarget = GrandMean()
+    ) -> JamesStein
 
 Keywords correspond to the struct's fields.
 
@@ -131,9 +133,11 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
   - `tgt`: The shrinkage target type.
 
-# Constructor
+# Constructors
 
-    BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    BayesStein(;
+        tgt::AbstractShrunkExpectedReturnsTarget = GrandMean()
+    ) -> BayesStein
 
 Keywords correspond to the struct's fields.
 
@@ -172,9 +176,11 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
   - `tgt`: The shrinkage target type.
 
-# Constructor
+# Constructors
 
-    BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    BodnarOkhrinParolya(;
+        tgt::AbstractShrunkExpectedReturnsTarget = GrandMean()
+    ) -> BodnarOkhrinParolya
 
 Keywords correspond to the struct's fields.
 
@@ -215,11 +221,13 @@ Container type for shrinkage-based expected returns estimators.
   - `ce`: Covariance estimator.
   - `alg`: Shrinkage algorithm (e.g., James-Stein, Bayes-Stein).
 
-# Constructor
+# Constructors
 
-    ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                          alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+    ShrunkExpectedReturns(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein()
+    ) -> ShrunkExpectedReturns
 
 Keywords correspond to the struct's fields.
 

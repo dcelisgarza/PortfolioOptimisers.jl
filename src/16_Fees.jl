@@ -24,13 +24,20 @@ This estimator can be converted into a concrete [`Fees`](@ref) constraint using 
   - `dfs`: Default short fixed fees.
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
 
-# Constructor
+# Constructors
 
-    FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType} = nothing,
-                  s::Option{<:EstValType} = nothing, fl::Option{<:EstValType} = nothing,
-                  fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
-                  ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
-                  dfs::Option{<:Number} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+    FeesEstimator(;
+        tn::Option{<:TnE_Tn} = nothing,
+        l::Option{<:EstValType} = nothing,
+        s::Option{<:EstValType} = nothing,
+        fl::Option{<:EstValType} = nothing,
+        fs::Option{<:EstValType} = nothing,
+        dl::Option{<:Number} = nothing,
+        ds::Option{<:Number} = nothing,
+        dfl::Option{<:Number} = nothing,
+        dfs::Option{<:Number} = nothing,
+        kwargs::NamedTuple = (; atol = 1e-8)
+    ) -> FeesEstimator
 
 Keywords correspond to the struct's fields.
 
@@ -285,11 +292,16 @@ Where:
   - `fs`: Short fixed fees.
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
 
-# Constructor
+# Constructors
 
-    Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
-         s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
-         fs::Option{<:Num_VecNum} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+    Fees(;
+        tn::Option{<:Turnover} = nothing,
+        l::Option{<:Num_VecNum} = nothing,
+        s::Option{<:Num_VecNum} = nothing,
+        fl::Option{<:Num_VecNum} = nothing,
+        fs::Option{<:Num_VecNum} = nothing,
+        kwargs::NamedTuple = (; atol = 1e-8)
+    ) -> Fees
 
 ## Validation
 

@@ -473,18 +473,22 @@ Container type for low order prior results in `PortfolioOptimisers.jl`.
   - `f_sigma`: Factor covariance matrix.
   - `f_w`: Factor weights.
 
-# Constructor
+# Constructors
 
-    LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
-                  chol::Option{<:MatNum} = nothing,
-                  w::Option{<:StatsBase.AbstractWeights} = nothing,
-                  ens::Option{<:Number} = nothing,
-                  kld::Option{<:Num_VecNum} = nothing,
-                  ow::Option{<:VecNum} = nothing,
-                  rr::Option{<:Regression} = nothing,
-                  f_mu::Option{<:VecNum} = nothing,
-                  f_sigma::Option{<:MatNum} = nothing,
-                  f_w::Option{<:VecNum} = nothing)
+    LowOrderPrior(;
+        X::MatNum,
+        mu::VecNum,
+        sigma::MatNum,
+        chol::Option{<:MatNum} = nothing,
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        ens::Option{<:Number} = nothing,
+        kld::Option{<:Num_VecNum} = nothing,
+        ow::Option{<:VecNum} = nothing,
+        rr::Option{<:Regression} = nothing,
+        f_mu::Option{<:VecNum} = nothing,
+        f_sigma::Option{<:MatNum} = nothing,
+        f_w::Option{<:VecNum} = nothing
+    ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
 
@@ -620,14 +624,17 @@ Container type for high order prior results in `PortfolioOptimisers.jl`.
   - `V`: Negative quadratic skewness matrix.
   - `skmp`: Matrix processing estimator for post-processing quadratic skewness.
 
-# Constructor
+# Constructors
 
-    HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
-                   L2::Option{<:MatNum} = nothing,
-                   S2::Option{<:MatNum} = nothing,
-                   sk::Option{<:MatNum} = nothing,
-                   V::Option{<:MatNum} = nothing,
-                   skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing())
+    HighOrderPrior(;
+        pr::AbstractPriorResult,
+        kt::Option{<:MatNum} = nothing,
+        L2::Option{<:MatNum} = nothing,
+        S2::Option{<:MatNum} = nothing,
+        sk::Option{<:MatNum} = nothing,
+        V::Option{<:MatNum} = nothing,
+        skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing()
+    ) -> HighOrderPrior
 
 Keywords correspond to the struct's fields.
 

@@ -20,10 +20,12 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
   - `power`: Optional integer power to which the base correlation or distance matrix is raised.
   - `alg`: The base distance algorithm.
 
-# Constructor
+# Constructors
 
-    Distance(; power::Option{<:Integer} = nothing,
-             alg::AbstractDistanceAlgorithm = SimpleDistance())
+    Distance(;
+        power::Option{<:Integer} = nothing,
+        alg::AbstractDistanceAlgorithm = SimpleDistance()
+    ) -> Distance
 
 Keywords correspond to the struct's fields.
 

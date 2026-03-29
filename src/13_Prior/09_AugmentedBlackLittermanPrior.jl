@@ -22,21 +22,24 @@ Augmented Black-Litterman prior estimator for asset returns.
   - `l`: Optional leverage parameter.
   - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
 
-# Constructor
+# Constructors
 
-    AugmentedBlackLittermanPrior(; a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                 f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                 mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                                 re::AbstractRegressionEstimator = StepwiseRegression(),
-                                 a_views::Lc_BLV,
-                                 f_views::Lc_BLV,
-                                 a_sets::Option{<:AssetSets} = nothing,
-                                 f_sets::Option{<:AssetSets} = nothing,
-                                 a_views_conf::Option{<:Num_VecNum} = nothing,
-                                 f_views_conf::Option{<:Num_VecNum} = nothing,
-                                 w::Option{<:VecNum} = nothing, rf::Number = 0.0,
-                                 l::Option{<:Number} = nothing,
-                                 tau::Option{<:Number} = nothing)
+    AugmentedBlackLittermanPrior(;
+        a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        re::AbstractRegressionEstimator = StepwiseRegression(),
+        a_views::Lc_BLV,
+        f_views::Lc_BLV,
+        a_sets::Option{<:AssetSets} = nothing,
+        f_sets::Option{<:AssetSets} = nothing,
+        a_views_conf::Option{<:Num_VecNum} = nothing,
+        f_views_conf::Option{<:Num_VecNum} = nothing,
+        w::Option{<:VecNum} = nothing,
+        rf::Number = 0.0,
+        l::Option{<:Number} = nothing,
+        tau::Option{<:Number} = nothing
+    ) -> AugmentedBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
 

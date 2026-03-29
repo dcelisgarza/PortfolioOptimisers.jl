@@ -11,11 +11,13 @@ Covariance estimator based on mutual information.
   - `bins`: Binning algorithm or fixed number of bins for histogram-based MI estimation.
   - `normalise`: Whether to normalise the MI matrix.
 
-# Constructor
+# Constructors
 
-    MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                         bins::Int_Bin = HacineGharbiRavier(),
-                         normalise::Bool = true)
+    MutualInfoCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        bins::Int_Bin = HacineGharbiRavier(),
+        normalise::Bool = true
+    ) -> MutualInfoCovariance
 
 Keywords correspond to the struct's fields.
 

@@ -242,14 +242,20 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
   - `alg`: Smyth-Broby covariance algorithm variant.
   - `ex`: Parallel execution strategy.
 
-# Constructor
+# Constructors
 
-    SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                         pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
-                         c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4, n::Number = 2,
-                         alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                         ex::FLoops.Transducers.Executor = ThreadedEx())
+    SmythBrobyCovariance(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+        pdm::Option{<:Posdef} = Posdef(),
+        t::Number = 0.5,
+        c1::Number = 0.5,
+        c2::Number = 0.5,
+        c3::Number = 4,
+        n::Number = 2,
+        alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
+        ex::FLoops.Transducers.Executor = ThreadedEx()
+    ) -> SmythBrobyCovariance
 
 Keywords correspond to the struct's fields.
 

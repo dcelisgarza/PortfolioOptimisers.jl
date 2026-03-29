@@ -109,15 +109,21 @@ Defines the number of points on the efficient frontier (Pareto Front).
   - `factor`: Scaling factor, used to normalise moment-based risk measures.
   - `flag`: Boolean flag indicating whether to use the risk measure value as-is (`true`) or apply a square root (`false`).
 
-# Constructor
+# Constructors
 
 Creates a `Frontier` with the specified number of points, scaling factor, and flag.
 
-    Frontier(; N::Integer = 20)
+    Frontier(;
+        N::Integer = 20,
+    ) -> Frontier
 
 Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`]-(@ref) and [`second_moment_bound_val`]-(@ref).
 
-    PortfolioOptimisers._Frontier(; N::Integer = 20, factor::Number, flag::Bool)
+    PortfolioOptimisers._Frontier(;
+        N::Integer = 20,
+        factor::Number = 1.0,
+        flag::Bool = true
+    ) -> Frontier
 
 Keywords correspond to the struct's fields.
 
@@ -230,7 +236,9 @@ Used for `HierarchicalRiskMeasure`, where it is impossible to set a risk upper b
 
 # Constructors
 
-    HierarchicalRiskMeasureSettings()
+    HierarchicalRiskMeasureSettings(;
+        scale::Number,
+    ) -> HierarchicalRiskMeasureSettings
 
 Creates a `HierarchicalRiskMeasureSettings` instance with the specified scaling factor.
 

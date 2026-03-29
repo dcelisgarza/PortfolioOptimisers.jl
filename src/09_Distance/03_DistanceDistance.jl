@@ -21,11 +21,15 @@ where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}
   - `power`: The integer power to which the base correlation or distance matrix is raised.
   - `alg`: The base distance algorithm to use.
 
-# Constructor
+# Constructors
 
-    DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                     kwargs::NamedTuple = (;), power::Option{<:Integer} = 1,
-                     alg::AbstractDistanceAlgorithm = SimpleDistance())
+    DistanceDistance(;
+        dist::Distances.Metric = Distances.Euclidean(),
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        power::Option{<:Integer} = 1,
+        alg::AbstractDistanceAlgorithm = SimpleDistance()
+    ) -> DistanceDistance
 
 Keywords correspond to the struct's fields.
 

@@ -82,10 +82,14 @@ Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
   - `D`: Distance matrix used for clustering.
   - `k`: Number of clusters.
 
-# Constructor
+# Constructors
 
-    Clusters(; res::Clustering.Hclust, S::MatNum,
-                           D::MatNum, k::Integer)
+    Clusters(;
+        res::ClTypes,
+        S::MatNum,
+        D::MatNum,
+        k::Integer
+    ) -> Clusters
 
 Keywords correspond to the struct's fields.
 
@@ -152,9 +156,11 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
 
   - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
 
-# Constructor
+# Constructors
 
-    SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
+    SecondOrderDifference(;
+        alg::VectorToScalarMeasure = StandardisedValue()
+    ) -> SecondOrderDifference
 
 Keywords correspond to the struct's fields.
 
@@ -201,10 +207,12 @@ Algorithm type for estimating the optimal number of clusters using the standardi
   - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
   - `metric`: The distance metric used for silhouette calculation from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), or `nothing` for the default.
 
-# Constructor
+# Constructors
 
-    SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
-                     metric::Option{<:Distances.SemiMetric} = nothing)
+    SilhouetteScore(;
+        alg::VectorToScalarMeasure = StandardisedValue(),
+        metric::Option{<:Distances.SemiMetric} = nothing
+    ) -> SilhouetteScore
 
 Keywords correspond to the struct's fields.
 
@@ -256,10 +264,12 @@ Estimator type for selecting the optimal number of clusters in `PortfolioOptimis
   - `max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `sqrt(N)`, where `N` is the number of assets.
   - `alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.
 
-# Constructor
+# Constructors
 
-    OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                          alg::Int_ONC = SecondOrderDifference())
+    OptimalNumberClusters(;
+        max_k::Option{<:Integer} = nothing,
+        alg::Int_ONC = SecondOrderDifference()
+    ) -> OptimalNumberClusters
 
 Keywords correspond to the struct's fields.
 
@@ -319,9 +329,11 @@ Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
   - `linkage`: Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html).
 
-# Constructor
+# Constructors
 
-    HClustAlgorithm(; linkage::Symbol = :ward)
+    HClustAlgorithm(;
+        linkage::Symbol = :ward
+    ) -> HClustAlgorithm
 
 Keywords correspond to the struct's fields.
 
@@ -361,12 +373,14 @@ Estimator type for clustering in `PortfolioOptimisers.jl`.
   - `alg`: Clustering algorithm.
   - `onc`: Optimal number of clusters estimator.
 
-# Constructor
+# Constructors
 
-    ClustersEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                        alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-                        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+    ClustersEstimator(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::AbstractClustersAlgorithm = HClustAlgorithm(),
+        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters()
+    ) -> ClustersEstimator
 
 Keywords correspond to the struct's fields.
 

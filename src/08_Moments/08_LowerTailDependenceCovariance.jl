@@ -11,10 +11,13 @@ Lower tail dependence covariance estimator.
   - `alpha`: Quantile level for the 5% lower tail.
   - `ex`: Parallel execution strategy.
 
-# Constructor
+# Constructors
 
-    LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Number = 0.05,
-                  ex::FLoops.Transducers.Executor = ThreadedEx())
+    LowerTailDependenceCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        alpha::Number = 0.05,
+        ex::FLoops.Transducers.Executor = ThreadedEx()
+    ) -> LowerTailDependenceCovariance
 
 Keywords correspond to the struct's fields.
 

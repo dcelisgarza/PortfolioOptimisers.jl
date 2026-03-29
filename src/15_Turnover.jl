@@ -39,9 +39,14 @@ This estimator can be converted into a concrete [`Turnover`](@ref) constraint us
   - `dval`: Default turnover value for assets not specified in `val`.
   - `fixed`: Boolean indicating whether the estimator is fixed (does not update with new weights) or variable (updates with new weights).
 
-# Constructor
+# Constructors
 
-    TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing, fixed::Bool = false)
+    TurnoverEstimator(;
+        w::VecNum,
+        val::EstValType,
+        dval::Option{<:Number} = nothing,
+        fixed::Bool = false
+    ) -> TurnoverEstimator
 
 ## Validation
 
@@ -295,9 +300,13 @@ Where:
 
   - `fixed`: Boolean indicating whether the turnover constraint is fixed (does not update with new weights) or variable (updates with new weights).
 
-# Constructor
+# Constructors
 
-    Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)
+    Turnover(;
+        w::VecNum,
+        val::Num_VecNum = 0.0,
+        fixed::Bool = false
+    ) -> Turnover
 
 Keywords correspond to the struct's fields.
 

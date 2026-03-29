@@ -66,12 +66,17 @@ It supports both asset and factor returns, as well as optional time series and i
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
-                  nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
-                  ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
-                  ivpa::Option{<:Num_VecNum} = nothing)
+    ReturnsResult(;
+        nx::Option{<:VecStr} = nothing,
+        X::Option{<:MatNum} = nothing,
+        nf::Option{<:VecStr} = nothing,
+        F::Option{<:MatNum} = nothing,
+        ts::Option{<:VecDate} = nothing,
+        iv::Option{<:MatNum} = nothing,
+        ivpa::Option{<:Num_VecNum} = nothing,
+    ) -> ReturnsResult
 
 Keywords correspond to the struct's fields.
 

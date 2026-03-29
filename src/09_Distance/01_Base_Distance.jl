@@ -129,10 +129,12 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
   - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
   - `normalise`: Whether to normalise the VI distance to the range [0, 1].
 
-# Constructor
+# Constructors
 
-    VariationInfoDistance(; bins::Int_Bin = HacineGharbiRavier(),
-                          normalise::Bool = true)
+    VariationInfoDistance(;
+        bins::Int_Bin = HacineGharbiRavier(),
+        normalise::Bool = true
+    ) -> VariationInfoDistance
 
 Keywords correspond to the struct's fields.
 

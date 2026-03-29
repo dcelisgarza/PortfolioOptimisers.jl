@@ -145,9 +145,11 @@ Where:
 
   - `alg`: Second-order cone risk expression to use.
 
-# Constructor
+# Constructors
 
-    MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+    MinimumSquaredDistance(;
+        alg::UnionAllSOCRiskExpr = SOCRiskExpr(),
+    ) -> MinimumSquaredDistance
 
 Keywords correspond to the struct's fields.
 
@@ -215,9 +217,11 @@ Where:
 
   - `alg`: Second-order cone risk expression to use.
 
-# Constructor
+# Constructors
 
-    MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+    MinimumSumSquares(;
+        alg::UnionAllSOCRiskExpr = SOCRiskExpr(),
+    ) -> MinimumSumSquares
 
 Keywords correspond to the struct's fields.
 
@@ -284,9 +288,11 @@ Where:
 
   - `g`: Risk aversion parameter.
 
-# Constructor
+# Constructors
 
-    NormalisedConstantRelativeRiskAversion(; g::Number = 0.5)
+    NormalisedConstantRelativeRiskAversion(;
+        g::Number = 0.5,
+    ) -> NormalisedConstantRelativeRiskAversion
 
 Keywords correspond to the struct's fields.
 
@@ -337,12 +343,17 @@ Estimator type for OWA weights using JuMP-based optimization.
   - `so`: Scaling parameter for the objective.
   - `alg`: Algorithm for OWA weight estimation.
 
-# Constructor
+# Constructors
 
-    OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
-            so::Number = 1.0, alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+    OWAJuMP(;
+        slv::Slv_VecSlv = Solver(),
+        max_phi::Number = 0.5,
+        sc::Number = 1.0,
+        so::Number = 1.0,
+        alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy(),
+    ) -> OWAJuMP
 
-Keywords correspond to the struct's fields.
+Keyword arguments correspond to the struct's fields.
 
 ## Validation
 

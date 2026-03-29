@@ -36,7 +36,7 @@ Randomised search cross-validation estimator for portfolio optimisation. Samples
         kwargs::NamedTuple = (;),
     ) -> RandomisedSearchCrossValidation
 
-Keywords correspond to the struct's fields.
+Keyword arguments correspond to the struct's fields.
 
 ## Validation
 

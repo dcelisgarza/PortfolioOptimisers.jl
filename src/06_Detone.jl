@@ -75,9 +75,12 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
+    Detone(;
+        n::Integer = 1,
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> Detone
 
 Keywords correspond to the struct's fields.
 

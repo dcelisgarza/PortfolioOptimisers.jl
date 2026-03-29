@@ -46,11 +46,12 @@ Estimator for generating semi-definite phylogeny-based constraints in `Portfolio
   - `pl`: Phylogeny or clustering estimator.
   - `p`: Non-negative penalty parameter for the constraint.
 
-# Constructor
+# Constructors
 
     SemiDefinitePhylogenyEstimator(;
-                                   pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                   p::Number = 0.05)
+        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        p::Number = 0.05
+    ) -> SemiDefinitePhylogenyEstimator
 
 ## Validation
 
@@ -122,10 +123,12 @@ Container for the result of semi-definite phylogeny-based constraint generation.
   - `A`: Phylogeny matrix encoding a relationship graph.
   - `p`: Non-negative penalty parameter controlling the strength of the constraint.
 
-# Constructor
+# Constructors
 
     SemiDefinitePhylogeny(;
-                          A::MatNum_PhRMatNum, p::Number = 0.05)
+        A::MatNum_PhRMatNum,
+        p::Number = 0.05
+    ) -> SemiDefinitePhylogeny
 
 ## Validation
 
@@ -262,12 +265,13 @@ Estimator for generating integer phylogeny-based constraints in `PortfolioOptimi
   - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
   - `scale`: Non-negative big-M parameter for the MIP formulation.
 
-# Constructor
+# Constructors
 
     IntegerPhylogenyEstimator(;
-                              pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                              B::Int_VecInt = 1,
-                              scale::Number = 100_000.0)
+        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        B::Int_VecInt = 1,
+        scale::Number = 100_000.0
+    ) -> IntegerPhylogenyEstimator
 
 ## Validation
 
@@ -346,12 +350,13 @@ Container for the result of integer phylogeny-based constraint generation.
   - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
   - `scale`: Non-negative scaling parameter (big-M) for the constraint.
 
-# Constructor
+# Constructors
 
     IntegerPhylogeny(;
-                     A::MatNum_PhRMatNum,
-                     B::Int_VecInt = 1,
-                     scale::Number = 100_000.0)
+        A::MatNum_PhRMatNum,
+        B::Int_VecInt = 1,
+        scale::Number = 100_000.0
+    ) -> IntegerPhylogeny
 
 ## Validation
 
@@ -465,11 +470,13 @@ Estimator for generating centrality-based portfolio constraints.
   - `B`: Number value or reduction measure.
   - `comp`: Comparison operator.
 
-# Constructor
+# Constructors
 
-    CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                         B::Num_VecToScaM = MinValue(),
-                         comp::ComparisonOperator = <=)
+    CentralityConstraint(;
+        A::CentralityEstimator = CentralityEstimator(),
+        B::Num_VecToScaM = MinValue(),
+        comp::ComparisonOperator = <=
+    ) -> CentralityConstraint
 
 # Examples
 

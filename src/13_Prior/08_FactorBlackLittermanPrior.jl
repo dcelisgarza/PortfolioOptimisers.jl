@@ -21,19 +21,23 @@ Factor Black-Litterman prior estimator for asset returns.
   - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
   - `rsd`: Boolean flag to include residual variance in posterior covariance.
 
-# Constructor
+# Constructors
 
-    FactorBlackLittermanPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                              f_mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                              mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                              re::AbstractRegressionEstimator = StepwiseRegression(),
-                              ve::AbstractVarianceEstimator = SimpleVariance(),
-                              views::Lc_BLV,
-                              sets::Option{<:AssetSets} = nothing,
-                              views_conf::Option{<:Num_VecNum} = nothing,
-                              w::Option{<:StatsBase.AbstractWeights} = nothing, rf::Number = 0.0,
-                              l::Option{<:Number} = nothing,
-                              tau::Option{<:Number} = nothing, rsd::Bool = true)
+    FactorBlackLittermanPrior(;
+        pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        f_mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        re::AbstractRegressionEstimator = StepwiseRegression(),
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        views::Lc_BLV,
+        sets::Option{<:AssetSets} = nothing,
+        views_conf::Option{<:Num_VecNum} = nothing,
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        rf::Number = 0.0,
+        l::Option{<:Number} = nothing,
+        tau::Option{<:Number} = nothing,
+        rsd::Bool = true
+    ) -> FactorBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
 

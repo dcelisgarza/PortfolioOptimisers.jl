@@ -9,10 +9,13 @@ Estimator for box uncertainty sets using delta bounds on mean and covariance sta
   - `dmu`: Delta bound for expected returns (mean).
   - `dsigma`: Delta bound for covariance.
 
-# Constructor
+# Constructors
 
-    DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
-                        dsigma::Number = 0.1)
+    DeltaUncertaintySet(;
+        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        dmu::Number = 0.1,
+        dsigma::Number = 0.1
+    ) -> DeltaUncertaintySet
 
 Keywords correspond to the struct's fields.
 

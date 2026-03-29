@@ -115,9 +115,11 @@ Second-order cone (SOC) norm-based tracking formulation.
 
   - `ddof`: Degrees of freedom adjustment.
 
-# Constructor
+# Constructors
 
-    L2Tracking(; ddof::Integer = 1)
+    L2Tracking(;
+        ddof::Integer = 1
+    ) -> L2Tracking
 
 ## Validation
 
@@ -383,9 +385,13 @@ Asset weights-based tracking algorithm.
   - `w`: Portfolio weights (vector of real numbers).
   - `fixed`: Boolean indicating whether the algorithm is fixed (does not update with new weights) or variable (updates with new weights).
 
-# Constructor
+# Constructors
 
-    WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
+    WeightsTracking(;
+        fees::Option{<:Fees} = nothing,
+        w::VecNum,
+        fixed::Bool = false
+    ) -> WeightsTracking
 
 ## Validation
 
@@ -619,9 +625,11 @@ Returns-based tracking algorithm.
 
   - `w`: Benchmark portfolio returns (vector of real numbers).
 
-# Constructor
+# Constructors
 
-    ReturnsTracking(; w::VecNum)
+    ReturnsTracking(;
+        w::VecNum
+    ) -> ReturnsTracking
 
 ## Validation
 
@@ -760,10 +768,13 @@ Tracking error result type.
   - `err`: Tracking error value.
   - `alg`: Tracking formulation algorithm.
 
-# Constructor
+# Constructors
 
-    TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
-                  alg::NormTracking = L2Tracking())
+    TrackingError(;
+        tr::AbstractTrackingAlgorithm,
+        err::Number = 0.0,
+        alg::NormTracking = L2Tracking()
+    ) -> TrackingError
 
 ## Validation
 

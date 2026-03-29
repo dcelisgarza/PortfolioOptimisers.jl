@@ -13,11 +13,15 @@ A flexible container type for configuring and applying distance-based covariance
   - `w`: Optional weights for observations.
   - `ex`: Parallel execution strategy.
 
-# Constructor
+# Constructors
 
-    DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                       kwargs::NamedTuple = (;), w::Option{<:StatsBase.AbstractWeights} = nothing,
-                       ex::FLoops.Transducers.Executor = ThreadedEx())
+    DistanceCovariance(;
+        dist::Distances.Metric = Distances.Euclidean(),
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        ex::FLoops.Transducers.Executor = ThreadedEx()
+    ) -> DistanceCovariance
 
 Keywords correspond to the struct's fields.
 

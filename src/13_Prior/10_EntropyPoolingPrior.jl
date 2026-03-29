@@ -167,9 +167,12 @@ Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
   - `args`: Tuple of arguments passed to the root-finding algorithm (e.g., `Roots.Brent()`).
   - `kwargs`: Named tuple of keyword arguments for the root-finding algorithm.
 
-# Constructor
+# Constructors
 
-    CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
+    CVaREntropyPooling(;
+        args::Tuple = (Roots.Brent(),),
+        kwargs::NamedTuple = (;)
+    ) -> CVaREntropyPooling
 
 Keywords correspond to the struct's fields.
 
@@ -215,11 +218,15 @@ $(DocStringExtensions.TYPEDEF)
   - `sc2`: Slack parameter for relaxing fixed equality constraint penalties so that they can be satisfied more easily.
   - `alg`: Entropy pooling optimisation algorithm.
 
-# Constructor
+# Constructors
 
-    OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
-                        sc2::Number = 1e3,
-                        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+    OptimEntropyPooling(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        sc1::Number = 1,
+        sc2::Number = 1e3,
+        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling()
+    ) -> OptimEntropyPooling
 
 Keywords correspond to the struct's fields.
 
@@ -286,11 +293,15 @@ $(DocStringExtensions.TYPEDEF)
   - `so`: Scaling parameter for the objective expression.
   - `alg`: Entropy pooling optimisation algorithm.
 
-# Constructor
+# Constructors
 
-    JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1,
-                       sc2::Number = 1e5, so::Number = 1,
-                       alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+    JuMPEntropyPooling(;
+        slv::Slv_VecSlv,
+        sc1::Number = 1,
+        sc2::Number = 1e5,
+        so::Number = 1,
+        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling()
+    ) -> JuMPEntropyPooling
 
 Keywords correspond to the struct's fields.
 
@@ -379,23 +390,26 @@ Entropy pooling prior estimator for asset returns.
   - `w`: Prior weights.
   - `alg`: Entropy pooling algorithm.
 
-# Constructor
+# Constructors
 
-    EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                        mu_views::Option{<:LinearConstraintEstimator} = nothing,
-                        var_views::Option{<:LinearConstraintEstimator} = nothing,
-                        cvar_views::Option{<:LinearConstraintEstimator} = nothing,
-                        sigma_views::Option{<:LinearConstraintEstimator} = nothing,
-                        sk_views::Option{<:LinearConstraintEstimator} = nothing,
-                        kt_views::Option{<:LinearConstraintEstimator} = nothing,
-                        rho_views::Option{<:LinearConstraintEstimator} = nothing,
-                        var_alpha::Number = 0.05, cvar_alpha::Number = 0.05,
-                        sets::Option{<:AssetSets} = nothing,
-                        ds_opt::Option{<:CVaREntropyPooling} = nothing,
-                        dm_opt::Option{<:OptimEntropyPooling} = nothing,
-                        opt::NonCVaREP = OptimEntropyPooling(),
-                        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
-                        alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
+    EntropyPoolingPrior(;
+        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        mu_views::Option{<:LinearConstraintEstimator} = nothing,
+        var_views::Option{<:LinearConstraintEstimator} = nothing,
+        cvar_views::Option{<:LinearConstraintEstimator} = nothing,
+        sigma_views::Option{<:LinearConstraintEstimator} = nothing,
+        sk_views::Option{<:LinearConstraintEstimator} = nothing,
+        kt_views::Option{<:LinearConstraintEstimator} = nothing,
+        rho_views::Option{<:LinearConstraintEstimator} = nothing,
+        var_alpha::Number = 0.05,
+        cvar_alpha::Number = 0.05,
+        sets::Option{<:AssetSets} = nothing,
+        ds_opt::Option{<:CVaREntropyPooling} = nothing,
+        dm_opt::Option{<:OptimEntropyPooling} = nothing,
+        opt::NonCVaREP = OptimEntropyPooling(),
+        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
+        alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling()
+    ) -> EntropyPoolingPrior
 
 Keywords correspond to the struct's fields.
 

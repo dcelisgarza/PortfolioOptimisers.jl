@@ -9,11 +9,13 @@ A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional e
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
     SimpleVariance(;
-                   me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                   w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+        me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        corrected::Bool = true
+    ) -> SimpleVariance
 
 Keywords correspond to the struct's fields.
 

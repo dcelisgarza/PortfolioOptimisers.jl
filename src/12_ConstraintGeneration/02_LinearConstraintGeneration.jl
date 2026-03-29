@@ -10,9 +10,12 @@ Container for a set of linear constraints (either equality or inequality) in the
   - `A`: Coefficient matrix of the linear constraints.
   - `B`: Right-hand side vector of the linear constraints.
 
-# Constructor
+# Constructors
 
-    PartialLinearConstraint(; A::MatNum, B::VecNum)
+    PartialLinearConstraint(;
+        A::MatNum,
+        B::VecNum
+    ) -> PartialLinearConstraint
 
 Keywords correspond to the struct's fields.
 
@@ -59,10 +62,12 @@ Container for a set of linear constraints, separating inequality and equality co
   - `ineq`: Inequality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
   - `eq`: Equality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
 
-# Constructor
+# Constructors
 
-    LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
-                     eq::Option{<:PartialLinearConstraint} = nothing)
+    LinearConstraint(;
+        ineq::Option{<:PartialLinearConstraint} = nothing,
+        eq::Option{<:PartialLinearConstraint} = nothing
+    ) -> LinearConstraint
 
 Keywords correspond to the struct's fields.
 
@@ -188,10 +193,13 @@ If a key in `dict` starts with the same value as `key`, it means that the corres
   - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`]-(@ref) optimisations.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
-# Constructor
+# Constructors
 
-    AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
-              dict::AbstractDict{<:AbstractString, <:Any})
+    AssetSets(;
+        key::AbstractString = "nx",
+        ukey::AbstractString = "ux",
+        dict::AbstractDict{<:AbstractString, <:Any}
+    ) -> AssetSets
 
 Keywords correspond to the struct's fields.
 
@@ -1198,9 +1206,12 @@ Container for one or more linear constraint equations to be parsed and converted
   - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
   - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
 
-# Constructor
+# Constructors
 
-    LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
+    LinearConstraintEstimator(;
+        val::EqnType,
+        key::Option{<:AbstractString} = nothing
+    ) -> LinearConstraintEstimator
 
 Keywords correspond to the struct's fields.
 

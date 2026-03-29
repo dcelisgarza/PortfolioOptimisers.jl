@@ -10,10 +10,12 @@ Container type for excess expected returns estimators.
   - `me`: Mean estimator for expected returns.
   - `rf`: Risk-free rate to subtract from expected returns.
 
-# Constructor
+# Constructors
 
-    ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          rf::Number = 0.0)
+    ExcessExpectedReturns(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        rf::Number = 0.0
+    ) -> ExcessExpectedReturns
 
 Keywords correspond to the struct's fields.
 

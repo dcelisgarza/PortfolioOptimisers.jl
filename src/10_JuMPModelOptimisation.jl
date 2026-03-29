@@ -55,11 +55,15 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
   - `check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
   - `add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
 
-# Constructor
+# Constructors
 
-    Solver(; name::Sym_Str = "", solver::Any = nothing,
-           settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
-           add_bridges::Bool = true)
+    Solver(;
+        name::Sym_Str = "",
+        solver::Any = nothing,
+        settings::Option{<:SlvSettings} = nothing,
+        check_sol::NamedTuple = (;),
+        add_bridges::Bool = true
+    ) -> Solver
 
 Keywords correspond to the struct's fields.
 
@@ -147,9 +151,12 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
   - `trials`: Dictionary of solver trials and errors.
   - `success`: Boolean indicating whether optimisation succeeded.
 
-# Constructor
+# Constructors
 
-    JuMPResult(; trials::AbstractDict, success::Bool)
+    JuMPResult(;
+        trials::AbstractDict,
+        success::Bool
+    ) -> JuMPResult
 
 Keywords correspond to the struct's fields.
 

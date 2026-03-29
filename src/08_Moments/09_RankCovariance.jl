@@ -23,9 +23,11 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
   - `ve`: Variance estimator used to compute marginal standard deviations.
 
-# Constructor
+# Constructors
 
-    KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+    KendallCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance()
+    ) -> KendallCovariance
 
 Keywords correspond to the struct's fields.
 
@@ -139,9 +141,11 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
   - `ve`: Variance estimator used to compute marginal standard deviations.
 
-# Constructor
+# Constructors
 
-    SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+    SpearmanCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance()
+    ) -> SpearmanCovariance
 
 Keywords correspond to the struct's fields.
 

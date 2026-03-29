@@ -11,11 +11,13 @@ Empirical prior estimator for asset returns.
   - `me`: Expected returns estimator.
   - `horizon`: Optional investment horizon.
 
-# Constructor
+# Constructors
 
-    EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                   me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                   horizon::Option{<:Number} = nothing)
+    EmpiricalPrior(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        horizon::Option{<:Number} = nothing
+    ) -> EmpiricalPrior
 
 Keywords correspond to the struct's fields.
 

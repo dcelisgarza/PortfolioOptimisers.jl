@@ -9,9 +9,11 @@ Stepwise regression criterion based on p-value thresholding.
 
   - `t`: The p-value threshold for variable inclusion.
 
-# Constructor
+# Constructors
 
-    PValue(; t::Number = 0.05)
+    PValue(;
+        t::Number = 0.05
+    ) -> PValue
 
 Keywords correspond to the struct's fields.
 
@@ -83,11 +85,13 @@ Estimator for stepwise regression-based moment estimation.
   - `alg`: Stepwise algorithm.
   - `tgt`: Regression target type.
 
-# Constructor
+# Constructors
 
-    StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
-                       alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                       tgt::AbstractRegressionTarget = LinearModel())
+    StepwiseRegression(;
+        crit::AbstractStepwiseRegressionCriterion = PValue(),
+        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+        tgt::AbstractRegressionTarget = LinearModel()
+    ) -> StepwiseRegression
 
 Keywords correspond to the struct's fields.
 

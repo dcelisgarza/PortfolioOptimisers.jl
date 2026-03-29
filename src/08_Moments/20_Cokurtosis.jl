@@ -24,11 +24,13 @@ Container type for cokurtosis estimators.
   - `mp`: Matrix processing estimator for cokurtosis tensors.
   - `alg`: Moment algorithm.
 
-# Constructor
+# Constructors
 
-    Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-               alg::AbstractMomentAlgorithm = Full())
+    Cokurtosis(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        alg::AbstractMomentAlgorithm = Full()
+    ) -> Cokurtosis
 
 Keywords correspond to the struct's fields.
 

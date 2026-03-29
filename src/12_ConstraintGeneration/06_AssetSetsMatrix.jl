@@ -9,9 +9,11 @@ Estimator for constructing asset set membership matrices from asset groupings.
 
   - `val`: The key or group name to extract from the asset sets.
 
-# Constructor
+# Constructors
 
-    AssetSetsMatrixEstimator(; val::AbstractString)
+    AssetSetsMatrixEstimator(;
+        val::AbstractString
+    ) -> AssetSetsMatrixEstimator
 
 Keywords correspond to the struct's fields.
 

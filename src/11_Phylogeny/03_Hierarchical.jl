@@ -13,13 +13,17 @@ Node type for representing clusters in a hierarchical clustering tree.
   - `height`: Height of the node in the tree.
   - `level`: Level of the node in the tree.
 
-# Constructor
+# Constructors
 
-    ClusterNode(id, left::Option{<:ClusterNode} = nothing,
-                right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
-                level::Int = 1)
+    ClusterNode(
+        id,
+        left::Option{<:ClusterNode} = nothing,
+        right::Option{<:ClusterNode} = nothing,
+        height::Number = 0.0,
+        level::Int = 1
+    ) -> ClusterNode
 
-Positional and Keywords correspond to the struct's fields. The `level` is automatically computed based on the levels of child nodes if they exist.
+Arguments correspond to the struct's fields. The `level` is automatically computed based on the levels of child nodes if they exist.
 
 # Examples
 

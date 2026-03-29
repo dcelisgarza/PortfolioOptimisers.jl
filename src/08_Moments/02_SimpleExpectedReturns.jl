@@ -9,10 +9,12 @@ A simple expected returns estimator for `PortfolioOptimisers.jl`, representing t
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                           idx::Option{<:VecInt} = nothing)
+    SimpleExpectedReturns(;
+        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        idx::Option{<:VecInt} = nothing
+    ) -> SimpleExpectedReturns
 
 Keywords correspond to the struct's fields.
 

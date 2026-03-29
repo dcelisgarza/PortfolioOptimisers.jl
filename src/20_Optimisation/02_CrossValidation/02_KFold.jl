@@ -17,7 +17,7 @@ Implements non-sequential k-fold cross-validation with optional purging and emba
         embargo_size::Integer = 0,
     ) -> KFold
 
-Keywords correspond to the struct's fields.
+Keyword arguments correspond to the struct's fields.
 
 ## Validation
 

@@ -29,9 +29,11 @@ Principal Component Analysis (PCA) dimension reduction target.
 
   - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
 
-# Constructor
+# Constructors
 
-    PCA(; kwargs::NamedTuple = ())
+    PCA(;
+        kwargs::NamedTuple = (;)
+    ) -> PCA
 
 Keywords correspond to the struct's fields.
 
@@ -94,9 +96,11 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
   - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
 
-# Constructor
+# Constructors
 
-    PPCA(; kwargs::NamedTuple = ())
+    PPCA(;
+        kwargs::NamedTuple = (),
+    ) -> PPCA
 
 Keywords correspond to the struct's fields.
 
@@ -162,13 +166,14 @@ Estimator for dimension reduction regression-based moment estimation.
   - `drtgt`: Dimension reduction target.
   - `retgt`: Regression target type.
 
-# Constructor
+# Constructors
 
     DimensionReductionRegression(;
-                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                 ve::AbstractVarianceEstimator = SimpleVariance(),
-                                 drtgt::DimensionReductionTarget = PCA(),
-                                 retgt::AbstractRegressionTarget = LinearModel())
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        drtgt::DimensionReductionTarget = PCA(),
+        retgt::AbstractRegressionTarget = LinearModel()
+    ) -> DimensionReductionRegression
 
 Keywords correspond to the struct's fields.
 

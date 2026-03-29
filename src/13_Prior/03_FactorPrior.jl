@@ -13,12 +13,15 @@ Factor-based prior estimator for asset returns.
   - `ve`: Variance estimator for residuals.
   - `rsd`: Boolean flag to add residual variance to posterior covariance.
 
-# Constructor
+# Constructors
 
-    FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                re::AbstractRegressionEstimator = StepwiseRegression(),
-                ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
+    FactorPrior(;
+        pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        re::AbstractRegressionEstimator = StepwiseRegression(),
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        rsd::Bool = true
+    ) -> FactorPrior
 
 Keywords correspond to the struct's fields.
 

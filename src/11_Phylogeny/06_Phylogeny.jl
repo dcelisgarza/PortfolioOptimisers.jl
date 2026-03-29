@@ -9,9 +9,11 @@ Container type for phylogeny matrix or vector results in `PortfolioOptimisers.jl
 
   - `X`: The phylogeny matrix or centrality vector.
 
-# Constructor
+# Constructors
 
-    PhylogenyResult(; X::ArrNum)
+    PhylogenyResult(;
+        X::ArrNum
+    ) -> PhylogenyResult
 
 Keywords correspond to the struct's fields.
 
@@ -163,9 +165,12 @@ Centrality algorithm type for betweenness centrality in `PortfolioOptimisers.jl`
   - `args`: Positional arguments for the centrality computation.
   - `kwargs`: Keyword arguments for the centrality computation.
 
-# Constructor
+# Constructors
 
-    BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+    BetweennessCentrality(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> BetweennessCentrality
 
 Keywords correspond to the struct's fields.
 
@@ -205,9 +210,12 @@ Centrality algorithm type for closeness centrality in `PortfolioOptimisers.jl`.
   - `args`: Positional arguments for the centrality computation.
   - `kwargs`: Keyword arguments for the centrality computation.
 
-# Constructor
+# Constructors
 
-    ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+    ClosenessCentrality(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> ClosenessCentrality
 
 Keywords correspond to the struct's fields.
 
@@ -247,9 +255,12 @@ Centrality algorithm type for degree centrality in `PortfolioOptimisers.jl`.
   - `kind`: Degree type (0: total, 1: in-degree, 2: out-degree).
   - `kwargs`: Keyword arguments for the centrality computation.
 
-# Constructor
+# Constructors
 
-    DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
+    DegreeCentrality(;
+        kind::Integer = 0,
+        kwargs::NamedTuple = (;)
+    ) -> DegreeCentrality
 
 Keywords correspond to the struct's fields.
 
@@ -306,9 +317,11 @@ Centrality algorithm type for Katz centrality in `PortfolioOptimisers.jl`.
 
   - `alpha`: Attenuation factor for Katz centrality.
 
-# Constructor
+# Constructors
 
-    KatzCentrality(; alpha::Number = 0.3)
+    KatzCentrality(;
+        alpha::Number = 0.3
+    ) -> KatzCentrality
 
 Keywords correspond to the struct's fields.
 
@@ -347,9 +360,13 @@ Centrality algorithm type for PageRank in `PortfolioOptimisers.jl`.
   - `alpha`: Damping factor (must be in (0, 1)).
   - `epsilon`: Convergence tolerance (must be > 0).
 
-# Constructor
+# Constructors
 
-    Pagerank(; alpha::Number = 0.85, n::Integer = 100, epsilon::Number = 1e-6)
+    Pagerank(;
+        alpha::Number = 0.85,
+        n::Integer = 100,
+        epsilon::Number = 1e-6
+    ) -> Pagerank
 
 Keywords correspond to the struct's fields.
 
@@ -414,9 +431,12 @@ Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs
   - `args`: Positional arguments for the centrality computation.
   - `kwargs`: Keyword arguments for the centrality computation.
 
-# Constructor
+# Constructors
 
-    StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+    StressCentrality(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> StressCentrality
 
 Keywords correspond to the struct's fields.
 
@@ -533,9 +553,12 @@ Algorithm type for Kruskal's minimum spanning tree (MST) in `PortfolioOptimisers
   - `args`: Positional arguments for the MST computation.
   - `kwargs`: Keyword arguments for the MST computation.
 
-# Constructor
+# Constructors
 
-    KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+    KruskalTree(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> KruskalTree
 
 Keywords correspond to the struct's fields.
 
@@ -575,9 +598,12 @@ Algorithm type for Boruvka's minimum spanning tree (MST) in `PortfolioOptimisers
   - `args`: Positional arguments for the MST computation.
   - `kwargs`: Keyword arguments for the MST computation.
 
-# Constructor
+# Constructors
 
-    BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+    BoruvkaTree(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> BoruvkaTree
 
 Keywords correspond to the struct's fields.
 
@@ -617,9 +643,12 @@ Algorithm type for Prim's minimum spanning tree (MST) in `PortfolioOptimisers.jl
   - `args`: Positional arguments for the MST computation.
   - `kwargs`: Keyword arguments for the MST computation.
 
-# Constructor
+# Constructors
 
-    PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+    BoruvkaTree(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> BoruvkaTree
 
 Keywords correspond to the struct's fields.
 
@@ -714,12 +743,14 @@ Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
   - `alg`: Tree or similarity matrix algorithm.
   - `n`: NetworkEstimator depth parameter.
 
-# Constructor
+# Constructors
 
-    NetworkEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                     de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                     alg::Tree_SimMat = KruskalTree(),
-                     n::Integer = 1)
+    NetworkEstimator(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::Tree_SimMat = KruskalTree(),
+        n::Integer = 1
+    ) -> NetworkEstimator
 
 Keywords correspond to the struct's fields.
 
@@ -803,11 +834,12 @@ Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
   - `pl`: NetworkEstimator estimator.
   - `ct`: Centrality algorithm.
 
-# Constructor
+# Constructors
 
     CentralityEstimator(;
-                        pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
-                        ct::AbstractCentralityAlgorithm = DegreeCentrality())
+        pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
+        ct::AbstractCentralityAlgorithm = DegreeCentrality()
+    ) -> CentralityEstimator
 
 Keywords correspond to the struct's fields.
 

@@ -10,9 +10,12 @@ Container for Black-Litterman investor views in canonical matrix form.
   - `P`: Matrix of view coefficients, where each row represents a view and each column corresponds to an asset.
   - `Q`: Vector of expected returns or values for each view.
 
-# Constructor
+# Constructors
 
-    BlackLittermanViews(; P::MatNum, Q::VecNum)
+    BlackLittermanViews(;
+        P::MatNum,
+        Q::VecNum
+    ) -> BlackLittermanViews
 
 Keywords correspond to the struct's fields.
 

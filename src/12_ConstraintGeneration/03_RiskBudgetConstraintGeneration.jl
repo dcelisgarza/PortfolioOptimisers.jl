@@ -9,9 +9,11 @@ Container for the result of a risk budget constraint.
 
   - `val`: Vector of risk budget allocations (typically `VecNum`).
 
-# Constructor
+# Constructors
 
-    RiskBudget(; val::VecNum)
+    RiskBudget(;
+        val::VecNum
+    ) -> RiskBudget
 
 Keywords correspond to the struct's fields.
 
@@ -63,9 +65,11 @@ Container for a risk budget allocation mapping or vector.
 
   - `val`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
 
-# Constructor
+# Constructors
 
-    RiskBudgetEstimator(; val::EstValType)
+    RiskBudgetEstimator(;
+        val::EstValType
+    ) -> RiskBudgetEstimator
 
 Keywords correspond to the struct's fields.
 

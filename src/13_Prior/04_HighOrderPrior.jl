@@ -322,13 +322,17 @@ High order prior estimator for asset returns.
   - `kte`: Cokurtosis estimator (`CokurtosisEstimator` or `Nothing`).
   - `ske`: Coskewness estimator (`CoskewnessEstimator` or `Nothing`).
 
-# Constructor
+# Constructors
 
-    HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                            kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
-                                                                                    alg = Full()),
-                            ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                    alg = Full()))
+    HighOrderPriorEstimator(;
+        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
+            alg = Full()
+        ),
+        ske::Option{<:CoskewnessEstimator} = Coskewness(;
+            alg = Full()
+        )
+    ) -> HighOrderPriorEstimator
 
 Keywords correspond to the struct's fields.
 

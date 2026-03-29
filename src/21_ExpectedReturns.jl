@@ -245,9 +245,11 @@ Return-based risk measure.
 
   - `rt`: Return estimator.
 
-# Constructor
+# Constructors
 
-    ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())
+    ExpectedReturn(;
+        rt::JuMPReturnsEstimator = ArithmeticReturn()
+    ) -> ExpectedReturn
 
 # Examples
 
@@ -353,10 +355,13 @@ Ratio-based risk measure.
   - `rk`: Risk measure.
   - `rf`: Risk-free rate.
 
-# Constructor
+# Constructors
 
-    ExpectedReturnRiskRatio(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
-                     rk::AbstractBaseRiskMeasure = Variance(), rf::Number = 0.0)
+    ExpectedReturnRiskRatio(;
+        rt::JuMPReturnsEstimator = ArithmeticReturn(),
+        rk::AbstractBaseRiskMeasure = Variance(),
+        rf::Number = 0.0,
+    ) -> ExpectedReturnRiskRatio
 
 # Examples
 

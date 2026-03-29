@@ -184,9 +184,11 @@ A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a c
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ShrunkDenoise(; alpha::Number = 0.0)
+    ShrunkDenoise(;
+        alpha::Number = 0.0,
+    ) -> ShrunkDenoise
 
 Keywords correspond to the struct's fields.
 
@@ -236,13 +238,17 @@ A flexible container type for configuring and applying denoising algorithms to c
 
 $(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Denoise(; pdm::Option{<:Posdef} = Posdef(),
-            alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
-            kwargs::NamedTuple = (;),
-            kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
-            n::Integer = 1000)
+    Denoise(;
+        pdm::Option{<:Posdef} = Posdef(),
+        alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        kernel = AverageShiftedHistograms.Kernels.gaussian,
+        m::Integer = 10,
+        n::Integer = 1000
+    ) -> Denoise
 
 Keywords correspond to the struct's fields.
 

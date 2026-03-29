@@ -15,17 +15,21 @@ Bayesian Black-Litterman prior estimator for asset returns.
   - `rf`: Risk-free rate.
   - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of factor observations.
 
-# Constructor
+# Constructors
 
     BayesianBlackLittermanPrior(;
-                                pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(;
-                                                                                      pe = EmpiricalPrior(;
-                                                                                                          me = EquilibriumExpectedReturns())),
-                                mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                                views::Lc_BLV,
-                                sets::Option{<:AssetSets} = nothing,
-                                views_conf::Option{<:Num_VecNum} = nothing,
-                                rf::Number = 0.0, tau::Option{<:Number} = nothing)
+        pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(;
+            pe = EmpiricalPrior(;
+                me = EquilibriumExpectedReturns()
+            )
+        ),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        views::Lc_BLV,
+        sets::Option{<:AssetSets} = nothing,
+        views_conf::Option{<:Num_VecNum} = nothing,
+        rf::Number = 0.0,
+        tau::Option{<:Number} = nothing
+    ) -> BayesianBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
 

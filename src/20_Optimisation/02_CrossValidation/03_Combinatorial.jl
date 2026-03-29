@@ -20,7 +20,7 @@ Implements combinatorial non-sequential cross-validation with purging and embarg
         warn_comb::Integer = 100_000,
     ) -> CombinatorialCrossValidation
 
-Keywords correspond to the struct's fields.
+Keyword arguments correspond to the struct's fields.
 
 ## Validation
 

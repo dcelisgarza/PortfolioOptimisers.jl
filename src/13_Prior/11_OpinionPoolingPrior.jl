@@ -71,9 +71,17 @@ Opinion pooling prior estimator for asset returns.
   - `alg`: Opinion pooling algorithm.
   - `ex`: Parallel execution strategy.
 
-# Constructor
+# Constructors
 
-    OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, ex)
+    OpinionPoolingPrior(;
+        pes::VecEP,
+        pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+        pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        p::Option{<:Number} = nothing,
+        w::Option{<:VecNum} = nothing,
+        alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
+        ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx()
+    ) -> OpinionPoolingPrior
 
 Keywords correspond to the struct's fields. All arguments are validated for type and value consistency.
 

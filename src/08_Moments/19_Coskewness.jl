@@ -24,11 +24,13 @@ Container type for coskewness estimators.
   - `mp`: Matrix processing estimator for coskewness tensors.
   - `alg`: Moment algorithm.
 
-# Constructor
+# Constructors
 
-    Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-               alg::AbstractMomentAlgorithm = Full())
+    Coskewness(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        alg::AbstractMomentAlgorithm = Full()
+    ) -> Coskewness
 
 Keywords correspond to the struct's fields.
 

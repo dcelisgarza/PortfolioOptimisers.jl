@@ -95,9 +95,11 @@ Regression target type for standard linear models in `PortfolioOptimisers.jl`.
 
   - `kwargs`: Keyword arguments to be passed to the linear model fitting routine (e.g., options for the solver or regularisation).
 
-# Constructor
+# Constructors
 
-    LinearModel(; kwargs::NamedTuple = (;))
+    LinearModel(;
+        kwargs::NamedTuple = (;)
+    ) -> LinearModel
 
 Keywords correspond to the struct's fields.
 
@@ -164,9 +166,12 @@ Regression target type for generalised linear models (GLMs) in `PortfolioOptimis
   - `args`: Positional arguments to be passed to the GLM fitting routine (e.g., distribution and link).
   - `kwargs`: Keyword arguments for the GLM fitting routine (e.g., solver options, regularisation).
 
-# Constructor
+# Constructors
 
-    GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+    GeneralisedLinearModel(;
+        args::Tuple = (Normal(),),
+        kwargs::NamedTuple = (;)
+    ) -> GeneralisedLinearModel
 
 Keywords correspond to the struct's fields.
 
@@ -399,10 +404,13 @@ Container type for regression results in `PortfolioOptimisers.jl`.
   - `L`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
   - `b`: Optional intercept vector.
 
-# Constructor
+# Constructors
 
-    Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
-               b::Option{<:VecNum} = nothing)
+    Regression(;
+        M::MatNum,
+        L::Option{<:MatNum} = nothing,
+        b::Option{<:VecNum} = nothing
+    ) -> Regression
 
 Keywords correspond to the struct's fields.
 

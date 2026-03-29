@@ -303,9 +303,12 @@ Stores lower and upper bounds for the uncertain quantity, such as expected retur
   - `lb`: Lower bound array for the uncertainty set.
   - `ub`: Upper bound array for the uncertainty set.
 
-# Constructor
+# Constructors
 
-    BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)
+    BoxUncertaintySet(;
+        lb::ArrNum,
+        ub::ArrNum
+    ) -> BoxUncertaintySet
 
 Keywords correspond to the struct's fields.
 
@@ -358,9 +361,11 @@ Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty se
 
   - `kwargs`: Named tuple of keyword arguments for quantile calculation.
 
-# Constructor
+# Constructors
 
-    NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
+    NormalKUncertaintyAlgorithm(;
+        kwargs::NamedTuple = (;)
+    )
 
 Keyword arguments correspond to the field above.
 
@@ -482,11 +487,12 @@ Ellipsoidal uncertainty sets model uncertainty by specifying an ellipsoidal regi
   - `method`: Algorithm or value used to determine the scaling parameter for the ellipsoidal.
   - `diagonal`: Indicates whether to use only the diagonal elements of the covariance matrix.
 
-# Constructor
+# Constructors
 
     EllipsoidalUncertaintySetAlgorithm(;
-                                   method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-                                   diagonal::Bool = true)
+        method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
+        diagonal::Bool = true
+    ) -> EllipsoidalUncertaintySetAlgorithm
 
   - `method`: Sets the scaling algorithm or value for the ellipsoidal.
   - `diagonal`: Sets whether to use only diagonal elements.
@@ -570,10 +576,13 @@ Stores a covariance matrix, a scaling parameter, and a class identifier for the 
   - `k`: Scaling parameter for the ellipsoidal.
   - `class`: Identifier for the type of ellipsoidal uncertainty set (e.g., mean or covariance).
 
-# Constructor
+# Constructors
 
-    EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
-                          class::AbstractEllipsoidalUncertaintySetResultClass)
+    EllipsoidalUncertaintySet(;
+        sigma::MatNum,
+        k::Number,
+        class::AbstractEllipsoidalUncertaintySetResultClass
+    ) -> EllipsoidalUncertaintySet
 
 Keywords correspond to the struct's fields.
 

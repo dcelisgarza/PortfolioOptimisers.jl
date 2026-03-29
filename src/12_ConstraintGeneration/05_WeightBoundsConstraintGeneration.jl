@@ -45,10 +45,12 @@ Container for lower and upper portfolio weight bounds.
   - `lb`: Lower bound(s) for portfolio weights.
   - `ub`: Upper bound(s) for portfolio weights.
 
-# Constructor
+# Constructors
 
-    WeightBounds(lb::Option{<:Num_VecNum},
-                 ub::Option{<:Num_VecNum})
+    WeightBounds(
+        lb::Option{<:Num_VecNum} = 0.0,
+        ub::Option{<:Num_VecNum} = 1.0
+    ) -> WeightBounds
 
 ## Validation
 
@@ -108,11 +110,14 @@ Estimator for portfolio weight bounds constraints.
   - `dlb`: Default lower bound applied when no specific bound is not `nothing`.
   - `dub`: Default upper bound applied when no specific bound is not `nothing`.
 
-# Constructor
+# Constructors
 
     WeightBoundsEstimator(;
-                          lb::Option{<:EstValType} = nothing,
-                          ub::Option{<:EstValType} = nothing)
+        lb::Option{<:EstValType} = nothing,
+        ub::Option{<:EstValType} = nothing,
+        dlb::Option{<:Number} = nothing,
+        dub::Option{<:Number} = nothing
+    ) -> WeightBoundsEstimator
 
 ## Validation
 

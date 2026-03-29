@@ -25,7 +25,7 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
         kwargs::NamedTuple = (;),
     ) -> GridSearchCrossValidation
 
-  - Arguments correspond to fields above.
+Positional and keyword arguments correspond to fields above.
 
 ## Validation
 

@@ -108,9 +108,12 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale fa
   - `coef`: Non-negative scaling coefficient.
   - `power`: Non-negative exponent applied to the distance matrix.
 
-# Constructor
+# Constructors
 
-    GeneralExponentialSimilarity(; coef::Number = 1.0, power::Number = 1.0)
+    GeneralExponentialSimilarity(;
+        coef::Number = 1.0,
+        power::Number = 1.0
+    ) -> GeneralExponentialSimilarity
 
 Keywords correspond to the struct's fields.
 
@@ -200,10 +203,12 @@ Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
   - `sim`: Similarity matrix algorithm.
   - `root`: Root selection method.
 
-# Constructor
+# Constructors
 
-    DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-         root::DBHTRootMethod = UniqueRoot())
+    DBHT(;
+        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        root::DBHTRootMethod = UniqueRoot()
+    ) -> DBHT
 
 Keywords correspond to the struct's fields.
 
@@ -1779,11 +1784,13 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
   - `sim`: Similarity matrix algorithm.
   - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
-# Constructor
+# Constructors
 
-    LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-         sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-         pdm::Option{<:Posdef} = Posdef())
+    LoGo(;
+        dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        pdm::Option{<:Posdef} = Posdef()
+    ) -> LoGo
 
 Keywords correspond to the struct's fields.
 

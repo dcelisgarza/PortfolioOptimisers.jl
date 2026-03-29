@@ -10,10 +10,12 @@ Composite covariance estimator with post-processing.
   - `ce`: The underlying covariance estimator.
   - `mp`: Matrix post-processing estimator.
 
-# Constructor
+# Constructors
 
-    PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                  mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
+    PortfolioOptimisersCovariance(;
+        ce::AbstractCovarianceEstimator = Covariance(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing()
+    ) -> PortfolioOptimisersCovariance
 
 Keywords correspond to the struct's fields.
 

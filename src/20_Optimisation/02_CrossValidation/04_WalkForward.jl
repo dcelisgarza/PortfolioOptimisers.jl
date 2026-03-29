@@ -30,13 +30,15 @@ Implements index-based walk-forward cross-validation for time series, supporting
 
 # Constructors
 
-    IndexWalkForward(train_size::Integer, test_size::Integer;
+    IndexWalkForward(
+        train_size::Integer,
+        test_size::Integer;
         purged_size::Integer = 0,
         expend_train::Bool = false,
         reduce_test::Bool = false,
     ) -> IndexWalkForward
 
-Keywords correspond to the struct's fields.
+Positional and keyword arguments correspond to the struct's fields.
 
 ## Validation
 
@@ -157,7 +159,7 @@ Implements date-based walk-forward cross-validation for time series, supporting 
         reduce_test::Bool = false,
     ) -> DateWalkForward
 
-Keywords correspond to the struct's fields.
+Positional and keyword arguments correspond to the struct's fields.
 
 ## Validation
 
