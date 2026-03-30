@@ -38,6 +38,12 @@ julia> using Pkg
 julia> Pkg.add(PackageSpec(; name = "PortfolioOptimisers"))
 ```
 
+## Roadmap
+
+- For a roadmap of planned and desired features in no particular order please refer to Issue [#37](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/37).
+
+- Some docstrings are incomplete and/or outdated, please refer to Issue [#58](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/58) for details on what docstrings have been completed in the `dev` branch.
+
 ## Quick-start
 
 The library is quite powerful and extremely flexible. Here is what a very basic end-to-end workflow can look like. The [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples) contain more thorough explanations and demos. The [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/00_API) docs contain toy examples of the many, many features.
