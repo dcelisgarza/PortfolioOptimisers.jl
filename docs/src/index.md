@@ -1016,3 +1016,7 @@ Visualising the results is quite a useful way of summarising the portfolio chara
 - Simple or compound drawdowns [`plot_drawdowns`]-(@ref).
 - Portfolio returns histogram + density [`plot_histogram`]-(@ref).
 - 2/3D risk measure scatter plots [`plot_measures`]-(@ref).
+
+```@docs
+PortfolioOptimisers
+```

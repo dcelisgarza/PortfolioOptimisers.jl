@@ -7,7 +7,7 @@
 [![Docs workflow Status](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Docs.yml/badge.svg?branch=main)](https://github.com/dcelisgarza/PortfolioOptimisers.jl/actions/workflows/Docs.yml?query=branch%3Amain)
 [![Build Status](https://api.cirrus-ci.com/github/dcelisgarza/PortfolioOptimisers.jl.svg)](https://cirrus-ci.com/github/dcelisgarza/PortfolioOptimisers.jl)
 [![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/CODE_OF_CONDUCT.md)
 [![All Contributors](https://img.shields.io/github/all-contributors/dcelisgarza/PortfolioOptimisers.jl?labelColor=5e1ec7&color=c0ffee&style=flat-square)](#contributors)
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
@@ -139,7 +139,7 @@ pretty_table(df; formatters = [fmt2])
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
-![Fig. 1](./docs/src/assets/readme_1.svg)
+![Fig. 1](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_1.svg)
 
 ```julia
 # Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the `factory` function (recommended when doing so programmatically), or manually set the quantities ourselves.
@@ -149,18 +149,18 @@ plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
 # This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 ```
 
-![Fig. 2](./docs/src/assets/readme_2.svg)
+![Fig. 2](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_2.svg)
 
 ```julia
 # We can also plot the returns' histogram and probability density.
 plot_histogram(mip_res.w, rd.X, slv)
 ```
 
-![Fig. 3](./docs/src/assets/readme_3.svg)
+![Fig. 3](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_3.svg)
 
 ```julia
 # Plot compounded or uncompounded drawdowns. We use the former here.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
 
-![Fig. 4](./docs/src/assets/readme_4.svg)
+![Fig. 4](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_4.svg)
