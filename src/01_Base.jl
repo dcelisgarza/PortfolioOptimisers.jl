@@ -858,9 +858,9 @@ This dictionary contains the arg_dict terms and their corresponding descriptions
 """
 const arg_dict = Dict(
                       # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector.",
-                      :ow => "`w`: Observation weights vector.",
-                      :oow => "`w`: Optional observation weights vector. If `nothing`, the computation is unweighted.",
+                      :pw => "`w`: Portfolio weights vector `assets × 1`.",
+                      :ow => "`w`: Observation weights vector `observations × 1`.",
+                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
                       :opdm => "`pdm`: Optional positive definite matrix estimator.",
@@ -880,7 +880,7 @@ const arg_dict = Dict(
                       :ske => "`ske`: Coskewness estimator.",
                       :kte => "`kte`: Cokurtosis estimator.",
                       :de => "`de`: Distance matrix estimator.",
-                      :oidx => "`oidx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.",
+                      :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
                       :malg => "`alg`: Moment algorithm.",
                       :corrected => "`corrected`: Whether to apply Bessel's correction.",
                       # Priors.
@@ -924,19 +924,19 @@ const arg_dict = Dict(
                       :feesr => "`fees`: Fees result.",
                       :feeser => "`fees`: Fees estimator or result.",
                       # Stats.
-                      :sigma => "`sigma`: Covariance matrix.",#
-                      :mu => "`mu`: Expected returns vector.",#
-                      :rho => "`rho`: Correlation matrix.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
-                      :kt => "`kt`: Cokurtosis matrix.",#
-                      :sk => "`sk`: Coskewness matrix.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
-                      :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.",#
-                      :Xv => "`X`: Data vector.",#
-                      :dims => "`dims`: Dimensions along which to perform the computation.",#
-                      :omean => "`mean`: Optional mean vector to use for centering.")
+                      :sigma => "`sigma`: Covariance matrix `features × features`.",#
+                      :mu => "`mu`: Expected returns vector `features × 1`.",#
+                      :rho => "`rho`: Correlation matrix `features × features`.",
+                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `features × features`.",
+                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
+                      :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
+                      :sk => "`sk`: Coskewness matrix `features × features^2`.",#
+                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix `features × features`.",
+                      :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
+                      :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
+                      :Xv => "`X`: Data vector `observations × 1`.",#
+                      :dims => "`dims`: Dimension along which to perform the computation.",#
+                      :omean => "`mean`: Optional mean value to use for centering.")
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
@@ -950,12 +950,12 @@ val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector (features x 1) for dims = 1, (1 x features) for dims = 2.",#
-                :sigma => "`sigma::MatNum`: Covariance matrix (features x features).",#
-                :rho => "`rho::MatNum`: Correlation matrix (features x features).",#
-                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix (features x features).",#
-                :sk => "`sk::MatNum`: Coskewness matrix (features x features).",#
-                :kt => "`kt::MatNum`: Cokurtosis matrix (features x features).",#
+ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 1`, `1 x features` if `dims = 2`.",#
+                :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
+                :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
+                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
+                :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                :kt => "`kt::MatNum`: Cokurtosis matrix `features x features`.",#
                 :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
                 :ce => "`ce`: New covariance estimator of the same type as the argument, with the appropriate weights applied.",#
                 :ve => "`ve`: New variance estimator of the same type as the argument, with the appropriate weights applied.",
@@ -965,5 +965,7 @@ ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector (features x 1) for
                 :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
                 :stdnum => "`vr::Number`: Standard deviation of `X`",
                 :varnum => "`vr::Number`: Variance of `X`")
+math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
+                 :tgt => "``\\boldsymbol{t}``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

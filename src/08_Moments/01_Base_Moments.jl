@@ -290,13 +290,13 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ### Arguments
 
-    - $(arg_dict[:me])
-    - $(arg_dict[:X])
-    - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - $(arg_dict[:me])
+  - $(arg_dict[:X])
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 ### Returns
 
-    - $(ret_dict[:mu])
+  - $(ret_dict[:mu])
 
 ## Factory
 
@@ -304,12 +304,12 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ### Arguments
 
-    - $(arg_dict[:me])
-    - $(arg_dict[:ow])
+  - $(arg_dict[:me])
+  - $(arg_dict[:ow])
 
 ### Returns
 
-    - $(ret_dict[:me])
+  - $(ret_dict[:me])
 
 # Examples
 
@@ -400,7 +400,20 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`Full` is used to indicate that all available data points are included in the moment estimation process.
+`Full` is used to indicate that all deviations are included in the moment estimation process.
+
+When computing the full moments, the expression of deviation used is the following:
+
+```math
+\\begin{align}
+\\boldsymbol{D} &= \\boldsymbol{X} - t
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Xv])
+  - $(math_dict[:tgt])
 
 # Related
 
@@ -411,7 +424,18 @@ struct Full <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`Semi` is used for semi-moment estimators, where only observations below the mean (i.e., negative deviations) are considered.
+`Semi` is used for semi-moment estimators, where only observations below the a target are considered.
+
+```math
+\\begin{align}
+\\boldsymbol{D} &= \\min\\left(\\boldsymbol{X} - t,\\, 0\\right)
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Xv])
+  - $(math_dict[:tgt])
 
 # Related
 
