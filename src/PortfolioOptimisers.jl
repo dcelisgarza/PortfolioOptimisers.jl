@@ -37,6 +37,15 @@ using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 
 #=
+# Turn readme into PortfolioOptimisers' docs.
+@doc let
+    path = joinpath(dirname(@__DIR__), "docs/src/index.md")
+    include_dependency(path)
+    read(path, String)
+end PortfolioOptimisers
+=#
+
+#=
 # Programmatically include source files
 src_files = String[]
 sizehint!(src_files, 149)
