@@ -6,18 +6,22 @@ const PopulationCrossValScorer = Union{<:PopulationScorer, <:Function}
 @concrete struct NearestQuantilePrediction <: PredictionScorer
     r
     q
-    kwargs
+    r_kwargs
+    q_kwargs
     function NearestQuantilePrediction(r::AbstractBaseRiskMeasure, q::Real,
-                                       kwargs::NamedTuple)
-        return new{typeof(r), typeof(q), typeof(kwargs)}(r, q, kwargs)
+                                       r_kwargs::NamedTuple, q_kwargs::NamedTuple)
+        return new{typeof(r), typeof(q), typeof(r_kwargs), typeof(q_kwargs)}(r, q, r_kwargs,
+                                                                             q_kwargs)
     end
 end
 function NearestQuantilePrediction(; r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                                   q::Real = 0.5, kwargs::NamedTuple = (;))
-    return NearestQuantilePrediction(r, q, kwargs)
+                                   q::Real = 0.5, r_kwargs::NamedTuple = (;),
+                                   q_kwargs::NamedTuple = (;))
+    return NearestQuantilePrediction(r, q, r_kwargs, q_kwargs)
 end
 function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
-    return quantile_by_measure(ppred, s.r, s.q; s.kwargs...)
+    return quantile_by_measure(ppred, s.r, s.q; r_kwargs = s.r_kwargs,
+                               q_kwargs = s.q_kwargs)
 end
 
 export NearestQuantilePrediction

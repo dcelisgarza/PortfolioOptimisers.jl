@@ -220,11 +220,12 @@ function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskM
     return sort(pred; by = x -> expected_risk(r, x; kwargs...), rev = bigger_is_better(r))
 end
 function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
-                             q::Real; kwargs...)
+                             q::Real; r_kwargs::NamedTuple = (;),
+                             q_kwargs::NamedTuple = (;))
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
-    rks = [expected_risk(r, p; kwargs...) for p in pred]
-    rkq = Statistics.quantile(rks, q)
+    rks = [expected_risk(r, p; r_kwargs...) for p in pred]
+    rkq = Statistics.quantile(rks, q; q_kwargs...)
     rk_min = typemax(eltype(rks))
     idx = 1
     for (i, rk) in enumerate(rks)

@@ -115,6 +115,7 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
   - `q`: Quantile or confidence level for uncertainty set bounds.
   - `seed`: Optional random seed for reproducibility.
   - `bootstrap`: Bootstrap algorithm type.
+  - `kwargs`: Additional keyword arguments to pass on to [`Statistics.quantile`](https://docs.julialang.org/en/v1/stdlib/Statistics/#Statistics.quantile).
 
 # Constructors
 
@@ -126,6 +127,7 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
         q::Number = 0.05,
         seed::Option{<:Integer} = nothing,
         bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
+        kwargs::NamedTuple = (;),
     ) -> ARCHUncertaintySet
 
 Keywords correspond to the struct's fields.
@@ -148,7 +150,7 @@ ARCHUncertaintySet
              │           │      │       │     w ┼ nothing
              │           │      │       │   idx ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    ce ┼ SimpleCovariance: SimpleCovariance(true)
              │           │      │       │     w ┼ nothing
              │           │      │       │   idx ┴ nothing
              │           │      │   alg ┴ Full()
@@ -169,7 +171,8 @@ ARCHUncertaintySet
   block_size ┼ Int64: 3
            q ┼ Float64: 0.05
         seed ┼ nothing
-   bootstrap ┴ StationaryBootstrap()
+   bootstrap ┼ StationaryBootstrap()
+      kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -190,24 +193,27 @@ ARCHUncertaintySet
     q
     seed
     bootstrap
+    kwargs
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, seed::Option{<:Integer},
-                                bootstrap::ARCHBootstrapSet)
+                                bootstrap::ARCHBootstrapSet, kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim))
         @argcheck(block_size > zero(block_size))
         @argcheck(zero(q) < q < one(q))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size), typeof(q),
-                   typeof(seed), typeof(bootstrap)}(pe, alg, n_sim, block_size, q, seed,
-                                                    bootstrap)
+                   typeof(seed), typeof(bootstrap), typeof(kwargs)}(pe, alg, n_sim,
+                                                                    block_size, q, seed,
+                                                                    bootstrap, kwargs)
     end
 end
 function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
                             q::Number = 0.05, seed::Option{<:Integer} = nothing,
-                            bootstrap::ARCHBootstrapSet = StationaryBootstrap())
-    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
+                            bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
+                            kwargs::NamedTuple = (;))
+    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap, kwargs)
 end
 """
     bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
@@ -371,12 +377,13 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
     sigma_u = Matrix{eltype(X)}(undef, N, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = Statistics.quantile(mu_j, q)
-        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q; ue.kwargs...)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q; ue.kwargs...)
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
+                                                                ue.kwargs...)
         end
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
@@ -428,8 +435,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     mu_u = Vector{eltype(X)}(undef, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = Statistics.quantile(mu_j, q)
-        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q; ue.kwargs...)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q; ue.kwargs...)
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
@@ -480,8 +487,9 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
     for j in 1:N
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
+                                                                ue.kwargs...)
         end
     end
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
