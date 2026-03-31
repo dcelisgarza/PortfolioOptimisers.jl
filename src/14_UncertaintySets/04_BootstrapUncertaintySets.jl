@@ -150,7 +150,7 @@ ARCHUncertaintySet
              │           │      │       │     w ┼ nothing
              │           │      │       │   idx ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │    ce ┼ SimpleCovariance: SimpleCovariance(true)
+             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              │           │      │       │     w ┼ nothing
              │           │      │       │   idx ┴ nothing
              │           │      │   alg ┴ Full()

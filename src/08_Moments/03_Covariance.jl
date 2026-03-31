@@ -201,7 +201,7 @@ Return a new `GeneralCovariance` estimator with observation weights `w`.
 ```jldoctest
 julia> ce = GeneralCovariance()
 GeneralCovariance
-   ce ┼ SimpleCovariance: SimpleCovariance(true)
+   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
     w ┼ nothing
   idx ┴ nothing
 

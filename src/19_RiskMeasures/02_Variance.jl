@@ -594,35 +594,36 @@ UncertaintySetVariance
            │      ub ┼ nothing
            │     rke ┴ Bool: true
        ucs ┼ NormalUncertaintySet
-           │      pe ┼ EmpiricalPrior
-           │         │        ce ┼ PortfolioOptimisersCovariance
-           │         │           │   ce ┼ Covariance
-           │         │           │      │    me ┼ SimpleExpectedReturns
-           │         │           │      │       │     w ┼ nothing
-           │         │           │      │       │   idx ┴ nothing
-           │         │           │      │    ce ┼ GeneralCovariance
-           │         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │         │           │      │       │     w ┼ nothing
-           │         │           │      │       │   idx ┴ nothing
-           │         │           │      │   alg ┴ Full()
-           │         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-           │         │           │      │     pdm ┼ Posdef
-           │         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-           │         │           │      │      dn ┼ nothing
-           │         │           │      │      dt ┼ nothing
-           │         │           │      │     alg ┼ nothing
-           │         │           │      │   order ┴ DenoiseDetoneAlg()
-           │         │        me ┼ SimpleExpectedReturns
-           │         │           │     w ┼ nothing
-           │         │           │   idx ┴ nothing
-           │         │   horizon ┴ nothing
-           │     alg ┼ BoxUncertaintySetAlgorithm()
-           │   n_sim ┼ Int64: 3000
-           │       q ┼ Float64: 0.05
-           │     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-           │    seed ┼ nothing
-           │     ens ┴ nothing
+           │       pe ┼ EmpiricalPrior
+           │          │        ce ┼ PortfolioOptimisersCovariance
+           │          │           │   ce ┼ Covariance
+           │          │           │      │    me ┼ SimpleExpectedReturns
+           │          │           │      │       │     w ┼ nothing
+           │          │           │      │       │   idx ┴ nothing
+           │          │           │      │    ce ┼ GeneralCovariance
+           │          │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │          │           │      │       │     w ┼ nothing
+           │          │           │      │       │   idx ┴ nothing
+           │          │           │      │   alg ┴ Full()
+           │          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+           │          │           │      │     pdm ┼ Posdef
+           │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │          │           │      │      dn ┼ nothing
+           │          │           │      │      dt ┼ nothing
+           │          │           │      │     alg ┼ nothing
+           │          │           │      │   order ┴ DenoiseDetoneAlg()
+           │          │        me ┼ SimpleExpectedReturns
+           │          │           │     w ┼ nothing
+           │          │           │   idx ┴ nothing
+           │          │   horizon ┴ nothing
+           │      alg ┼ BoxUncertaintySetAlgorithm()
+           │    n_sim ┼ Int64: 3000
+           │        q ┼ Float64: 0.05
+           │      rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+           │     seed ┼ nothing
+           │      ens ┼ nothing
+           │   kwargs ┴ @NamedTuple{}: NamedTuple()
      sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
