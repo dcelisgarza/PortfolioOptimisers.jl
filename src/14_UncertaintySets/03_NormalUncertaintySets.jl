@@ -221,7 +221,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j in 1:N
         for i in j:N
-            sigma_ij = getindex.(sigmas[:], i, j)
+            sigma_ij = getindex.(sigmas, i, j)
             sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
             sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
         end
@@ -335,7 +335,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j in 1:N
         for i in j:N
-            sigma_ij = getindex.(sigmas[:], i, j)
+            sigma_ij = getindex.(sigmas, i, j)
             sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
             sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
         end
