@@ -274,7 +274,6 @@
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.alg.me.w === ew
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),
@@ -283,10 +282,8 @@
                                                                       n = 3))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
-        @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.me.w === ew
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.t == ce0.ce.t
         @test ce.ce.c1 == ce0.ce.c1

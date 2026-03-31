@@ -655,37 +655,36 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     return gerber(ce, X)
 end
 """
-    Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cov(
+        ce::GerberCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
 
 Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
 # Arguments
 
-  - `ce::GerberCovariance`: Gerber covariance estimator.
-
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnstandardisedGerberCovarianceAlgorithm}`: Compute the unstandardised Gerber covariance matrix.
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber covariance matrix.
-
-  - `X`: Data matrix (observations × assets).
-
+  - $(arg_dict[:gerbce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: The Gerber covariance matrix.
+  - $(arg_dict[:rho])
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - $(val_dict[:dims])
 
 # Details
 
- 1. Computes the standard deviation vector for each asset using the estimator's variance estimator.
- 2. If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
- 3. Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
- 4. Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
+  - Computes the standard deviation vector for each asset using the estimator's variance estimator.
+  - If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+  - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+  - Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
 
 # Related
 
