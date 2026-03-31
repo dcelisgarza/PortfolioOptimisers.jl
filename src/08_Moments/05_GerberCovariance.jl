@@ -272,8 +272,8 @@ Implements the original Gerber correlation algorithm.
 The algorithm proceeds as follows:
 
   - For each entry in `X`, compute two Boolean matrices:
-      + `U`: Entries where `X` exceeds `ce.t * sd`.
-      + `D`: Entries where `X` is less than `-ce.t * sd`.
+      + `U`: Entries where `X .>= ce.t * sd`.
+      + `D`: Entries where `X .<= -ce.t * sd`.
   - Compute `UmD = U - D` and `UpD = U + D`.
   - The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
@@ -326,8 +326,8 @@ Implements the original Gerber correlation algorithm on Z-transformed data.
 The algorithm proceeds as follows:
 
   - For each entry in `X`, compute two Boolean matrices:
-      + `U`: Entries where `X` exceeds `ce.t`.
-      + `D`: Entries where `X` is less than `-ce.t`.
+      + `U`: Entries where `X .>= ce.t`.
+      + `D`: Entries where `X .<= -ce.t`.
   - Compute `UmD = U - D` and `UpD = U + D`.
   - The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
@@ -381,9 +381,9 @@ Implements the first variant of the Gerber correlation algorithm.
 The algorithm proceeds as follows:
 
   - For each entry in `X`, compute three Boolean matrices:
-      + `U`: Entries where `X` exceeds `ce.t * sd`.
-      + `D`: Entries where `X` is less than `-ce.t * sd`.
-      + `N`: Entries where `X` is within `[-ce.t * sd, ce.t * sd]` (i.e., neither up nor down).
+      + `U`: Entries where `X .>= ce.t * sd`.
+      + `D`: Entries where `X .<= -ce.t * sd`.
+      + `N`: Entries where `X in (-ce.t * sd, ce.t * sd)` (i.e., neither up nor down).
   - Compute `UmD = U - D`.
   - The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
@@ -437,9 +437,9 @@ Implements the first variant of the Gerber correlation algorithm on Z-transforme
 The algorithm proceeds as follows:
 
   - For each entry in `X`, compute three Boolean matrices:
-      + `U`: Entries where `X` exceeds `ce.t`.
-      + `D`: Entries where `X` is less than `-ce.t`.
-      + `N`: Entries where `X` is within `[-ce.t, ce.t]` (i.e., neither up nor down).
+      + `U`: Entries where `X .>= ce.t`.
+      + `D`: Entries where `X .<= -ce.t`.
+      + `N`: Entries where `X in (-ce.t, ce.t)` (i.e., neither up nor down).
   - Compute `UmD = U - D`.
   - The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
@@ -494,8 +494,8 @@ Implements the second variant of the Gerber correlation algorithm.
 The algorithm proceeds as follows:
 
   - For each entry in `X`, compute two Boolean matrices:
-      + `U`: Entries where `X` exceeds `ce.t * sd`.
-      + `D`: Entries where `X` is less than `-ce.t * sd`.
+      + `U`: Entries where `X .>= ce.t * sd`.
+      + `D`: Entries where `X .<= -ce.t * sd`.
   - Compute the signed indicator matrix `UmD = U - D`.
   - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
   - Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
@@ -550,8 +550,8 @@ Implements the second variant of the Gerber correlation algorithm on Z-transform
 The algorithm proceeds as follows:
 
   - For each entry in `X`, compute two Boolean matrices:
-      + `U`: Entries where `X` exceeds `ce.t`.
-      + `D`: Entries where `X` is less than `-ce.t`.
+      + `U`: Entries where `X .>= ce.t`.
+      + `D`: Entries where `X .<= -ce.t`.
   - Compute the signed indicator matrix `UmD = U - D`.
   - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
   - Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
@@ -591,7 +591,7 @@ end
         kwargs...
     ) -> MatNum
 
-Compute the Gerber correlation matrix using an unstandardised Gerber covariance estimator.
+Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 
 # Arguments
 
@@ -728,9 +728,65 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     sigma = gerber(ce, X)
     return StatsBase.cor2cov!(sigma, sd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new `GerberCovariance` estimator with the specified observation weights.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:oow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Details
+
+  - Applies `factory(ce.ve, w)` to update the variance estimator.
+  - Preserves the other fields of the original estimator.
+
+# Examples
+
+```jldoctest
+julia> ce = GerberCovariance()
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │     w ┼ nothing
+      │             │   idx ┴ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┴ Gerber1()
+
+julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+      │             │   idx ┴ nothing
+      │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+      │   corrected ┴ Bool: true
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┴ Gerber1()
+```
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
+"""
 function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
-    return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
-                            pdm = ce.pdm, t = ce.t)
+    return GerberCovariance(; alg = ce.alg, ve = factory(ce.ve, w), pdm = ce.pdm, t = ce.t)
 end
 
 export GerberCovariance, Gerber0, Gerber1, Gerber2, StandardisedGerber0,

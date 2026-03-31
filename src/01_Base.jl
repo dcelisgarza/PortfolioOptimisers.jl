@@ -874,7 +874,7 @@ const arg_dict = Dict(
                       :mpa => "`mpa`: Matrix processing algorithm.",
                       # Moments.
                       :me => "`me`: Expected returns estimator.",
-                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector, if `nothing` and used on a matrix defaults to [`SimpleExpectedReturns`](@ref).",
+                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
                       :ce => "`ce`: Covariance estimator.",#
                       :ve => "`ve`: Variance estimator.",#
                       :ske => "`ske`: Coskewness estimator.",

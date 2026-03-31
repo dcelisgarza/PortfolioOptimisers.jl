@@ -27,22 +27,15 @@ StandardisedGerber0
 StandardisedGerber1
 StandardisedGerber2
 GerberCovariance
+factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, std_vec::ArrNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::MatNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, std_vec::ArrNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, std_vec::ArrNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                         <:UnstandardisedGerberCovarianceAlgorithm}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                         <:UnstandardisedGerberCovarianceAlgorithm}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
-                std_vec::ArrNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0},
-                X::MatNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
-                std_vec::ArrNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1},
-                X::MatNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
-                std_vec::ArrNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2},
-                X::MatNum)
-factory(alg::Gerber0, ::Any)
-factory(alg::StandardisedGerber0, w::Option{<:StatsBase.AbstractWeights} = nothing)
 ```

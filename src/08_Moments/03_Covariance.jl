@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A simple wrapper for a covariance estimator around a [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator), optional [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/), and an optional index. It simplifies the standard API of [`StatsBase.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.cov) by using ideas from SCIML.
+A simple wrapper around a [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator), optional [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/), and an optional index. It uses ideas from SCIML to simplify the standard API of [`StatsBase.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.cov).
 
 # Fields
 
@@ -30,13 +30,13 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> gwc = GeneralCovariance()
+julia> GeneralCovariance()
 GeneralCovariance
    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
     w ┼ nothing
   idx ┴ nothing
 
-julia> gwc = GeneralCovariance(; w = StatsBase.Weights([0.1, 0.2, 0.7]))
+julia> GeneralCovariance(; w = StatsBase.Weights([0.1, 0.2, 0.7]))
 GeneralCovariance
    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
@@ -196,6 +196,22 @@ Return a new `GeneralCovariance` estimator with observation weights `w`.
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = GeneralCovariance()
+GeneralCovariance
+   ce ┼ SimpleCovariance: SimpleCovariance(true)
+    w ┼ nothing
+  idx ┴ nothing
+
+julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
+GeneralCovariance
+   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+  idx ┴ nothing
+```
+
 # Related
 
   - [`GeneralCovariance`](@ref)
@@ -208,9 +224,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying joint expected returns and covariance estimation in `PortfolioOptimisers.jl`.
+A flexible container type for covariance estimation in `PortfolioOptimisers.jl`.
 
-`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm. It is one level of abstraction above [`GeneralCovariance`](@ref), providing a convenient way to configure and apply these components together.
+`Covariance` encapsulates all components required for estimating the covariance matrix of asset returns, including the expected returns estimator for centering the data, the covariance estimator, and the moment algorithm.
 
 # Fields
 
@@ -289,13 +305,6 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
   - Preserves the moment algorithm `ce.alg` from the original estimator.
   - Enables weighted estimation for both mean and covariance in portfolio workflows.
 
-# Related
-
-  - [`Covariance`](@ref)
-  - [`GeneralCovariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
-
 # Examples
 
 ```jldoctest
@@ -321,6 +330,12 @@ Covariance
       │   idx ┴ nothing
   alg ┴ Full()
 ```
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
 """
 function factory(ce::Covariance, w::StatsBase.AbstractWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)

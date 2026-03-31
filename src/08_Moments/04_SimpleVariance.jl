@@ -80,7 +80,7 @@ end
         kwargs...,
     ) -> ArrNum
 
-Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
+Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a matrix.
 
 This method computes the standard deviation of the input matrix `X` using the configuration specified in `ve`.
 
@@ -217,7 +217,7 @@ end
         kwargs...
     ) -> ArrNum
 
-Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
+Compute the variance using a [`SimpleVariance`](@ref) estimator for a matrix.
 
 This method computes the variance of the input matrix `X` using the configuration specified in `ve`.
 
@@ -365,12 +365,6 @@ Return a new `SimpleVariance` estimator with the specified observation weights.
   - The mean estimator is updated using `factory(ve.me, w)` for consistency.
   - The bias correction flag is preserved from the original estimator.
 
-# Related
-
-  - [`SimpleVariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
-
 # Examples
 
 ```jldoctest
@@ -382,7 +376,7 @@ SimpleVariance
           w ┼ nothing
   corrected ┴ Bool: true
 
-julia> svw = factory(sv, StatsBase.Weights([0.2, 0.3, 0.5]))
+julia> factory(sv, StatsBase.Weights([0.2, 0.3, 0.5]))
 SimpleVariance
          me ┼ SimpleExpectedReturns
             │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
@@ -390,6 +384,12 @@ SimpleVariance
           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected ┴ Bool: true
 ```
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
 """
 function factory(ve::SimpleVariance, w::StatsBase.AbstractWeights)
     return SimpleVariance(; me = factory(ve.me, w), w = w, corrected = ve.corrected)

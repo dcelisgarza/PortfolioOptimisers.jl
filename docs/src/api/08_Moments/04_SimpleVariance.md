@@ -1,4 +1,4 @@
-# Variance and standard deviation
+# Simple variance and standard deviation
 
 The variance is used throughout the library, it can be used as part of the expected return, covariance estimation, performance analysis, and constraint generation. It is trivial to compute the standard deviation from the variance, so we provide those too.
 

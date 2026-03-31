@@ -150,11 +150,24 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 
   - $(ret_dict[:me])
 
+# Examples
+
+```jldoctest
+julia> me = SimpleExpectedReturns()
+SimpleExpectedReturns
+    w ┼ nothing
+  idx ┴ nothing
+
+julia> factory(me, StatsBase.Weights([0.1, 0.2, 0.7]))
+SimpleExpectedReturns
+    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+  idx ┴ nothing
+```
+
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
     return SimpleExpectedReturns(; w = w, idx = me.idx)
