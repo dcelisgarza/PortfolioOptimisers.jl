@@ -361,8 +361,8 @@ Return a new `SimpleVariance` estimator with the specified observation weights.
 
 # Details
 
-  - Constructs a new `SimpleVariance` estimator with updated weights.
   - The mean estimator is updated using `factory(ve.me, w)` for consistency.
+  - Sets `w` to the new weights.
   - The bias correction flag is preserved from the original estimator.
 
 # Examples

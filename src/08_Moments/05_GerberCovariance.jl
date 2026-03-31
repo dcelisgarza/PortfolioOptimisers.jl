@@ -5,6 +5,10 @@ Abstract supertype for all Gerber covariance estimators in `PortfolioOptimisers.
 
 All concrete and/or abstract types implementing Gerber covariance estimation algorithms should be subtypes of `BaseGerberCovariance`.
 
+# Interfaces
+
+If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain.
+
 # Related
 
   - [`GerberCovariance`](@ref)
@@ -23,6 +27,10 @@ Abstract supertype for all Gerber covariance algorithm types in `PortfolioOptimi
 All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`.
 
 These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator.
+
+# Interfaces
+
+If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain. Else you can follow the instructions and examples in [`UnstandardisedGerberCovarianceAlgorithm`](@ref) and [`StandardisedGerberCovarianceAlgorithm`](@ref).
 
 # Related
 
@@ -43,6 +51,104 @@ Abstract supertype for all unstandardised Gerber covariance algorithm types.
 
 Concrete types implementing unstandardised Gerber covariance algorithms should subtype `UnstandardisedGerberCovarianceAlgorithm`.
 
+# Interfaces
+
+In order to implement a new Gerber algorithm which will work seamlessly with the library, subtype `UnstandardisedGerberCovarianceAlgorithm` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Gerber correlation
+
+  - `PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnstandardisedGerberCovarianceAlgorithm}, X::MatNum, sd::ArrNum) -> MatNum`: Unstandardised Gerber correlation matrix.
+
+### Arguments
+
+  - $(arg_dict[:gerbce]). Configured with the custom `UnstandardisedGerberCovarianceAlgorithm` algorithm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
+
+### Returns
+
+  - $(ret_dict[:rho])
+
+## Factory (if algorithm uses observation weights)
+
+If the algorithm uses observation weights, the `factory` method will update the algorithm with the new weights.
+
+  - `PortfolioOptimisers.factory(alg::UnstandardisedGerberCovarianceAlgorithm, w::StatsBase.AbstractWeights) -> UnstandardisedGerberCovarianceAlgorithm`: Updates the algorithm with the new weights.
+
+### Arguments
+
+  - $(arg_dict[:gerbalg])
+  - $(arg_dict[:ow])
+
+### Returns
+
+  - $(ret_dict[:algw])
+
+## Examples
+
+We can create a dummy unstandardised Gerber covariance algorithm as follows:
+
+```jldoctest
+julia> struct MyUnstandardisedGerberCovarianceAlg{T} <:
+              PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm
+           w::T
+           function MyUnstandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w)
+                   @assert(!isempty(w))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyUnstandardisedGerberCovarianceAlg(;
+                                                    w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyUnstandardisedGerberCovarianceAlg(w)
+       end
+MyUnstandardisedGerberCovarianceAlg
+
+julia> function PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any,
+                                                                <:MyUnstandardisedGerberCovarianceAlg},
+                                           X::PortfolioOptimisers.MatNum,
+                                           sd::PortfolioOptimisers.ArrNum)
+           rho = rand(StableRNGs.StableRNG(420), size(X, 2), size(X, 2))
+           rho = rho * rho'
+           return StatsBase.cov2cor!(rho)
+       end
+
+julia> function PortfolioOptimisers.factory(alg::MyUnstandardisedGerberCovarianceAlg,
+                                            w::StatsBase.AbstractWeights)
+           return MyUnstandardisedGerberCovarianceAlg(; w = w)
+       end
+
+julia> cor(GerberCovariance(; alg = MyUnstandardisedGerberCovarianceAlg()),
+           [1.0 2.0; 0.3 0.7; 0.5 1.1])
+2×2 Matrix{Float64}:
+ 1.0      0.64112
+ 0.64112  1.0
+
+julia> cov(GerberCovariance(; alg = MyUnstandardisedGerberCovarianceAlg()),
+           [1.0 2.0; 0.3 0.7; 0.5 1.1])
+2×2 Matrix{Float64}:
+ 0.13      0.153913
+ 0.153913  0.443333
+
+julia> PortfolioOptimisers.factory(GerberCovariance(; alg = MyUnstandardisedGerberCovarianceAlg()),
+                                   StatsBase.Weights([1, 2, 3]))
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │     w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │             │   idx ┴ nothing
+      │           w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │   corrected ┴ Bool: true
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┼ MyUnstandardisedGerberCovarianceAlg
+      │   w ┴ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+```
+
 # Related
 
   - [`GerberCovarianceAlgorithm`](@ref)
@@ -62,6 +168,103 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for all standardised Gerber covariance algorithm types. These Z-transform the data before applying the Gerber covariance algorithm.
 
 Concrete types implementing standardised Gerber covariance algorithms should subtype `StandardisedGerberCovarianceAlgorithm`.
+
+# Interfaces
+
+In order to implement a new Gerber algorithm which will work seamlessly with the library, subtype `StandardisedGerberCovarianceAlgorithm` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Gerber correlation
+
+  - `PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}, X::MatNum, sd::ArrNum) -> MatNum`: Unstandardised Gerber correlation matrix.
+
+### Arguments
+
+  - $(arg_dict[:gerbce]). Configured with the custom `StandardisedGerberCovarianceAlgorithm` algorithm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
+
+### Returns
+
+  - $(ret_dict[:rho])
+
+## Factory (if algorithm uses observation weights)
+
+If the algorithm uses observation weights, the `factory` method will update the algorithm with the new weights.
+
+  - `PortfolioOptimisers.factory(alg::StandardisedGerberCovarianceAlgorithm, w::StatsBase.AbstractWeights) -> StandardisedGerberCovarianceAlgorithm`: Updates the algorithm with the new weights.
+
+### Arguments
+
+  - $(arg_dict[:gerbalg])
+  - $(arg_dict[:ow])
+
+### Returns
+
+  - $(ret_dict[:algw])
+
+## Examples
+
+We can create a dummy standardised Gerber covariance algorithm as follows:
+
+```jldoctest
+julia> struct MyStandardisedGerberCovarianceAlg{T} <:
+              PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
+           w::T
+           function MyStandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
+               if !isnothing(w)
+                   @assert(!isempty(w))
+               end
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyStandardisedGerberCovarianceAlg(;
+                                                  w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+           return MyStandardisedGerberCovarianceAlg(w)
+       end
+MyStandardisedGerberCovarianceAlg
+
+julia> function PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:Any,
+                                                                <:MyStandardisedGerberCovarianceAlg},
+                                           X::PortfolioOptimisers.MatNum)
+           rho = rand(StableRNGs.StableRNG(420), size(X, 2), size(X, 2))
+           rho = rho * rho'
+           return StatsBase.cov2cor!(rho)
+       end
+
+julia> function PortfolioOptimisers.factory(alg::MyStandardisedGerberCovarianceAlg,
+                                            w::StatsBase.AbstractWeights)
+           return MyStandardisedGerberCovarianceAlg(; w = w)
+       end
+
+julia> cor(GerberCovariance(; alg = MyStandardisedGerberCovarianceAlg()),
+           [1.0 2.0; 0.3 0.7; 0.5 1.1])
+2×2 Matrix{Float64}:
+ 1.0      0.64112
+ 0.64112  1.0
+
+julia> cov(GerberCovariance(; alg = MyStandardisedGerberCovarianceAlg()),
+           [1.0 2.0; 0.3 0.7; 0.5 1.1])
+2×2 Matrix{Float64}:
+ 0.13      0.153913
+ 0.153913  0.443333
+
+julia> PortfolioOptimisers.factory(GerberCovariance(; alg = MyStandardisedGerberCovarianceAlg()),
+                                   StatsBase.Weights([1, 2, 3]))
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │     w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │             │   idx ┴ nothing
+      │           w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │   corrected ┴ Bool: true
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┼ MyStandardisedGerberCovarianceAlg
+      │   w ┴ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+```
 
 # Related
 
@@ -498,7 +701,7 @@ The algorithm proceeds as follows:
       + `D`: Entries where `X .<= -ce.t * sd`.
   - Compute the signed indicator matrix `UmD = U - D`.
   - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
-  - Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+  - Normalise `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -554,7 +757,7 @@ The algorithm proceeds as follows:
       + `D`: Entries where `X .<= -ce.t`.
   - Compute the signed indicator matrix `UmD = U - D`.
   - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
-  - Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+  - Normalise `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
   - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
@@ -744,7 +947,8 @@ Return a new `GerberCovariance` estimator with the specified observation weights
 
 # Details
 
-  - Applies `factory(ce.ve, w)` to update the variance estimator.
+  - Calls `factory(ce.alg, w)` to update the algorithm (current algorithms do not use weights, this for future proofing).
+  - Calls `factory(ce.ve, w)` to update the variance estimator.
   - Preserves the other fields of the original estimator.
 
 # Examples
@@ -786,7 +990,8 @@ GerberCovariance
   - [`factory`](@ref)
 """
 function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
-    return GerberCovariance(; alg = ce.alg, ve = factory(ce.ve, w), pdm = ce.pdm, t = ce.t)
+    return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
+                            pdm = ce.pdm, t = ce.t)
 end
 
 export GerberCovariance, Gerber0, Gerber1, Gerber2, StandardisedGerber0,

@@ -301,7 +301,7 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 
 # Details
 
-  - Applies weights to both the expected returns estimator `ce.me` and the covariance estimator `ce.ce`.
+  - Calls `factory(ce.me, w)` and `factory(ce.ce, w)` to propagate the weights to the mean and covariance estimators.
   - Preserves the moment algorithm `ce.alg` from the original estimator.
   - Enables weighted estimation for both mean and covariance in portfolio workflows.
 

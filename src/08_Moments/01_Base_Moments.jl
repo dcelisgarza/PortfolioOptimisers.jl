@@ -54,7 +54,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Factory
 
-  - `factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -86,10 +86,9 @@ julia> function MyCovarianceEstimator(;
        end
 MyCovarianceEstimator
 
-julia> function factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
            return MyCovarianceEstimator(; w = w)
        end
-factory (generic function with 1 method)
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
@@ -132,6 +131,10 @@ julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
  1.0       0.998274  0.999315
  0.998274  1.0       0.999764
  0.999315  0.999764  1.0
+
+julia> PortfolioOptimisers.factory(MyCovarianceEstimator(), StatsBase.Weights([1, 2, 3]))
+MyCovarianceEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -181,7 +184,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Factory
 
-  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -213,10 +216,9 @@ julia> function MyVarianceEstimator(;
        end
 MyVarianceEstimator
 
-julia> function factory(::MyVarianceEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyVarianceEstimator, w::StatsBase.AbstractWeights)
            return MyVarianceEstimator(; w = w)
        end
-factory (generic function with 1 method)
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
@@ -265,6 +267,10 @@ julia> var(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 1×3 Matrix{Float64}:
  2.23607  0.761577  1.2083
+
+julia> PortfolioOptimisers.factory(MyVarianceEstimator(), StatsBase.Weights([1, 2, 3]))
+MyVarianceEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -300,7 +306,7 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ## Factory
 
-  - `factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -331,10 +337,10 @@ julia> function MyExpectedReturnsEstimator(;
        end
 MyExpectedReturnsEstimator
 
-julia> function factory(::MyExpectedReturnsEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
+                                            w::StatsBase.AbstractWeights)
            return MyExpectedReturnsEstimator(; w = w)
        end
-factory (generic function with 1 method)
 
 julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
                                 dims::Int = 1, kwargs...)
@@ -355,6 +361,10 @@ julia> mean(MyExpectedReturnsEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1]; dims = 2)
  1.5
  0.5
  0.8
+
+julia> PortfolioOptimisers.factory(MyExpectedReturnsEstimator(), StatsBase.Weights([1, 2, 3]))
+MyExpectedReturnsEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
