@@ -883,6 +883,11 @@ const arg_dict = Dict(
                       :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
                       :malg => "`alg`: Moment algorithm.",
                       :corrected => "`corrected`: Whether to apply Bessel's correction.",
+                      ## Gerber
+                      :gerbt => "`t`: Threshold value.",
+                      :gerbalg => "`alg`: Gerber covariance algorithm.",
+                      :gerbce => "`ce`: Gerber covariance estimator.",
+                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",
                       # Priors.
                       :pe => "`pe`: Prior estimator.",#
                       :pr => "`pr`: Prior result.",#
@@ -936,7 +941,8 @@ const arg_dict = Dict(
                       :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                       :Xv => "`X`: Data vector `observations × 1`.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
-                      :omean => "`mean`: Optional mean value to use for centering.")
+                      :omean => "`mean`: Optional mean value to use for centering.",
+                      :stdvec => "`std_vec`: Vector of standard deviations for each asset, used to scale the threshold.")
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
@@ -945,26 +951,30 @@ const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 """
 val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.")
+                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                :gerbt => "`0 < t < 1`.",#
+                :dims => "`dims in (1, 2)`.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 1`, `1 x features` if `dims = 2`.",#
+ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
                 :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
                 :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
                 :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
                 :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
                 :kt => "`kt::MatNum`: Cokurtosis matrix `features x features`.",#
                 :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
-                :ce => "`ce`: New covariance estimator of the same type as the argument, with the appropriate weights applied.",#
-                :ve => "`ve`: New variance estimator of the same type as the argument, with the appropriate weights applied.",
+                :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
+                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",
                 :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
                 :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
                 :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
                 :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
                 :stdnum => "`vr::Number`: Standard deviation of `X`",
-                :varnum => "`vr::Number`: Variance of `X`")
+                :varnum => "`vr::Number`: Variance of `X`",
+                :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
+                :alg => "`alg`: The original algorithm instance.")
 math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
                  :tgt => "``\\boldsymbol{t}``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.")
 

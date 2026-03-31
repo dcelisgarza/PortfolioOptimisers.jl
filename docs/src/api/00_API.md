@@ -16,7 +16,6 @@ There are three overarching design choices in `PortfolioOptimisers.jl`:
 - Constants can be propagated if necessary.
 - There is always a single immutable source of truth for every process.
 - If needed, modifying values must be done via interface functions, which simplifies finding and fixing bugs. If the interface for modification is not provided the code will throw a missing method exception.
-- Future developments may make use of [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) for certain things.
 
 ### 3. Compositional design
 

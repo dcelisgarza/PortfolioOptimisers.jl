@@ -261,5 +261,3 @@ We can also plot the compounded or uncompounded drawdowns, here we plot the form
 ```@example 0_index
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ```
-
-There are other kinds of plots which we explore in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).

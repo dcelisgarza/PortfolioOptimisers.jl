@@ -557,10 +557,10 @@ Expand and collect all terms from a Julia expression representing a linear const
 
 # Details
 
-    - Calls [`_collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
-    - Numeric constants are collected as `(coefficient, nothing)`.
-    - Variables are collected as `(coefficient, variable_name)`.
-    - Arithmetic expressions are recursively expanded and collected.
+  - Calls [`_collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
+  - Numeric constants are collected as `(coefficient, nothing)`.
+  - Variables are collected as `(coefficient, variable_name)`.
+  - Arithmetic expressions are recursively expanded and collected.
 
 # Returns
 
@@ -670,9 +670,9 @@ Format a single term in a linear constraint equation as a string.
 
 # Details
 
-    - If `coeff == 1`, returns `"\$var"` (no explicit coefficient).
-    - If `coeff == -1`, returns `"-\$(var)"` (no explicit coefficient).
-    - Otherwise, returns `"\$(coeff)*\$(var)"`.
+  - If `coeff == 1`, returns `"\$var"` (no explicit coefficient).
+  - If `coeff == -1`, returns `"-\$(var)"` (no explicit coefficient).
+  - Otherwise, returns `"\$(coeff)*\$(var)"`.
 
 # Returns
 
@@ -960,8 +960,8 @@ This function takes a [`ParsingResult`](@ref) containing variable names (which m
 
 # Validation
 
-    - `bl_flag` can only be `true` if both `ep_flag` and `rho_flag` are `false`.
-    - `rho_flag` can only be `true` if `ep_flag` is also `true`.
+  - `bl_flag` can only be `true` if both `ep_flag` and `rho_flag` are `false`.
+  - `rho_flag` can only be `true` if `ep_flag` is also `true`.
 
 # Details
 

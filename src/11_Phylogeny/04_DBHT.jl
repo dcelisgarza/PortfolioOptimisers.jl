@@ -1390,11 +1390,11 @@ This function builds a hierarchical clustering (dendrogram) by first constructin
 
 # Details
 
-    - For each cluster, the function identifies the bubbles that coincide with the cluster and assigns each vertex to a specific bubble using [`BubbleMember`](@ref).
-    - It constructs intra-bubble and intra-cluster linkages using [`build_link_and_dendro`](@ref).
-    - After intra-cluster linkage, it merges clusters to form the global hierarchy using inter-cluster linkage steps.
-    - The resulting linkage matrix can be converted to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) using [`turn_into_Hclust_merges`](@ref).
-    - Used internally by DBHT clustering routines for dendrogram construction.
+  - For each cluster, the function identifies the bubbles that coincide with the cluster and assigns each vertex to a specific bubble using [`BubbleMember`](@ref).
+  - It constructs intra-bubble and intra-cluster linkages using [`build_link_and_dendro`](@ref).
+  - After intra-cluster linkage, it merges clusters to form the global hierarchy using inter-cluster linkage steps.
+  - The resulting linkage matrix can be converted to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) using [`turn_into_Hclust_merges`](@ref).
+  - Used internally by DBHT clustering routines for dendrogram construction.
 
 # Returns
 
@@ -1902,8 +1902,8 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 
 # Validation
 
-    - `size(sigma, 1) == size(sigma, 2)`.
-    - `size(sigma, 1) == size(X, 2)`.
+  - `size(sigma, 1) == size(sigma, 2)`.
+  - `size(sigma, 1) == size(X, 2)`.
 
 # Returns
 

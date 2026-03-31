@@ -86,7 +86,7 @@ Num_VecNum_VecScalar
 Num_ArrNum_VecScalar
 ```
 
-## Documentation arg_dict
+## Glossaries
 
 In order to standardise the documentation we use a arg_dict of terms.
 

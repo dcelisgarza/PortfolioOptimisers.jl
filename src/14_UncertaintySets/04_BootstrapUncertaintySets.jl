@@ -298,7 +298,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
 
 # Returns
 
-    - `sigmas::Array{<:Number, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
+  - `sigmas::Array{<:Number, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
 
 # Details
 

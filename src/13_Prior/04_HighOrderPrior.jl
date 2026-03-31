@@ -196,9 +196,9 @@ Construct duplication, elimination, and summation matrices for symmetric matrix 
 
 # Returns
 
-    - `D::SparseMatrixCSC{Int64, Int64}`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
-    - `L::SparseMatrixCSC{Int64, Int64}`: Elimination matrix (`m × n^2`).
-    - `S::SparseMatrixCSC{Int64, Int64}`: Summation matrix (`m × n^2`).
+  - `D::SparseMatrixCSC{Int64, Int64}`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
+  - `L::SparseMatrixCSC{Int64, Int64}`: Elimination matrix (`m × n^2`).
+  - `S::SparseMatrixCSC{Int64, Int64}`: Summation matrix (`m × n^2`).
 
 # Validation
 

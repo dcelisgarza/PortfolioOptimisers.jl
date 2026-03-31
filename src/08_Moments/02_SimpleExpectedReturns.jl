@@ -20,8 +20,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-    - $(val_dict[:oow])
-    - $(val_dict[:oidx])
+  - $(val_dict[:oow])
+  - $(val_dict[:oidx])
 
 # Examples
 
@@ -70,7 +70,7 @@ end
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
-This method computes the expected returns as the sample mean of the input data `X`, optionally using observation weights stored in the estimator. If no weights are provided, the unweighted mean is computed.
+This method computes the expected returns as the sample mean of the input data `X` according to `ce`.
 
 # Arguments
 

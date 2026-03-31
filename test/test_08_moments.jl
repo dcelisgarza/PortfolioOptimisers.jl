@@ -135,10 +135,7 @@
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = StandardisedGerber0()),
-               GerberCovariance(;
-                                alg = StandardisedGerber0(;
-                                                          me = SimpleExpectedReturns(;
-                                                                                     w = ew)),
+               GerberCovariance(; alg = StandardisedGerber0(),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber1()),
@@ -147,14 +144,12 @@
                GerberCovariance(; alg = StandardisedGerber2()),
                SmythBrobyCovariance(; alg = SmythBroby0()),
                SmythBrobyCovariance(; alg = SmythBroby0(),
-                                    me = SimpleExpectedReturns(; w = ew),
                                     ve = SimpleVariance(;
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
                SmythBrobyCovariance(; alg = StandardisedSmythBroby0()),
                SmythBrobyCovariance(; alg = StandardisedSmythBroby0(),
-                                    me = SimpleExpectedReturns(; w = ew),
                                     ve = SimpleVariance(;
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),

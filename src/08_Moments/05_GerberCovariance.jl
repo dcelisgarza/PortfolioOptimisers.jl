@@ -132,28 +132,6 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber covariance algorithm on Z-transformed data.
 
-# Fields
-
-  - `me`: Expected returns estimator used for mean-centering prior to normalisation.
-
-# Constructors
-
-    StandardisedGerber0(;
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
-    ) -> StandardisedGerber0
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> StandardisedGerber0()
-StandardisedGerber0
-  me ┼ SimpleExpectedReturns
-     │     w ┼ nothing
-     │   idx ┴ nothing
-```
-
 # Related
 
   - [`StandardisedGerberCovarianceAlgorithm`](@ref)
@@ -167,43 +145,12 @@ StandardisedGerber0
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-@concrete struct StandardisedGerber0 <: StandardisedGerberCovarianceAlgorithm
-    me
-    function StandardisedGerber0(me::AbstractExpectedReturnsEstimator)
-        return new{typeof(me)}(me)
-    end
-end
-function StandardisedGerber0(;
-                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-    return StandardisedGerber0(me)
-end
+struct StandardisedGerber0 <: StandardisedGerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Gerber covariance algorithm on Z-transformed data.
 
-# Fields
-
-  - `me`: Expected returns estimator used for mean-centering prior to normalisation.
-
-# Constructors
-
-    StandardisedGerber1(;
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
-    ) -> StandardisedGerber1
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> StandardisedGerber1()
-StandardisedGerber1
-  me ┼ SimpleExpectedReturns
-     │     w ┼ nothing
-     │   idx ┴ nothing
-```
-
 # Related
 
   - [`StandardisedGerberCovarianceAlgorithm`](@ref)
@@ -217,42 +164,11 @@ StandardisedGerber1
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-@concrete struct StandardisedGerber1 <: StandardisedGerberCovarianceAlgorithm
-    me
-    function StandardisedGerber1(me::AbstractExpectedReturnsEstimator)
-        return new{typeof(me)}(me)
-    end
-end
-function StandardisedGerber1(;
-                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-    return StandardisedGerber1(me)
-end
+struct StandardisedGerber1 <: StandardisedGerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Gerber covariance algorithm on Z-transformed data.
-
-# Fields
-
-  - `me`: Expected returns estimator used for mean-centering prior to normalisation.
-
-# Constructors
-
-    StandardisedGerber2(;
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
-    ) -> StandardisedGerber2
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> StandardisedGerber2()
-StandardisedGerber2
-  me ┼ SimpleExpectedReturns
-     │     w ┼ nothing
-     │   idx ┴ nothing
-```
 
 # Related
 
@@ -267,109 +183,7 @@ StandardisedGerber2
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-@concrete struct StandardisedGerber2 <: StandardisedGerberCovarianceAlgorithm
-    me
-    function StandardisedGerber2(me::AbstractExpectedReturnsEstimator)
-        return new{typeof(me)}(me)
-    end
-end
-function StandardisedGerber2(;
-                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-    return StandardisedGerber2(me)
-end
-for (i, alg) in enumerate((Gerber0, Gerber1, Gerber2))
-    doc_str = if i == 1
-        """
-          factory(alg::Gerber0, ::Any)
-          factory(alg::Gerber1, ::Any)
-          factory(alg::Gerber2, ::Any)
-
-      Return the provided Gerber covariance algorithm instance unchanged.
-
-      These methods are used to support the `factory` interface for Gerber covariance algorithm types that do not require weights or additional configuration. They enable consistent construction and dispatch for Gerber algorithm variants.
-
-      # Arguments
-
-        - `alg`: Gerber covariance algorithm instance.
-        - Unused for API compatibility.
-
-      # Returns
-
-        - `alg`: The input.
-
-      # Details
-
-        - These methods allow the `factory` interface to return the algorithm instance directly for unweighted Gerber algorithms.
-        - Used internally when constructing Gerber covariance estimators.
-
-      # Related
-
-        - [`UnstandardisedGerberCovarianceAlgorithm`](@ref)
-        - [`factory`](@ref)
-      """
-    else
-        nothing
-    end
-    eval(quote
-             @doc $(doc_str) function factory(alg::$(alg), ::Any)
-                 return alg
-             end
-         end)
-end
-for (i, alg) in enumerate((StandardisedGerber0, StandardisedGerber1, StandardisedGerber2))
-    doc_str = if i == 1
-        """
-        factory(alg::StandardisedGerber0, w::StatsBase.AbstractWeights)
-        factory(alg::StandardisedGerber1, w::StatsBase.AbstractWeights)
-        factory(alg::StandardisedGerber2, w::StatsBase.AbstractWeights)
-
-    Construct a new standardised Gerber covariance algorithm instance with the expected returns estimator adapted for the provided weights.
-
-    # Arguments
-
-      - `alg`: Standardised Gerber covariance algorithm instance (`StandardisedGerber0`, `StandardisedGerber1`, or `StandardisedGerber2`).
-      - `w`: Weights vector.
-
-    # Returns
-
-      - A new instance of the same algorithm type, with the `me` field replaced by the result of `factory(alg.me, w)`.
-
-    # Details
-
-      - These methods enable the `factory` interface for standardised Gerber covariance algorithms to support weighted expected returns estimators.
-      - The returned algorithm instance is configured for weighted or unweighted mean estimation as appropriate.
-      - Used internally when constructing weighted Gerber covariance estimators.
-
-    # Related
-
-      - [`StandardisedGerberAlgorithm`](@ref)
-      - [`factory`](@ref)
-
-    # Examples
-
-    ```jldoctest
-    julia> alg = StandardisedGerber0()
-    StandardisedGerber0
-      me ┼ SimpleExpectedReturns
-         │     w ┼ nothing
-         │   idx ┴ nothing
-
-    julia> factory(alg, StatsBase.Weights([0.2, 0.3, 0.5]))
-    StandardisedGerber0
-      me ┼ SimpleExpectedReturns
-         │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-         │   idx ┴ nothing
-    ```
-    """
-    else
-        nothing
-    end
-    eval(quote
-             @doc $(doc_str) function factory(alg::$(alg), w::StatsBase.AbstractWeights)
-                 return $(alg)(; me = factory(alg.me, w))
-             end
-         end)
-end
+struct StandardisedGerber2 <: StandardisedGerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -379,10 +193,7 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
 # Fields
 
-  - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `t`: Threshold parameter for Gerber covariance computation.
-  - `alg`: Gerber covariance algorithm variant.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -397,7 +208,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < t < 1`.
+  - $(val_dict[:gerbt])
 
 # Related
 
@@ -418,9 +229,13 @@ Keywords correspond to the struct's fields.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 @concrete struct GerberCovariance <: BaseGerberCovariance
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:pdm])"
     pdm
+    "$(field_dict[:gerbt])"
     t
+    "$(field_dict[:gerbalg])"
     alg
     function GerberCovariance(ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
                               t::Number, alg::GerberCovarianceAlgorithm)
@@ -434,37 +249,34 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
     return GerberCovariance(ve, pdm, t, alg)
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
-           std_vec::ArrNum)
+    gerber(
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0},
+        X::MatNum,
+        sd::ArrNum
+    ) -> MatNum
 
 Implements the original Gerber correlation algorithm.
 
-This method computes the Gerber correlation or correlation matrix for the input data matrix `X` using the original Gerber0 algorithm. The computation is based on thresholding the standardized data and counting co-occurrences of threshold exceedances.
-
 # Arguments
 
-  - `ce`: Gerber correlation estimator configured with the `Gerber0` algorithm.
-  - `X`: Data matrix (observations × assets).
-  - `std_vec`: Vector of standard deviations for each asset, used to scale the threshold.
+  - $(arg_dict[:gerbce]). Configured with the `Gerber0` algorithm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation, projected to be positive definite using the estimator's `pdm` field.
+  - $(ret_dict[:rho])
 
 # Details
 
 The algorithm proceeds as follows:
 
- 1. For each entry in `X`, compute two Boolean matrices:
-
-      + `U`: Entries where `X` exceeds `t * std_vec`.
-      + `D`: Entries where `X` is less than `-t * std_vec`.
-
- 2. Compute `UmD = U - D` and `UpD = U + D`.
-
- 3. The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
-
- 4. The result is projected to the nearest positive definite matrix using `posdef!`.
+  - For each entry in `X`, compute two Boolean matrices:
+      + `U`: Entries where `X` exceeds `ce.t * sd`.
+      + `D`: Entries where `X` is less than `-ce.t * sd`.
+  - Compute `UmD = U - D` and `UpD = U + D`.
+  - The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
+  - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
@@ -476,14 +288,13 @@ The algorithm proceeds as follows:
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
-                std_vec::ArrNum)
+function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
-    std_vec = std_vec * ce.t
-    U .= X .>= std_vec
-    D .= X .<= -std_vec
+    sd = sd * ce.t
+    U .= X .>= sd
+    D .= X .<= -sd
     # nconc = transpose(U) * U + transpose(D) * D
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
@@ -494,35 +305,32 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::MatNum)
+    gerber(
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0},
+        X::MatNum
+    ) -> MatNum
 
 Implements the original Gerber correlation algorithm on Z-transformed data.
 
-This method computes the Gerber correlation or correlation matrix for the input data matrix `X` using the original `StandardisedGerber0` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding and counting co-occurrences of threshold exceedances.
-
 # Arguments
 
-  - `ce`: Gerber correlation estimator configured with the `StandardisedGerber0` algorithm.
-  - `X`: Z-transformed data matrix (observations × assets).
+  - $(arg_dict[:gerbce]). Configured with the `StandardisedGerber0` algorithm.
+  - $(arg_dict[:X]) Assumed to be Z-transformed.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - $(ret_dict[:rho])
 
 # Details
 
 The algorithm proceeds as follows:
 
- 1. For each entry in `X`, compute two Boolean matrices:
-
+  - For each entry in `X`, compute two Boolean matrices:
       + `U`: Entries where `X` exceeds `ce.t`.
       + `D`: Entries where `X` is less than `-ce.t`.
-
- 2. Compute `UmD = U - D` and `UpD = U + D`.
-
- 3. The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
-
- 4. The result is projected to the nearest positive definite matrix using `posdef!`.
+  - Compute `UmD = U - D` and `UpD = U + D`.
+  - The Gerber correlation is given by `(UmD' * UmD) ⊘ (UpD' * UpD)`.
+  - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
@@ -550,38 +358,35 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
-           std_vec::ArrNum)
+    gerber(
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1},
+        X::MatNum,
+        sd::ArrNum
+    ) -> MatNum
 
 Implements the first variant of the Gerber correlation algorithm.
 
-This method computes the Gerber correlation or correlation matrix for the input data matrix `X` using the Gerber1 algorithm. The computation is based on thresholding the standardized data, counting co-occurrences of threshold exceedances, and adjusting for non-exceedance events.
-
 # Arguments
 
-  - `ce`: Gerber correlation estimator configured with the `Gerber1` algorithm.
-  - `X`: Data matrix (observations × assets).
-  - `std_vec`: Vector of standard deviations for each asset, used to scale the threshold.
+  - $(arg_dict[:gerbce]). Configured with the `Gerber1` algorithm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - $(ret_dict[:rho])
 
 # Details
 
 The algorithm proceeds as follows:
 
- 1. For each entry in `X`, compute three Boolean matrices:
-
-      + `U`: Entries where `X` exceeds `t * std_vec`.
-      + `D`: Entries where `X` is less than `-t * std_vec`.
-      + `N`: Entries where `X` is within `[-t * std_vec, t * std_vec]` (i.e., neither up nor down).
-
- 2. Compute `UmD = U - D`.
-
- 3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
-
- 4. The result is projected to the nearest positive definite matrix using `posdef!`.
+  - For each entry in `X`, compute three Boolean matrices:
+      + `U`: Entries where `X` exceeds `ce.t * sd`.
+      + `D`: Entries where `X` is less than `-ce.t * sd`.
+      + `N`: Entries where `X` is within `[-ce.t * sd, ce.t * sd]` (i.e., neither up nor down).
+  - Compute `UmD = U - D`.
+  - The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
+  - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
@@ -593,15 +398,14 @@ The algorithm proceeds as follows:
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
-                std_vec::ArrNum)
+function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
     N = Matrix{Bool}(undef, T, N)
-    std_vec = std_vec * ce.t
-    U .= X .>= std_vec
-    D .= X .<= -std_vec
+    sd = sd * ce.t
+    U .= X .>= sd
+    D .= X .<= -sd
     N .= .!U .& .!D
     # nconc = transpose(U) * U + transpose(D) * D
     # ndisc = transpose(U) * D + transpose(D) * U
@@ -612,36 +416,33 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)
+    gerber(
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1},
+        X::MatNum
+    ) -> MatNum
 
 Implements the first variant of the Gerber correlation algorithm on Z-transformed data.
 
-This method computes the Gerber correlation or correlation matrix for the input data matrix `X` using the `StandardisedGerber1` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding, counting co-occurrences of threshold exceedances, and adjusting for non-exceedance events.
-
 # Arguments
 
-  - `ce`: Gerber correlation estimator configured with the `StandardisedGerber1` algorithm.
-  - `X`: Z-transformed data matrix (observations × assets).
+  - $(arg_dict[:gerbce]). Configured with the `StandardisedGerber1` algorithm.
+  - $(arg_dict[:X]) Assumed to be Z-transformed.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - $(ret_dict[:rho])
 
 # Details
 
 The algorithm proceeds as follows:
 
- 1. For each entry in `X`, compute three Boolean matrices:
-
+  - For each entry in `X`, compute three Boolean matrices:
       + `U`: Entries where `X` exceeds `ce.t`.
       + `D`: Entries where `X` is less than `-ce.t`.
       + `N`: Entries where `X` is within `[-ce.t, ce.t]` (i.e., neither up nor down).
-
- 2. Compute `UmD = U - D`.
-
- 3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
-
- 4. The result is projected to the nearest positive definite matrix using `posdef!`.
+  - Compute `UmD = U - D`.
+  - The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
+  - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
@@ -670,39 +471,35 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
-           std_vec::ArrNum)
+    gerber(
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2},
+        X::MatNum,
+        sd::ArrNum
+    ) -> MatNum
 
 Implements the second variant of the Gerber correlation algorithm.
 
-This method computes the Gerber correlation or correlation matrix for the input data matrix `X` using the Gerber2 algorithm. The computation is based on thresholding the standardized data, constructing a signed indicator matrix, and normalizing by the geometric mean of diagonal elements.
-
 # Arguments
 
-  - `ce`: Gerber correlation estimator configured with the `Gerber2` algorithm.
-  - `X`: Data matrix (observations × assets).
-  - `std_vec`: Vector of standard deviations for each asset, used to scale the threshold.
+  - $(arg_dict[:gerbce]). Configured with the `Gerber2` algorithm.
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation or correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - $(ret_dict[:rho])
 
 # Details
 
 The algorithm proceeds as follows:
 
- 1. For each entry in `X`, compute two Boolean matrices:
-
-      + `U`: Entries where `X` exceeds `t * std_vec`.
-      + `D`: Entries where `X` is less than `-t * std_vec`.
-
- 2. Compute the signed indicator matrix `UmD = U - D`.
-
- 3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
-
- 4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
-
- 5. The result is projected to the nearest positive definite matrix using `posdef!`.
+  - For each entry in `X`, compute two Boolean matrices:
+      + `U`: Entries where `X` exceeds `ce.t * sd`.
+      + `D`: Entries where `X` is less than `-ce.t * sd`.
+  - Compute the signed indicator matrix `UmD = U - D`.
+  - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
+  - Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+  - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
@@ -714,14 +511,13 @@ The algorithm proceeds as follows:
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
-                std_vec::ArrNum)
+function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
-    std_vec = std_vec * ce.t
-    U .= X .>= std_vec
-    D .= X .<= -std_vec
+    sd = sd * ce.t
+    U .= X .>= sd
+    D .= X .<= -sd
     # nconc = transpose(U) * U + transpose(D) * D
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
@@ -733,37 +529,33 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)
+    gerber(
+        ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2},
+        X::MatNum
+    ) -> MatNum
 
 Implements the second variant of the Gerber correlation algorithm on Z-transformed data.
 
-This method computes the Gerber correlation or correlation matrix for the input data matrix `X` using the `StandardisedGerber2` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding, constructing a signed indicator matrix, and normalizing by the geometric mean of diagonal elements.
-
 # Arguments
 
-  - `ce`: Gerber correlation estimator configured with the `StandardisedGerber2` algorithm.
-  - `X`: Z-transformed data matrix (observations × assets).
+  - $(arg_dict[:gerbce]). Configured with the `StandardisedGerber2` algorithm.
+  - $(arg_dict[:X]) Assumed to be Z-transformed.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - $(ret_dict[:rho])
 
 # Details
 
 The algorithm proceeds as follows:
 
- 1. For each entry in `X`, compute two Boolean matrices:
-
+  - For each entry in `X`, compute two Boolean matrices:
       + `U`: Entries where `X` exceeds `ce.t`.
       + `D`: Entries where `X` is less than `-ce.t`.
-
- 2. Compute the signed indicator matrix `UmD = U - D`.
-
- 3. Compute the raw Gerber2 matrix `H = UmD' * UmD`.
-
- 4. Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
-
- 5. The result is projected to the nearest positive definite matrix using `posdef!`.
+  - Compute the signed indicator matrix `UmD = U - D`.
+  - Compute the raw Gerber2 matrix `H = UmD' * UmD`.
+  - Normalize: `rho = H ⊘ (h * h')`, where `h = sqrt.(LinearAlgebra.diag(H))`.
+  - The result is projected to the nearest positive definite matrix using `posdef!`.
 
 # Related
 
@@ -792,43 +584,42 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}
     return rho
 end
 """
-    Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.cor(
+        ce::GerberCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
 
 Compute the Gerber correlation matrix using an unstandardised Gerber covariance estimator.
 
 # Arguments
 
-  - `ce::GerberCovariance`: Gerber covariance estimator.
-
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnstandardisedGerberCovarianceAlgorithm}`: Compute the unstandardised Gerber correlation matrix.
-      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerberCovarianceAlgorithm}`: Compute the standardised Gerber correlation matrix.
-
-  - `X`: Data matrix (observations × assets).
-
+  - $(arg_dict[:gerbce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Gerber correlation matrix.
+  - $(arg_dict[:rho])
 
 # Validation
 
-  - `dims` is either `1` or `2`.
+  - $(val_dict[:dims])
 
 # Details
 
- 1. Computes the standard deviation vector for each asset using the estimator's variance estimator.
- 2. If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
- 3. Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
+  - Computes the standard deviation vector for each asset using the estimator's variance estimator.
+  - If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+  - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
 
 # Related
 
   - [`GerberCovariance`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, std_vec::ArrNum)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, std_vec::ArrNum)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, std_vec::ArrNum)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::MatNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)`](@ref)
@@ -845,8 +636,8 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return gerber(ce, X, std_vec)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    return gerber(ce, X, sd)
 end
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:StandardisedGerberCovarianceAlgorithm},
@@ -855,11 +646,12 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? Statistics.mean(ce.alg.me, X; dims = 1, kwargs...) : mean
-    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ std_vec
+    me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
+    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    X = (X .- mean_vec) ⊘ sd
     return gerber(ce, X)
 end
 """
@@ -898,9 +690,9 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 # Related
 
   - [`GerberCovariance`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, std_vec::ArrNum)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, std_vec::ArrNum)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, std_vec::ArrNum)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::MatNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)`](@ref)
@@ -917,9 +709,9 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    sigma = gerber(ce, X, std_vec)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sigma = gerber(ce, X, sd)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:StandardisedGerberCovarianceAlgorithm},
@@ -928,13 +720,14 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? Statistics.mean(ce.alg.me, X; dims = 1, kwargs...) : mean
-    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ std_vec
+    me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
+    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    X = (X .- mean_vec) ⊘ sd
     sigma = gerber(ce, X)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),

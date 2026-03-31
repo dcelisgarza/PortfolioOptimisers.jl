@@ -1,9 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrary covariance estimators and optional observation weights.
-
-`GeneralCovariance` allows users to specify both the covariance estimation method and optional observation weights.
+A simple wrapper for a covariance estimator around a [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator), optional [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/), and an optional index. It simplifies the standard API of [`StatsBase.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.cov) by using ideas from SCIML.
 
 # Fields
 
@@ -86,7 +84,7 @@ end
 
 Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
 
-This method dispatches to [`robust_cov`](@ref), using the specified covariance estimator and optional observation weights stored in `ce`. If no weights are provided, the unweighted covariance is computed; otherwise, the weighted covariance is used.
+This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.w`, which computes the covariance matrix using `ce.ce`.
 
 # Arguments
 
@@ -139,7 +137,7 @@ end
 
 Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
 
-This method dispatches to [`robust_cor`](@ref), using the specified covariance estimator and optional observation weights stored in `ce`. If no weights are provided, the unweighted correlation is computed; otherwise, the weighted correlation is used.
+This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.w`, which computes the correlation matrix using `ce.ce`.
 
 # Arguments
 
@@ -212,7 +210,7 @@ $(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying joint expected returns and covariance estimation in `PortfolioOptimisers.jl`.
 
-`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm.
+`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm. It is one level of abstraction above [`GeneralCovariance`](@ref), providing a convenient way to configure and apply these components together.
 
 # Fields
 

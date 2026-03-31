@@ -3,8 +3,6 @@ $(DocStringExtensions.TYPEDEF)
 
 A flexible variance estimator for `PortfolioOptimisers.jl` supporting optional expected returns estimators, observation weights, and bias correction.
 
-`SimpleVariance` enables users to specify an expected returns estimator (for mean-centering), optional observation weights, and whether to apply bias correction (Bessel's correction). This type is suitable for both unweighted and weighted variance estimation workflows.
-
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -84,7 +82,7 @@ end
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
 
-This method computes the standard deviation of the input array `X` using the configuration specified in `ve`, including optional mean-centering (via `ve.me`), observation weights (`ve.w`), and bias correction (`ve.corrected`). If a mean is not provided, it is estimated using the expected returns estimator in `ve.me`.
+This method computes the standard deviation of the input matrix `X` using the configuration specified in `ve`.
 
 # Arguments
 
@@ -135,8 +133,11 @@ function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
 end
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    me = SimpleExpectedReturns()
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
+    mu = if isnothing(mean)
+        Statistics.mean(SimpleExpectedReturns(), X; dims = dims, kwargs...)
+    else
+        mean
+    end
     return if isnothing(ve.w)
         Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
@@ -152,7 +153,7 @@ end
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
 
-This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is not `nothing`, it is used for centering; otherwise, the default mean is used.
+This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`.
 
 # Arguments
 
@@ -218,7 +219,7 @@ end
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
 
-This method computes the variance of the input array `X` using the configuration specified in `ve`, including optional mean-centering (via `ve.me`), observation weights (`ve.w`), and bias correction (`ve.corrected`). If a mean is not provided, it is estimated using the expected returns estimator in `ve.me`.
+This method computes the variance of the input matrix `X` using the configuration specified in `ve`.
 
 # Arguments
 
@@ -286,7 +287,7 @@ end
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 
-This method computes the variance of the input vector `X` using the configuration specified in `ve`, including optional observation weights (`ve.w`) and bias correction (`ve.corrected`). If a mean is not `nothing`, it is used for centering; otherwise, the default mean is used.
+This method computes the variance of the input vector `X` using the configuration specified in `ve`.
 
 # Arguments
 
