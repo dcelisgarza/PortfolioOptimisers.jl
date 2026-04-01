@@ -20,9 +20,7 @@ Container type for coskewness estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `mp`: Matrix processing estimator for coskewness tensors.
-  - `alg`: Moment algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -61,8 +59,11 @@ Coskewness
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct Coskewness <: CoskewnessEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:malg])"
     alg
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)

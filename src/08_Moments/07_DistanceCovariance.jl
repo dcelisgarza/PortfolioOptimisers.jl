@@ -7,11 +7,7 @@ A flexible container type for configuring and applying distance-based covariance
 
 # Fields
 
-  - `dist`: Distance metric used for pairwise computations.
-  - `args`: Additional positional arguments for the distance metric.
-  - `kwargs`: Additional keyword arguments for the distance metric.
-  - `w`: Optional weights for observations.
-  - `ex`: Parallel execution strategy.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -45,10 +41,15 @@ DistanceCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
+    "$(arg_dict[:dist])"
     dist
+    "$(arg_dict[:dist_args])"
     args
+    "$(arg_dict[:dist_kwargs])"
     kwargs
+    "$(arg_dict[:oow])"
     w
+    "$(arg_dict[:ex])"
     ex
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                                 w::Option{<:StatsBase.AbstractWeights},

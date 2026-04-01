@@ -7,9 +7,7 @@ Container type for equilibrium expected returns estimators.
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
-  - `l`: Risk aversion parameter.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -23,7 +21,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -59,8 +57,11 @@ EquilibriumExpectedReturns
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 @concrete struct EquilibriumExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:eqw])"
     w
+    "$(field_dict[:l])"
     l
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
                                         w::Option{<:VecNum}, l::Number)

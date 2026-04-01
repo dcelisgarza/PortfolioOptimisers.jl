@@ -20,9 +20,7 @@ Container type for cokurtosis estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `mp`: Matrix processing estimator for cokurtosis tensors.
-  - `alg`: Moment algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -61,8 +59,11 @@ Cokurtosis
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct Cokurtosis <: CokurtosisEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:malg])"
     alg
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)

@@ -7,8 +7,7 @@ Composite covariance estimator with post-processing.
 
 # Fields
 
-  - `ce`: The underlying covariance estimator.
-  - `mp`: Matrix post-processing estimator.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -49,7 +48,9 @@ PortfolioOptimisersCovariance
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
 @concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:mp])"
     mp
     function PortfolioOptimisersCovariance(ce::AbstractCovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator)

@@ -5,9 +5,7 @@ A covariance estimator that applies a custom matrix processing algorithm and pos
 
 # Fields
 
-  - `ce`: The underlying covariance estimator to be processed.
-  - `alg`: The matrix processing algorithm to apply to the covariance matrix.
-  - `pdm`: The positive definite matrix projection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -46,8 +44,11 @@ ProcessedCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:mpa])"
     alg
+    "$(field_dict[:pdm])"
     pdm
     function ProcessedCovariance(ce::AbstractCovarianceEstimator,
                                  alg::Option{<:AbstractMatrixProcessingAlgorithm},

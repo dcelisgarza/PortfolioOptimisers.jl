@@ -21,7 +21,7 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -52,6 +52,7 @@ KendallCovariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct KendallCovariance <: RankCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
     function KendallCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
@@ -126,9 +127,9 @@ function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs.
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = StatsBase.corkendall(X)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -139,7 +140,7 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -170,6 +171,7 @@ SpearmanCovariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct SpearmanCovariance <: RankCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
     function SpearmanCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
@@ -244,9 +246,9 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = StatsBase.corspearman(X)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote

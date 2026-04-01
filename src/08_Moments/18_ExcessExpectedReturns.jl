@@ -7,8 +7,7 @@ Container type for excess expected returns estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `rf`: Risk-free rate to subtract from expected returns.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -36,7 +35,9 @@ ExcessExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 @concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:rf])"
     rf
     function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Number)
         return new{typeof(me), typeof(rf)}(me, rf)

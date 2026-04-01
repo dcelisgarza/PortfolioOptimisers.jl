@@ -5,9 +5,7 @@ A covariance estimator that applies a detoning algorithm and positive definite p
 
 # Fields
 
-  - `ce`: The underlying covariance estimator to be detoned.
-  - `dt`: The detoning algorithm to apply to the covariance matrix.
-  - `pdm`: The positive definite matrix projection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -50,8 +48,11 @@ DetoneCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct DetoneCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:dt])"
     dt
+    "$(field_dict[:pdm])"
     pdm
     function DetoneCovariance(ce::AbstractCovarianceEstimator, dt::Detone,
                               pdm::Option{<:Posdef})

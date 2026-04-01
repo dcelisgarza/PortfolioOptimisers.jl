@@ -5,9 +5,7 @@ A covariance estimator that applies a denoising algorithm and positive definite 
 
 # Fields
 
-  - `ce`: The underlying covariance estimator to be denoised.
-  - `dn`: The denoising algorithm to apply to the covariance matrix.
-  - `pdm`: The positive definite matrix projection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -56,8 +54,11 @@ DenoiseCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct DenoiseCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:dn])"
     dn
+    "$(field_dict[:pdm])"
     pdm
     function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
                                pdm::Option{<:Posdef})

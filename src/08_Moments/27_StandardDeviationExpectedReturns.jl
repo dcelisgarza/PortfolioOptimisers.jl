@@ -1,4 +1,5 @@
 @concrete struct StandardDeviationExpectedReturns <: AbstractExpectedReturnsEstimator
+    "$(field_dict[:ce])"
     ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)

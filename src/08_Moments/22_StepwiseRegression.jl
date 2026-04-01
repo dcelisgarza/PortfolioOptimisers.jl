@@ -7,7 +7,7 @@ Stepwise regression criterion based on p-value thresholding.
 
 # Fields
 
-  - `t`: The p-value threshold for variable inclusion.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -19,7 +19,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < t < 1`.
+  - $(val_dict[:t])
 
 # Examples
 
@@ -35,6 +35,7 @@ PValue
   - [`StepwiseRegression`](@ref)
 """
 @concrete struct PValue <: AbstractStepwiseRegressionCriterion
+    "$(field_dict[:t])"
     t
     function PValue(t::Number)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
@@ -114,8 +115,11 @@ StepwiseRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 @concrete struct StepwiseRegression <: AbstractRegressionEstimator
+    "$(field_dict[:crit])"
     crit
+    "$(field_dict[:realg])"
     alg
+    "$(field_dict[:retgt])"
     tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,

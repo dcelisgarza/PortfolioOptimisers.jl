@@ -231,15 +231,7 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 
 # Fields
 
-  - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator.
-  - `t`: Threshold parameter for Smyth-Broby covariance computation.
-  - `c1`: Zone of confusion parameter.
-  - `c2`: Zone of indecision lower bound.
-  - `c3`: Zone of indecision upper bound.
-  - `n`: Exponent parameter for the Smyth-Broby kernel.
-  - `alg`: Smyth-Broby covariance algorithm variant.
-  - `ex`: Parallel execution strategy.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -259,10 +251,10 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < t < 1`.
-  - `0 < c1 <= 1`.
-  - `0 < c2 <= 1`.
-  - `c3 > c2`.
+  - $(val_dict[:t])
+  - $(val_dict[:c1])
+  - $(val_dict[:c2])
+  - $(val_dict[:c3c2])
 
 # Examples
 
@@ -311,14 +303,23 @@ SmythBrobyCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:pdm])"
     pdm
+    "$(field_dict[:t])"
     t
+    "$(field_dict[:c1])"
     c1
+    "$(field_dict[:c2])"
     c2
+    "$(field_dict[:c3])"
     c3
+    "$(field_dict[:sbn])"
     n
+    "$(field_dict[:sbalg])"
     alg
+    "$(field_dict[:ex])"
     ex
     function SmythBrobyCovariance(ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
                                   t::Number, c1::Number, c2::Number, c3::Number, n::Number,
@@ -409,7 +410,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBroby0, <:Any}, X::MatNum,
-               mean_vec::ArrNum, std_vec::ArrNum)
+               mu::ArrNum, sd::ArrNum)
 
 Implements the original Smyth-Broby covariance/correlation algorithm (unstandardised variant).
 
@@ -419,8 +420,8 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
   - `ce`: Smyth-Broby covariance estimator configured with the `SmythBroby0` algorithm.
   - `X`: Data matrix (observations × assets).
-  - `mean_vec`: Vector of means for each asset, used for centering.
-  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `mu`: Vector of means for each asset, used for centering.
+  - `sd`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
 # Returns
 
@@ -446,7 +447,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:SmythBroby0, <:Any}, X::MatNum,
-                    mean_vec::ArrNum, std_vec::ArrNum)
+                    mu::ArrNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     t = ce.t
@@ -455,14 +456,14 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c3 = ce.c3
     n = ce.n
     FLoops.@floop ce.ex for j in axes(X, 2)
-        muj = mean_vec[j]
-        sigmaj = std_vec[j]
+        muj = mu[j]
+        sigmaj = sd[j]
         tj = t * sigmaj
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
-            mui = mean_vec[i]
-            sigmai = std_vec[i]
+            mui = mu[i]
+            sigmai = sd[i]
             ti = t * sigmai
             for k in 1:T
                 xi = X[k, i]
@@ -592,7 +593,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:SmythBroby1, <:Any}, X::MatNum,
-                    mean_vec::ArrNum, std_vec::ArrNum)
+                    mu::ArrNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     t = ce.t
@@ -601,15 +602,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c3 = ce.c3
     n = ce.n
     FLoops.@floop ce.ex for j in axes(X, 2)
-        muj = mean_vec[j]
-        sigmaj = std_vec[j]
+        muj = mu[j]
+        sigmaj = sd[j]
         tj = t * sigmaj
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             nn = zero(eltype(X))
-            mui = mean_vec[i]
-            sigmai = std_vec[i]
+            mui = mu[i]
+            sigmai = sd[i]
             ti = t * sigmai
             for k in 1:T
                 xi = X[k, i]
@@ -711,7 +712,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBroby2, <:Any}, X::MatNum,
-               mean_vec::ArrNum, std_vec::ArrNum)
+               mu::ArrNum, sd::ArrNum)
 
 Implements the second variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -721,8 +722,8 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
   - `ce`: Smyth-Broby covariance estimator configured with the `SmythBroby2` algorithm.
   - `X`: Data matrix (observations × assets).
-  - `mean_vec`: Vector of means for each asset, used for centering.
-  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `mu`: Vector of means for each asset, used for centering.
+  - `sd`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
 # Returns
 
@@ -749,7 +750,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:SmythBroby2, <:Any}, X::MatNum,
-                    mean_vec::ArrNum, std_vec::ArrNum)
+                    mu::ArrNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     t = ce.t
@@ -758,14 +759,14 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c3 = ce.c3
     n = ce.n
     FLoops.@floop ce.ex for j in axes(X, 2)
-        muj = mean_vec[j]
-        sigmaj = std_vec[j]
+        muj = mu[j]
+        sigmaj = sd[j]
         tj = t * sigmaj
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
-            mui = mean_vec[i]
-            sigmai = std_vec[i]
+            mui = mu[i]
+            sigmai = sd[i]
             ti = t * sigmai
             for k in 1:T
                 xi = X[k, i]
@@ -856,7 +857,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBrobyGerber0, <:Any}, X::MatNum,
-               mean_vec::ArrNum, std_vec::ArrNum)
+               mu::ArrNum, sd::ArrNum)
 
 Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -866,8 +867,8 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
   - `ce`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber0` algorithm.
   - `X`: Data matrix (observations × assets).
-  - `mean_vec`: Vector of means for each asset, used for centering.
-  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `mu`: Vector of means for each asset, used for centering.
+  - `sd`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
 # Returns
 
@@ -893,7 +894,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:SmythBrobyGerber0, <:Any}, X::MatNum,
-                    mean_vec::ArrNum, std_vec::ArrNum)
+                    mu::ArrNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     t = ce.t
@@ -902,16 +903,16 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c3 = ce.c3
     n = ce.n
     FLoops.@floop ce.ex for j in axes(X, 2)
-        muj = mean_vec[j]
-        sigmaj = std_vec[j]
+        muj = mu[j]
+        sigmaj = sd[j]
         tj = t * sigmaj
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             cneg = 0
             cpos = 0
-            mui = mean_vec[i]
-            sigmai = std_vec[i]
+            mui = mu[i]
+            sigmai = sd[i]
             ti = t * sigmai
             for k in 1:T
                 xi = X[k, i]
@@ -1018,7 +1019,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBrobyGerber1, <:Any}, X::MatNum,
-               mean_vec::ArrNum, std_vec::ArrNum)
+               mu::ArrNum, sd::ArrNum)
 
 Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -1028,8 +1029,8 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
   - `ce`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber1` algorithm.
   - `X`: Data matrix (observations × assets).
-  - `mean_vec`: Vector of means for each asset, used for centering.
-  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `mu`: Vector of means for each asset, used for centering.
+  - `sd`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
 # Returns
 
@@ -1055,7 +1056,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:SmythBrobyGerber1, <:Any}, X::MatNum,
-                    mean_vec::ArrNum, std_vec::ArrNum)
+                    mu::ArrNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     t = ce.t
@@ -1064,8 +1065,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c3 = ce.c3
     n = ce.n
     FLoops.@floop ce.ex for j in axes(X, 2)
-        muj = mean_vec[j]
-        sigmaj = std_vec[j]
+        muj = mu[j]
+        sigmaj = sd[j]
         tj = t * sigmaj
         for i in 1:j
             neg = zero(eltype(X))
@@ -1074,8 +1075,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             cneg = 0
             cpos = 0
             cnn = 0
-            mui = mean_vec[i]
-            sigmai = std_vec[i]
+            mui = mu[i]
+            sigmai = sd[i]
             ti = t * sigmai
             for k in 1:T
                 xi = X[k, i]
@@ -1193,7 +1194,7 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SmythBrobyGerber2, <:Any}, X::MatNum,
-               mean_vec::ArrNum, std_vec::ArrNum)
+               mu::ArrNum, sd::ArrNum)
 
 Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
 
@@ -1203,8 +1204,8 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
   - `ce`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber2` algorithm.
   - `X`: Data matrix (observations × assets).
-  - `mean_vec`: Vector of means for each asset, used for centering.
-  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `mu`: Vector of means for each asset, used for centering.
+  - `sd`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
 # Returns
 
@@ -1231,7 +1232,7 @@ The algorithm proceeds as follows:
 """
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:SmythBrobyGerber2, <:Any}, X::MatNum,
-                    mean_vec::ArrNum, std_vec::ArrNum)
+                    mu::ArrNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     t = ce.t
@@ -1240,16 +1241,16 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c3 = ce.c3
     n = ce.n
     FLoops.@floop ce.ex for j in axes(X, 2)
-        muj = mean_vec[j]
-        sigmaj = std_vec[j]
+        muj = mu[j]
+        sigmaj = sd[j]
         tj = t * sigmaj
         for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             cneg = 0
             cpos = 0
-            mui = mean_vec[i]
-            sigmai = std_vec[i]
+            mui = mu[i]
+            sigmai = sd[i]
             ti = t * sigmai
             for k in 1:T
                 xi = X[k, i]
@@ -1403,11 +1404,11 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    return smythbroby(ce, X, mean_vec, std_vec)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    return smythbroby(ce, X, mu, sd)
 end
 function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any,
@@ -1419,11 +1420,11 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ std_vec
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    X = (X .- mu) ⊘ sd
     return smythbroby(ce, X)
 end
 """
@@ -1485,12 +1486,12 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    sigma = smythbroby(ce, X, mean_vec, std_vec)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    sigma = smythbroby(ce, X, mu, sd)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any,
@@ -1502,13 +1503,13 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
         X = transpose(X)
     end
     me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    std_vec = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ std_vec
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    X = (X .- mu) ⊘ sd
     sigma = smythbroby(ce, X)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 
 export SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, SmythBrobyGerber1,

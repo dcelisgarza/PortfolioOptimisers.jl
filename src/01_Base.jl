@@ -858,9 +858,10 @@ This dictionary contains the arg_dict terms and their corresponding descriptions
 """
 const arg_dict = Dict(
                       # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector `assets × 1`.",
-                      :ow => "`w`: Observation weights vector `observations × 1`.",
-                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",
+                      :pw => "`w`: Portfolio weights vector `assets × 1`.",#
+                      :ow => "`w`: Observation weights vector `observations × 1`.",#
+                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",#
+                      :eqw => "`eqw`: Equilibrium weights vector `features × 1`.",#
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
                       :opdm => "`pdm`: Optional positive definite matrix estimator.",
@@ -880,14 +881,35 @@ const arg_dict = Dict(
                       :ske => "`ske`: Coskewness estimator.",
                       :kte => "`kte`: Cokurtosis estimator.",
                       :de => "`de`: Distance matrix estimator.",
+                      :dist => "`dist`: Distance metric used for pairwise computations.",#
+                      :dist_args => "`args`: Additional positional arguments for the distance metric.",#
+                      :dist_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
                       :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
                       :malg => "`alg`: Moment algorithm.",
-                      :corrected => "`corrected`: Whether to apply Bessel's correction.",
+                      :corrected => "`corrected`: Whether to apply Bessel's correction.",#
+                      :mutgt => "`tgt`: Shrinkage target.",#
+                      ## Regression
+                      :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
+                      :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
+                      :b => "`b`: Regression intercept vector.",#
+                      :t => "`t`: Threshold value.",#
+                      :crit => "`crit`: Feature selection criterion.",#
+                      :realg => "`alg`: Regression algorithm.",#
+                      :retgt => "`tgt`: Regression model target.",#
+                      :dretgt => "`retgt`: Regression model target.",#
+                      :drtgt => "`drtgt`: Dimension reduction target.",
                       ## Gerber
-                      :gerbt => "`t`: Threshold value.",
-                      :gerbalg => "`alg`: Gerber covariance algorithm.",
-                      :gerbce => "`ce`: Gerber covariance estimator.",
-                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",
+                      :gerbalg => "`alg`: Gerber covariance algorithm.",#
+                      :gerbce => "`ce`: Gerber covariance estimator.",#
+                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
+                      :c1 => "`c1`: Zone of confusion parameter.",#
+                      :c2 => "`c2`: Zone of indecision lower bound.",#
+                      :c3 => "`c3`: Zone of indecision upper bound.",#
+                      :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
+                      :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
+                      ## Mutual and var info
+                      :bins => "`bins`: Binning algorithm or fixed number of bins.",#
+                      :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
                       # Priors.
                       :pe => "`pe`: Prior estimator.",#
                       :pr => "`pr`: Prior result.",#
@@ -942,7 +964,12 @@ const arg_dict = Dict(
                       :Xv => "`X`: Data vector `observations × 1`.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
                       :omean => "`mean`: Optional mean value to use for centering.",
-                      :stdvec => "`std_vec`: Vector of standard deviations for each asset, used to scale the threshold.")
+                      :stdvec => "`sd`: Vector of standard deviations for each asset.",#
+                      :ex => "`ex`: Parallel execution strategy.",#
+                      :alpha => "`alpha`: Quantile level for the lower tail.",#
+                      :beta => "`beta`: Quantile level for the upper tail.",#
+                      :l => "`l`: Risk aversion parameter.",#
+                      :rf => "`rf`: Risk-free rate.")
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
@@ -952,8 +979,14 @@ Validation rules for certain arg_dict terms used in the documentation of `Portfo
 """
 val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
-                :gerbt => "`0 < t < 1`.",#
-                :dims => "`dims in (1, 2)`.")
+                :t => "`0 < t < 1`.",#
+                :c1 => "`0 < c1 <= 1`.",#
+                :c2 => "`0 < c2 <= 1`.",#
+                :c3c2 => "`c3 > c2`.",#
+                :dims => "`dims in (1, 2)`.",#
+                :alpha => "`0 < alpha < 1`.",#
+                :beta => "`0 < beta < 1`.",#
+                :bins => "If `bins` is an integer, `bins > 0`.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.

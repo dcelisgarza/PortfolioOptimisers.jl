@@ -7,9 +7,7 @@ Lower tail dependence covariance estimator.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
-  - `alpha`: Quantile level for the 5% lower tail.
-  - `ex`: Parallel execution strategy.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -23,7 +21,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - $(val_dict[:alpha])
 
 # Examples
 
@@ -48,8 +46,11 @@ LowerTailDependenceCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:ex])"
     ex
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
                                            ex::FLoops.Transducers.Executor)
@@ -185,9 +186,9 @@ function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = lower_tail_dependence(X, ce.alpha, ce.ex)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 
 export LowerTailDependenceCovariance

@@ -27,7 +27,7 @@ Principal Component Analysis (PCA) dimension reduction target.
 
 # Fields
 
-  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -52,6 +52,7 @@ PCA
   - [`PPCA`](@ref)
 """
 @concrete struct PCA <: DimensionReductionTarget
+    "Keyword arguments passed to `fit(MultivariateStats.PCA, X; kwargs...)`"
     kwargs
     function PCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -94,7 +95,7 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
 # Fields
 
-  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -119,6 +120,7 @@ PPCA
   - [`PCA`](@ref)
 """
 @concrete struct PPCA <: DimensionReductionTarget
+    "Keyword arguments passed to `fit(MultivariateStats.PPCA, X; kwargs...)`"
     kwargs
     function PPCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -161,15 +163,11 @@ Estimator for dimension reduction regression-based moment estimation.
 
 # Fields
 
-  - `me`: Expected returns estimator.
-  - `ve`: Variance estimator.
-  - `drtgt`: Dimension reduction target.
-  - `retgt`: Regression target type.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     DimensionReductionRegression(;
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
         drtgt::DimensionReductionTarget = PCA(),
         retgt::AbstractRegressionTarget = LinearModel()
@@ -182,9 +180,6 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> DimensionReductionRegression()
 DimensionReductionRegression
-     me ┼ SimpleExpectedReturns
-        │     w ┼ nothing
-        │   idx ┴ nothing
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
         │             │     w ┼ nothing
@@ -206,31 +201,29 @@ DimensionReductionRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 @concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
-    me
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:drtgt])"
     drtgt
+    "$(field_dict[:dretgt])"
     retgt
-    function DimensionReductionRegression(me::AbstractExpectedReturnsEstimator,
-                                          ve::AbstractVarianceEstimator,
+    function DimensionReductionRegression(ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
         if haskey(retgt.kwargs, :weights)
             @argcheck(isa(retgt.kwargs.weights, StatsBase.AbstractWeights), TypeError)
             @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
         end
-        return new{typeof(me), typeof(ve), typeof(drtgt), typeof(retgt)}(me, ve, drtgt,
-                                                                         retgt)
+        return new{typeof(ve), typeof(drtgt), typeof(retgt)}(ve, drtgt, retgt)
     end
 end
-function DimensionReductionRegression(;
-                                      me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                      ve::AbstractVarianceEstimator = SimpleVariance(),
+function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel())
-    return DimensionReductionRegression(me, ve, drtgt, retgt)
+    return DimensionReductionRegression(ve, drtgt, retgt)
 end
 function factory(re::DimensionReductionRegression, w::StatsBase.AbstractWeights)
-    return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
+    return DimensionReductionRegression(; ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
@@ -358,7 +351,8 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
-    mu = Statistics.mean(re.me, F; dims = 1)
+    me = ifelse(isnothing(re.ve.me), SimpleExpectedReturns(), re.ve.me)
+    mu = Statistics.mean(me, F; dims = 1)
     sigma = vec(Statistics.std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)

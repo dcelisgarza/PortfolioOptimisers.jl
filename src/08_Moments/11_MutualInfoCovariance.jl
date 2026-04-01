@@ -7,9 +7,7 @@ Covariance estimator based on mutual information.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
-  - `bins`: Binning algorithm or fixed number of bins for histogram-based MI estimation.
-  - `normalise`: Whether to normalise the MI matrix.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -23,7 +21,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `bins` is an integer, `bins > 0`.
+  - $(val_dict[:bins])
 
 # Examples
 
@@ -46,8 +44,11 @@ MutualInfoCovariance
   - [`AbstractBins`](@ref)
 """
 @concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:bins])"
     bins
+    "$(field_dict[:normalise])"
     normalise
     function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
                                   normalise::Bool)
@@ -135,9 +136,9 @@ function Statistics.cov(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwar
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = mutual_info(X, ce.bins, ce.normalise)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 
 export MutualInfoCovariance

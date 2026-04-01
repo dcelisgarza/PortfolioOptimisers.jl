@@ -93,7 +93,7 @@ Regression target type for standard linear models in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `kwargs`: Keyword arguments to be passed to the linear model fitting routine (e.g., options for the solver or regularisation).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -118,6 +118,7 @@ LinearModel
   - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct LinearModel <: AbstractRegressionTarget
+    "Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`."
     kwargs
     function LinearModel(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -163,8 +164,7 @@ Regression target type for generalised linear models (GLMs) in `PortfolioOptimis
 
 # Fields
 
-  - `args`: Positional arguments to be passed to the GLM fitting routine (e.g., distribution and link).
-  - `kwargs`: Keyword arguments for the GLM fitting routine (e.g., solver options, regularisation).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -191,7 +191,9 @@ GeneralisedLinearModel
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
+    "Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
     args
+    "Keyword arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
     kwargs
     function GeneralisedLinearModel(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -400,9 +402,7 @@ Container type for regression results in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `M`: Main coefficient matrix (e.g., regression weights or loadings).
-  - `L`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
-  - `b`: Optional intercept vector.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -435,8 +435,11 @@ Regression
   - [`AbstractRegressionResult`](@ref)
 """
 @concrete struct Regression <: AbstractRegressionResult
+    "$(arg_dict[:M])"
     M
+    "$(arg_dict[:L])"
     L
+    "$(arg_dict[:b])"
     b
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
         @argcheck(!isempty(M), IsEmptyError)

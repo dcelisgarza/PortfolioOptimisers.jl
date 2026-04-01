@@ -137,16 +137,16 @@ julia> PortfolioOptimisers.factory(GerberCovariance(; alg = MyUnstandardisedGerb
 GerberCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │             │     w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │             │   idx ┴ nothing
-      │           w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │           w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │   corrected ┴ Bool: true
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
     t ┼ Float64: 0.5
   alg ┼ MyUnstandardisedGerberCovarianceAlg
-      │   w ┴ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -254,16 +254,16 @@ julia> PortfolioOptimisers.factory(GerberCovariance(; alg = MyStandardisedGerber
 GerberCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │             │     w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │             │   idx ┴ nothing
-      │           w ┼ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │           w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │   corrected ┴ Bool: true
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
     t ┼ Float64: 0.5
   alg ┼ MyStandardisedGerberCovarianceAlg
-      │   w ┴ Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+      │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -411,7 +411,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:gerbt])
+  - $(val_dict[:t])
 
 # Related
 
@@ -436,7 +436,7 @@ Keywords correspond to the struct's fields.
     ve
     "$(field_dict[:pdm])"
     pdm
-    "$(field_dict[:gerbt])"
+    "$(field_dict[:t])"
     t
     "$(field_dict[:gerbalg])"
     alg
@@ -850,11 +850,11 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
         X = transpose(X)
     end
     me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    sd = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
     idx = iszero.(sd)
     sd[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ sd
+    X = (X .- mu) ⊘ sd
     return gerber(ce, X)
 end
 """
@@ -923,11 +923,11 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
         X = transpose(X)
     end
     me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mean_vec = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    sd = Statistics.std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
     idx = iszero.(sd)
     sd[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ sd
+    X = (X .- mu) ⊘ sd
     sigma = gerber(ce, X)
     return StatsBase.cor2cov!(sigma, sd)
 end

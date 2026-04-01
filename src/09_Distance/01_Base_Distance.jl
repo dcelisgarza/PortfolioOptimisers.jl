@@ -126,8 +126,7 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
 
 # Fields
 
-  - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
-  - `normalise`: Whether to normalise the VI distance to the range [0, 1].
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -140,7 +139,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `bins` is an integer, `bins > 0`.
+  - $(val_dict[:bins])
 
 # Examples
 
@@ -158,7 +157,9 @@ VariationInfoDistance
   - [`cor_and_dist`](@ref)
 """
 @concrete struct VariationInfoDistance <: AbstractDistanceAlgorithm
+    "$(field_dict[:bins])"
     bins
+    "$(field_dict[:normalise])"
     normalise
     function VariationInfoDistance(bins::Int_Bin, normalise::Bool)
         if isa(bins, Integer)

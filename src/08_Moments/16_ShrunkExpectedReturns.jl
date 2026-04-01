@@ -88,7 +88,7 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
 # Fields
 
-  - `tgt`: The shrinkage target type.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -114,6 +114,7 @@ JamesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
+    "$(field_dict[:mutgt])"
     tgt
     function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -131,7 +132,7 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
 # Fields
 
-  - `tgt`: The shrinkage target type.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -157,6 +158,7 @@ BayesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
+    "$(field_dict[:mutgt])"
     tgt
     function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -174,7 +176,7 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
 # Fields
 
-  - `tgt`: The shrinkage target type.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -200,6 +202,7 @@ BodnarOkhrinParolya
   - [`BayesStein`](@ref)
 """
 @concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
+    "$(field_dict[:mutgt])"
     tgt
     function BodnarOkhrinParolya(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -217,9 +220,7 @@ Container type for shrinkage-based expected returns estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `ce`: Covariance estimator.
-  - `alg`: Shrinkage algorithm (e.g., James-Stein, Bayes-Stein).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -269,8 +270,11 @@ ShrunkExpectedReturns
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
 @concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:ce])"
     ce
+    "Expected returns shrinkage algorithm."
     alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
