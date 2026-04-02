@@ -252,6 +252,16 @@ function returns_result_view(rd::ReturnsResult, i)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
                          iv = iv, ivpa = ivpa)
 end
+function returns_result_getindex(rd::ReturnsResult, i)
+    nx = nothing_scalar_array_getindex(rd.nx, i)
+    X = isnothing(rd.X) ? nothing : rd.X[:, i]
+    nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_getindex(rd.nb, i)
+    B = !isa(rd.B, MatNum) ? rd.B : rd.B[:, i]
+    iv = isnothing(rd.iv) ? nothing : rd.iv[:, i]
+    ivpa = nothing_scalar_array_getindex(rd.ivpa, i)
+    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
+                         iv = iv, ivpa = ivpa)
+end
 """
     returns_result_view(
                         rd::ReturnsResult,
@@ -306,6 +316,25 @@ function returns_result_view(rd::ReturnsResult, i, j, k = :)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
+    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
+                         ivpa = ivpa)
+end
+function returns_result_getindex(rd::ReturnsResult, i, j, k = :)
+    nx = nothing_scalar_array_getindex(rd.nx, j)
+    X = isnothing(rd.X) ? rd.X : rd.X[i, j]
+    nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : rd.nf[k]
+    F = isnothing(rd.F) ? rd.F : rd.F[i, k]
+    nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_getindex(rd.nb, j)
+    B = if isnothing(rd.B)
+        nothing
+    elseif isa(rd.B, VecNum)
+        rd.B[i]
+    else
+        rd.B[i, j]
+    end
+    ts = isnothing(rd.ts) ? rd.ts : rd.ts[i]
+    iv = isnothing(rd.iv) ? rd.iv : rd.iv[i, j]
+    ivpa = nothing_scalar_array_getindex(rd.ivpa, j)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
                          ivpa = ivpa)
 end

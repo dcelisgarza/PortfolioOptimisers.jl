@@ -192,7 +192,7 @@ function _set_mip_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeti
                           clog_w[i = 1:N],
                           [sc * log_w[i], sc, sc * w_obj[i]] in JuMP.MOI.ExponentialCone()
                           crkb, sc * LinearAlgebra.dot(rb, log_w) >= 0
-                          mipcrkb, sc * (sum(w) - k) == 0
+                          mipcrkb, sc * (sum(w) - k) >= 0
                       end)
     return rkb
 end
