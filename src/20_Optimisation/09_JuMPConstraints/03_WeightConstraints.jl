@@ -38,16 +38,20 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     set_budget_constraints!(model, bgt, w)
     if flag
-        JuMP.@variables(model, begin
-                            lw[1:N] >= 0
-                            sw[1:N] >= 0
-                        end)
+        lw, sw = if !haskey(model, :sw)
+            JuMP.@variables(model, begin
+                                lw[1:N] >= 0
+                                sw[1:N] >= 0
+                            end)
+        else
+            model[:lw], model[:sw]
+        end
         JuMP.@constraints(model, begin
                               w_lw, sc * (w - lw) <= 0
                               w_sw, sc * (w + sw) >= 0
                           end)
         set_long_short_budget_constraints!(model, bgt, sbgt)
-    else
+    elseif !flag && !haskey(model, :lw)
         JuMP.@expression(model, lw, w)
     end
     return nothing

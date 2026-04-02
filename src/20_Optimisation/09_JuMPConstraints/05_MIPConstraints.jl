@@ -45,14 +45,14 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    ss = get_mip_ss(ss, wb)
+    JuMP.@expression(model, ss, get_mip_ss(ss, wb))
     N = length(w)
     JuMP.@variables(model, begin
                         ilb[1:N], (binary = true)
                         isb[1:N], (binary = true)
                     end)
     JuMP.@expression(model, i_mip, ilb + isb)
-    if isa(k, Number)
+    if isa(k, Number) || haskey(model, :crkb)
         JuMP.@expressions(model, begin
                               il, ilb
                               is, isb
@@ -104,7 +104,7 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_
     if isa(k, Number)
         JuMP.@expression(model, i_mip, ib)
     else
-        ss = get_mip_ss(ss, wb)
+        JuMP.@expression(model, ss, get_mip_ss(ss, wb))
         JuMP.@variable(model, ibf[1:N] >= 0)
         JuMP.@constraints(model, begin
                               ibf_ub, sc * (ibf .- k) <= 0
@@ -139,7 +139,8 @@ end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
                               gcard::Option{<:LinearConstraint}, pl::Option{<:PlC_VecPlC},
                               lt::Option{<:Threshold}, st::Option{<:Threshold},
-                              fees::Option{<:Fees}, ss::Option{<:Number})
+                              fees::Option{<:Fees}, ss::Option{<:Number},
+                              miprb_flag::Bool = false)
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(pl, IntegerPhylogeny) ||
@@ -151,7 +152,14 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     else
         false, false, nothing, nothing
     end
-    if !(card_flag || gcard_flag || iplg_flag || lt_flag || st_flag || ffl_flag || ffs_flag)
+    if !(card_flag ||
+         gcard_flag ||
+         iplg_flag ||
+         lt_flag ||
+         st_flag ||
+         ffl_flag ||
+         ffs_flag ||
+         miprb_flag)
         return nothing
     end
     ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
@@ -178,6 +186,15 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     end
     if iplg_flag
         set_iplg_constraints!(model, pl)
+    end
+    if miprb_flag
+        lw = model[:lw]
+        sw = model[:sw]
+        ss = model[:ss]
+        JuMP.@constraints(model, begin
+                              lmiprb, sc * (lw - ss * ib) <= 0
+                              smiprb, sc * (sw - ss * (1 .- ib)) <= 0
+                          end)
     end
     return nothing
 end
@@ -211,7 +228,7 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    ss = get_mip_ss(ss, wb)
+    JuMP.@expression(model, ss, get_mip_ss(ss, wb))
     N = size(smtx, 1)
     ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = JuMP.@variables(model,
                                                                                             begin
@@ -310,7 +327,7 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:Ma
     i_smip = if isa(k, Number)
         model[Symbol(key2, i)] = JuMP.@expression(model, sib)
     else
-        ss = get_mip_ss(ss, wb)
+        JuMP.@expression(model, ss, get_mip_ss(ss, wb))
         isbf = model[Symbol(key3, i)] = JuMP.@variable(model, [1:N], lower_bound = 0)
         model[Symbol(key3, :_ub_, i)], model[Symbol(key3, :d_ub_, i)], model[Symbol(key3, :d_lb_, i)] = JuMP.@constraints(model,
                                                                                                                           begin
