@@ -501,7 +501,7 @@
                         0.08910512294473034, 0.04281741172335355, 0.0840529450637892,
                         0.10412048295611062, 0.08726672366225435], rtol = 1e-6)
 
-        rd2 = PortfolioOptimisers.returns_result_getindex(rd, 1:2:20)
+        rd2 = PortfolioOptimisers.returns_result_view(rd, 1:2:20)
         pr2 = prior(EmpiricalPrior(), rd2)
         r = factory(StandardDeviation(), pr2, mip_slv)
 
