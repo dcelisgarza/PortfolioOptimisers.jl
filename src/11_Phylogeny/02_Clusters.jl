@@ -103,7 +103,7 @@ Keywords correspond to the struct's fields.
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct Clusters <: AbstractClusteringResult
-    "$(field_dict[:cres])"
+    "$(field_dict[:clres])"
     res
     "$(field_dict[:S])"
     S
@@ -160,7 +160,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SecondOrderDifference(;
-        alg::VectorToScalarMeasure = StandardisedValue()
+        alg::Num_VecToScaM = StandardisedValue()
     ) -> SecondOrderDifference
 
 Keywords correspond to the struct's fields.
@@ -187,11 +187,11 @@ SecondOrderDifference
 @concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
     "$(field_dict[:vsalg])"
     alg
-    function SecondOrderDifference(alg::VectorToScalarMeasure)
+    function SecondOrderDifference(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
     end
 end
-function SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
+function SecondOrderDifference(; alg::Num_VecToScaM = StandardisedValue())
     return SecondOrderDifference(alg)
 end
 function factory(alg::SecondOrderDifference, w::StatsBase.AbstractWeights)
@@ -211,8 +211,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SilhouetteScore(;
-        alg::VectorToScalarMeasure = StandardisedValue(),
-        metric::Option{<:Distances.SemiMetric} = nothing
+        alg::Num_VecToScaM = StandardisedValue()
     ) -> SilhouetteScore
 
 Keywords correspond to the struct's fields.
@@ -222,13 +221,12 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> SilhouetteScore()
 SilhouetteScore
-     alg ┼ StandardisedValue
-         │   mv ┼ MeanValue
-         │      │   w ┴ nothing
-         │   sv ┼ StdValue
-         │      │           w ┼ nothing
-         │      │   corrected ┴ Bool: true
-  metric ┴ nothing
+  alg ┼ StandardisedValue
+      │   mv ┼ MeanValue
+      │      │   w ┴ nothing
+      │   sv ┼ StdValue
+      │      │           w ┼ nothing
+      │      │   corrected ┴ Bool: true
 ```
 
 # Related
@@ -241,20 +239,15 @@ SilhouetteScore
 @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
     "$(field_dict[:vsalg])"
     alg
-    #! This is useless.
-    "$(field_dict[:metric])"
-    metric
-    function SilhouetteScore(alg::VectorToScalarMeasure,
-                             metric::Option{<:Distances.SemiMetric})
-        return new{typeof(alg), typeof(metric)}(alg, metric)
+    function SilhouetteScore(alg::Num_VecToScaM)
+        return new{typeof(alg)}(alg)
     end
 end
-function SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
-                         metric::Option{<:Distances.SemiMetric} = nothing)
-    return SilhouetteScore(alg, metric)
+function SilhouetteScore(; alg::Num_VecToScaM = StandardisedValue())
+    return SilhouetteScore(alg)
 end
 function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)
-    return SilhouetteScore(; alg = factory(alg.alg, w), metric = alg.metric)
+    return SilhouetteScore(; alg = factory(alg.alg, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -332,7 +325,7 @@ Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `linkage`: Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -356,6 +349,7 @@ HClustAlgorithm
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
+    "Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html)."
     linkage
     function HClustAlgorithm(linkage::Symbol)
         return new{typeof(linkage)}(linkage)
@@ -373,10 +367,7 @@ Estimator type for clustering in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `de`: Distance estimator.
-  - `alg`: Clustering algorithm.
-  - `onc`: Optimal number of clusters estimator.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -435,9 +426,13 @@ ClustersEstimator
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 @concrete struct ClustersEstimator <: AbstractClustersEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:de])"
     de
+    "$(field_dict[:clalg])"
     alg
+    "$(field_dict[:onc])"
     onc
     function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
                                de::AbstractDistanceEstimator,

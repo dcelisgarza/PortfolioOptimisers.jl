@@ -30,7 +30,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:dpower])
+  - $(val_dict[:dopower])
 
 # Examples
 
@@ -53,7 +53,7 @@ Distance
   - [`VariationInfoDistance`](@ref)
 """
 @concrete struct Distance <: AbstractDistanceEstimator
-    "$(field_dict[:dpower])"
+    "$(field_dict[:dopower])"
     power
     "$(field_dict[:dalg])"
     alg

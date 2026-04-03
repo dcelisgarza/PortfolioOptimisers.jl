@@ -31,7 +31,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:dpower])
+  - $(val_dict[:dopower])
 
 # Examples
 
@@ -58,7 +58,7 @@ DistanceDistance
     args
     "$(field_dict[:dmetric_kwargs])"
     kwargs
-    "$(field_dict[:dpower])"
+    "$(field_dict[:dopower])"
     power
     "$(field_dict[:dalg])"
     alg

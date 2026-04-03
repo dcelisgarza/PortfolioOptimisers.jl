@@ -1,6 +1,16 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+"""
 @concrete struct KMeansAlgorithm <: AbstractNonHierarchicalClusteringAlgorithm
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "Keyword arguments for [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)."
     kwargs
     function KMeansAlgorithm(rng::Random.AbstractRNG, seed::Option{<:Integer},
                              kwargs::NamedTuple)

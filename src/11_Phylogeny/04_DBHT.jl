@@ -105,8 +105,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale fa
 
 # Fields
 
-  - `coef`: Non-negative scaling coefficient.
-  - `power`: Non-negative exponent applied to the distance matrix.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -119,16 +118,16 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `coef > 0`.
-  - `power > 0`.
+  - $(val_dict[:dbhtcoef])
+  - $(val_dict[:dbhtpower])
 
 # Examples
 
 ```jldoctest
 julia> GeneralExponentialSimilarity()
 GeneralExponentialSimilarity
-   coef ┼ Float64: 1.0
-  power ┴ Float64: 1.0
+   coef ┼ Int64: 1
+  power ┴ Int64: 1
 ```
 
 # Related
@@ -139,7 +138,9 @@ GeneralExponentialSimilarity
   - [`dbht_similarity`](@ref)
 """
 @concrete struct GeneralExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm
+    "$(field_dict[:dbhtcoef])"
     coef
+    "$(field_dict[:dbhtpower])"
     power
     function GeneralExponentialSimilarity(coef::Number, power::Number)
         @argcheck(zero(coef) < coef, DomainError)
@@ -147,7 +148,7 @@ GeneralExponentialSimilarity
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
-function GeneralExponentialSimilarity(; coef::Number = 1.0, power::Number = 1.0)
+function GeneralExponentialSimilarity(; coef::Number = 1, power::Number = 1)
     return GeneralExponentialSimilarity(coef, power)
 end
 """
@@ -200,8 +201,7 @@ Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
 # Fields
 
-  - `sim`: Similarity matrix algorithm.
-  - `root`: Root selection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -233,7 +233,9 @@ DBHT
   - [`EqualRoot`](@ref)
 """
 @concrete struct DBHT <: AbstractHierarchicalClusteringAlgorithm
+    "$(field_dict[:sim])"
     sim
+    "$(field_dict[:root])"
     root
     function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
         return new{typeof(sim), typeof(root)}(sim, root)
@@ -1780,9 +1782,7 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
 # Fields
 
-  - `de`: Distance matrix estimator.
-  - `sim`: Similarity matrix algorithm.
-  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -1818,8 +1818,11 @@ LoGo
   - [`GeneralExponentialSimilarity`](@ref)
 """
 @concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
+    "$(field_dict[:de])"
     de
+    "$(field_dict[:sim])"
     sim
+    "$(field_dict[:pdm])"
     pdm
     function LoGo(de::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
                   pdm::Option{<:Posdef} = Posdef())

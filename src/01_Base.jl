@@ -114,7 +114,7 @@ const arg_dict = Dict(
                       :bins => "`bins`: Binning algorithm or fixed number of bins.",#
                       :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
                       ## Distance
-                      :dpower => "`power`: Optional matrix exponent.",#
+                      :dopower => "`power`: Optional matrix exponent.",#
                       :dalg => "`alg`: Distance algorithm.",#
                       :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
                       :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
@@ -137,13 +137,27 @@ const arg_dict = Dict(
                       :cta => "`ct`: Centrality algorithm.",#
                       :ctr => "`ct`: Centrality result.",#
                       :cter => "`ct`: Centrality estimator or result.",#
-                      :cres => "`res`: Clustering result.",#
+                      :ctargs => "`args`: Positional arguments for the centrality function.",#
+                      :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
+                      :treeargs => "`args`: Positional arguments for the centrality function.",#
+                      :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
+                      :ntalg => "`alg`: Tree or similarity matrix algorithm.",#
+                      :ntn => "`n`: Number of steps to take in the network for deciding adjacency.",#
+                      :clres => "`res`: Clustering result.",#
                       :S => "`S`: Similarity matrix",#
                       :D => "`D`: Distance matrix",#
                       :ck => "`k`: Optimal number of clusters.",#
-                      :vsalg => "`alg`: The [`VectorToScalarMeasure`](@ref) measure used to evaluate clustering quality.",#
+                      :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
                       :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(features))`.",#
                       :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
+                      :clalg => "`alg`: Clustering algorithm.",#
+                      :onc => "`onc`: Optimal number of clusters estimator.",#
+                      :phX_Xv => "`X`: Phylogeny matrix or vector.",#
+                      ## DBHT
+                      :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
+                      :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
+                      :sim => "`sim`: Similarity matrix algorithm.",#
+                      :root => "`root`: Root selection method.",#
                       # Turnover.
                       :tne => "`tn`: Turnover estimator.",#
                       :tnr => "`tn`: Turnover result.",
@@ -193,7 +207,10 @@ const arg_dict = Dict(
                       :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
                       :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
                       :check_sol => "`check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).",#
-                      :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).")
+                      :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                      # RNG
+                      :rng => "`rng`: Random number generator.",#
+                      :seed => "`seed`: Seed for the random number generator.")
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
@@ -211,14 +228,18 @@ val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :alpha => "`0 < alpha < 1`.",#
                 :beta => "`0 < beta < 1`.",#
                 :bins => "If `bins` is an integer, `bins > 0`.",#
-                :dpower => "If `power` is not `nothing`, `power >= 1`.",#
+                :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                 :settings => "If not `nothing`, `!isempty(settings)`.",#
                 :S => "`!isempty(S)`.",#
                 :D => "`!isempty(D)`.",#
                 :ck => "`k >= 1`.",#
                 :S_D => "size(S) == size(D)`.",#
                 :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
-                :kalg => "If `alg` is not `nothing`, `alg >= 1`.")
+                :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
+                :dbhtpower => "`power > 0`.",#
+                :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
+                :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
+                :ntn => "`n >= 1`.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
