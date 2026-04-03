@@ -38,9 +38,9 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> DistanceDistance()
 DistanceDistance
-    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
    power ┼ nothing
      alg ┴ SimpleDistance()
 ```

@@ -26,9 +26,9 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> DistanceCovariance()
 DistanceCovariance
-    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
       ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
@@ -188,9 +188,9 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
       ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
@@ -330,9 +330,9 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-      args ┼ Tuple{}: ()
-    kwargs ┼ @NamedTuple{}: NamedTuple()
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
       ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
