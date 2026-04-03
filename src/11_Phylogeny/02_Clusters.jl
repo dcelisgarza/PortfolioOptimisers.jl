@@ -77,10 +77,7 @@ Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `clustering`: The hierarchical clustering object.
-  - `S`: Similarity matrix used for clustering.
-  - `D`: Distance matrix used for clustering.
-  - `k`: Number of clusters.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -95,10 +92,10 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(S)`.
-  - `!isempty(D)`.
-  - `size(S) == size(D)`.
-  - `k ≥ 1`.
+  - $(val_dict[:S])
+  - $(val_dict[:D])
+  - $(val_dict[:S_D])
+  - $(val_dict[:ck])
 
 # Related
 
@@ -106,9 +103,13 @@ Keywords correspond to the struct's fields.
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct Clusters <: AbstractClusteringResult
+    "$(field_dict[:cres])"
     res
+    "$(field_dict[:S])"
     S
+    "$(field_dict[:D])"
     D
+    "$(field_dict[:ck])"
     k
     function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
@@ -154,7 +155,7 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
 
 # Fields
 
-  - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -184,6 +185,7 @@ SecondOrderDifference
   - [`VectorToScalarMeasure`](@ref)
 """
 @concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
+    "$(field_dict[:vsalg])"
     alg
     function SecondOrderDifference(alg::VectorToScalarMeasure)
         return new{typeof(alg)}(alg)
@@ -203,6 +205,8 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 `SilhouetteScore` selects the optimal number of clusters by maximizing the silhouette score, which measures how well each object lies within its cluster compared to other clusters. The score can be computed using different distance metrics.
 
 # Fields
+
+$(DocStringExtensions.FIELDS)
 
   - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
   - `metric`: The distance metric used for silhouette calculation from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), or `nothing` for the default.
@@ -238,6 +242,7 @@ SilhouetteScore
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
+    "$(field_dict[:vsalg])"
     alg
     metric
     function SilhouetteScore(alg::VectorToScalarMeasure,

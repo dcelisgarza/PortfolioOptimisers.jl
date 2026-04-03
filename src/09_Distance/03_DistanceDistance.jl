@@ -15,16 +15,12 @@ where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}
 
 # Fields
 
-  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
-  - `args`: Positional arguments to pass to the metric.
-  - `kwargs`: Keyword arguments to pass to the metric.
-  - `power`: The integer power to which the base correlation or distance matrix is raised.
-  - `alg`: The base distance algorithm to use.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     DistanceDistance(;
-        dist::Distances.Metric = Distances.Euclidean(),
+        metric::Distances.Metric = Distances.Euclidean(),
         args::Tuple = (),
         kwargs::NamedTuple = (;),
         power::Option{<:Integer} = 1,
@@ -35,16 +31,16 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `power >= 1`.
+  - $(val_dict[:dpower])
 
 # Examples
 
 ```jldoctest
 julia> DistanceDistance()
 DistanceDistance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
+    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+      args ┼ Tuple{}: ()
+    kwargs ┼ @NamedTuple{}: NamedTuple()
    power ┼ nothing
      alg ┴ SimpleDistance()
 ```
@@ -56,28 +52,30 @@ DistanceDistance
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 @concrete struct DistanceDistance <: AbstractDistanceEstimator
-    dist
+    "$(field_dict[:dmetric])"
+    metric
+    "$(field_dict[:dmetric_args])"
     args
+    "$(field_dict[:dmetric_kwargs])"
     kwargs
+    "$(field_dict[:dpower])"
     power
+    "$(field_dict[:dalg])"
     alg
-    function DistanceDistance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
+    function DistanceDistance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                               power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
             @argcheck(one(power) <= power, DomainError)
         end
-        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(power), typeof(alg)}(dist,
-                                                                                           args,
-                                                                                           kwargs,
-                                                                                           power,
-                                                                                           alg)
+        return new{typeof(metric), typeof(args), typeof(kwargs), typeof(power),
+                   typeof(alg)}(metric, args, kwargs, power, alg)
     end
 end
-function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
+function DistanceDistance(; metric::Distances.Metric = Distances.Euclidean(),
                           args::Tuple = (), kwargs::NamedTuple = (;),
                           power::Option{<:Integer} = nothing,
                           alg::AbstractDistanceAlgorithm = SimpleDistance())
-    return DistanceDistance(dist, args, kwargs, power, alg)
+    return DistanceDistance(metric, args, kwargs, power, alg)
 end
 """
     distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
@@ -97,7 +95,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise distances of distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise distances of distances.
 
 # Related
 
@@ -107,9 +105,8 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 """
 function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                   dims::Int = 1, kwargs...)
-    dist = distance(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
-                    kwargs...)
-    return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
+    D = distance(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims, kwargs...)
+    return Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
 end
 """
     distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
@@ -127,7 +124,7 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise distances of distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise distances of distances.
 
 # Related
 
@@ -139,8 +136,8 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
 ```
 """
 function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
-    dist = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
-    return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
+    D = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)
+    return Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
 end
 """
     cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
@@ -170,9 +167,9 @@ This method first computes the correlation and base distance matrices using [`Di
 """
 function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::MatNum;
                       dims::Int = 1, kwargs...)
-    rho, dist = cor_and_dist(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
-                             kwargs...)
-    return rho, Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
+    rho, D = cor_and_dist(Distance(; power = de.power, alg = de.alg), ce, X; dims = dims,
+                          kwargs...)
+    return rho, Distances.pairwise(de.metric, D, de.args...; de.kwargs...)
 end
 
 export DistanceDistance

@@ -307,7 +307,7 @@
                                             ce = DistanceCovariance(; args = (3,),
                                                                     kwargs = (; foo = 5)))
         ce = PortfolioOptimisers.factory(ce0, ew)
-        @test ce.ce.dist === ce0.ce.dist
+        @test ce.ce.metric === ce0.ce.metric
         @test ce.ce.args === ce0.ce.args
         @test ce.ce.kwargs === ce0.ce.kwargs
         @test ce.ce.ex === ce0.ce.ex

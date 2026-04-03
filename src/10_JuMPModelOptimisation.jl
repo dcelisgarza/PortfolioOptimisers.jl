@@ -49,11 +49,7 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 
 # Fields
 
-  - `name`: Symbol or string identifier for the solver.
-  - `solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
-  - `settings`: Solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).
-  - `check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
-  - `add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -69,9 +65,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `settings`:
-
-      + `Dict_Vec`: `!isempty(settings)`.
+  - $(val_dict[:settings])
 
 # Examples
 
@@ -95,10 +89,15 @@ Solver
   - [`SlvSettings`](@ref)
 """
 @concrete struct Solver <: AbstractEstimator
+    "$(field_dict[:name])"
     name
+    "$(field_dict[:solver])"
     solver
+    "$(field_dict[:settings])"
     settings
+    "$(field_dict[:check_sol])"
     check_sol
+    "$(field_dict[:add_bridges])"
     add_bridges
     function Solver(name::Sym_Str, solver::Any, settings::Option{<:SlvSettings},
                     check_sol::NamedTuple, add_bridges::Bool)
@@ -148,8 +147,7 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
 
 # Fields
 
-  - `trials`: Dictionary of solver trials and errors.
-  - `success`: Boolean indicating whether optimisation succeeded.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -174,7 +172,9 @@ JuMPResult
   - [`optimise_JuMP_model!`](@ref)
 """
 @concrete struct JuMPResult <: AbstractJuMPResult
+    "Dictionary of solver trials and errors."
     trials
+    "Boolean indicating whether optimisation succeeded."
     success
     function JuMPResult(trials::AbstractDict, success::Bool)
         if !success

@@ -1,4 +1,245 @@
 """
+    arg_dict = Dict(
+                 # Weight vectors.
+                 :pw => "`w`: Portfolio weights vector.",
+                 :ow => "`w`: Observation weights vector.",
+                 :oow => "`w`: Optional observation weights vector.",
+                 # Matrix processing.
+                 :pdm => "`pdm`: Positive definite matrix estimator.",
+                 :dn => "`dn`: Matrix denoising estimator.",
+                 :dt => "`dt`: Matrix detoning estimator.",
+                 :mp => "`mp`: Matrix processing estimator.",
+                 # Moments.
+                 :me => "`me`: Expected returns estimator.",
+                 :ce => "`ce`: Covariance estimator.",
+                 :ve => "`ve`: Variance estimator.",
+                 :ske => "`ske`: Coskewness estimator.",
+                 :kte => "`kte`: Cokurtosis estimator.",
+                 :de => "`de`: Distance matrix estimator.",
+                 # Priors.
+                 :pe => "`pe`: Prior estimator.",
+                 :pr => "`pr`: Prior result.",
+                 :per => "`pe`: Prior estimator or result.",
+                 # Phylogeny.
+                 :cle => "`cle`: Clusters estimator.",
+                 :clr => "`clr`: Clusters result.",
+                 :cler => "`cle`: Clusters estimator or result.",
+                 :ple => "`pl`: Phylogeny estimator.",
+                 :plr => "`pl`: Phylogeny result.",
+                 :pler => "`pl`: Phylogeny estimator or result.",
+                 :nte => "`pl`: Network estimator.",
+                 :ntr => "`pl`: Network result.",
+                 :nter => "`pl`: Network estimator or result.",
+                 :cte => "`cte`: Centrality estimator.",
+                 :cta => "`ct`: Centrality algorithm.",
+                 :ctr => "`ct`: Centrality result.",
+                 :cter => "`ct`: Centrality estimator or result.",
+                 # Turnover.
+                 :tne => "`tn`: Turnover estimator.",
+                 :tnr => "`tn`: Turnover result.",
+                 :tner => "`tn`: Turnover estimator or result.",
+                 :tnes => "`tn`: Turnover estimator(s).",
+                 :tnrs => "`tn`: Turnover result(s).",
+                 :tners => "`tn`: Turnover estimator(s) or result(s).",
+                 # Tracking.
+                 :tre => "`tr`: Tracking error estimator.",
+                 :trr => "`tr`: Tracking error result.",
+                 :trer => "`tr`: Tracking error estimator or result.",
+                 :tres => "`tr`: Tracking error estimator(s).",
+                 :trrs => "`tr`: Tracking error result(s).",
+                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                 # Weight bounds.
+                 :wbe => "`wb`: Weight bounds estimator.",
+                 :wbr => "`wb`: Weight bounds result.",
+                 :wber => "`wb`: Weight bounds estimator or result.",
+                 # Fees.
+                 :feese => "`fees`: Fees estimator.",
+                 :feesr => "`fees`: Fees result.",
+                 :feeser => "`fees`: Fees estimator or result.")
+
+This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+"""
+const arg_dict = Dict(
+                      # Weight vectors.
+                      :pw => "`w`: Portfolio weights vector `assets × 1`.",#
+                      :ow => "`w`: Observation weights vector `observations × 1`.",#
+                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",#
+                      :eqw => "`eqw`: Equilibrium weights vector `features × 1`.",#
+                      # Matrix processing.
+                      :pdm => "`pdm`: Positive definite matrix estimator.",
+                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
+                      :dn => "`dn`: Matrix denoising estimator.",
+                      :odn => "`dn`: Optional matrix denoising estimator.",
+                      :dna => "`dna`: Matrix denoising algorithm.",
+                      :dt => "`dt`: Matrix detoning estimator.",
+                      :odt => "`dt`: Optional matrix detoning estimator.",
+                      :mp => "`mp`: Matrix processing estimator.",
+                      :omp => "`mp`: Optional matrix processing estimator.",
+                      :mpa => "`mpa`: Matrix processing algorithm.",
+                      # Moments.
+                      :me => "`me`: Expected returns estimator.",
+                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
+                      :ce => "`ce`: Covariance estimator.",#
+                      :ve => "`ve`: Variance estimator.",#
+                      :ske => "`ske`: Coskewness estimator.",
+                      :kte => "`kte`: Cokurtosis estimator.",
+                      :de => "`de`: Distance matrix estimator.",
+                      :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
+                      :malg => "`alg`: Moment algorithm.",
+                      :corrected => "`corrected`: Whether to apply Bessel's correction.",#
+                      :mutgt => "`tgt`: Shrinkage target.",#
+                      :metric => "`metric`: Distance metric used for pairwise computations.",#
+                      :metric_args => "`args`: Additional positional arguments for the distance metric.",#
+                      :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
+                      :t => "`t`: Threshold value.",#
+                      ## Regression
+                      :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
+                      :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
+                      :b => "`b`: Regression intercept vector.",#
+                      :crit => "`crit`: Feature selection criterion.",#
+                      :realg => "`alg`: Regression algorithm.",#
+                      :retgt => "`tgt`: Regression model target.",#
+                      :dretgt => "`retgt`: Regression model target.",#
+                      :drtgt => "`drtgt`: Dimension reduction target.",
+                      ## Gerber
+                      :gerbalg => "`alg`: Gerber covariance algorithm.",#
+                      :gerbce => "`ce`: Gerber covariance estimator.",#
+                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
+                      :c1 => "`c1`: Zone of confusion parameter.",#
+                      :c2 => "`c2`: Zone of indecision lower bound.",#
+                      :c3 => "`c3`: Zone of indecision upper bound.",#
+                      :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
+                      :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
+                      ## Mutual and var info
+                      :bins => "`bins`: Binning algorithm or fixed number of bins.",#
+                      :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
+                      ## Distance
+                      :dpower => "`power`: Optional matrix exponent.",#
+                      :dalg => "`alg`: Distance algorithm.",#
+                      :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
+                      :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
+                      :dmetric_kwargs => "`kwargs`: Additional keyword arguments for the distances of distances metric.",#
+                      # Priors.
+                      :pe  => "`pe`: Prior estimator.",#
+                      :pr  => "`pr`: Prior result.",#
+                      :per => "`pr`: Prior estimator or result.",#
+                      # Phylogeny.
+                      :cle => "`cle`: Clusters estimator.",#
+                      :clr => "`clr`: Clusters result.",#
+                      :cler => "`clr`: Clusters estimator or result.",#
+                      :ple => "`ple`: Phylogeny estimator.",#
+                      :plr => "`plr`: Phylogeny result.",#
+                      :pler => "`pl`: Phylogeny estimator or result.",#
+                      :nte => "`nte`: Network estimator.",#
+                      :ntr => "`pl`: Network result.",#
+                      :nter => "`pl`: Network estimator or result.",#
+                      :cte => "`cte`: Centrality estimator.",#
+                      :cta => "`ct`: Centrality algorithm.",#
+                      :ctr => "`ct`: Centrality result.",#
+                      :cter => "`ct`: Centrality estimator or result.",#
+                      :cres => "`res`: Clustering result.",#
+                      :S => "`S`: Similarity matrix",#
+                      :D => "`D`: Distance matrix",#
+                      :ck => "`k`: Optimal number of clusters.",#
+                      :vsalg => "`alg`: The [`VectorToScalarMeasure`](@ref) measure used to evaluate clustering quality.",#
+                      # Turnover.
+                      :tne => "`tn`: Turnover estimator.",#
+                      :tnr => "`tn`: Turnover result.",
+                      :tner => "`tn`: Turnover estimator or result.",
+                      :tnes => "`tn`: Turnover estimator(s).",
+                      :tnrs => "`tn`: Turnover result(s).",
+                      :tners => "`tn`: Turnover estimator(s) or result(s).",
+                      # Tracking.
+                      :tre => "`tr`: Tracking error estimator.",
+                      :trr => "`tr`: Tracking error result.",
+                      :trer => "`tr`: Tracking error estimator or result.",
+                      :tres => "`tr`: Tracking error estimator(s).",
+                      :trrs => "`tr`: Tracking error result(s).",
+                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                      # Weight bounds.
+                      :wbe => "`wb`: Weight bounds estimator.",
+                      :wbr => "`wb`: Weight bounds result.",
+                      :wber => "`wb`: Weight bounds estimator or result.",
+                      # Fees.
+                      :feese => "`fees`: Fees estimator.",#
+                      :feesr => "`fees`: Fees result.",
+                      :feeser => "`fees`: Fees estimator or result.",
+                      # Stats.
+                      :sigma => "`sigma`: Covariance matrix `features × features`.",#
+                      :mu => "`mu`: Expected returns vector `features × 1`.",#
+                      :rho => "`rho`: Correlation matrix `features × features`.",
+                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `features × features`.",
+                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
+                      :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
+                      :sk => "`sk`: Coskewness matrix `features × features^2`.",#
+                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix `features × features`.",
+                      :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
+                      :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
+                      :Xv => "`X`: Data vector `observations × 1`.",#
+                      :dims => "`dims`: Dimension along which to perform the computation.",#
+                      :omean => "`mean`: Optional mean value to use for centering.",
+                      :stdvec => "`sd`: Vector of standard deviations for each asset.",#
+                      :ex => "`ex`: Parallel execution strategy.",#
+                      :alpha => "`alpha`: Quantile level for the lower tail.",#
+                      :beta => "`beta`: Quantile level for the upper tail.",#
+                      :l => "`l`: Risk aversion parameter.",#
+                      :rf => "`rf`: Risk-free rate.",#
+                      # Errors
+                      :msg => "`msg`: Error message describing the condition that triggered the exception.",#
+                      # Solver
+                      :name => "`name`: Symbol or string identifier for logging purposes.",#
+                      :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                      :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
+                      :check_sol => "`check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).",#
+                      :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).")
+const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
+                        for (key, val) in arg_dict)
+"""
+    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+
+Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
+"""
+val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                :t => "`0 < t < 1`.",#
+                :c1 => "`0 < c1 <= 1`.",#
+                :c2 => "`0 < c2 <= 1`.",#
+                :c3c2 => "`c3 > c2`.",#
+                :dims => "`dims in (1, 2)`.",#
+                :alpha => "`0 < alpha < 1`.",#
+                :beta => "`0 < beta < 1`.",#
+                :bins => "If `bins` is an integer, `bins > 0`.",#
+                :dpower => "If `power` is not `nothing`, `power >= 1`.",#
+                :settings => "If not `nothing`, `!isempty(settings)`.",#
+                :S => "`!isempty(S)`.",#
+                :D => "`!isempty(D)`.",#
+                :ck => "`k >= 1`.",#
+                :S_D => "size(S) == size(D)`.")
+
+"""
+Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
+"""
+ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
+                :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
+                :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
+                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
+                :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                :kt => "`kt::MatNum`: Cokurtosis matrix `features x features`.",#
+                :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
+                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",
+                :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
+                :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                :stdnum => "`vr::Number`: Standard deviation of `X`",
+                :varnum => "`vr::Number`: Variance of `X`",
+                :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
+                :alg => "`alg`: The original algorithm instance.")
+math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
+                 :tgt => "``\\boldsymbol{t}``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.")
+
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
@@ -207,7 +448,7 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsNothingError <: PortfolioOptimisersError
-    "error message describing the condition that triggered the exception."
+    "$(field_dict[:msg])"
     msg
 end
 """
@@ -242,7 +483,7 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsEmptyError <: PortfolioOptimisersError
-    "error message describing the condition that triggered the exception."
+    "$(field_dict[:msg])"
     msg
 end
 """
@@ -277,7 +518,7 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
-    "error message describing the condition that triggered the exception."
+    "$(field_dict[:msg])"
     msg
 end
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
@@ -795,220 +1036,5 @@ function Base.getindex(A::SingletonVector, i::Int)
 end
 Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
 Base.size(::SingletonVector) = (1,)
-"""
-    arg_dict = Dict(
-                 # Weight vectors.
-                 :pw => "`w`: Portfolio weights vector.",
-                 :ow => "`w`: Observation weights vector.",
-                 :oow => "`w`: Optional observation weights vector.",
-                 # Matrix processing.
-                 :pdm => "`pdm`: Positive definite matrix estimator.",
-                 :dn => "`dn`: Matrix denoising estimator.",
-                 :dt => "`dt`: Matrix detoning estimator.",
-                 :mp => "`mp`: Matrix processing estimator.",
-                 # Moments.
-                 :me => "`me`: Expected returns estimator.",
-                 :ce => "`ce`: Covariance estimator.",
-                 :ve => "`ve`: Variance estimator.",
-                 :ske => "`ske`: Coskewness estimator.",
-                 :kte => "`kte`: Cokurtosis estimator.",
-                 :de => "`de`: Distance matrix estimator.",
-                 # Priors.
-                 :pe => "`pe`: Prior estimator.",
-                 :pr => "`pr`: Prior result.",
-                 :per => "`pe`: Prior estimator or result.",
-                 # Phylogeny.
-                 :cle => "`cle`: Clusters estimator.",
-                 :clr => "`clr`: Clusters result.",
-                 :cler => "`cle`: Clusters estimator or result.",
-                 :ple => "`pl`: Phylogeny estimator.",
-                 :plr => "`pl`: Phylogeny result.",
-                 :pler => "`pl`: Phylogeny estimator or result.",
-                 :nte => "`pl`: Network estimator.",
-                 :ntr => "`pl`: Network result.",
-                 :nter => "`pl`: Network estimator or result.",
-                 :cte => "`cte`: Centrality estimator.",
-                 :cta => "`ct`: Centrality algorithm.",
-                 :ctr => "`ct`: Centrality result.",
-                 :cter => "`ct`: Centrality estimator or result.",
-                 # Turnover.
-                 :tne => "`tn`: Turnover estimator.",
-                 :tnr => "`tn`: Turnover result.",
-                 :tner => "`tn`: Turnover estimator or result.",
-                 :tnes => "`tn`: Turnover estimator(s).",
-                 :tnrs => "`tn`: Turnover result(s).",
-                 :tners => "`tn`: Turnover estimator(s) or result(s).",
-                 # Tracking.
-                 :tre => "`tr`: Tracking error estimator.",
-                 :trr => "`tr`: Tracking error result.",
-                 :trer => "`tr`: Tracking error estimator or result.",
-                 :tres => "`tr`: Tracking error estimator(s).",
-                 :trrs => "`tr`: Tracking error result(s).",
-                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                 # Weight bounds.
-                 :wbe => "`wb`: Weight bounds estimator.",
-                 :wbr => "`wb`: Weight bounds result.",
-                 :wber => "`wb`: Weight bounds estimator or result.",
-                 # Fees.
-                 :feese => "`fees`: Fees estimator.",
-                 :feesr => "`fees`: Fees result.",
-                 :feeser => "`fees`: Fees estimator or result.")
-
-This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
-"""
-const arg_dict = Dict(
-                      # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector `assets × 1`.",#
-                      :ow => "`w`: Observation weights vector `observations × 1`.",#
-                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",#
-                      :eqw => "`eqw`: Equilibrium weights vector `features × 1`.",#
-                      # Matrix processing.
-                      :pdm => "`pdm`: Positive definite matrix estimator.",
-                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
-                      :dn => "`dn`: Matrix denoising estimator.",
-                      :odn => "`dn`: Optional matrix denoising estimator.",
-                      :dna => "`dna`: Matrix denoising algorithm.",
-                      :dt => "`dt`: Matrix detoning estimator.",
-                      :odt => "`dt`: Optional matrix detoning estimator.",
-                      :mp => "`mp`: Matrix processing estimator.",
-                      :omp => "`mp`: Optional matrix processing estimator.",
-                      :mpa => "`mpa`: Matrix processing algorithm.",
-                      # Moments.
-                      :me => "`me`: Expected returns estimator.",
-                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
-                      :ce => "`ce`: Covariance estimator.",#
-                      :ve => "`ve`: Variance estimator.",#
-                      :ske => "`ske`: Coskewness estimator.",
-                      :kte => "`kte`: Cokurtosis estimator.",
-                      :de => "`de`: Distance matrix estimator.",
-                      :dist => "`dist`: Distance metric used for pairwise computations.",#
-                      :dist_args => "`args`: Additional positional arguments for the distance metric.",#
-                      :dist_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
-                      :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
-                      :malg => "`alg`: Moment algorithm.",
-                      :corrected => "`corrected`: Whether to apply Bessel's correction.",#
-                      :mutgt => "`tgt`: Shrinkage target.",#
-                      ## Regression
-                      :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
-                      :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
-                      :b => "`b`: Regression intercept vector.",#
-                      :t => "`t`: Threshold value.",#
-                      :crit => "`crit`: Feature selection criterion.",#
-                      :realg => "`alg`: Regression algorithm.",#
-                      :retgt => "`tgt`: Regression model target.",#
-                      :dretgt => "`retgt`: Regression model target.",#
-                      :drtgt => "`drtgt`: Dimension reduction target.",
-                      ## Gerber
-                      :gerbalg => "`alg`: Gerber covariance algorithm.",#
-                      :gerbce => "`ce`: Gerber covariance estimator.",#
-                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
-                      :c1 => "`c1`: Zone of confusion parameter.",#
-                      :c2 => "`c2`: Zone of indecision lower bound.",#
-                      :c3 => "`c3`: Zone of indecision upper bound.",#
-                      :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
-                      :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
-                      ## Mutual and var info
-                      :bins => "`bins`: Binning algorithm or fixed number of bins.",#
-                      :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
-                      # Priors.
-                      :pe => "`pe`: Prior estimator.",#
-                      :pr => "`pr`: Prior result.",#
-                      :per => "`pr`: Prior estimator or result.",
-                      # Phylogeny.
-                      :cle => "`cle`: Clusters estimator.",#
-                      :clr => "`clr`: Clusters result.",#
-                      :cler => "`clr`: Clusters estimator or result.",#
-                      :ple => "`ple`: Phylogeny estimator.",#
-                      :plr => "`plr`: Phylogeny result.",
-                      :pler => "`pl`: Phylogeny estimator or result.",
-                      :nte => "`nte`: Network estimator.",#
-                      :ntr => "`pl`: Network result.",
-                      :nter => "`pl`: Network estimator or result.",
-                      :cte => "`cte`: Centrality estimator.",#
-                      :cta => "`ct`: Centrality algorithm.",
-                      :ctr => "`ct`: Centrality result.",
-                      :cter => "`ct`: Centrality estimator or result.",
-                      # Turnover.
-                      :tne => "`tn`: Turnover estimator.",#
-                      :tnr => "`tn`: Turnover result.",
-                      :tner => "`tn`: Turnover estimator or result.",
-                      :tnes => "`tn`: Turnover estimator(s).",
-                      :tnrs => "`tn`: Turnover result(s).",
-                      :tners => "`tn`: Turnover estimator(s) or result(s).",
-                      # Tracking.
-                      :tre => "`tr`: Tracking error estimator.",
-                      :trr => "`tr`: Tracking error result.",
-                      :trer => "`tr`: Tracking error estimator or result.",
-                      :tres => "`tr`: Tracking error estimator(s).",
-                      :trrs => "`tr`: Tracking error result(s).",
-                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                      # Weight bounds.
-                      :wbe => "`wb`: Weight bounds estimator.",
-                      :wbr => "`wb`: Weight bounds result.",
-                      :wber => "`wb`: Weight bounds estimator or result.",
-                      # Fees.
-                      :feese => "`fees`: Fees estimator.",#
-                      :feesr => "`fees`: Fees result.",
-                      :feeser => "`fees`: Fees estimator or result.",
-                      # Stats.
-                      :sigma => "`sigma`: Covariance matrix `features × features`.",#
-                      :mu => "`mu`: Expected returns vector `features × 1`.",#
-                      :rho => "`rho`: Correlation matrix `features × features`.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `features × features`.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
-                      :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
-                      :sk => "`sk`: Coskewness matrix `features × features^2`.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix `features × features`.",
-                      :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
-                      :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
-                      :Xv => "`X`: Data vector `observations × 1`.",#
-                      :dims => "`dims`: Dimension along which to perform the computation.",#
-                      :omean => "`mean`: Optional mean value to use for centering.",
-                      :stdvec => "`sd`: Vector of standard deviations for each asset.",#
-                      :ex => "`ex`: Parallel execution strategy.",#
-                      :alpha => "`alpha`: Quantile level for the lower tail.",#
-                      :beta => "`beta`: Quantile level for the upper tail.",#
-                      :l => "`l`: Risk aversion parameter.",#
-                      :rf => "`rf`: Risk-free rate.")
-const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
-                        for (key, val) in arg_dict)
-"""
-    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
-
-Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
-"""
-val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
-                :t => "`0 < t < 1`.",#
-                :c1 => "`0 < c1 <= 1`.",#
-                :c2 => "`0 < c2 <= 1`.",#
-                :c3c2 => "`c3 > c2`.",#
-                :dims => "`dims in (1, 2)`.",#
-                :alpha => "`0 < alpha < 1`.",#
-                :beta => "`0 < beta < 1`.",#
-                :bins => "If `bins` is an integer, `bins > 0`.")
-
-"""
-Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
-"""
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
-                :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
-                :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
-                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
-                :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
-                :kt => "`kt::MatNum`: Cokurtosis matrix `features x features`.",#
-                :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
-                :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
-                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",
-                :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
-                :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
-                :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                :stdnum => "`vr::Number`: Standard deviation of `X`",
-                :varnum => "`vr::Number`: Variance of `X`",
-                :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
-                :alg => "`alg`: The original algorithm instance.")
-math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
-                 :tgt => "``\\boldsymbol{t}``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

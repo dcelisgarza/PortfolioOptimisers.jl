@@ -17,8 +17,7 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
 
 # Fields
 
-  - `power`: Optional integer power to which the base correlation or distance matrix is raised.
-  - `alg`: The base distance algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -31,7 +30,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `power` is not `nothing`, then `power >= 1`.
+  - $(val_dict[:dpower])
 
 # Examples
 
@@ -54,7 +53,9 @@ Distance
   - [`VariationInfoDistance`](@ref)
 """
 @concrete struct Distance <: AbstractDistanceEstimator
+    "$(field_dict[:dpower])"
     power
+    "$(field_dict[:dalg])"
     alg
     function Distance(power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
@@ -95,7 +96,7 @@ This method computes the correlation matrix using the provided covariance estima
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise distances.
 
 # Related
 
@@ -178,7 +179,7 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise log-distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise log-distances.
 
 # Related
 
@@ -216,7 +217,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise variation of information distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise variation of information distances.
 
 # Details
 
@@ -272,7 +273,7 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise Euclidean distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise Euclidean distances.
 
 # Details
 
@@ -401,7 +402,7 @@ Compute and return the correlation and distance matrices. The distance matrix de
 # Returns
 
   - `rho::Matrix{<:Number}`: Correlation matrix.
-  - `dist::Matrix{<:Number}`: Distance matrix.
+  - `D::Matrix{<:Number}`: Distance matrix.
 
 # Related
 
@@ -551,7 +552,7 @@ Compute the canonical distance matrix using the covariance estimator and data ma
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise canonical distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise canonical distances.
 
 # Related
 

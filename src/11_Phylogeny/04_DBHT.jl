@@ -1780,14 +1780,14 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
 # Fields
 
-  - `dist`: Distance matrix estimator.
+  - `de`: Distance matrix estimator.
   - `sim`: Similarity matrix algorithm.
   - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
 # Constructors
 
     LoGo(;
-        dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
         sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
         pdm::Option{<:Posdef} = Posdef()
     ) -> LoGo
@@ -1799,13 +1799,13 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> LoGo()
 LoGo
-  dist ┼ Distance
-       │   power ┼ nothing
-       │     alg ┴ CanonicalDistance()
-   sim ┼ MaximumDistanceSimilarity()
-   pdm ┼ Posdef
-       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   de ┼ Distance
+      │   power ┼ nothing
+      │     alg ┴ CanonicalDistance()
+  sim ┼ MaximumDistanceSimilarity()
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -1818,30 +1818,30 @@ LoGo
   - [`GeneralExponentialSimilarity`](@ref)
 """
 @concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
-    dist
+    de
     sim
     pdm
-    function LoGo(dist::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
+    function LoGo(de::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
                   pdm::Option{<:Posdef} = Posdef())
-        return new{typeof(dist), typeof(sim), typeof(pdm)}(dist, sim, pdm)
+        return new{typeof(de), typeof(sim), typeof(pdm)}(de, sim, pdm)
     end
 end
-function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               pdm::Option{<:Posdef} = Posdef())
-    return LoGo(dist, sim, pdm)
+    return LoGo(de, sim, pdm)
 end
 const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
                                  <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
                                                     <:Any, <:Any}}
 """
-    LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::MatNum, X::MatNum)
+    LoGo_dist_assert(de::AbstractDistanceEstimator, sigma::MatNum, X::MatNum)
 
 Validate compatibility of the distance estimator and covariance matrix for LoGo sparse inverse covariance estimation by checking `size(sigma, 1) == size(X, 2)`.
 
 # Arguments
 
-  - `dist`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
+  - `de`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
   - `sigma`: Covariance matrix (`N × N`).
   - `X`: Data matrix (`T × N` or `N × T`).
 
@@ -1920,7 +1920,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 """
 function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma, :sigma)
-    LoGo_dist_assert(je.dist, sigma, X)
+    LoGo_dist_assert(je.de, sigma, X)
     s = LinearAlgebra.diag(sigma)
     iscov = any(!isone, s)
     S = if iscov
@@ -1929,7 +1929,7 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     else
         sigma
     end
-    D = distance(je.dist, S, X; dims = dims, kwargs...)
+    D = distance(je.de, S, X; dims = dims, kwargs...)
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I

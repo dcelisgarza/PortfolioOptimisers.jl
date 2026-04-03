@@ -117,11 +117,11 @@ makedocs(; #modules = [PortfolioOptimisers],
                             "Risk Measures" => joinpath.(api_pages[8][1][idx1:end],
                                                          api_pages[8][3])
                             "Optimisation" => [joinpath.(api_pages[9][1][idx1:end],
-                                                         api_pages[9][3]);
+                                                         api_pages[9][3])
                                                joinpath.(api_pages[10][1][idx1:end],
-                                                         api_pages[10][3]);
+                                                         api_pages[10][3])
                                                joinpath.(api_pages[11][1][idx1:end],
-                                                         api_pages[11][3]);
+                                                         api_pages[11][3])
                                                joinpath.(api_pages[12][1][idx1:end],
                                                          api_pages[12][3])]];
                   "Contribute" => contribute;

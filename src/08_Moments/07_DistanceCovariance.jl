@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DistanceCovariance(;
-        dist::Distances.Metric = Distances.Euclidean(),
+        metric::Distances.Metric = Distances.Euclidean(),
         args::Tuple = (),
         kwargs::NamedTuple = (;),
         w::Option{<:StatsBase.AbstractWeights} = nothing,
@@ -26,9 +26,9 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> DistanceCovariance()
 DistanceCovariance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
+    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+      args ┼ Tuple{}: ()
+    kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
       ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
@@ -41,34 +41,35 @@ DistanceCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
-    "$(arg_dict[:dist])"
-    dist
-    "$(arg_dict[:dist_args])"
+    "$(arg_dict[:metric])"
+    metric
+    "$(arg_dict[:metric_args])"
     args
-    "$(arg_dict[:dist_kwargs])"
+    "$(arg_dict[:metric_kwargs])"
     kwargs
     "$(arg_dict[:oow])"
     w
     "$(arg_dict[:ex])"
     ex
-    function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
+    function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                                 w::Option{<:StatsBase.AbstractWeights},
                                 ex::FLoops.Transducers.Executor)
-        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(dist,
-                                                                                      args,
-                                                                                      kwargs,
-                                                                                      w, ex)
+        return new{typeof(metric), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(metric,
+                                                                                        args,
+                                                                                        kwargs,
+                                                                                        w,
+                                                                                        ex)
     end
 end
-function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
+function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:StatsBase.AbstractWeights} = nothing,
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    return DistanceCovariance(dist, args, kwargs, w, ex)
+    return DistanceCovariance(metric, args, kwargs, w, ex)
 end
 function factory(ce::DistanceCovariance, w::StatsBase.AbstractWeights)
-    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs, w = w,
-                              ex = ce.ex)
+    return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
+                              w = w, ex = ce.ex)
 end
 """
     cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
@@ -109,11 +110,11 @@ function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
     a, b = if isnothing(ce.w)
-        Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
     else
-        Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.metric, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.metric, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
@@ -187,9 +188,9 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
+    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+      args ┼ Tuple{}: ()
+    kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
       ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
@@ -253,11 +254,11 @@ function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
     a, b = if isnothing(ce.w)
-        Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
     else
-        Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.metric, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.metric, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
@@ -329,9 +330,9 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
+    metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+      args ┼ Tuple{}: ()
+    kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
       ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 
