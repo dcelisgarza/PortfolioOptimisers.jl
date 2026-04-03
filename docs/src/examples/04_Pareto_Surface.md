@@ -83,8 +83,8 @@ We will be using high order risk measures, so we need to compute high order mome
 Note how many options this estimator contains.
 
 ````@example 04_Pareto_Surface
-de = Denoise(; alg = SpectralDenoise(;))
-mp = DenoiseDetoneAlgMatrixProcessing(; dn = de)
+dn = Denoise(; alg = SpectralDenoise(;))
+mp = DenoiseDetoneAlgMatrixProcessing(; dn = dn)
 pe = HighOrderPriorEstimator(;
                              # Prior estimator for low order moments
                              pe = EmpiricalPrior(;

@@ -196,8 +196,8 @@ julia> detone!(Detone(), X)
 function detone!(::Nothing, X::MatNum)
     return X
 end
-function detone!(de::Detone, X::MatNum)
-    n = de.n
+function detone!(dt::Detone, X::MatNum)
+    n = dt.n
     @argcheck(zero(n) < n <= size(X, 2),
               DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
@@ -212,7 +212,7 @@ function detone!(de::Detone, X::MatNum)
     vecs = vecs[:, (end - n):end]
     X .-= vecs * vals * transpose(vecs)
     X .= StatsBase.cov2cor(X)
-    posdef!(de.pdm, X)
+    posdef!(dt.pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
@@ -238,9 +238,9 @@ Out-of-place version of [`detone!`](@ref).
 function detone(::Nothing, X::MatNum)
     return X
 end
-function detone(de::Detone, X::MatNum)
+function detone(dt::Detone, X::MatNum)
     X = copy(X)
-    detone!(de, X)
+    detone!(dt, X)
     return X
 end
 

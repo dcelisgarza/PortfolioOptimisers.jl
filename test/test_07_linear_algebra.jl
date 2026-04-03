@@ -63,12 +63,12 @@
     T, N = size(rd.X)
     q = T / N
     @testset "Denoise algorithms" begin
-        des = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
+        dns = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
                Denoise(; alg = SpectralDenoise())]
         df = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv.gz"), DataFrame)
-        for (i, de) in pairs(des)
+        for (i, dn) in pairs(dns)
             sigma1 = copy(pr.sigma)
-            denoise!(de, sigma1, q)
+            denoise!(dn, sigma1, q)
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")
@@ -83,11 +83,11 @@
         @test sigma1 == sigma2
     end
     @testset "Detone" begin
-        des = [nothing, Detone(), Detone(; n = 3)]
+        dts = [nothing, Detone(), Detone(; n = 3)]
         df = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv.gz"), DataFrame)
-        for (i, de) in pairs(des)
+        for (i, dt) in pairs(dts)
             sigma1 = copy(pr.sigma)
-            detone!(des[i], sigma1)
+            detone!(dt, sigma1)
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")
