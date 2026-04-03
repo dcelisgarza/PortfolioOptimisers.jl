@@ -1,14 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for a set of linear constraints (either equality or inequality) in the form `A * x = B` or `A * x ≤ B`.
-
-`PartialLinearConstraint` stores the coefficient matrix `A` and right-hand side vector `B` for a group of linear constraints. This type is used internally by [`LinearConstraint`](@ref) to represent either the equality or inequality constraints in a portfolio optimisation problem.
+`PartialLinearConstraint` stores the coefficient matrix `A` and right-hand side vector `B` for a group of linear constraints. It can represent equality or inequality constraints depending on whether the instance is stored in the `eq` or `ineq` fields of [`LinearConstraint`](@ref).
 
 # Fields
 
-  - `A`: Coefficient matrix of the linear constraints.
-  - `B`: Right-hand side vector of the linear constraints.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -21,8 +18,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(A)`.
-  - `!isempty(B)`.
+  - $(val_dict[:A])
+  - $(val_dict[:B])
 
 # Examples
 
@@ -39,7 +36,9 @@ PartialLinearConstraint
   - [`LinearConstraintEstimator`](@ref)
 """
 @concrete struct PartialLinearConstraint <: AbstractConstraintResult
+    "$(field_dict[:A])"
     A
+    "$(field_dict[:B])"
     B
     function PartialLinearConstraint(A::MatNum, B::VecNum)
         @argcheck(!isempty(A), IsEmptyError)
@@ -53,14 +52,26 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for a set of linear constraints, separating inequality and equality constraints.
+`LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented by a [`PartialLinearConstraint`](@ref).
 
-`LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented as a [`PartialLinearConstraint`](@ref). This type is used to encapsulate all linear constraints in a unified structure, enabling composable and modular constraint handling.
+```math
+\\begin{align}
+  \\mathbf{A}_\\text{ineq} \\boldsymbol{x} &\\leq \\boldsymbol{B}_\\text{ineq} \\\\
+  \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:A])
+  - $(math_dict[:B])
+  - $(math_dict[:ineq])
+  - $(math_dict[:eq])
+  - $(math_dict[:x])
 
 # Fields
 
-  - `ineq`: Inequality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
-  - `eq`: Equality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -73,7 +84,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!(isnothing(ineq) && isnothing(eq))`, i.e. they cannot both be `nothing` at the same time.
+  - $(val_dict[:eqineq])
 
 # Examples
 
@@ -98,7 +109,9 @@ LinearConstraint
   - [`LinearConstraintEstimator`](@ref)
 """
 @concrete struct LinearConstraint <: AbstractConstraintResult
+    "$(field_dict[:ineq])"
     ineq
+    "$(field_dict[:eq])"
     eq
     function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
                               eq::Option{<:PartialLinearConstraint})

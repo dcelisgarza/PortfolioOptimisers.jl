@@ -153,11 +153,17 @@ const arg_dict = Dict(
                       :clalg => "`alg`: Clustering algorithm.",#
                       :onc => "`onc`: Optimal number of clusters estimator.",#
                       :phX_Xv => "`X`: Phylogeny matrix or vector.",#
+                      :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                       ## DBHT
                       :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
                       :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
                       :sim => "`sim`: Similarity matrix algorithm.",#
                       :root => "`root`: Root selection method.",#
+                      # Constraints
+                      :A => "`A`: Linear constraint coefficient matrix.",#
+                      :B => "`B`: Linear constraint response vector.",#
+                      :eq => "`eq`: Optional equality constraints.",#
+                      :ineq => "`ineq`: Optional inequality constraints.",#
                       # Turnover.
                       :tne => "`tn`: Turnover estimator.",#
                       :tnr => "`tn`: Turnover result.",
@@ -239,7 +245,10 @@ val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :dbhtpower => "`power > 0`.",#
                 :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
                 :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
-                :ntn => "`n >= 1`.")
+                :ntn => "`n >= 1`.",#
+                :A => "`!isempty(A)`.",#
+                :B => "`!isempty(B)`.",#
+                :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
@@ -262,7 +271,12 @@ ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if 
                 :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
                 :alg => "`alg`: The original algorithm instance.")
 math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
-                 :tgt => "``\\boldsymbol{t}``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.")
+                 :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
+                 :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
+                 :B => "``\\boldsymbol{B}``: Constraint response vector.",#
+                 :x => "``\\boldsymbol{x}``: Constrained variable.",
+                 :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
+                 :eq => "``\\text{eq}``: Subscript for equality constraints.")
 
 """
 $(DocStringExtensions.TYPEDEF)

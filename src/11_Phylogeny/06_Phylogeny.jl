@@ -843,8 +843,7 @@ Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `pl`: NetworkEstimator estimator.
-  - `ct`: Centrality algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -897,7 +896,9 @@ CentralityEstimator
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
+    "$(field_dict[:pler])"
     pl
+    "$(field_dict[:cta])"
     ct
     function CentralityEstimator(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm)
         return new{typeof(pl), typeof(ct)}(pl, ct)
