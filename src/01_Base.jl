@@ -142,6 +142,8 @@ const arg_dict = Dict(
                       :D => "`D`: Distance matrix",#
                       :ck => "`k`: Optimal number of clusters.",#
                       :vsalg => "`alg`: The [`VectorToScalarMeasure`](@ref) measure used to evaluate clustering quality.",#
+                      :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(features))`.",#
+                      :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
                       # Turnover.
                       :tne => "`tn`: Turnover estimator.",#
                       :tnr => "`tn`: Turnover result.",
@@ -214,7 +216,9 @@ val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :S => "`!isempty(S)`.",#
                 :D => "`!isempty(D)`.",#
                 :ck => "`k >= 1`.",#
-                :S_D => "size(S) == size(D)`.")
+                :S_D => "size(S) == size(D)`.",#
+                :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
+                :kalg => "If `alg` is not `nothing`, `alg >= 1`.")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.

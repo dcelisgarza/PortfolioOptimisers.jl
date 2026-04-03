@@ -208,9 +208,6 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 $(DocStringExtensions.FIELDS)
 
-  - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
-  - `metric`: The distance metric used for silhouette calculation from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), or `nothing` for the default.
-
 # Constructors
 
     SilhouetteScore(;
@@ -244,6 +241,8 @@ SilhouetteScore
 @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
     "$(field_dict[:vsalg])"
     alg
+    #! This is useless.
+    "$(field_dict[:metric])"
     metric
     function SilhouetteScore(alg::VectorToScalarMeasure,
                              metric::Option{<:Distances.SemiMetric})
@@ -266,8 +265,7 @@ Estimator type for selecting the optimal number of clusters in `PortfolioOptimis
 
 # Fields
 
-  - `max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `sqrt(N)`, where `N` is the number of assets.
-  - `alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -280,8 +278,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `max_k >= 1`.
-  - If `alg` is an integer, `alg >= 1`.
+  - $(val_dict[:max_k])
+  - $(val_dict[:kalg])
 
 # Examples
 
@@ -304,7 +302,9 @@ OptimalNumberClusters
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
 @concrete struct OptimalNumberClusters <: AbstractOptimalNumberClustersEstimator
+    "$(field_dict[:max_k])"
     max_k
+    "$(field_dict[:kalg])"
     alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
