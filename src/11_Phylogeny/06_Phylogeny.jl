@@ -810,7 +810,7 @@ NetworkEstimator
     n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
-        @argcheck(n > one(n))
+        @argcheck(n >= one(n))
         return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
     end
 end
