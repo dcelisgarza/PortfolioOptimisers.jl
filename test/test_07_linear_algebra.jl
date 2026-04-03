@@ -78,8 +78,8 @@
         end
         @test denoise(nothing, pr.sigma) === pr.sigma
         sigma1 = copy(pr.sigma)
-        sigma2 = denoise(des[2], sigma1, q)
-        denoise!(des[2], sigma1, q)
+        sigma2 = denoise(dns[2], sigma1, q)
+        denoise!(dns[2], sigma1, q)
         @test sigma1 == sigma2
     end
     @testset "Detone" begin
@@ -97,8 +97,8 @@
         end
         @test denoise(nothing, pr.sigma) === pr.sigma
         sigma1 = copy(pr.sigma)
-        sigma2 = detone(des[2], sigma1)
-        detone!(des[2], sigma1)
+        sigma2 = detone(dts[2], sigma1)
+        detone!(dts[2], sigma1)
         @test sigma1 == sigma2
         @test detone(nothing, pr.sigma) === pr.sigma
     end
