@@ -21,6 +21,16 @@ AbstractResult
 has_pretty_show_method
 ```
 
+## Utility types
+
+Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types non-specific and used throughout the library.
+
+```@docs
+VecScalar
+AbstractEstimatorValueAlgorithm
+SingletonVector
+```
+
 ## Error types
 
 Many of the types defined in `PortfolioOptimisers.jl` make use of extensive data validation to ensure values meet various criteria. This simplifies the implementation of methods, and improves performance and by delegating as many checks as possible to variable instantiation. In cases where validation cannot be performed at variable instantiation, they are performed as soon as possible within functions.
@@ -34,14 +44,15 @@ IsEmptyError
 IsNonFiniteError
 ```
 
-## Utility types
+## Assertions
 
-Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types non-specific and used throughout the library.
+In order to increase correctness, robustness, and safety, we make extensive use of [defensive programming](https://en.wikipedia.org/wiki/Defensive_programming). The following functions perform some of these validations and are usually called at variable instantiation.
 
 ```@docs
-VecScalar
-AbstractEstimatorValueAlgorithm
-SingletonVector
+assert_nonempty_nonneg_finite_val
+assert_nonempty_gt0_finite_val
+assert_nonempty_finite_val
+assert_matrix_issquare
 ```
 
 ## Base type aliases

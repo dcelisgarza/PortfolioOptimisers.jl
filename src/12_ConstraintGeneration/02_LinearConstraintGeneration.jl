@@ -58,6 +58,7 @@ $(DocStringExtensions.TYPEDEF)
 \\begin{align}
   \\mathbf{A}_\\text{ineq} \\boldsymbol{x} &\\leq \\boldsymbol{B}_\\text{ineq} \\\\
   \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}
+
 \\end{align}
 ```
 

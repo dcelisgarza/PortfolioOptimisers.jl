@@ -12,17 +12,6 @@ concrete_typed_array
 factory(::Nothing, args...; kwargs...)
 ```
 
-## Assertions
-
-In order to increase correctness, robustness, and safety, we make extensive use of [defensive programming](https://en.wikipedia.org/wiki/Defensive_programming). The following functions perform some of these validations and are usually called at variable instantiation.
-
-```@docs
-assert_nonempty_nonneg_finite_val
-assert_nonempty_gt0_finite_val
-assert_nonempty_finite_val
-assert_matrix_issquare
-```
-
 ## Mathematical functions
 
 `PortfolioOptimisers.jl` makes use of various mathematical operators, some of which are generic to support the variety of inputs supported by the library.
