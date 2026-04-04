@@ -545,7 +545,7 @@ Where:
 
   - ``\\sigma``: Variable representing the portfolio's variance of the variance.
 
-  - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\mathbf{G}``: Suitable factorisation of the `N^2 × N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
 
   - ``k``: Scalar variable/constant.
 
