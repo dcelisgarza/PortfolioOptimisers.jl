@@ -5,7 +5,7 @@
 These types and functions let us define solver and solution interfaces.
 
 ```@docs
-DictStrA_VecPairStrA
+Dict_VecPair
 SlvSettings
 Solver
 VecSlv

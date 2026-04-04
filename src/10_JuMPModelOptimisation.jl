@@ -11,7 +11,7 @@ All concrete and/or abstract types representing the result of a JuMP model optim
 """
 abstract type AbstractJuMPResult <: AbstractResult end
 """
-    const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
+    const Dict_VecPair = Union{<:AbstractDict{<:AbstractString, <:Any},
                                        <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
 
 Alias for a dictionary or vector of pairs with string keys.
@@ -24,10 +24,9 @@ Represents solver settings as either a dictionary mapping strings to values, or 
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const DictStrA_VecPairStrA = Union{<:AbstractDict{<:AbstractString, <:Any},
-                                   <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
+const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
 """
-    const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
+    const SlvSettings = Union{<:Pair, <:Dict_VecPair}
 
 Alias for solver settings used in JuMP-based optimisation.
 
@@ -35,11 +34,12 @@ Represents solver settings as either a single pair of string key and value, or a
 
 # Related
 
-  - [`DictStrA_VecPairStrA`](@ref)
+  - [`Dict_VecPair`](@ref)
   - [`Solver`](@ref)
   - [`set_solver_attributes`](@ref)
 """
-const SlvSettings = Union{<:Pair{<:AbstractString, <:Any}, <:DictStrA_VecPairStrA}
+const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -101,8 +101,15 @@ Solver
     add_bridges
     function Solver(name::Sym_Str, solver::Any, settings::Option{<:SlvSettings},
                     check_sol::NamedTuple, add_bridges::Bool)
-        if isa(settings, Dict_Vec)
+        if isa(settings, Dict_VecPair)
             @argcheck(!isempty(settings), IsEmptyError)
+            if isa(settings, AbstractVector)
+                @argcheck(all(x -> isa(x[1], SlvKeys), settings))
+            else
+                @argcheck(all(x -> isa(x, SlvKeys), keys(settings)))
+            end
+        elseif isa(settings, Pair)
+            @argcheck(isa(settings[1], SlvKeys))
         end
         return new{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                    typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
@@ -205,7 +212,7 @@ function set_solver_attributes(args...)
     return nothing
 end
 """
-    set_solver_attributes(model::JuMP.Model, settings::DictStrA_VecPairStrA)
+    set_solver_attributes(model::JuMP.Model, settings::Dict_VecPair)
 
 Set multiple solver attributes on a JuMP model.
 
@@ -224,9 +231,9 @@ Iterates over the provided settings and applies each as a solver attribute.
 
   - [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
   - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
-  - [`DictStrA_VecPairStrA`](@ref)
+  - [`Dict_VecPair`](@ref)
 """
-function set_solver_attributes(model::JuMP.Model, settings::DictStrA_VecPairStrA)
+function set_solver_attributes(model::JuMP.Model, settings::Dict_VecPair)
     for (k, v) in settings
         JuMP.set_attribute(model, k, v)
     end
