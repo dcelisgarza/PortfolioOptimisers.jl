@@ -535,5 +535,37 @@
                         -3.5475446827000723, 5.25869258317521, -3.557616841873538,
                         3.737346772646009, 3.54749774747547, 1.626855992937381,
                         3.665078207675533], rtol = 5e-4)
+
+        opt = JuMPOptimiser(; pe = pr2, slv = mip_slv, sbgt = nothing, bgt = nothing,
+                            wb = nothing,
+                            st = Threshold(val = [0.01, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+        rb = RiskBudgeting(; r = r, opt = opt,
+                           rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting()))
+        res = optimise(rb, rd2)
+        rkc = risk_contribution(r, res.w, pr2.X)
+        v1 = minimum(rkc)
+        v2 = maximum(rkc)
+        @test isapprox(v2 / v1, 1; rtol = 5e-4)
+        @test isapprox(res.w,
+                       [-0.006068502328800911, -0.010283710731139427, -0.004579361951455645,
+                        -0.006290315431572123, 0.011859181266864818, -0.005786676796080669,
+                        0.007876659408692635, 0.005615829457468683, 0.002654898473146833,
+                        0.005559729799907208], rtol = 5e-4)
+
+        rb = RiskBudgeting(; r = r, opt = opt,
+                           rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting(),
+                                                    rkb = RiskBudget(; val = 1:10)))
+        res = optimise(rb, rd2)
+        rkc = risk_contribution(r, res.w, pr2.X)
+        v1, m1 = findmin(rkc)
+        v2, m2 = findmax(rkc)
+        @test isapprox(v2 / v1, 10; rtol = 5e-5)
+        @test m1 == 1
+        @test m2 == 10
+        @test isapprox(res.w,
+                       [0.004663614996213126, 0.009179614179805309, 0.004642030574929459,
+                        0.006809591767936649, -0.01009480267331323, 0.006829360387914899,
+                        -0.007174027276685721, -0.006809730598840817,
+                        -0.0031229863166250408, -0.007035130305474053], rtol = 5e-4)
     end
 end

@@ -41,7 +41,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          ffl::Option{<:Num_VecNum},
                                          ffs::Option{<:Num_VecNum}, ss::Option{<:Number},
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
-                                         ffs_flag::Bool)
+                                         ffs_flag::Bool, miprb_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -91,11 +91,19 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
         JuMP.@expression(model, ffs, dot_scalar(ffs, isb))
         add_to_fees!(model, ffs)
     end
+    if miprb_flag
+        lw = model[:lw]
+        sw = model[:sw]
+        JuMP.@constraints(model, begin
+                              lmiprb, sc * (lw - ss * il) <= 0
+                              smiprb, sc * (sw - ss * is) <= 0
+                          end)
+    end
     return i_mip
 end
 function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_VecNum},
                          lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
-                         ffl_flag::Bool)
+                         ffl_flag::Bool, miprb_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -120,6 +128,14 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_
     if ffl_flag
         JuMP.@expression(model, ffl, dot_scalar(ffl, ib))
         add_to_fees!(model, ffl)
+    end
+    if miprb_flag
+        lw = model[:lw]
+        sw = model[:sw]
+        JuMP.@constraints(model, begin
+                              lmiprb, sc * (lw - ss * ib) <= 0
+                              smiprb, sc * (sw - ss * (1 .- ib)) <= 0
+                          end)
     end
     return ib
 end
@@ -164,9 +180,9 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     end
     ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
         short_mip_threshold_constraints(model, wb, lt, st, ffl, ffs, ss, lt_flag, st_flag,
-                                        ffl_flag, ffs_flag)
+                                        ffl_flag, ffs_flag, miprb_flag)
     else
-        mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag)
+        mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag)
     end
     sc = model[:sc]
     if card_flag
@@ -186,15 +202,6 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     end
     if iplg_flag
         set_iplg_constraints!(model, pl)
-    end
-    if miprb_flag
-        lw = model[:lw]
-        sw = model[:sw]
-        ss = model[:ss]
-        JuMP.@constraints(model, begin
-                              lmiprb, sc * (lw - ss * ib) <= 0
-                              smiprb, sc * (sw - ss * (1 .- ib)) <= 0
-                          end)
     end
     return nothing
 end
