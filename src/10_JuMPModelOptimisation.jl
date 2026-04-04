@@ -11,12 +11,11 @@ All concrete and/or abstract types representing the result of a JuMP model optim
 """
 abstract type AbstractJuMPResult <: AbstractResult end
 """
-    const Dict_VecPair = Union{<:AbstractDict{<:AbstractString, <:Any},
-                                       <:AbstractVector{<:Pair{<:AbstractString, <:Any}}}
+    const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
 
-Alias for a dictionary or vector of pairs with string keys.
+Alias for a dictionary or vector of pairs.
 
-Represents solver settings as either a dictionary mapping strings to values, or a vector of pairs where the first element is a string and the second is any value. Used for passing attribute settings to JuMP solvers.
+Represents solver settings as either a dictionary mapping constraint attributes to values, or a vector of pairs where the first element is a constraint attribute and the second is its value. Used for passing attribute settings to JuMP solvers.
 
 # Related
 
@@ -30,7 +29,7 @@ const Dict_VecPair = Union{<:AbstractDict, <:AbstractVector{<:Pair}}
 
 Alias for solver settings used in JuMP-based optimisation.
 
-Represents solver settings as either a single pair of string key and value, or as a dictionary/vector of pairs with string keys. Used for passing attribute settings to JuMP solvers.
+Represents solver settings as either a single solver attribute, or a collection of solver attributes.
 
 # Related
 
