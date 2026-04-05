@@ -111,17 +111,15 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing, Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing, Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
       │            pe ┼ EmpiricalPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
       │               │           │      │    me ┼ SimpleExpectedReturns
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   w ┴ nothing
       │               │           │      │    ce ┼ GeneralCovariance
-      │               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │               │           │      │     pdm ┼ Posdef
@@ -132,8 +130,7 @@ OpinionPoolingPrior
       │               │           │      │     alg ┼ nothing
       │               │           │      │   order ┴ DenoiseDetoneAlg()
       │               │        me ┼ SimpleExpectedReturns
-      │               │           │     w ┼ nothing
-      │               │           │   idx ┴ nothing
+      │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
       │      mu_views ┼ LinearConstraintEstimator
       │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
@@ -165,12 +162,10 @@ OpinionPoolingPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
       │               │           │      │    me ┼ SimpleExpectedReturns
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   w ┴ nothing
       │               │           │      │    ce ┼ GeneralCovariance
-      │               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │               │           │      │     pdm ┼ Posdef
@@ -181,8 +176,7 @@ OpinionPoolingPrior
       │               │           │      │     alg ┼ nothing
       │               │           │      │   order ┴ DenoiseDetoneAlg()
       │               │        me ┼ SimpleExpectedReturns
-      │               │           │     w ┼ nothing
-      │               │           │   idx ┴ nothing
+      │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
       │      mu_views ┼ LinearConstraintEstimator
       │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
@@ -215,12 +209,10 @@ OpinionPoolingPrior
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
@@ -231,8 +223,7 @@ OpinionPoolingPrior
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │     w ┼ nothing
-      │           │   idx ┴ nothing
+      │           │   w ┴ nothing
       │   horizon ┴ nothing
     p ┼ nothing
     w ┼ nothing

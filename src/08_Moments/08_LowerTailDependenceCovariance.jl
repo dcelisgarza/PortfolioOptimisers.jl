@@ -30,8 +30,7 @@ julia> LowerTailDependenceCovariance()
 LowerTailDependenceCovariance
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
-        │             │     w ┼ nothing
-        │             │   idx ┴ nothing
+        │             │   w ┴ nothing
         │           w ┼ nothing
         │   corrected ┴ Bool: true
   alpha ┼ Float64: 0.05

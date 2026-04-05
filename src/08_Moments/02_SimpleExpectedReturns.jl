@@ -12,8 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SimpleExpectedReturns(;
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
-        idx::Option{<:VecInt} = nothing
+        w::Option{<:StatsBase.AbstractWeights} = nothing
     ) -> SimpleExpectedReturns
 
 Keywords correspond to the struct's fields.
@@ -21,20 +20,17 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:oow])
-  - $(val_dict[:oidx])
 
 # Examples
 
 ```jldoctest
 julia> SimpleExpectedReturns()
 SimpleExpectedReturns
-    w ┼ nothing
-  idx ┴ nothing
+  w ┴ nothing
 
 julia> SimpleExpectedReturns(; w = StatsBase.Weights([0.5, 0.5]))
 SimpleExpectedReturns
-    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.5, 0.5]
-  idx ┴ nothing
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.5, 0.5]
 ```
 
 # Related
@@ -47,18 +43,13 @@ SimpleExpectedReturns
 @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
     "$(field_dict[:oow])"
     w
-    "$(field_dict[:oidx])"
-    idx
-    function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights},
-                                   idx::Option{<:VecInt})
+    function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights})
         assert_nonempty_finite_val(w, :w)
-        assert_nonempty_gt0_finite_val(idx, :idx)
-        return new{typeof(w), typeof(idx)}(w, idx)
+        return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                               idx::Option{<:VecInt} = nothing)
-    return SimpleExpectedReturns(w, idx)
+function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    return SimpleExpectedReturns(w)
 end
 """
     Statistics.mean(
@@ -90,8 +81,7 @@ julia> X = [0.01 0.02; 0.03 0.04];
 
 julia> ser = SimpleExpectedReturns()
 SimpleExpectedReturns
-    w ┼ nothing
-  idx ┴ nothing
+  w ┴ nothing
 
 julia> mean(ser, X)
 1×2 Matrix{Float64}:
@@ -99,8 +89,7 @@ julia> mean(ser, X)
 
 julia> serw = SimpleExpectedReturns(; w = StatsBase.Weights([0.2, 0.8]))
 SimpleExpectedReturns
-    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
-  idx ┴ nothing
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
 
 julia> mean(serw, X)
 1×2 Matrix{Float64}:
@@ -114,17 +103,7 @@ julia> mean(serw, X)
   - [`VecNum`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function Statistics.mean(me::SimpleExpectedReturns{<:Any, Nothing}, X::MatNum;
-                         dims::Int = 1, kwargs...)
-    return if isnothing(me.w)
-        Statistics.mean(X; dims = dims)
-    else
-        Statistics.mean(X, me.w; dims = dims)
-    end
-end
-function Statistics.mean(me::SimpleExpectedReturns{<:Any, <:VecInt}, X::MatNum;
-                         dims::Int = 1, kwargs...)
-    X = view(X, me.idx, :)
+function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     return if isnothing(me.w)
         Statistics.mean(X; dims = dims)
     else
@@ -155,13 +134,11 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 ```jldoctest
 julia> me = SimpleExpectedReturns()
 SimpleExpectedReturns
-    w ┼ nothing
-  idx ┴ nothing
+  w ┴ nothing
 
 julia> factory(me, StatsBase.Weights([0.1, 0.2, 0.7]))
 SimpleExpectedReturns
-    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-  idx ┴ nothing
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
 ```
 
 # Related
@@ -169,8 +146,8 @@ SimpleExpectedReturns
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
-function factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
-    return SimpleExpectedReturns(; w = w, idx = me.idx)
+function factory(::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
+    return SimpleExpectedReturns(; w = w)
 end
 
 export SimpleExpectedReturns, mean

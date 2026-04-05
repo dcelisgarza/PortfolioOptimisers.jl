@@ -345,12 +345,10 @@ HighOrderPriorEstimator
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
@@ -361,13 +359,11 @@ HighOrderPriorEstimator
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │     w ┼ nothing
-      │           │   idx ┴ nothing
+      │           │   w ┴ nothing
       │   horizon ┴ nothing
   kte ┼ Cokurtosis
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -379,8 +375,7 @@ HighOrderPriorEstimator
       │   alg ┴ Full()
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

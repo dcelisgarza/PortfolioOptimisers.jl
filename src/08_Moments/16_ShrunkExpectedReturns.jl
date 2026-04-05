@@ -238,17 +238,14 @@ Keywords correspond to the struct's fields.
 julia> ShrunkExpectedReturns()
 ShrunkExpectedReturns
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    ce ┼ PortfolioOptimisersCovariance
       │   ce ┼ Covariance
       │      │    me ┼ SimpleExpectedReturns
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │      │     pdm ┼ Posdef

@@ -48,12 +48,10 @@ BlackLittermanPrior
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   w ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -67,12 +65,10 @@ BlackLittermanPrior
              │           │   ce ┼ PortfolioOptimisersCovariance
              │           │      │   ce ┼ Covariance
              │           │      │      │    me ┼ SimpleExpectedReturns
-             │           │      │      │       │     w ┼ nothing
-             │           │      │      │       │   idx ┴ nothing
+             │           │      │      │       │   w ┴ nothing
              │           │      │      │    ce ┼ GeneralCovariance
-             │           │      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │      │       │     w ┼ nothing
-             │           │      │      │       │   idx ┴ nothing
+             │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │      │       │    w ┴ nothing
              │           │      │      │   alg ┴ Full()
              │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │      │     pdm ┼ Posdef

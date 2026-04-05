@@ -24,8 +24,7 @@ Keywords correspond to the struct's fields.
 julia> ExcessExpectedReturns()
 ExcessExpectedReturns
   me ┼ SimpleExpectedReturns
-     │     w ┼ nothing
-     │   idx ┴ nothing
+     │   w ┴ nothing
   rf ┴ Float64: 0.0
 ```
 

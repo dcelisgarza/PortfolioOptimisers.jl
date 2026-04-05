@@ -263,8 +263,7 @@ julia> SmythBrobyCovariance()
 SmythBrobyCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ nothing
-      │             │   idx ┴ nothing
+      │             │   w ┴ nothing
       │           w ┼ nothing
       │   corrected ┴ Bool: true
   pdm ┼ Posdef

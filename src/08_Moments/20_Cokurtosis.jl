@@ -38,8 +38,7 @@ Keywords correspond to the struct's fields.
 julia> Cokurtosis()
 Cokurtosis
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

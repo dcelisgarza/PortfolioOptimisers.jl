@@ -38,8 +38,7 @@ julia> KendallCovariance()
 KendallCovariance
   ve ┼ SimpleVariance
      │          me ┼ SimpleExpectedReturns
-     │             │     w ┼ nothing
-     │             │   idx ┴ nothing
+     │             │   w ┴ nothing
      │           w ┼ nothing
      │   corrected ┴ Bool: true
 ```
@@ -157,8 +156,7 @@ julia> SpearmanCovariance()
 SpearmanCovariance
   ve ┼ SimpleVariance
      │          me ┼ SimpleExpectedReturns
-     │             │     w ┼ nothing
-     │             │   idx ┴ nothing
+     │             │   w ┴ nothing
      │           w ┼ nothing
      │   corrected ┴ Bool: true
 ```

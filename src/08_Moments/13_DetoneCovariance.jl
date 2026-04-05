@@ -24,12 +24,10 @@ julia> DetoneCovariance()
 DetoneCovariance
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    ce ┼ GeneralCovariance
-      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │    w ┴ nothing
       │   alg ┴ Full()
    dt ┼ Detone
       │   pdm ┼ Posdef

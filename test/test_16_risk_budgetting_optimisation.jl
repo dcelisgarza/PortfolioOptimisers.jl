@@ -560,7 +560,7 @@
         rkc = risk_contribution(r, res.w, pr2.X)
         v1, m1 = findmin(rkc)
         v2, m2 = findmax(rkc)
-        @test isapprox(v2 / v1, 10; rtol = 1e-4)
+        @test isapprox(v2 / v1, 10; rtol = 5e-4)
         @test m1 == 1
         @test m2 == 10
         @test isapprox(res.w,

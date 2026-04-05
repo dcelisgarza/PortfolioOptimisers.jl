@@ -137,8 +137,7 @@ julia> PortfolioOptimisers.factory(GerberCovariance(; alg = MyUnstandardisedGerb
 GerberCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
-      │             │   idx ┴ nothing
+      │             │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │           w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │   corrected ┴ Bool: true
   pdm ┼ Posdef
@@ -254,8 +253,7 @@ julia> PortfolioOptimisers.factory(GerberCovariance(; alg = MyStandardisedGerber
 GerberCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
-      │             │   idx ┴ nothing
+      │             │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │           w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
       │   corrected ┴ Bool: true
   pdm ┼ Posdef
@@ -958,8 +956,7 @@ julia> ce = GerberCovariance()
 GerberCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ nothing
-      │             │   idx ┴ nothing
+      │             │   w ┴ nothing
       │           w ┼ nothing
       │   corrected ┴ Bool: true
   pdm ┼ Posdef
@@ -972,8 +969,7 @@ julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
 GerberCovariance
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-      │             │   idx ┴ nothing
+      │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
       │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
       │   corrected ┴ Bool: true
   pdm ┼ Posdef
