@@ -258,7 +258,7 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     end
     @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
     # Factor prior.
-    f_prior = prior(pe.pe, F; strict = strict)
+    f_prior = prior(pe.pe, F; strict = strict, kwargs...)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
     rr = regression(pe.re, X, F)
