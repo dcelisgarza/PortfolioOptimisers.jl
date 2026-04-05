@@ -157,7 +157,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
         X = transpose(X)
         F = transpose(F)
     end
-    f_prior = prior(pe.pe, F; kwargs...)
+    f_prior = prior(pe.pe, F)
     f_mu, f_sigma = f_prior.mu, f_prior.sigma
     rr = regression(pe.re, X, F)
     (; b, M) = rr
