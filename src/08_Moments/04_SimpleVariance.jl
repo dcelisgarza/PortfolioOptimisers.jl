@@ -261,6 +261,7 @@ julia> var(sv, Xmat; dims = 1)
 """
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
+    #! X = observation_window(X, ve.idx)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -270,6 +271,7 @@ function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
 end
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
+    #! X = observation_window(X, ve.idx)
     me = SimpleExpectedReturns()
     mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)

@@ -114,17 +114,8 @@ julia> mean(serw, X)
   - [`VecNum`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function Statistics.mean(me::SimpleExpectedReturns{<:Any, Nothing}, X::MatNum;
-                         dims::Int = 1, kwargs...)
-    return if isnothing(me.w)
-        Statistics.mean(X; dims = dims)
-    else
-        Statistics.mean(X, me.w; dims = dims)
-    end
-end
-function Statistics.mean(me::SimpleExpectedReturns{<:Any, <:VecInt}, X::MatNum;
-                         dims::Int = 1, kwargs...)
-    X = view(X, me.idx, :)
+function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    X = observation_window(X, me.idx)
     return if isnothing(me.w)
         Statistics.mean(X; dims = dims)
     else

@@ -198,7 +198,7 @@ function distance(de::Distance{<:Integer, <:LogDistance}, ce::LTDCov_AllInternal
     return -log.(rho)
 end
 """
-    distance(de::Distance{<:Any, <:VariationInfoDistance}, ::Any, X::MatNum;
+    distance(de::Distance{<:Any, <:VariationInfoDistance}, ce::Any, X::MatNum;
              dims::Int = 1, kwargs...)
 
 Compute the variation of information (VI) distance matrix from a data matrix.
@@ -229,17 +229,23 @@ Compute the variation of information (VI) distance matrix from a data matrix.
   - [`Distance`](@ref)
   - [`VariationInfoDistance`](@ref)
 """
-function distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatNum;
+function distance(de::Distance{Nothing, <:VariationInfoDistance}, ce::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
+    if hasproperty(ce, :idx)
+        X = observation_window(X, ce.idx)
+    end
     if dims == 2
         X = transpose(X)
     end
     return variation_info(X, de.alg.bins, de.alg.normalise)
 end
-function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any, X::MatNum;
+function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ce::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
+    if hasproperty(ce, :idx)
+        X = observation_window(X, ce.idx)
+    end
     if dims == 2
         X = transpose(X)
     end
@@ -466,6 +472,9 @@ function cor_and_dist(de::Distance{Nothing, <:VariationInfoDistance},
                       kwargs...)
     @argcheck(dims in (1, 2))
     rho = Statistics.cor(ce, X; dims = dims, kwargs...)
+    if hasproperty(ce, :idx)
+        X = observation_window(X, ce.idx)
+    end
     if dims == 2
         X = transpose(X)
     end
@@ -476,6 +485,9 @@ function cor_and_dist(de::Distance{<:Integer, <:VariationInfoDistance},
                       kwargs...)
     @argcheck(dims in (1, 2))
     rho = Statistics.cor(ce, X; dims = dims, kwargs...) .^ de.power
+    if hasproperty(ce, :idx)
+        X = observation_window(X, ce.idx)
+    end
     if dims == 2
         X = transpose(X)
     end
