@@ -263,15 +263,6 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
                                    i)
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
-function observation_window(x::AbstractArray, ::Nothing)
-    return x
-end
-function observation_window(x::AbstractVector, i)
-    return view(x, i)
-end
-function observation_window(x::AbstractMatrix, i)
-    return view(x, i, :)
-end
 """
     nothing_scalar_array_view_odd_order(::Nothing, i, j)
     nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j) -> view(x, i, j)

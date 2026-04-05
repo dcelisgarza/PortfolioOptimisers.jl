@@ -109,9 +109,17 @@ This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.
   - [`robust_cov`](@ref)
   - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-    X = observation_window(X, ce.idx)
+function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    return if isnothing(ce.w)
+        robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
+    else
+        robust_cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+    end
+end
+function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    X = view(X, ce.idx, :)
     return if isnothing(ce.w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
@@ -156,8 +164,16 @@ This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.
 """
 function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum;
                         dims::Int = 1, mean = nothing, kwargs...)
-    X = observation_window(X, ce.idx)
     if isnothing(ce.w)
+        robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
+    else
+        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+    end
+end
+function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    X = view(X, ce.idx, :)
+    return if isnothing(ce.w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
