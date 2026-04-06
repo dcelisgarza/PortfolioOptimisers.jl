@@ -11,7 +11,7 @@ $(DocStringExtensions.FIELDS)
 
     SimpleVariance(;
         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         corrected::Bool = true
     ) -> SimpleVariance
 
@@ -58,15 +58,14 @@ SimpleVariance
     "$(field_dict[:corrected])"
     corrected
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
-                            w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
-        assert_nonempty_finite_val(w, :w)
+                            w::Option{<:ObsWeights}, corrected::Bool)
+        validate_observation_weights(w)
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
     end
 end
 function SimpleVariance(;
                         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
-                        corrected::Bool = true)
+                        w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return SimpleVariance(me, w, corrected)
 end
 """
@@ -122,10 +121,11 @@ julia> std(sv, Xmat; dims = 1)
 function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
-    return if isnothing(ve.w)
+    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        Statistics.std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+        Statistics.std(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
@@ -135,10 +135,11 @@ function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
     else
         mean
     end
-    return if isnothing(ve.w)
+    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         Statistics.std(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        Statistics.std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+        Statistics.std(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
 """
@@ -197,10 +198,11 @@ julia> std(svw, X)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
-    return if isnothing(ve.w)
+    w = get_observation_weights(ve.w, X)
+    return if isnothing(w)
         Statistics.std(X; corrected = ve.corrected, mean = mean)
     else
-        Statistics.std(X, ve.w; corrected = ve.corrected, mean = mean)
+        Statistics.std(X, w; corrected = ve.corrected, mean = mean)
     end
 end
 """
@@ -256,20 +258,22 @@ julia> var(sv, Xmat; dims = 1)
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
-    return if isnothing(ve.w)
+    w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        Statistics.var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+        Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     me = SimpleExpectedReturns()
     mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
-    return if isnothing(ve.w)
+    w = get_observation_weights(me.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         Statistics.var(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        Statistics.var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
+        Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
 """
@@ -328,16 +332,17 @@ julia> var(svw, X)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
-    return if isnothing(ve.w)
+    w = get_observation_weights(ve.w, X)
+    return if isnothing(w)
         Statistics.var(X; corrected = ve.corrected, mean = mean)
     else
-        Statistics.var(X, ve.w; corrected = ve.corrected, mean = mean)
+        Statistics.var(X, w; corrected = ve.corrected, mean = mean)
     end
 end
 """
     factory(
         ve::SimpleVariance,
-        w::StatsBase.AbstractWeights
+        w::ObsWeights
     ) -> SimpleVariance
 
 Return a new `SimpleVariance` estimator with the specified observation weights.
@@ -381,7 +386,7 @@ SimpleVariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ve::SimpleVariance, w::StatsBase.AbstractWeights)
+function factory(ve::SimpleVariance, w::ObsWeights)
     return SimpleVariance(; me = factory(ve.me, w), w = w, corrected = ve.corrected)
 end
 

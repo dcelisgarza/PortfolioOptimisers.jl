@@ -73,7 +73,7 @@ In order to implement a new Gerber algorithm which will work seamlessly with the
 
 If the algorithm uses observation weights, the `factory` method will update the algorithm with the new weights.
 
-  - `PortfolioOptimisers.factory(alg::UnstandardisedGerberCovarianceAlgorithm, w::StatsBase.AbstractWeights) -> UnstandardisedGerberCovarianceAlgorithm`: Updates the algorithm with the new weights.
+  - `PortfolioOptimisers.factory(alg::UnstandardisedGerberCovarianceAlgorithm, w::PortfolioOptimisers.ObsWeights) -> UnstandardisedGerberCovarianceAlgorithm`: Updates the algorithm with the new weights.
 
 ### Arguments
 
@@ -92,16 +92,14 @@ We can create a dummy unstandardised Gerber covariance algorithm as follows:
 julia> struct MyUnstandardisedGerberCovarianceAlg{T} <:
               PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm
            w::T
-           function MyUnstandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w)
-                   @assert(!isempty(w))
-               end
+           function MyUnstandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyUnstandardisedGerberCovarianceAlg(;
-                                                    w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                                    w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyUnstandardisedGerberCovarianceAlg(w)
        end
 MyUnstandardisedGerberCovarianceAlg
@@ -116,7 +114,7 @@ julia> function PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:
        end
 
 julia> function PortfolioOptimisers.factory(alg::MyUnstandardisedGerberCovarianceAlg,
-                                            w::StatsBase.AbstractWeights)
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyUnstandardisedGerberCovarianceAlg(; w = w)
        end
 
@@ -190,7 +188,7 @@ In order to implement a new Gerber algorithm which will work seamlessly with the
 
 If the algorithm uses observation weights, the `factory` method will update the algorithm with the new weights.
 
-  - `PortfolioOptimisers.factory(alg::StandardisedGerberCovarianceAlgorithm, w::StatsBase.AbstractWeights) -> StandardisedGerberCovarianceAlgorithm`: Updates the algorithm with the new weights.
+  - `PortfolioOptimisers.factory(alg::StandardisedGerberCovarianceAlgorithm, w::PortfolioOptimisers.ObsWeights) -> StandardisedGerberCovarianceAlgorithm`: Updates the algorithm with the new weights.
 
 ### Arguments
 
@@ -209,16 +207,14 @@ We can create a dummy standardised Gerber covariance algorithm as follows:
 julia> struct MyStandardisedGerberCovarianceAlg{T} <:
               PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
            w::T
-           function MyStandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w)
-                   @assert(!isempty(w))
-               end
+           function MyStandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyStandardisedGerberCovarianceAlg(;
-                                                  w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                                  w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyStandardisedGerberCovarianceAlg(w)
        end
 MyStandardisedGerberCovarianceAlg
@@ -232,7 +228,7 @@ julia> function PortfolioOptimisers.gerber(ce::GerberCovariance{<:Any, <:Any, <:
        end
 
 julia> function PortfolioOptimisers.factory(alg::MyStandardisedGerberCovarianceAlg,
-                                            w::StatsBase.AbstractWeights)
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyStandardisedGerberCovarianceAlg(; w = w)
        end
 
@@ -985,7 +981,7 @@ GerberCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::GerberCovariance, w::ObsWeights)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
                             pdm = ce.pdm, t = ce.t)
 end

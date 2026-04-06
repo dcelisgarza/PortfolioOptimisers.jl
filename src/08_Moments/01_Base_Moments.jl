@@ -54,7 +54,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Factory
 
-  - `PortfolioOptimisers.factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ce::AbstractCovarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -72,21 +72,20 @@ We can create a dummy covariance estimator as follows:
 ```jldoctest
 julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
            w::T1
-           function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w) && isempty(w)
-                   throw(IsEmptyError("`w` cannot be an empty weights object"))
-               end
+           function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyCovarianceEstimator(;
-                                      w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                      w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyCovarianceEstimator(w)
        end
 MyCovarianceEstimator
 
-julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyCovarianceEstimator(; w = w)
        end
 
@@ -184,7 +183,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Factory
 
-  - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -202,21 +201,20 @@ We can create a dummy variance estimator as follows:
 ```jldoctest
 julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
            w::T1
-           function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w) && isempty(w)
-                   throw(IsEmptyError("`w` cannot be an empty weights object"))
-               end
+           function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyVarianceEstimator(;
-                                    w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                    w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyVarianceEstimator(w)
        end
 MyVarianceEstimator
 
-julia> function PortfolioOptimisers.factory(::MyVarianceEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyVarianceEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyVarianceEstimator(; w = w)
        end
 
@@ -306,7 +304,7 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ## Factory
 
-  - `PortfolioOptimisers.factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(me::AbstractExpectedReturnsEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -323,22 +321,20 @@ In order to implement a new expected returns estimator which will work seamlessl
 julia> struct MyExpectedReturnsEstimator{T1} <:
               PortfolioOptimisers.AbstractExpectedReturnsEstimator
            w::T1
-           function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w) && isempty(w)
-                   throw(IsEmptyError("`w` cannot be an empty weights object"))
-               end
+           function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyExpectedReturnsEstimator(;
-                                           w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                           w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyExpectedReturnsEstimator(w)
        end
 MyExpectedReturnsEstimator
 
 julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
-                                            w::StatsBase.AbstractWeights)
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyExpectedReturnsEstimator(; w = w)
        end
 

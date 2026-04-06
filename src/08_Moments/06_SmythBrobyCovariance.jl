@@ -342,7 +342,7 @@ function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVarian
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return SmythBrobyCovariance(ve, pdm, t, c1, c2, c3, n, alg, ex)
 end
-function factory(ce::SmythBrobyCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::SmythBrobyCovariance, w::ObsWeights)
     return SmythBrobyCovariance(; ve = factory(ce.ve, w), pdm = ce.pdm, t = ce.t,
                                 c1 = ce.c1, c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg,
                                 ex = ce.ex)

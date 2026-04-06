@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
     GeneralCovariance(;
         ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
             corrected = true),
-        w::Option{<:StatsBase.AbstractWeights} = nothing
+        w::Option{<:ObsWeights} = nothing
     ) -> GeneralCovariance
 
 Keywords correspond to the struct's fields.
@@ -52,16 +52,15 @@ GeneralCovariance
     ce
     "$(field_dict[:oow])"
     w
-    function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
-                               w::Option{<:StatsBase.AbstractWeights})
-        assert_nonempty_finite_val(w, :w)
+    function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
+        validate_observation_weights(w)
         return new{typeof(ce), typeof(w)}(ce, w)
     end
 end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:StatsBase.AbstractWeights} = nothing)
+                           w::Option{<:ObsWeights} = nothing)
     return GeneralCovariance(ce, w)
 end
 """
@@ -146,16 +145,17 @@ This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.
 """
 function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    if isnothing(ce.w)
+    w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
+    if isnothing(w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+        robust_cor(ce.ce, X, w; dims = dims, mean = mean, kwargs...)
     end
 end
 """
     factory(
         ce::GeneralCovariance,
-        w::StatsBase.AbstractWeights
+        w::ObsWeights
     ) -> GeneralCovariance
 
 Return a new `GeneralCovariance` estimator with observation weights `w`.
@@ -189,7 +189,7 @@ GeneralCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::GeneralCovariance, w::ObsWeights)
     return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
 end
 """
@@ -254,7 +254,7 @@ end
 """
     factory(
         ce::Covariance,
-        w::StatsBase.AbstractWeights
+        w::ObsWeights
     ) -> Covariance
 
 Return a new `Covariance` estimator with observation weights `w` applied to both the expected returns and covariance estimators.
@@ -302,7 +302,7 @@ Covariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::Covariance, w::StatsBase.AbstractWeights)
+function factory(ce::Covariance, w::ObsWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """

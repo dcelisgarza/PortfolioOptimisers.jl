@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SimpleExpectedReturns(;
-        w::Option{<:StatsBase.AbstractWeights} = nothing
+        w::Option{<:ObsWeights} = nothing
     ) -> SimpleExpectedReturns
 
 Keywords correspond to the struct's fields.
@@ -43,12 +43,12 @@ SimpleExpectedReturns
 @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
     "$(field_dict[:oow])"
     w
-    function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights})
-        assert_nonempty_finite_val(w, :w)
+    function SimpleExpectedReturns(w::Option{<:ObsWeights})
+        validate_observation_weights(w)
         return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+function SimpleExpectedReturns(; w::Option{<:ObsWeights} = nothing)
     return SimpleExpectedReturns(w)
 end
 """
@@ -104,16 +104,17 @@ julia> mean(serw, X)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    return if isnothing(me.w)
+    w = get_observation_weights(me.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         Statistics.mean(X; dims = dims)
     else
-        Statistics.mean(X, me.w; dims = dims)
+        Statistics.mean(X, w; dims = dims)
     end
 end
 """
     factory(
         me::SimpleExpectedReturns,
-        w::StatsBase.AbstractWeights
+        w::ObsWeights
     ) -> SimpleExpectedReturns
 
 Create a new `SimpleExpectedReturns` estimator with observation weights `w`.
@@ -146,7 +147,7 @@ SimpleExpectedReturns
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
-function factory(::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
+function factory(::SimpleExpectedReturns, w::ObsWeights)
     return SimpleExpectedReturns(; w = w)
 end
 

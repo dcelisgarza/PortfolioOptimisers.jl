@@ -15,7 +15,7 @@ $(DocStringExtensions.FIELDS)
         metric::Distances.Metric = Distances.Euclidean(),
         args::Tuple = (),
         kwargs::NamedTuple = (;),
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         ex::FLoops.Transducers.Executor = ThreadedEx()
     ) -> DistanceCovariance
 
@@ -52,8 +52,8 @@ DistanceCovariance
     "$(arg_dict[:ex])"
     ex
     function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Option{<:StatsBase.AbstractWeights},
-                                ex::FLoops.Transducers.Executor)
+                                w::Option{<:ObsWeights}, ex::FLoops.Transducers.Executor)
+        validate_observation_weights(w)
         return new{typeof(metric), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(metric,
                                                                                         args,
                                                                                         kwargs,
@@ -63,11 +63,11 @@ DistanceCovariance
 end
 function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Option{<:StatsBase.AbstractWeights} = nothing,
+                            w::Option{<:ObsWeights} = nothing,
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(metric, args, kwargs, w, ex)
 end
-function factory(ce::DistanceCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::DistanceCovariance, w::ObsWeights)
     return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
                               w = w, ex = ce.ex)
 end
@@ -104,17 +104,18 @@ This function computes the distance correlation between `v1` and `v2` using the 
   - [`DistanceCovariance`](@ref)
   - [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
 """
-function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = length(v1)
     @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
-    a, b = if isnothing(ce.w)
+    a, b = if isnothing(w)
         Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
     else
-        Distances.pairwise(ce.metric, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.metric, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.metric, v1 ⊙ w, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
     end
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
@@ -152,13 +153,14 @@ This function computes the distance correlation between each pair of columns in 
   - [`DistanceCovariance`](@ref)
   - [`cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref)
 """
-function cor_distance(ce::DistanceCovariance, X::MatNum)
+function cor_distance(ce::DistanceCovariance, X::MatNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
     FLoops.@floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
-            rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
+            rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj, w)
         end
     end
     return rho
@@ -213,7 +215,8 @@ function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    return cor_distance(ce, X)
+    w = get_observation_weights(ce.w, X)
+    return cor_distance(ce, X, w)
 end
 """
     cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
@@ -248,17 +251,18 @@ This function computes the distance covariance between `v1` and `v2` using the s
   - [`DistanceCovariance`](@ref)
   - [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
 """
-function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = length(v1)
     @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
-    a, b = if isnothing(ce.w)
+    a, b = if isnothing(w)
         Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
     else
-        Distances.pairwise(ce.metric, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.metric, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.metric, v1 ⊙ w, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
     end
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
@@ -294,13 +298,14 @@ This function computes the distance covariance between each pair of columns in `
   - [`DistanceCovariance`](@ref)
   - [`cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref)
 """
-function cov_distance(ce::DistanceCovariance, X::MatNum)
+function cov_distance(ce::DistanceCovariance, X::MatNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
     FLoops.@floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
-            rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)
+            rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj, w)
         end
     end
     return rho
@@ -355,7 +360,8 @@ function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    return cov_distance(ce, X)
+    w = get_observation_weights(ce.w, X)
+    return cov_distance(ce, X, w)
 end
 
 export DistanceCovariance

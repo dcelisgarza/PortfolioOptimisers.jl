@@ -263,6 +263,22 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
                                    i)
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
+function get_window(::Nothing, X::ArrNum, args...)
+    return X
+end
+function get_window(window::Integer, X::MatNum, dims::Int = 1)
+    stop = lastindex(X, dims)
+    start = firstindex(X, dims)
+    return max(1, stop - window):stop
+end
+function get_window(window::Integer, X::VecNum, args...)
+    stop = lastindex(X)
+    start = firstindex(X)
+    return max(1, stop - window):stop
+end
+function get_window(window::VecInt, args...)
+    return window
+end
 """
     nothing_scalar_array_view_odd_order(::Nothing, i, j)
     nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j) -> view(x, i, j)
@@ -593,7 +609,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MeanValue(;
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
     ) -> MeanValue
 
 Keywords correspond to the struct's fields.
@@ -620,14 +636,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
 @concrete struct MeanValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    function MeanValue(w::Option{<:StatsBase.AbstractWeights})
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function MeanValue(w::Option{<:ObsWeights})
+        validate_observation_weights(w)
         return new{typeof(w)}(w)
     end
 end
-function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+function MeanValue(; w::Option{<:ObsWeights} = nothing)
     return MeanValue(w)
 end
 """
@@ -657,7 +671,7 @@ MeanValue
   - [`MeanValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(::MeanValue, w::StatsBase.AbstractWeights)
+function factory(::MeanValue, w::ObsWeights)
     return MeanValue(; w = w)
 end
 """
@@ -672,7 +686,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MedianValue(;
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
     ) -> MedianValue
 
 Keywords correspond to the struct's fields.
@@ -699,14 +713,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
 @concrete struct MedianValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    function MedianValue(w::Option{<:StatsBase.AbstractWeights})
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function MedianValue(w::Option{<:ObsWeights})
+        validate_observation_weights(w)
         return new{typeof(w)}(w)
     end
 end
-function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+function MedianValue(; w::Option{<:ObsWeights} = nothing)
     return MedianValue(w)
 end
 """
@@ -736,7 +748,7 @@ MedianValue
   - [`MedianValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(::MedianValue, w::StatsBase.AbstractWeights)
+function factory(::MedianValue, w::ObsWeights)
     return MedianValue(; w = w)
 end
 """
@@ -772,7 +784,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     StdValue(;
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         corrected::Bool = true,
     ) -> StdValue
 
@@ -802,15 +814,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
     w
     "$(field_dict[:corrected])"
     corrected
-    function StdValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function StdValue(w::Option{<:ObsWeights}, corrected::Bool)
+        validate_observation_weights(w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                  corrected::Bool = true)
+function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return StdValue(w, corrected)
 end
 """
@@ -841,7 +850,7 @@ StdValue
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(sv::StdValue, w::StatsBase.AbstractWeights)
+function factory(sv::StdValue, w::ObsWeights)
     return StdValue(; w = w, corrected = sv.corrected)
 end
 """
@@ -856,7 +865,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     VarValue(;
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         corrected::Bool = true,
     ) -> VarValue
 
@@ -886,15 +895,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
     w
     "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
     corrected
-    function VarValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
+        validate_observation_weights(w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                  corrected::Bool = true)
+function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return VarValue(w, corrected)
 end
 """
@@ -925,7 +931,7 @@ VarValue
   - [`VarValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(vv::VarValue, w::StatsBase.AbstractWeights)
+function factory(vv::VarValue, w::ObsWeights)
     return VarValue(; w = w, corrected = vv.corrected)
 end
 """
@@ -1066,7 +1072,7 @@ StandardisedValue
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+function factory(msv::StandardisedValue, w::ObsWeights)
     return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """

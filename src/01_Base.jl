@@ -323,6 +323,7 @@ Result types encapsulate the outcomes of estimators. This makes dispatch and usa
   - [`AbstractAlgorithm`](@ref)
 """
 abstract type AbstractResult end
+abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
     define_pretty_show(T, flag::Bool = true)
 
@@ -980,6 +981,13 @@ Alias for a union of an abstract string or an abstract vector.
   - [`Str_Expr`](@ref)
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
+    return nothing
+end
+function get_observation_weights(w::StatsBase.AbstractWeights, args...; kwargs...)
+    return w
+end
 """
     assert_nonempty_nonneg_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
@@ -1200,6 +1208,13 @@ function assert_nonempty_finite_val(val::Number, val_sym::Sym_Str = :val)
     return nothing
 end
 function assert_nonempty_finite_val(args...)
+    return nothing
+end
+function validate_observation_weights(args...)
+    return nothing
+end
+function validate_observation_weights(w::StatsBase.AbstractWeights)
+    assert_nonempty_nonneg_finite_val(w, :w)
     return nothing
 end
 """
