@@ -94,7 +94,7 @@ Dict_Vec
 Sym_Str
 Str_Vec
 Num_VecNum_VecScalar
-Num_ArrNum_VecScalar
+Num_ArrNum_VecScalar_DynWeights
 ```
 
 ## Glossaries
