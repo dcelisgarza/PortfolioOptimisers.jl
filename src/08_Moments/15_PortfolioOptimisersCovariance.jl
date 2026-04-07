@@ -59,7 +59,7 @@ function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covar
                                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
-function factory(ce::PortfolioOptimisersCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::PortfolioOptimisersCovariance, w::ObsWeights)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """

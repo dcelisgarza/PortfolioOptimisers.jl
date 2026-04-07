@@ -72,7 +72,7 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns, w::StatsBase.AbstractWeights)
+function factory(ce::EquilibriumExpectedReturns, w::ObsWeights)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """
