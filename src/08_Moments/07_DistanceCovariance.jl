@@ -71,6 +71,15 @@ function factory(ce::DistanceCovariance, w::ObsWeights)
     return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
                               w = w, ex = ce.ex)
 end
+function calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, ::Nothing)
+    return Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
+           Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
+end
+function calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                             w::StatsBase.AbstractWeights)
+    return Distances.pairwise(ce.metric, v1 ⊙ w, ce.args...; ce.kwargs...),
+           Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
+end
 """
     cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
 
@@ -110,13 +119,7 @@ function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
     @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
-    a, b = if isnothing(w)
-        Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
-    else
-        Distances.pairwise(ce.metric, v1 ⊙ w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
-    end
+    a, b = calc_pairwise_dists(ce, v1, v2, w)
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
     mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
@@ -257,13 +260,7 @@ function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
     @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
-    a, b = if isnothing(w)
-        Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
-    else
-        Distances.pairwise(ce.metric, v1 ⊙ w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
-    end
+    a, b = calc_pairwise_dists(ce, v1, v2, w)
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
     mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)

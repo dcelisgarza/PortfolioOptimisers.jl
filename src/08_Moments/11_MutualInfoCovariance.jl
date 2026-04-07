@@ -61,7 +61,7 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
                               bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true)
     return MutualInfoCovariance(ve, bins, normalise)
 end
-function factory(ce::MutualInfoCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::MutualInfoCovariance, w::ObsWeights)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end

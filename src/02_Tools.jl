@@ -246,7 +246,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
 ```
 """
 function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                                            <:AbstractEstimatorValueAlgorithm}, ::Any)
+                                            <:AbstractEstimatorValueAlgorithm,
+                                            <:DynamicAbstractWeights}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
@@ -363,7 +364,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_getindex([[1, 2], [3, 4]], 1)
 ```
 """
 function nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair,
-                                                <:Dict}, ::Any)
+                                                <:Dict, <:AbstractEstimatorValueAlgorithm,
+                                                <:DynamicAbstractWeights}, ::Any)
     return x
 end
 function nothing_scalar_array_getindex(x::AbstractVector, i)

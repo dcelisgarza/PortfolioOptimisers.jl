@@ -63,7 +63,7 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
-function factory(ce::LowerTailDependenceCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          ex = ce.ex)
 end
@@ -102,15 +102,18 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
     if k > 0
+        Xs = copy(X)
+        mask = falses(T, N)
+        for i in axes(Xs, 2)
+            #! Use the weighted ValueatRisk formulation to account for observation weights
+            partialsort!(view(Xs, :, i), k)
+        end
         mv = sqrt(eps(eltype(X)))
         FLoops.@floop ex for j in axes(X, 2)
             xj = view(X, :, j)
-            v = sort(xj)[k]
-            maskj = xj .<= v
+            mask[:, j] .= xj .<= Xs[k, j]
             for i in 1:j
-                xi = view(X, :, i)
-                u = sort(xi)[k]
-                ltd = sum(xi .<= u .&& maskj) / k
+                ltd = count(view(mask, :, i) .&& view(mask, :, j)) / k
                 rho[j, i] = rho[i, j] = clamp(ltd, mv, one(eltype(X)))
             end
         end

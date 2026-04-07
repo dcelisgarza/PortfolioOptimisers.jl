@@ -67,7 +67,7 @@ function DenoiseCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                            dn::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
     return DenoiseCovariance(ce, dn, pdm)
 end
-function factory(ce::DenoiseCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::DenoiseCovariance, w::ObsWeights)
     return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
 end
 """

@@ -61,7 +61,7 @@ function DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                           dt::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
     return DetoneCovariance(ce, dt, pdm)
 end
-function factory(ce::DetoneCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::DetoneCovariance, w::ObsWeights)
     return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
 end
 """

@@ -618,5 +618,17 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     end
     =#
 end
+function get_moment_window(X::MatNum, w::Option{<:ObsWeights}, args...; kwargs...)
+    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    return X, w
+end
+function get_moment_window(X::MatNum, w::Option{<:ObsWeights}, window::Int_VecInt;
+                           dims::Int = 1, kwargs...)
+    idx = get_window(window, X, dims)
+    X = isone(dims) ? view(X, idx, :) : view(X, :, idx)
+    w = nothing_scalar_array_view(w, idx)
+    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    return X, w
+end
 
 export Full, Semi

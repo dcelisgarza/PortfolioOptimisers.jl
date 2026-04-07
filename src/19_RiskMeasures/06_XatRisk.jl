@@ -100,11 +100,12 @@ function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
 function (r::ValueatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+    sw = sum(r.w)
     order = sortperm(x)
     sorted_x = view(x, order)
     sorted_w = view(r.w, order)
     cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, r.alpha)
+    idx = searchsortedfirst(cum_w, sw * r.alpha)
     idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
 end
@@ -154,18 +155,19 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
     w = r.w
+    sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, r.alpha)
+    idx = searchsortedfirst(cum_w, sw * r.alpha)
     idx = ifelse(idx > length(x), idx - 1, idx)
     loss = -sorted_x[idx]
 
     sorted_x = reverse!(sorted_x)
     sorted_w = reverse!(sorted_w)
     cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, r.beta)
+    idx = searchsortedfirst(cum_w, sw * r.beta)
     idx = ifelse(idx > length(x), idx - 1, idx)
     gain = -sorted_x[idx]
     return loss - gain
