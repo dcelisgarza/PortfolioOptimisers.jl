@@ -9,7 +9,7 @@ function StandardDeviationExpectedReturns(;
                                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())
     return StandardDeviationExpectedReturns(ce)
 end
-function factory(ce::StandardDeviationExpectedReturns, w::StatsBase.AbstractWeights)
+function factory(ce::StandardDeviationExpectedReturns, w::ObsWeights)
     return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
 end
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
