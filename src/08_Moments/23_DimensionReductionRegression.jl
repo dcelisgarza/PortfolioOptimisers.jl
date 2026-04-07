@@ -210,8 +210,10 @@ DimensionReductionRegression
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
         if haskey(retgt.kwargs, :weights)
-            @argcheck(isa(retgt.kwargs.weights, StatsBase.AbstractWeights), TypeError)
-            @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+            @argcheck(isa(retgt.kwargs.weights, ObsWeights), TypeError)
+            if isa(retgt.kwargs.weights, AbstractVector)
+                @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+            end
         end
         return new{typeof(ve), typeof(drtgt), typeof(retgt)}(ve, drtgt, retgt)
     end
@@ -221,7 +223,7 @@ function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVa
                                       retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression(ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression, w::StatsBase.AbstractWeights)
+function factory(re::DimensionReductionRegression, w::ObsWeights)
     return DimensionReductionRegression(; ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))

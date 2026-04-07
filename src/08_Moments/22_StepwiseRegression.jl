@@ -124,6 +124,12 @@ StepwiseRegression
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
+        if haskey(tgt.kwargs, :weights)
+            @argcheck(isa(tgt.kwargs.weights, ObsWeights), TypeError)
+            if isa(tgt.kwargs.weights, AbstractVector)
+                @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
+            end
+        end
         return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
     end
 end
@@ -132,7 +138,7 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             tgt::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, tgt)
 end
-function factory(re::StepwiseRegression, w::StatsBase.AbstractWeights)
+function factory(re::StepwiseRegression, w::ObsWeights)
     return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """

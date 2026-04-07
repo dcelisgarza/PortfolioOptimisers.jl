@@ -127,7 +127,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::StatsBase.AbstractWeights)
+function factory(re::LinearModel, w::ObsWeights)
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
 """
@@ -153,7 +153,14 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
 function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
-    return StatsAPI.fit(GLM.LinearModel, X, y; tgt.kwargs...)
+    kwargs = if haskey(tgt.kwargs, :weights) &&
+                isa(tgt.kwargs.weights, DynamicAbstractWeights)
+        w = get_observation_weights(tgt.kwargs.weights, X)
+        (; tgt.kwargs..., weights = w)
+    else
+        tgt.kwargs
+    end
+    return StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -203,7 +210,7 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::StatsBase.AbstractWeights)
+function factory(re::GeneralisedLinearModel, w::ObsWeights)
     return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
 end
 """
@@ -229,7 +236,14 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
 function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
-    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; tgt.kwargs...)
+    kwargs = if haskey(tgt.kwargs, :weights) &&
+                isa(tgt.kwargs.weights, DynamicAbstractWeights)
+        w = get_observation_weights(tgt.kwargs.weights, X)
+        (; tgt.kwargs..., weights = w)
+    else
+        tgt.kwargs
+    end
+    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
