@@ -104,7 +104,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-function factory(pe::FactorPrior, w::StatsBase.AbstractWeights)
+function factory(pe::FactorPrior, w::ObsWeights)
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end

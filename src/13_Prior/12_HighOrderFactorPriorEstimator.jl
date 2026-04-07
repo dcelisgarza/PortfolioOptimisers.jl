@@ -87,7 +87,7 @@ function HighOrderFactorPriorEstimator(;
                                        rsd::Bool = true)
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
 end
-function factory(pe::HighOrderFactorPriorEstimator, w::StatsBase.AbstractWeights)
+function factory(pe::HighOrderFactorPriorEstimator, w::ObsWeights)
     return HighOrderFactorPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                          ske = factory(pe.ske, w), ex = pe.ex, rsd = pe.rsd)
 end

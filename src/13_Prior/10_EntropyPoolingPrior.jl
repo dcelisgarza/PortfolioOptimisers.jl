@@ -607,7 +607,7 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     end
 end
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::StatsBase.AbstractWeights)
+function factory(pe::EntropyPoolingPrior, w::ObsWeights)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
@@ -1312,7 +1312,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
 end
 """
     ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Number,
-                         w::StatsBase.AbstractWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
+                         w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
                          kwargs...)
 
 Solve entropy pooling views when no CVaR views are specified.
@@ -1345,7 +1345,7 @@ Solve entropy pooling views when no CVaR views are specified.
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Any,
-                              w::StatsBase.AbstractWeights,
+                              w::StatsBase.ProbabilityWeights,
                               opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any; kwargs...)
     return entropy_pooling(w, epc, opt)
 end
@@ -1381,7 +1381,7 @@ end
 """
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                          pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
-                         w::StatsBase.AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
+                         w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser,
                          ds_opt::Option{<:CVaREntropyPooling},
                          dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
 
@@ -1424,7 +1424,7 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
 """
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
-                              w::StatsBase.AbstractWeights,
+                              w::StatsBase.ProbabilityWeights,
                               opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Option{<:CVaREntropyPooling},
                               dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)

@@ -124,7 +124,7 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondMoment(ve, alg1, alg2)
 end
-function factory(alg::SecondMoment, w::StatsBase.AbstractWeights)
+function factory(alg::SecondMoment, w::ObsWeights)
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
@@ -262,7 +262,7 @@ function StandardisedHighOrderMoment(;
                                      alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return StandardisedHighOrderMoment(ve, alg)
 end
-function factory(alg::StandardisedHighOrderMoment, w::StatsBase.AbstractWeights)
+function factory(alg::StandardisedHighOrderMoment, w::ObsWeights)
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """
@@ -283,7 +283,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
     LowOrderMoment(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         mu::Option{<:Num_VecNum_VecScalar} = nothing,
         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
     ) -> LowOrderMoment
@@ -615,8 +615,7 @@ LowOrderMoment
     w
     mu
     alg
-    function LowOrderMoment(settings::RiskMeasureSettings,
-                            w::Option{<:StatsBase.AbstractWeights},
+    function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                             mu::Option{<:Num_VecNum_VecScalar},
                             alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
@@ -633,7 +632,7 @@ LowOrderMoment
     end
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
+                        w::Option{<:ObsWeights} = nothing,
                         mu::Option{<:Num_VecNum_VecScalar} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
@@ -656,7 +655,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
     HighOrderMoment(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         mu::Option{<:Num_VecNum_VecScalar} = nothing,
         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
     ) -> HighOrderMoment
@@ -766,8 +765,7 @@ HighOrderMoment
     w
     mu
     alg
-    function HighOrderMoment(settings::RiskMeasureSettings,
-                             w::Option{<:StatsBase.AbstractWeights},
+    function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                              mu::Option{<:Num_VecNum_VecScalar},
                              alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
@@ -784,7 +782,7 @@ HighOrderMoment
     end
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::Option{<:StatsBase.AbstractWeights} = nothing,
+                         w::Option{<:ObsWeights} = nothing,
                          mu::Option{<:Num_VecNum_VecScalar} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
@@ -1057,6 +1055,11 @@ for rt in (LowOrderMoment, HighOrderMoment)
              function risk_measure_view(r::$(rt), i, args...)
                  mu = nothing_scalar_array_view(r.mu, i)
                  return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
+             end
+             function (r::$(rt){<:Any, <:DynamicAbstractWeights})(w::VecNum, X::MatNum,
+                                                                  fees::Option{<:Fees} = nothing)
+                 return $(rt)(; settings = r.settings, alg = r.alg,
+                              w = get_observation_weights(r.w, x), mu = r.mu)(w, X, fees)
              end
          end)
 end

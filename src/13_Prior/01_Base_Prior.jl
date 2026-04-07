@@ -480,7 +480,7 @@ Container type for low order prior results in `PortfolioOptimisers.jl`.
         mu::VecNum,
         sigma::MatNum,
         chol::Option{<:MatNum} = nothing,
-        w::Option{<:StatsBase.AbstractWeights} = nothing,
+        w::Option{<:ObsWeights} = nothing,
         ens::Option{<:Number} = nothing,
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
@@ -545,7 +545,7 @@ LowOrderPrior
     f_sigma
     f_w
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
-                           w::Option{<:StatsBase.AbstractWeights}, ens::Option{<:Number},
+                           w::Option{<:ObsWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
                            f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
@@ -554,8 +554,8 @@ LowOrderPrior
         @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
+        validate_observation_weights(w)
+        if isa(w, StatsBase.AbstractWeights)
             @argcheck(length(w) == size(X, 1))
         end
         if isa(kld, VecNum)
@@ -592,8 +592,7 @@ LowOrderPrior
     end
 end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
-                       chol::Option{<:MatNum} = nothing,
-                       w::Option{<:StatsBase.AbstractWeights} = nothing,
+                       chol::Option{<:MatNum} = nothing, w::Option{<:ObsWeights} = nothing,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,

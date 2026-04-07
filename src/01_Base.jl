@@ -1309,7 +1309,7 @@ Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar`
 """
 const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
 """
-    const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+    const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar, <:DynamicAbstractWeights}
 
 Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
 
@@ -1318,7 +1318,8 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
   - [`Num_ArrNum`](@ref)
   - [`VecScalar`](@ref)
 """
-const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
+                                              <:DynamicAbstractWeights}
 
 """
 $(DocStringExtensions.TYPEDEF)
